@@ -41,6 +41,7 @@ return [
         ['General', 'settings.edit', 'settings.edit', 'settings.view'],
         ['Notifications', 'settings.notifications', 'settings.notifications*', 'settings.view'],
         ['Activity log', 'activity.index', 'activity.*', 'activity.view'],
+        ['Website connection', 'settings.integrations', 'settings.integrations*', 'access.manage'],
         ['System health', 'health', 'health', 'access.manage'],
         ['Components (dev)', 'dev.components', 'dev.*', 'access.manage'],
     ]],

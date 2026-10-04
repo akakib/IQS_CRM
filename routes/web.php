@@ -10,6 +10,8 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\Webhooks\WooCommerceWebhookController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationRuleController;
@@ -19,6 +21,9 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
+
+// Called by other systems (no login; each verifies its own signature).
+Route::post('/webhooks/woocommerce', WooCommerceWebhookController::class)->middleware('throttle:120,1')->name('webhooks.woocommerce');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
@@ -125,6 +130,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/roles', [RoleController::class, 'index'])->middleware('can:roles.view')->name('roles.index');
     Route::middleware('can:access.manage')->group(function () {
         Route::get('/health', HealthController::class)->name('health');
+        Route::get('/settings/integrations', [IntegrationController::class, 'index'])->name('settings.integrations');
+        Route::post('/settings/integrations/inbox/{inbox}/retry', [IntegrationController::class, 'retry'])->whereNumber('inbox')->name('settings.integrations.retry');
 
         Route::resource('roles', RoleController::class)->except(['index', 'show']);
 

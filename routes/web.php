@@ -4,6 +4,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -61,6 +62,16 @@ Route::middleware('auth')->group(function () {
         ->middlewareFor('destroy', 'can:products.delete');
     Route::resource('categories', CategoryController::class)->only(['index', 'store', 'update', 'destroy'])
         ->middleware('can:products.edit');
+
+    // Customers
+    Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');
+    Route::post('/customers/{customer}/merge', [CustomerController::class, 'merge'])->middleware('can:customers.edit')->name('customers.merge');
+    Route::post('/customers/{customer}/fraud-check', [CustomerController::class, 'fraudCheck'])->middleware('can:customers.view')->name('customers.fraud-check');
+    Route::resource('customers', CustomerController::class)
+        ->middlewareFor(['index', 'show'], 'can:customers.view')
+        ->middlewareFor(['create', 'store'], 'can:customers.create')
+        ->middlewareFor(['edit', 'update'], 'can:customers.edit')
+        ->middlewareFor('destroy', 'can:customers.delete');
 
     Route::resource('users', UserController::class)->except(['show', 'destroy'])
         ->middlewareFor('index', 'can:staff.view')

@@ -15,6 +15,7 @@
         ['label' => __('Locations'), 'route' => 'locations.index', 'active' => 'locations.*', 'can' => 'locations.view'],
         ['label' => __('Roles'), 'route' => 'roles.index', 'active' => 'roles.*', 'can' => 'roles.view'],
         ['label' => __('Activity log'), 'route' => 'activity.index', 'active' => 'activity.*', 'can' => 'activity.view'],
+        ['label' => __('Notification settings'), 'route' => 'settings.notifications', 'active' => 'settings.notifications*', 'can' => 'settings.view'],
     ];
     // A user only sees the modules they can view.
     $menu = array_filter($menu, fn ($item) => ! $item['can'] || auth()->user()->can($item['can']));
@@ -53,6 +54,8 @@
                 <h1 class="text-base font-semibold text-gray-800">{{ $heading ?? '' }}</h1>
             </div>
 
+            <div class="flex items-center gap-3">
+            <x-notification-bell />
             <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                 <button type="button" @click="open = !open" class="flex items-center gap-2 text-gray-700">
                     <span class="flex h-9 w-9 items-center justify-center rounded-full bg-green-900 text-sm font-semibold text-white">
@@ -71,6 +74,7 @@
                         <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">{{ __('Log out') }}</button>
                     </form>
                 </div>
+            </div>
             </div>
         </header>
 

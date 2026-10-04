@@ -14,6 +14,7 @@ return [
         // can grant it, so nobody can raise their own access).
         'roles' => ['view'],
         'activity' => ['view'],
+        'settings' => ['view', 'edit'],
     ],
 
     // Display names where the plain action word would mislead.

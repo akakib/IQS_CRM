@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call(RoleSeeder::class);
+        $this->call(NotificationSeeder::class);
 
         // First admin comes from .env so no password lives in the repo.
         $email = config('app.seed_admin.email');

@@ -4,6 +4,8 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\NotificationRuleController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserAccessController;
@@ -42,6 +44,20 @@ Route::middleware('auth')->group(function () {
     // Deactivate/activate is the "delete" action for staff (they are never deleted).
     Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])
         ->middleware('can:staff.delete')->name('users.status');
+
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/count', [NotificationController::class, 'count'])->name('notifications.count');
+    Route::get('/notifications/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::get('/notifications/{id}/open', [NotificationController::class, 'open'])->whereNumber('id')->name('notifications.open');
+
+    Route::get('/settings/notifications', [NotificationRuleController::class, 'index'])->middleware('can:settings.view')->name('settings.notifications');
+    Route::middleware('can:settings.edit')->group(function () {
+        Route::put('/settings/notifications/types/{type}', [NotificationRuleController::class, 'updateType'])->whereNumber('type')->name('settings.notifications.types.update');
+        Route::post('/settings/notifications/rules', [NotificationRuleController::class, 'store'])->name('settings.notifications.rules.store');
+        Route::delete('/settings/notifications/rules/{rule}', [NotificationRuleController::class, 'destroy'])->whereNumber('rule')->name('settings.notifications.rules.destroy');
+        Route::post('/settings/notifications/test', [NotificationRuleController::class, 'test'])->name('settings.notifications.test');
+    });
 
     Route::get('/activity', [ActivityLogController::class, 'index'])->middleware('can:activity.view')->name('activity.index');
 

@@ -18,6 +18,7 @@ return [
         ['Packing', 'packing.index', 'packing.*', 'packing.view'],
         ['Handover', 'handover.index', 'handover.*', 'packing.view'],
         ['Hotline', 'hotline.index', 'hotline.*', 'hotline.view'],
+        ['Delivery issues', 'issues.index', 'issues.*', 'orders.view'],
     ]],
     'catalog' => ['Catalog', [
         ['Products', 'products.index', 'products.*', 'products.view'],

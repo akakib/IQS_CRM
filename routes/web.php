@@ -12,6 +12,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\HotlineController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\Webhooks\SteadfastWebhookController;
 use App\Http\Controllers\Webhooks\WooCommerceWebhookController;
@@ -100,6 +101,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/shipping/labels', [ShippingController::class, 'labels'])->middleware('can:shipping.view')->name('shipping.labels');
     Route::post('/shipping/resync', [ShippingController::class, 'resync'])->middleware('can:shipping.create')->name('shipping.resync');
     Route::post('/shipping/{order}/reprint', [ShippingController::class, 'reprint'])->middleware('can:shipping.create')->name('shipping.reprint');
+
+    // Rider hotline and delivery issues
+    Route::get('/hotline', [HotlineController::class, 'index'])->middleware('can:hotline.view')->name('hotline.index');
+    Route::post('/hotline/{order}/solved', [HotlineController::class, 'solved'])->middleware('can:hotline.view')->name('hotline.solved');
+    Route::post('/hotline/{order}/issue', [HotlineController::class, 'openIssue'])->middleware('can:hotline.create')->name('hotline.issue');
+    Route::get('/issues', [HotlineController::class, 'issues'])->middleware('can:orders.view')->name('issues.index');
+    Route::post('/issues/{issue}/resolve', [HotlineController::class, 'resolve'])->whereNumber('issue')->middleware('can:orders.view')->name('issues.resolve');
 
     // Customers
     Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');

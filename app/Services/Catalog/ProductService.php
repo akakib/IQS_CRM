@@ -27,55 +27,14 @@ class ProductService
     public function save(Product $product, array $data, array $variants, ?int $userId, string $source = 'manual'): Product
     {
         return DB::transaction(function () use ($product, $data, $variants, $userId, $source) {
-            $data = Arr::only($data, (new Product)->getFillable());
-            $data['slug'] = $this->uniqueSlug($data['slug'] ?? null ?: ($data['name'] ?? $product->name), $product->id);
-            $data['updated_by'] = $userId;
-            if (! $product->exists) {
-                $data['created_by'] = $userId;
-            }
-
-            $contentChanged = ! $product->exists || array_intersect(self::CONTENT_FIELDS, array_keys(array_diff_assoc(
-                array_map(fn ($v) => (string) $v, Arr::only($data, self::CONTENT_FIELDS)),
-                array_map(fn ($v) => (string) $v, Arr::only($product->getAttributes(), self::CONTENT_FIELDS)),
-            ))) !== [];
-
-            $product->fill($data)->save();
-
-            $lists = DB::table('price_lists')->pluck('id', 'system_key');
+            $contentChanged = $this->saveProduct($product, $data, $userId);
             $keptIds = [];
 
             foreach (array_values($variants) as $i => $row) {
                 $variant = isset($row['id'])
                     ? $product->variants()->whereKey($row['id'])->firstOrFail()
                     : new ProductVariant(['product_id' => $product->id]);
-
-                $oldCost = $variant->exists ? $variant->cost_price : null;
-                $variant->fill([
-                    'sku' => trim($row['sku']),
-                    'barcode' => ($row['barcode'] ?? null) ?: null,
-                    'name' => trim($row['name'] ?: 'Default'),
-                    'unit' => $row['unit'] ?? 'pcs',
-                    'pack_qty' => $row['pack_qty'] ?? 1,
-                    'weight_g' => ($row['weight_g'] ?? null) ?: null,
-                    'is_active' => (bool) ($row['is_active'] ?? true),
-                    'is_default' => $i === 0,
-                    'sort_order' => $i,
-                ]);
-                // Staff whose role hides cost never send it; keep the stored value then.
-                if (array_key_exists('cost_price', $row)) {
-                    $variant->cost_price = $row['cost_price'] === '' ? null : $row['cost_price'];
-                }
-                $variant->search_text = ProductVariant::searchTextFor($product->name, $variant->name, $variant->sku, $variant->barcode);
-                $variant->save();
-                $keptIds[] = $variant->id;
-
-                $changed = $this->savePrices($variant, $row['prices'] ?? [], $lists, $userId, $source);
-                if ((string) $oldCost !== (string) $variant->cost_price && ($oldCost !== null || $variant->cost_price !== null)) {
-                    $this->history($variant->id, null, 'cost', $oldCost, $variant->cost_price, $userId, $source);
-                }
-
-                $fields = array_merge($changed, $contentChanged ? ['content'] : [], $variant->wasRecentlyCreated ? ['content', 'price', 'stock_status'] : []);
-                $this->sync->queue($variant->id, $fields);
+                $keptIds[] = $this->saveVariant($product, $variant, $row + ['sort_order' => $i], $userId, $source, $contentChanged)->id;
             }
 
             // Variants removed in the form are soft-deleted (never hard-deleted).
@@ -84,6 +43,73 @@ class ProductService
             return $product;
         });
     }
+
+    /** Product fields only. @return bool whether website-visible content changed */
+    public function saveProduct(Product $product, array $data, ?int $userId): bool
+    {
+        $data = Arr::only($data, (new Product)->getFillable());
+        $data['slug'] = $this->uniqueSlug($data['slug'] ?? null ?: ($data['name'] ?? $product->name), $product->id);
+        $data['updated_by'] = $userId;
+        if (! $product->exists) {
+            $data['created_by'] = $userId;
+        }
+
+        $contentChanged = ! $product->exists || array_intersect(self::CONTENT_FIELDS, array_keys(array_diff_assoc(
+            array_map(fn ($v) => (string) $v, Arr::only($data, self::CONTENT_FIELDS)),
+            array_map(fn ($v) => (string) $v, Arr::only($product->getAttributes(), self::CONTENT_FIELDS)),
+        ))) !== [];
+
+        $product->fill($data)->save();
+
+        return $contentChanged;
+    }
+
+    /**
+     * One variant with its prices. $queueSync = false for imports FROM the
+     * website (pushing the same values straight back would be pointless).
+     */
+    public function saveVariant(Product $product, ProductVariant $variant, array $row, ?int $userId, string $source = 'manual', bool $contentChanged = false, bool $queueSync = true): ProductVariant
+    {
+        $this->lists ??= DB::table('price_lists')->pluck('id', 'system_key');
+        $oldCost = $variant->exists ? $variant->cost_price : null;
+        $order = (int) ($row['sort_order'] ?? $variant->sort_order ?? 0);
+
+        $variant->fill([
+            'product_id' => $product->id,
+            'sku' => trim($row['sku']),
+            'barcode' => ($row['barcode'] ?? null) ?: null,
+            'name' => trim(($row['name'] ?? '') ?: 'Default'),
+            'unit' => $row['unit'] ?? 'pcs',
+            'pack_qty' => $row['pack_qty'] ?? 1,
+            'weight_g' => ($row['weight_g'] ?? null) ?: null,
+            'is_active' => (bool) ($row['is_active'] ?? true),
+            'is_default' => $order === 0,
+            'sort_order' => $order,
+        ]);
+        // Staff whose role hides cost never send it; keep the stored value then.
+        if (array_key_exists('cost_price', $row)) {
+            $variant->cost_price = $row['cost_price'] === '' ? null : $row['cost_price'];
+        }
+        if (isset($row['availability_status']) && ! $variant->exists) {
+            $variant->availability_status = $row['availability_status'];
+        }
+        $variant->search_text = ProductVariant::searchTextFor($product->name, $variant->name, $variant->sku, $variant->barcode);
+        $variant->save();
+
+        $changed = $this->savePrices($variant, $row['prices'] ?? [], $this->lists, $userId, $source);
+        if ((string) $oldCost !== (string) $variant->cost_price && ($oldCost !== null || $variant->cost_price !== null)) {
+            $this->history($variant->id, null, 'cost', $oldCost, $variant->cost_price, $userId, $source);
+        }
+
+        if ($queueSync) {
+            $fields = array_merge($changed, $contentChanged ? ['content'] : [], $variant->wasRecentlyCreated ? ['content', 'price', 'stock_status'] : []);
+            $this->sync->queue($variant->id, $fields);
+        }
+
+        return $variant;
+    }
+
+    private $lists = null;
 
     /**
      * Set availability for many variants at once (Out of Stock tab, bulk).

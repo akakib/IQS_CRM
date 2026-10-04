@@ -1,0 +1,7 @@
+ID,Type,SKU,Name,Published,"Short description",Description,"In stock?","Weight (kg)","Sale price","Regular price",Categories,Tags,Images,Parent,Position,"Attribute 1 name","Attribute 1 value(s)","Meta: rank_math_title","Meta: rank_math_description"
+101,simple,CASH-250,"Cashew Nut 250g",1,"Crunchy W320 cashew","<p>Premium cashew</p>",1,0.27,520,560,"Dry Fruits > Nuts",nuts,"https://example.com/cashew.jpg, https://example.com/cashew-2.jpg",,0,,,"Buy Cashew 250g","Fresh cashew nuts in Dhaka"
+200,variable,AJWA,"Ajwa Dates",1,"Madinah ajwa","<p>Ajwa</p>",1,,,,"Dry Fruits > Dates",dates,https://example.com/ajwa.jpg,,0,Weight,"500g, 1kg","Ajwa Dates Price in BD",
+201,variation,AJWA-500,"Ajwa Dates - 500g",1,,,1,0.55,,1200,,,,id:200,1,Weight,500g,,
+202,variation,AJWA-1000,"Ajwa Dates - 1kg",1,,,0,1.05,2100,2300,,,,id:200,2,Weight,1kg,,
+300,grouped,GIFT,"Gift set",1,,,1,,,,,,,,0,,,,
+401,variation,ORPHAN-1,"Orphan - x",1,,,1,,,100,,,,id:999,1,Size,x,,

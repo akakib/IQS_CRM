@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\LocationController;
@@ -47,6 +48,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/products/search', [ProductController::class, 'search'])->middleware('can:products.view')->name('products.search');
     Route::get('/products/availability', [AvailabilityController::class, 'index'])->middleware('can:products.availability')->name('products.availability');
     Route::post('/products/availability', [AvailabilityController::class, 'update'])->middleware('can:products.availability')->name('products.availability.update');
+    Route::middleware('can:products.create')->group(function () {
+        Route::get('/products/import', [ProductImportController::class, 'index'])->name('products.import');
+        Route::post('/products/import', [ProductImportController::class, 'store'])->name('products.import.store');
+        Route::get('/products/import/{import}', [ProductImportController::class, 'show'])->whereNumber('import')->name('products.import.show');
+        Route::post('/products/import/{import}/step', [ProductImportController::class, 'step'])->whereNumber('import')->name('products.import.step');
+    });
     Route::resource('products', ProductController::class)->except('show')
         ->middlewareFor('index', 'can:products.view')
         ->middlewareFor(['create', 'store'], 'can:products.create')

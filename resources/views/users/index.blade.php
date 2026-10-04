@@ -11,8 +11,10 @@
 <x-layouts.app :heading="__('Staff')">
     <div class="mb-4 flex items-center justify-between gap-3">
         <p class="text-sm text-gray-500">{{ trans_choice(':count staff member|:count staff members', $users->total(), ['count' => $users->total()]) }}</p>
-        <a href="{{ route('users.create') }}"
-            class="rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">+ {{ __('Add staff') }}</a>
+        @can('staff.create')
+            <a href="{{ route('users.create') }}"
+                class="rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">+ {{ __('Add staff') }}</a>
+        @endcan
     </div>
 
     {{-- Filters live in the query string so a shared link opens the same list. --}}

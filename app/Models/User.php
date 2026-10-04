@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Enums\EmploymentType;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Services\PermissionService;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -58,5 +60,33 @@ class User extends Authenticatable
     public function workLocation(): BelongsTo
     {
         return $this->belongsTo(Location::class, 'work_location_id');
+    }
+
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'user_roles')
+            ->withPivot(['id', 'starts_at', 'expires_at', 'assigned_by', 'reason'])
+            ->withTimestamps();
+    }
+
+    public function hasPermission(string $key): bool
+    {
+        return app(PermissionService::class)->for($this)->allows($key);
+    }
+
+    /** own | team | all, or null when not allowed. */
+    public function permissionScope(string $key): ?string
+    {
+        return app(PermissionService::class)->for($this)->scope($key);
+    }
+
+    public function isOwner(): bool
+    {
+        return app(PermissionService::class)->for($this)->isOwner;
+    }
+
+    public function canSeeField(string $field): bool
+    {
+        return ! app(PermissionService::class)->for($this)->hides($field);
     }
 }

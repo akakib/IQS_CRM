@@ -15,7 +15,7 @@ class LocationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs($this->owner());
     }
 
     public function test_index_lists_locations_as_table_and_cards(): void
@@ -52,8 +52,8 @@ class LocationTest extends TestCase
         DB::enableQueryLog();
         $this->get('/locations?per_page=25')->assertOk();
 
-        // session + user + count + select
-        $this->assertLessThanOrEqual(5, count(DB::getQueryLog()));
+        // user + permissions (2) + count + select; list budget is 10
+        $this->assertLessThanOrEqual(6, count(DB::getQueryLog()));
     }
 
     public function test_location_can_be_created(): void

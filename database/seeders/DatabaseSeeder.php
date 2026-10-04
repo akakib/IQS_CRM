@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use App\Enums\LocationType;
 use App\Models\Location;
+use App\Models\Role;
 use App\Models\User;
+use App\Services\PermissionService;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -22,6 +24,8 @@ class DatabaseSeeder extends Seeder
             Location::firstOrCreate(['name' => $location['name']], $location);
         }
 
+        $this->call(RoleSeeder::class);
+
         // First admin comes from .env so no password lives in the repo.
         $email = config('app.seed_admin.email');
         $password = config('app.seed_admin.password');
@@ -34,6 +38,14 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
                 'is_active' => true,
             ]);
+        }
+
+        // The seed admin is the Owner.
+        $admin = $email ? User::where('email', $email)->first() : null;
+        $owner = Role::firstWhere('system_key', Role::OWNER);
+        if ($admin && $owner && ! $admin->roles()->whereKey($owner->id)->exists()) {
+            $admin->roles()->attach($owner->id, ['reason' => 'Initial owner']);
+            app(PermissionService::class)->bump();
         }
     }
 }

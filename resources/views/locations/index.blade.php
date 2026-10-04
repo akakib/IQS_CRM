@@ -11,8 +11,10 @@
 <x-layouts.app :heading="__('Locations')">
     <div class="mb-4 flex items-center justify-between gap-3">
         <p class="text-sm text-gray-500">{{ trans_choice(':count location|:count locations', $locations->total(), ['count' => $locations->total()]) }}</p>
-        <a href="{{ route('locations.create') }}"
-            class="rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">+ {{ __('New location') }}</a>
+        @can('locations.create')
+            <a href="{{ route('locations.create') }}"
+                class="rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">+ {{ __('New location') }}</a>
+        @endcan
     </div>
 
     {{-- Filters live in the query string so a shared link opens the same list. --}}

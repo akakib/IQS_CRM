@@ -18,7 +18,7 @@ class UserManagementTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->admin = User::factory()->create(['name' => 'Admin']);
+        $this->admin = $this->owner(['name' => 'Admin']);
         $this->actingAs($this->admin);
     }
 
@@ -52,8 +52,8 @@ class UserManagementTest extends TestCase
         DB::enableQueryLog();
         $this->get('/users?per_page=25')->assertOk();
 
-        // user + count + select + locations eager load + location options
-        $this->assertLessThanOrEqual(6, count(DB::getQueryLog()));
+        // user + permissions (2) + count + select + location eager load + location options; list budget is 10
+        $this->assertLessThanOrEqual(8, count(DB::getQueryLog()));
     }
 
     public function test_staff_can_be_added_and_can_log_in(): void

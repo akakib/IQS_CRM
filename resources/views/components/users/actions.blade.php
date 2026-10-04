@@ -4,8 +4,10 @@
 @php($formId = 'user-status-'.$user->id.'-'.\Illuminate\Support\Str::random(4))
 
 <div class="inline-flex items-center gap-3">
-    <a href="{{ route('users.edit', $user) }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Edit') }}</a>
-    @unless ($user->is(auth()->user()))
+    @can('staff.edit')
+        <a href="{{ route('users.edit', $user) }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Edit') }}</a>
+    @endcan
+    @if (! $user->is(auth()->user()) && auth()->user()->can('staff.delete'))
         <form id="{{ $formId }}" method="POST" action="{{ route('users.status', $user) }}">
             @csrf
             @method('PATCH')
@@ -17,5 +19,5 @@
                     @click="$dispatch('open-confirm', { id: 'user-status', form: @js($formId), label: @js($user->name), verb: @js(__('Activate')), message: @js(__('They will be able to log in again.')), danger: false })">{{ __('Activate') }}</button>
             @endif
         </form>
-    @endunless
+    @endif
 </div>

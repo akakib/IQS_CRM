@@ -26,8 +26,17 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
-    Route::resource('locations', LocationController::class)->except('show');
+    Route::resource('locations', LocationController::class)->except('show')
+        ->middlewareFor('index', 'can:locations.view')
+        ->middlewareFor(['create', 'store'], 'can:locations.create')
+        ->middlewareFor(['edit', 'update'], 'can:locations.edit')
+        ->middlewareFor('destroy', 'can:locations.delete');
 
-    Route::resource('users', UserController::class)->except(['show', 'destroy']);
-    Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])->name('users.status');
+    Route::resource('users', UserController::class)->except(['show', 'destroy'])
+        ->middlewareFor('index', 'can:staff.view')
+        ->middlewareFor(['create', 'store'], 'can:staff.create')
+        ->middlewareFor(['edit', 'update'], 'can:staff.edit');
+    // Deactivate/activate is the "delete" action for staff (they are never deleted).
+    Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])
+        ->middleware('can:staff.delete')->name('users.status');
 });

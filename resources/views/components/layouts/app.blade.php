@@ -10,10 +10,12 @@
 <body class="bg-gray-50 font-sans text-gray-900 antialiased" x-data="{ sidebarOpen: false }">
 @php
     $menu = [
-        ['label' => __('Dashboard'), 'route' => 'dashboard', 'active' => 'dashboard'],
-        ['label' => __('Staff'), 'route' => 'users.index', 'active' => 'users.*'],
-        ['label' => __('Locations'), 'route' => 'locations.index', 'active' => 'locations.*'],
+        ['label' => __('Dashboard'), 'route' => 'dashboard', 'active' => 'dashboard', 'can' => null],
+        ['label' => __('Staff'), 'route' => 'users.index', 'active' => 'users.*', 'can' => 'staff.view'],
+        ['label' => __('Locations'), 'route' => 'locations.index', 'active' => 'locations.*', 'can' => 'locations.view'],
     ];
+    // A user only sees the modules they can view.
+    $menu = array_filter($menu, fn ($item) => ! $item['can'] || auth()->user()->can($item['can']));
 @endphp
 
 <div class="flex min-h-screen">

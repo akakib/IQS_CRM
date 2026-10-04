@@ -159,3 +159,34 @@ Tests: 168 passing.
 8. Delivery issues → close it as Delivered → bell highlight clears.
 9. Settings → Ad tracking → see the Purchase event logged (test mode).
 10. Settings → Website connection → Steadfast URL and token are there for the Steadfast panel.
+
+---
+
+## Step 4: Packing and dispatch (done 2026-10-05)
+
+### Built
+- **Batches + pick list**: Packing → Release batch. One list per item, totals across orders, **sorted by shelf** (new "Shelf" field on each variant). The bot posts it to the shop Telegram group with **Picked** and **Item missing** buttons. **No customer phone or address** reaches the shop.
+- **Scan to pack**: scan the label → Packed. Refuses unknown/old labels, cancelled or held orders, and orders with a missing-item report. **Edited after packing → RED with the exact difference** (e.g. "Dates ×2 → ×3"). After repacking and scanning the **new** label → purple "Edited".
+- **Handover**: start with rider name/phone, scan every parcel. Catches **scanned twice**, repack needed, new label needed, **COD not updated at Steadfast**. **Printable manifest** with COD total, signatures, and parcels ready but **not** handed over.
+- **Missing item**: packers only report (web or Telegram). The order is skipped. Admin chooses Out of stock / Pre-order / "it is there".
+- **Automatic holds**: marking an item Out of stock or Pre-order puts open, unpacked orders on Hold and tells the owner. Back in stock → waiting orders are released **first come, first served**.
+- **Telegram**: button presses count for the person whose Telegram ID is on their staff profile. Mini App sign-in is checked with Telegram's signature. Urgent alerts can go to Telegram (Settings → Notifications). End-of-day shop summary at 21:00.
+
+Tests: 176 passing.
+
+### Skipped / needs you
+- **Telegram bot**: create one with @BotFather and send me the token, the shop group chat id and your own chat id. Until then everything runs in fake mode (logged only).
+- Staff need their **Telegram user ID** on their profile (Staff → Edit) for buttons to count.
+- Not built yet: the 30-minute pre-pickup **freeze** rule, and the pinned live summary that the bot edits in place.
+
+### 10-line manual test checklist
+1. Products → edit a product → give each variant a Shelf (A1, B2…).
+2. Book two orders (Courier booking) → Packing → Release batch → open the batch: pick list sorted by shelf.
+3. Print labels → Packing → Open scan station → scan (or type) a label + Enter → green "Packed".
+4. Scan it again → orange "Already packed".
+5. Edit that order's quantity (manager) → scan the old label → RED with the difference.
+6. Courier booking → New label → scan the new label → purple "Repack done".
+7. Handover → Start → scan both → scan one twice → "Scanned twice".
+8. Finish → manifest shows the COD total and anything not handed over.
+9. Batch page → "Not found" on an item → Packing → Missing-item reports → Out of stock → that order goes on Hold.
+10. Products → Stock status → mark it In stock again → the held pre-order orders return to Confirmed.

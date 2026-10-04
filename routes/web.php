@@ -3,6 +3,7 @@
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationRuleController;
@@ -67,6 +68,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/roles', [RoleController::class, 'index'])->middleware('can:roles.view')->name('roles.index');
     Route::middleware('can:access.manage')->group(function () {
+        Route::get('/health', HealthController::class)->name('health');
+
         Route::resource('roles', RoleController::class)->except(['index', 'show']);
 
         Route::get('/users/{user}/access', [UserAccessController::class, 'edit'])->name('users.access');

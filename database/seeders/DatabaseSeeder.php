@@ -15,8 +15,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         foreach ([
-            ['name' => 'Shop', 'type' => LocationType::Shop],
-            ['name' => 'Online', 'type' => LocationType::Online],
+            // All online orders are packed at the shop. Warehouses are added from the UI.
+            ['name' => 'Riajuddin Bazar', 'type' => LocationType::Shop],
             ['name' => 'Direct', 'type' => LocationType::Virtual],
         ] as $location) {
             Location::firstOrCreate(['name' => $location['name']], $location);

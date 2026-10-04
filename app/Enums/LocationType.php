@@ -4,17 +4,15 @@ namespace App\Enums;
 
 enum LocationType: string
 {
-    case Store = 'store';
+    case Warehouse = 'warehouse';
     case Shop = 'shop';
-    case Online = 'online';
     case Virtual = 'virtual';
 
     public function label(): string
     {
         return match ($this) {
-            self::Store => __('Store'),
+            self::Warehouse => __('Warehouse'),
             self::Shop => __('Shop'),
-            self::Online => __('Online'),
             self::Virtual => __('Virtual'),
         };
     }

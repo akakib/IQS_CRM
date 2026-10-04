@@ -20,7 +20,7 @@ class LocationTest extends TestCase
 
     public function test_index_lists_locations_as_table_and_cards(): void
     {
-        Location::factory()->create(['name' => 'Lovelane', 'type' => 'store']);
+        Location::factory()->create(['name' => 'Lovelane', 'type' => 'warehouse']);
 
         $this->get('/locations')
             ->assertOk()
@@ -31,12 +31,12 @@ class LocationTest extends TestCase
 
     public function test_search_filter_and_pagination_work_from_the_query_string(): void
     {
-        Location::factory()->create(['name' => 'Lovelane', 'type' => 'store']);
-        Location::factory()->create(['name' => 'Newmarket', 'type' => 'store']);
-        Location::factory()->create(['name' => 'Online', 'type' => 'online']);
+        Location::factory()->create(['name' => 'Lovelane', 'type' => 'warehouse']);
+        Location::factory()->create(['name' => 'Newmarket', 'type' => 'warehouse']);
+        Location::factory()->create(['name' => 'Direct', 'type' => 'virtual']);
 
         $this->get('/locations?q=Love')->assertSee('Lovelane')->assertDontSee('Newmarket');
-        $this->get('/locations?type=online')->assertSee('>Online<', false)->assertDontSee('Lovelane');
+        $this->get('/locations?type=virtual')->assertSee('>Direct<', false)->assertDontSee('Lovelane');
 
         Location::factory()->count(30)->create(['type' => 'shop']);
         $response = $this->get('/locations?type=shop&per_page=25&page=2');
@@ -58,17 +58,17 @@ class LocationTest extends TestCase
 
     public function test_location_can_be_created(): void
     {
-        $this->post('/locations', ['name' => 'Lovelane', 'type' => 'store', 'is_active' => '1'])
+        $this->post('/locations', ['name' => 'Lovelane', 'type' => 'warehouse', 'is_active' => '1'])
             ->assertRedirect('/locations');
 
-        $this->assertDatabaseHas('locations', ['name' => 'Lovelane', 'type' => 'store', 'is_active' => true]);
+        $this->assertDatabaseHas('locations', ['name' => 'Lovelane', 'type' => 'warehouse', 'is_active' => true]);
     }
 
     public function test_create_validates_name_type_and_uniqueness(): void
     {
         Location::factory()->create(['name' => 'Shop']);
 
-        $this->post('/locations', ['name' => '', 'type' => 'castle'])
+        $this->post('/locations', ['name' => '', 'type' => 'online'])
             ->assertSessionHasErrors(['name', 'type']);
         $this->post('/locations', ['name' => 'Shop', 'type' => 'shop'])
             ->assertSessionHasErrors('name');
@@ -76,7 +76,7 @@ class LocationTest extends TestCase
 
     public function test_location_can_be_updated(): void
     {
-        $location = Location::factory()->create(['name' => 'Old', 'type' => 'store', 'is_active' => true]);
+        $location = Location::factory()->create(['name' => 'Old', 'type' => 'warehouse', 'is_active' => true]);
 
         $this->put("/locations/{$location->id}", ['name' => 'New', 'type' => 'shop', 'is_active' => '0'])
             ->assertRedirect('/locations');

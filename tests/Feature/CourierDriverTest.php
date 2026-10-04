@@ -43,8 +43,10 @@ class CourierDriverTest extends TestCase
         $driver = app(CourierDriver::class);
         $this->assertInstanceOf(SteadfastDriver::class, $driver);
 
-        $this->expectException(\RuntimeException::class);
-        $driver->bookBulk([$this->request('IQS-1')]);
+        // Without keys every booking fails clearly instead of guessing.
+        $result = $driver->bookBulk([$this->request('IQS-1')])['IQS-1'];
+        $this->assertFalse($result->ok);
+        $this->assertStringContainsString('STEADFAST_API_KEY', $result->error);
     }
 
     public function test_fake_bulk_booking_is_idempotent_by_invoice(): void

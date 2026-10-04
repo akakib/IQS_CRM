@@ -13,6 +13,7 @@ return [
         'products' => ['view', 'create', 'edit', 'delete', 'export', 'availability'],
         'customers' => ['view', 'create', 'edit', 'delete', 'export'],
         'orders' => ['view', 'create', 'edit', 'approve', 'export', 'reassign'],
+        'shipping' => ['view', 'create'],
         // Creating/editing roles and giving access is Owner-only (no permission
         // can grant it, so nobody can raise their own access).
         'roles' => ['view'],

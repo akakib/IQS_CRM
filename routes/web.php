@@ -20,6 +20,7 @@ use App\Http\Controllers\NotificationRuleController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\TrackingSettingsController;
 use App\Http\Controllers\UserController;
@@ -90,6 +91,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/amendments/{amendment}', [OrderController::class, 'decideAmendment'])->whereNumber('amendment')->middleware('can:orders.approve')->name('orders.amendments.decide');
     Route::post('/orders/{order}/reassign', [OrderController::class, 'reassign'])->middleware('can:orders.reassign')->name('orders.reassign');
     Route::post('/orders/{order}/payments/{payment}', [OrderController::class, 'verifyPayment'])->whereNumber('payment')->middleware('can:orders.approve')->name('orders.payments.verify');
+
+    // Courier desk
+    Route::get('/shipping', [ShippingController::class, 'index'])->middleware('can:shipping.view')->name('shipping.index');
+    Route::post('/shipping/book', [ShippingController::class, 'book'])->middleware('can:shipping.create')->name('shipping.book');
+    Route::get('/shipping/labels', [ShippingController::class, 'labels'])->middleware('can:shipping.view')->name('shipping.labels');
+    Route::post('/shipping/{order}/reprint', [ShippingController::class, 'reprint'])->middleware('can:shipping.create')->name('shipping.reprint');
 
     // Customers
     Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');

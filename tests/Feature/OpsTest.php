@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\LazyLoadingViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\File;
@@ -96,8 +97,16 @@ class OpsTest extends TestCase
 
     public function test_health_page_is_owner_only(): void
     {
-
         $this->actingAs($this->owner())->get('/health')->assertOk()->assertSee('Queue backlog')->assertSee('fake (no real parcels)');
         $this->actingAs(User::factory()->create())->get('/health')->assertForbidden();
+    }
+
+    public function test_lazy_loading_a_relationship_throws_outside_production(): void
+    {
+        User::factory()->count(2)->create();
+        $users = User::all();
+
+        $this->expectException(LazyLoadingViolationException::class);
+        $users->first()->workLocation;
     }
 }

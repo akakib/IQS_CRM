@@ -8,20 +8,6 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-gray-50 font-sans text-gray-900 antialiased" x-data="{ sidebarOpen: false }">
-@php
-    $menu = [
-        ['label' => __('Dashboard'), 'route' => 'dashboard', 'active' => 'dashboard', 'can' => null],
-        ['label' => __('Staff'), 'route' => 'users.index', 'active' => 'users.*', 'can' => 'staff.view'],
-        ['label' => __('Locations'), 'route' => 'locations.index', 'active' => 'locations.*', 'can' => 'locations.view'],
-        ['label' => __('Roles'), 'route' => 'roles.index', 'active' => 'roles.*', 'can' => 'roles.view'],
-        ['label' => __('Activity log'), 'route' => 'activity.index', 'active' => 'activity.*', 'can' => 'activity.view'],
-        ['label' => __('Settings'), 'route' => 'settings.edit', 'active' => 'settings.edit', 'can' => 'settings.view'],
-        ['label' => __('System health'), 'route' => 'health', 'active' => 'health', 'can' => 'access.manage'],
-        ['label' => __('Notification settings'), 'route' => 'settings.notifications', 'active' => 'settings.notifications*', 'can' => 'settings.view'],
-    ];
-    // A user only sees the modules they can view.
-    $menu = array_filter($menu, fn ($item) => ! $item['can'] || auth()->user()->can($item['can']));
-@endphp
 
 <div class="flex min-h-screen">
     <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-black/50 lg:hidden"></div>
@@ -34,16 +20,7 @@
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
-        <nav class="flex-1 space-y-1 overflow-y-auto p-4">
-            @foreach ($menu as $item)
-                <a href="{{ route($item['route']) }}"
-                    @class([
-                        'block rounded-lg px-3 py-2 text-sm font-medium',
-                        'bg-green-50 text-green-900' => request()->routeIs($item['active']),
-                        'text-gray-600 hover:bg-gray-100' => ! request()->routeIs($item['active']),
-                    ])>{{ $item['label'] }}</a>
-            @endforeach
-        </nav>
+        <x-sidebar-nav />
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col lg:ml-[260px]">

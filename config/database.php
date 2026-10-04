@@ -19,6 +19,9 @@ return [
 
     'default' => env('DB_CONNECTION', 'sqlite'),
 
+    // Queries slower than this (ms) are written to the log on staging/production.
+    'slow_query_ms' => (int) env('DB_SLOW_QUERY_MS', 200),
+
     /*
     |--------------------------------------------------------------------------
     | Database Connections

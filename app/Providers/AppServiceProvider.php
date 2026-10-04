@@ -9,7 +9,10 @@ use App\Services\Courier\CourierManager;
 use App\Services\PermissionService;
 use App\Services\SettingsService;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
@@ -35,6 +38,19 @@ class AppServiceProvider extends ServiceProvider
     {
         // N+1 queries fail loudly everywhere except production.
         Model::preventLazyLoading(! $this->app->isProduction());
+
+        // Slow-query log where real data lives (local uses the query budget tests instead).
+        if (! $this->app->environment(['local', 'testing'])) {
+            DB::listen(function (QueryExecuted $query) {
+                if ($query->time > config('database.slow_query_ms', 200)) {
+                    Log::warning('Slow query', [
+                        'ms' => $query->time,
+                        'sql' => $query->sql,
+                        'url' => app()->runningInConsole() ? 'console' : request()->path(),
+                    ]);
+                }
+            });
+        }
 
         // Every 'module.action' from config/permissions.php is answered by
         // PermissionService, so @can, can: middleware and $user->can() agree.

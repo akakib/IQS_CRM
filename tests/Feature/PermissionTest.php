@@ -215,6 +215,6 @@ class PermissionTest extends TestCase
         $user = User::factory()->create();
         $this->giveRole($user, $this->role(['locations.view']));
 
-        $this->actingAs($user)->get('/dashboard')->assertSee('Locations')->assertDontSee('>Staff<', false);
+        $this->actingAs($user)->get('/dashboard')->assertSee('Locations')->assertDontSee('>Staff<', false)->assertDontSee('>Team<', false);
     }
 }

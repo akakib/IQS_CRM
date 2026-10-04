@@ -11,6 +11,7 @@
 @php
     $menu = [
         ['label' => __('Dashboard'), 'route' => 'dashboard', 'active' => 'dashboard'],
+        ['label' => __('Staff'), 'route' => 'users.index', 'active' => 'users.*'],
         ['label' => __('Locations'), 'route' => 'locations.index', 'active' => 'locations.*'],
     ];
 @endphp

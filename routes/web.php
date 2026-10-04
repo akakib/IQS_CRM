@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -26,4 +27,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
     Route::resource('locations', LocationController::class)->except('show');
+
+    Route::resource('users', UserController::class)->except(['show', 'destroy']);
+    Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])->name('users.status');
 });

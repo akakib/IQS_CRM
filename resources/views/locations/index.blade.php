@@ -64,7 +64,7 @@
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-3 font-medium text-gray-800">{{ $location->name }}</td>
                             <td class="px-4 py-3 text-gray-600">{{ $location->type->label() }}</td>
-                            <td class="px-4 py-3"><x-locations.status-badge :active="$location->is_active" /></td>
+                            <td class="px-4 py-3"><x-status-badge :active="$location->is_active" /></td>
                             <td class="px-4 py-3 text-gray-500">{{ $location->updated_at->format('d M Y, g:i A') }}</td>
                             <td class="px-4 py-3 text-right"><x-locations.actions :location="$location" /></td>
                         </tr>
@@ -82,7 +82,7 @@
                             <p class="font-medium text-gray-800">{{ $location->name }}</p>
                             <p class="text-sm text-gray-500">{{ $location->type->label() }}</p>
                         </div>
-                        <x-locations.status-badge :active="$location->is_active" />
+                        <x-status-badge :active="$location->is_active" />
                     </div>
                     <div class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
                         <span class="text-xs text-gray-400">{{ $location->updated_at->format('d M Y, g:i A') }}</span>

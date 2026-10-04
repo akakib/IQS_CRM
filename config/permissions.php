@@ -13,6 +13,7 @@ return [
         // Creating/editing roles and giving access is Owner-only (no permission
         // can grant it, so nobody can raise their own access).
         'roles' => ['view'],
+        'activity' => ['view'],
     ],
 
     // Display names where the plain action word would mislead.

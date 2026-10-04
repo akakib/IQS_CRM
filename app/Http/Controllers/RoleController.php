@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Role;
+use App\Services\ActivityLogger;
 use App\Services\PermissionService;
 use App\Support\Permissions\Catalog;
 use Illuminate\Http\RedirectResponse;
@@ -125,6 +126,7 @@ class RoleController extends Controller
     private function saveAccess(Role $role, array $data): void
     {
         $ids = DB::table('permissions')->whereIn('key', $data['grants'])->pluck('id', 'key');
+        $before = $this->accessSnapshot($role);
 
         DB::table('role_permissions')->where('role_id', $role->id)->delete();
         DB::table('role_permissions')->insert($ids->map(fn ($id, $key) => [
@@ -136,7 +138,22 @@ class RoleController extends Controller
         DB::table('role_field_masks')->where('role_id', $role->id)->delete();
         DB::table('role_field_masks')->insert(array_map(fn ($f) => ['role_id' => $role->id, 'field' => $f], array_unique($data['masks'])));
 
+        $after = $this->accessSnapshot($role);
+        if ($before !== $after) {
+            app(ActivityLogger::class)->log('role.access_changed', $role, $before, $after);
+        }
+
         $this->permissions->bump();
+    }
+
+    /** @return array{grants: array<string, string>, masks: list<string>} */
+    private function accessSnapshot(Role $role): array
+    {
+        return [
+            'grants' => DB::table('role_permissions as rp')->join('permissions as p', 'p.id', '=', 'rp.permission_id')
+                ->where('rp.role_id', $role->id)->orderBy('p.key')->pluck('rp.data_scope', 'p.key')->all(),
+            'masks' => DB::table('role_field_masks')->where('role_id', $role->id)->orderBy('field')->pluck('field')->all(),
+        ];
     }
 
     private function formData(Role $role, array $grants, array $scopes, array $masks): array

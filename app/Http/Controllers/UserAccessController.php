@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use App\Services\PermissionService;
 use App\Support\Permissions\Catalog;
 use Illuminate\Http\RedirectResponse;
@@ -15,7 +16,7 @@ use Illuminate\View\View;
 /** Owner-only: which roles a staff member has, plus their personal allow/deny. */
 class UserAccessController extends Controller
 {
-    public function __construct(private PermissionService $permissions) {}
+    public function __construct(private PermissionService $permissions, private ActivityLogger $logger) {}
 
     public function edit(User $user): View
     {
@@ -57,17 +58,17 @@ class UserAccessController extends Controller
             'reason' => [Rule::requiredIf(fn () => $request->filled('expires_at')), 'nullable', 'string', 'max:255'],
         ], ['reason.required' => __('Give a reason for temporary access.')]);
 
-        DB::table('user_roles')->insert([
+        $row = [
             'user_id' => $user->id,
-            'role_id' => $data['role_id'],
+            'role_id' => (int) $data['role_id'],
             'starts_at' => $data['starts_at'] ?? null,
             'expires_at' => $data['expires_at'] ?? null,
             'reason' => $data['reason'] ?? null,
             'assigned_by' => $request->user()->id,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        ];
+        DB::table('user_roles')->insert($row + ['created_at' => now(), 'updated_at' => now()]);
         $this->permissions->bump();
+        $this->logger->log('user.role_given', $user, null, $row + ['role' => Role::find($row['role_id'])?->name]);
 
         return back()->with('success', __('Role given to :name.', ['name' => $user->name]));
     }
@@ -76,7 +77,7 @@ class UserAccessController extends Controller
     {
         $row = DB::table('user_roles as ur')->join('roles as r', 'r.id', '=', 'ur.role_id')
             ->where('ur.id', $assignment)->where('ur.user_id', $user->id)
-            ->first(['ur.id', 'r.system_key']);
+            ->first(['ur.id', 'r.system_key', 'r.name', 'ur.role_id', 'ur.starts_at', 'ur.expires_at', 'ur.reason']);
         abort_unless($row, 404);
 
         // Never leave the system without an Owner.
@@ -86,6 +87,7 @@ class UserAccessController extends Controller
 
         DB::table('user_roles')->where('id', $row->id)->delete();
         $this->permissions->bump();
+        $this->logger->log('user.role_removed', $user, (array) $row);
 
         return back()->with('success', __('Role removed.'));
     }
@@ -101,7 +103,7 @@ class UserAccessController extends Controller
             'reason' => ['required', 'string', 'max:255'],
         ]);
 
-        DB::table('user_permissions')->insert([
+        $row = [
             'user_id' => $user->id,
             'permission_id' => DB::table('permissions')->where('key', $data['permission'])->value('id'),
             'effect' => $data['effect'],
@@ -110,19 +112,24 @@ class UserAccessController extends Controller
             'expires_at' => $data['expires_at'] ?? null,
             'reason' => $data['reason'],
             'granted_by' => $request->user()->id,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        ];
+        DB::table('user_permissions')->insert($row + ['created_at' => now(), 'updated_at' => now()]);
         $this->permissions->bump();
+        $this->logger->log('user.access_'.$data['effect'], $user, null, $row + ['permission' => $data['permission']]);
 
         return back()->with('success', $data['effect'] === 'allow' ? __('Access allowed.') : __('Access denied.'));
     }
 
     public function destroyOverride(User $user, int $override): RedirectResponse
     {
-        $deleted = DB::table('user_permissions')->where('id', $override)->where('user_id', $user->id)->delete();
-        abort_unless($deleted, 404);
+        $row = DB::table('user_permissions as up')->join('permissions as p', 'p.id', '=', 'up.permission_id')
+            ->where('up.id', $override)->where('up.user_id', $user->id)
+            ->first(['up.id', 'p.key as permission', 'up.effect', 'up.data_scope', 'up.expires_at', 'up.reason']);
+        abort_unless($row, 404);
+
+        DB::table('user_permissions')->where('id', $row->id)->delete();
         $this->permissions->bump();
+        $this->logger->log('user.access_removed', $user, (array) $row);
 
         return back()->with('success', __('Custom access removed.'));
     }

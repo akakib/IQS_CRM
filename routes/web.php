@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\LocationController;
@@ -41,6 +42,8 @@ Route::middleware('auth')->group(function () {
     // Deactivate/activate is the "delete" action for staff (they are never deleted).
     Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])
         ->middleware('can:staff.delete')->name('users.status');
+
+    Route::get('/activity', [ActivityLogController::class, 'index'])->middleware('can:activity.view')->name('activity.index');
 
     Route::get('/roles', [RoleController::class, 'index'])->middleware('can:roles.view')->name('roles.index');
     Route::middleware('can:access.manage')->group(function () {

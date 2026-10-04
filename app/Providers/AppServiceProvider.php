@@ -3,7 +3,10 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Services\ActivityLogger;
 use App\Services\PermissionService;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
@@ -43,6 +46,8 @@ class AppServiceProvider extends ServiceProvider
 
             return $user->hasPermission($ability);
         });
+
+        Event::listen(Login::class, fn (Login $e) => app(ActivityLogger::class)->log('auth.login', $e->user));
 
         // Roles and access assignments: Owner only.
         Gate::define('access.manage', fn (User $user) => $user->isOwner());

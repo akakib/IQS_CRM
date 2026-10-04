@@ -32,7 +32,8 @@
             class="absolute -right-1 -top-1 min-w-[18px] rounded-full px-1 text-center text-[10px] font-semibold leading-[18px] text-white"></span>
     </button>
 
-    <div x-show="open" x-cloak class="absolute right-0 z-50 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white shadow-lg">
+    {{-- Phone: pinned to the screen edges under the top bar. sm+: drops from the bell. --}}
+    <div x-show="open" x-cloak class="fixed inset-x-3 top-16 z-50 rounded-xl border border-gray-200 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[22rem]">
         <div class="flex items-center justify-between border-b border-gray-100 px-3 py-2">
             <div class="flex gap-1 text-xs">
                 @foreach (['all' => __('All'), 'unread' => __('Unread'), 'urgent' => __('Urgent')] as $key => $label)

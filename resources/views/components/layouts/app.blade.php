@@ -15,6 +15,7 @@
         ['label' => __('Locations'), 'route' => 'locations.index', 'active' => 'locations.*', 'can' => 'locations.view'],
         ['label' => __('Roles'), 'route' => 'roles.index', 'active' => 'roles.*', 'can' => 'roles.view'],
         ['label' => __('Activity log'), 'route' => 'activity.index', 'active' => 'activity.*', 'can' => 'activity.view'],
+        ['label' => __('Settings'), 'route' => 'settings.edit', 'active' => 'settings.edit', 'can' => 'settings.view'],
         ['label' => __('Notification settings'), 'route' => 'settings.notifications', 'active' => 'settings.notifications*', 'can' => 'settings.view'],
     ];
     // A user only sees the modules they can view.

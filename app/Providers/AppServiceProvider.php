@@ -7,6 +7,7 @@ use App\Services\ActivityLogger;
 use App\Services\Courier\CourierDriver;
 use App\Services\Courier\CourierManager;
 use App\Services\PermissionService;
+use App\Services\SettingsService;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(PermissionService::class);
         $this->app->singleton(CourierManager::class);
+        $this->app->singleton(SettingsService::class);
         $this->app->bind(CourierDriver::class, fn ($app) => $app->make(CourierManager::class)->driver());
     }
 

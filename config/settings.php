@@ -21,4 +21,12 @@ return [
     'orders.discount_limit' => ['decimal', 200, 'Largest discount (৳) without manager approval', 'Orders', ['required', 'numeric', 'min:0', 'max:1000000']],
     'tracking.web_event_id' => ['string', 'wc_purchase_{external_ref}', 'Purchase event ID used by the website pixel ({external_ref} = website order id)', 'Tracking', ['required', 'string', 'max:100']],
     'verification.rerun_on_edit' => ['bool', true, 'Re-run verification when phone or amount changes', 'Orders', ['boolean']],
+    'points.trial_mode' => ['bool', true, 'Trial month: points are recorded and shown, but not used for bonus yet', 'Points', ['boolean']],
+    'points.min_confirm_minutes' => ['decimal', 1, 'Flag a web order confirmed faster than this after taking it (minutes)', 'Points', ['required', 'numeric', 'min:0', 'max:60']],
+    'points.monthly_negative_cap' => ['int', 50, 'Most minus points one person can lose in a month (0 = no limit)', 'Points', ['required', 'integer', 'min:0', 'max:100000']],
+    'points.dispute_days' => ['int', 3, 'Days a person has to dispute a point', 'Points', ['required', 'integer', 'min:0', 'max:60']],
+    'kpi.weight_volume' => ['int', 40, 'KPI weight: order volume (%)', 'KPI', ['required', 'integer', 'min:0', 'max:100']],
+    'kpi.weight_speed' => ['int', 20, 'KPI weight: speed (%)', 'KPI', ['required', 'integer', 'min:0', 'max:100']],
+    'kpi.weight_quality' => ['int', 40, 'KPI weight: quality, delivered rate (%)', 'KPI', ['required', 'integer', 'min:0', 'max:100']],
+    'reports.owner_summary_time' => ['string', '22:00', 'Time of the nightly owner summary on Telegram (HH:MM)', 'Reports', ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/']],
 ];

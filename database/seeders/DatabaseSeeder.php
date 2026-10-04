@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ConfirmationSeeder::class);
         $this->call(RoleSeeder::class);
         $this->call(NotificationSeeder::class);
+        $this->call(PointsSeeder::class);
 
         // First admin comes from .env so no password lives in the repo.
         $email = config('app.seed_admin.email');

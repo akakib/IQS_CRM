@@ -40,6 +40,8 @@ return [
     'team' => ['Team', [
         ['Staff', 'users.index', 'users.*', 'staff.view'],
         ['Roles', 'roles.index', 'roles.*', 'roles.view'],
+        ['My points', 'points.mine', 'points.mine', null],
+        ['Points review', 'points.review', 'points.review*', 'points.manage'],
     ]],
     'settings' => ['Settings', [
         ['General', 'settings.edit', 'settings.edit', 'settings.view'],
@@ -47,6 +49,7 @@ return [
         ['Verification rules', 'settings.verification', 'settings.verification*', 'settings.view'],
         ['Delivery charges', 'settings.charges', 'settings.charges*', 'settings.view'],
         ['Ad tracking', 'settings.tracking', 'settings.tracking*', 'settings.view'],
+        ['Points rules', 'settings.points', 'settings.points*', 'points.manage'],
         ['Statuses & reasons', 'settings.reasons', 'settings.reasons*', 'settings.view'],
         ['Activity log', 'activity.index', 'activity.*', 'activity.view'],
         ['Website connection', 'settings.integrations', 'settings.integrations*', 'access.manage'],

@@ -82,6 +82,7 @@ class DeliveryIssueService
             DB::table('delivery_issues')->where('id', $i->id)->update(['escalated_at' => now(), 'updated_at' => now()]);
             $order = Order::find($i->order_id);
             $this->orders->note($order, 'rider', __('Issue not handled in time: sent to managers.'), null, ['delivery_issue_id' => $i->id]);
+            app(\App\Services\Points\PointHooks::class)->escalated($order);
             $this->notifications->send('delivery_issue', __('Overdue: :no :t', ['no' => $i->order_no, 't' => str_replace('_', ' ', $i->issue_type)]), null, [
                 'link' => route('orders.show', $i->order_id), 'subject' => ['order', $i->order_id], 'user_ids' => $managers, 'priority' => 'urgent',
             ]);

@@ -19,6 +19,11 @@ return [
         // Creating/editing roles and giving access is Owner-only (no permission
         // can grant it, so nobody can raise their own access).
         'roles' => ['view'],
+        // Everyone sees their own points; "manage" = rules, reviews, disputes, QA.
+        'points' => ['manage'],
+        'kpi' => ['view'],
+        'analysis' => ['view'],
+        'marketing' => ['view', 'create'],
         'activity' => ['view'],
         'settings' => ['view', 'edit'],
     ],
@@ -27,6 +32,8 @@ return [
     'action_labels' => [
         'staff.delete' => 'Deactivate',
         'products.availability' => 'Stock status',
+        'points.manage' => 'Manage rules and reviews',
+        'marketing.create' => 'Add spend and USD lots',
     ],
 
     // Fields a role can have hidden (masked).

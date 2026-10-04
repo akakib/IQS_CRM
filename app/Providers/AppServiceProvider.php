@@ -88,6 +88,8 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        \App\Services\Orders\OrderStateMachine::listen(fn ($order, $from, $to, $user = null) => app(\App\Services\Points\PointHooks::class)->transition($order, $from, $to, $user));
+
         // Roles and access assignments: Owner only.
         Gate::define('access.manage', fn (User $user) => $user->isOwner());
 

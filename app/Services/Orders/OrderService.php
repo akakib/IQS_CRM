@@ -147,8 +147,10 @@ class OrderService
 
         $this->openAssignment($order, $user->id, 'claimed', null);
         $this->note($order, 'assignment', __(':n took the order.', ['n' => $user->name]), $user);
+        $order->refresh();
+        app(\App\Services\Points\PointHooks::class)->claimed($order, $user);
 
-        return $order->refresh();
+        return $order;
     }
 
     /** Admin only: move ownership, with a reason (it can count against the previous owner). */
@@ -164,8 +166,10 @@ class OrderService
             $from = $previous ? DB::table('users')->where('id', $previous)->value('name') : __('nobody');
             $this->note($order, 'assignment', __('Owner changed from :a to :b · :r', ['a' => $from, 'b' => $to->name, 'r' => $reason]), $by,
                 ['previous_owner_id' => $previous, 'reason_id' => $reasonId]);
+            $order->refresh();
+            app(\App\Services\Points\PointHooks::class)->reassigned($order, $previous, $reasonId);
 
-            return $order->refresh();
+            return $order;
         });
     }
 

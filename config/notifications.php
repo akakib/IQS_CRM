@@ -20,6 +20,7 @@ return [
         'sync_failed' => ['Website sync failed', 'normal'],
         'oos_review_due' => ['Out of stock item due for review', 'info'],
         'vendor_payment_due' => ['Dollar vendor payment due', 'normal'],
+        'points_review' => ['Points: flag or dispute to review', 'normal'],
         'system_test' => ['Test notification', 'info'],
     ],
 

@@ -147,6 +147,8 @@ class OrderEditor
             .' · '.__('reason: :r', ['r' => $reason])
             .($a->approval_status === 'approved' ? ' · '.__('approved by :n', ['n' => $by->name]) : '')), $by, ['amendment_id' => $amendmentId, 'version' => $version]);
 
+        app(\App\Services\Points\PointHooks::class)->amended($order, (int) $a->reason_id, $wasPacked);
+
         if ((float) $order->refund_due > 0) {
             $this->orders->note($order, 'payment', __('Advance is more than the new total: refund ৳:r due.', ['r' => $order->refund_due]), null);
         }

@@ -24,6 +24,14 @@ return [
         'capi_token' => env('META_CAPI_TOKEN'),
     ],
 
+    // Shop-team bot. Empty token = fake mode (messages are only logged).
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'shop_chat_id' => env('TELEGRAM_SHOP_CHAT_ID'),
+        'owner_chat_id' => env('TELEGRAM_OWNER_CHAT_ID'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

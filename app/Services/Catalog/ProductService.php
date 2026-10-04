@@ -78,6 +78,7 @@ class ProductService
             'product_id' => $product->id,
             'sku' => trim($row['sku']),
             'barcode' => ($row['barcode'] ?? null) ?: null,
+            'shelf_code' => array_key_exists('shelf_code', $row) ? (($row['shelf_code'] ?? null) ?: null) : $variant->shelf_code,
             'name' => trim(($row['name'] ?? '') ?: 'Default'),
             'unit' => $row['unit'] ?? 'pcs',
             'pack_qty' => $row['pack_qty'] ?? 1,
@@ -148,6 +149,7 @@ class ProductService
                         'source' => 'manual', 'user_id' => $userId, 'note' => $note, 'created_at' => now(),
                     ]);
                     $this->sync->queue($variant->id, ['stock_status']);
+                    app(\App\Services\Orders\AvailabilityEffects::class)->changed($variant->id, $from, $status);
                     $changed++;
                 }
             }

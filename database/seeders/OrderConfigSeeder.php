@@ -50,6 +50,7 @@ class OrderConfigSeeder extends Seeder
         ['confirmed', 'ready_for_packaging', null, false, true],             // bulk booking (needs CN ID)
         ['ready_for_packaging', 'packed', null, false, true],                // label scan
         ['ready_for_packaging', 'cancelled', 'orders.approve', true, false],
+        ['ready_for_packaging', 'hold', 'orders.approve', true, false],        // item went out of stock after booking
         ['packed', 'ready_for_pickup', null, false, true],
         ['packed', 'cancelled', 'orders.approve', true, false],
         ['ready_for_pickup', 'handed_over', null, false, true],             // handover scan

@@ -136,7 +136,7 @@ class ProductController extends Controller
         $lists = PriceList::where('is_active', true)->orderBy('sort_order')->get(['id', 'system_key', 'name']);
         $variants = $product->exists
             ? $product->variants()->with('prices')->get()->map(fn (ProductVariant $v) => [
-                'id' => $v->id, 'name' => $v->name, 'sku' => $v->sku, 'barcode' => $v->barcode, 'unit' => $v->unit,
+                'id' => $v->id, 'name' => $v->name, 'sku' => $v->sku, 'barcode' => $v->barcode, 'shelf_code' => $v->shelf_code, 'unit' => $v->unit,
                 'pack_qty' => (float) $v->pack_qty, 'weight_g' => $v->weight_g, 'cost_price' => $v->cost_price,
                 'is_active' => $v->is_active, 'availability' => $v->availabilityLabel(),
                 'prices' => $lists->mapWithKeys(fn ($l) => [$l->system_key => [

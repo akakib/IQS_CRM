@@ -18,6 +18,9 @@ Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3')
 
 Schedule::command('backup:database')->dailyAt('03:00');
 
+// Shop team end-of-day report on Telegram.
+Schedule::command('telegram:shop-summary')->dailyAt('21:00');
+
 // Delivery issues past their SLA go to managers.
 Schedule::command('issues:escalate')->everyFiveMinutes();
 

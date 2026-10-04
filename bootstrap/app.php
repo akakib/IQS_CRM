@@ -12,7 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Webhooks are called by other servers; they authenticate by signature/token instead.
-        $middleware->validateCsrfTokens(except: ['webhooks/*']);
+        $middleware->validateCsrfTokens(except: ['webhooks/*', 'tg/app/*']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

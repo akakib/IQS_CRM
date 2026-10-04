@@ -14,6 +14,7 @@ return [
         'delivery_issue' => ['Delivery issue from rider or courier', 'urgent'],
         'stock_issue_reported' => ['Packer could not find an item', 'urgent'],
         'hold_expected_date_passed' => ['Hold expected date passed', 'normal'],
+        'order_held_for_stock' => ['Order held: item out of stock or pre-order', 'normal'],
         'amendment_pending_approval' => ['Order change waiting for approval', 'normal'],
         'courier_action_pending' => ['Courier update pending (COD, rebook)', 'urgent'],
         'sync_failed' => ['Website sync failed', 'normal'],

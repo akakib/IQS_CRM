@@ -19,7 +19,7 @@ class ProductVariant extends Model
     public const AVAILABILITY = ['in_stock' => 'In stock', 'backorder' => 'Pre-order', 'out_of_stock' => 'Out of stock'];
 
     protected $fillable = [
-        'product_id', 'sku', 'barcode', 'name', 'unit', 'pack_qty', 'weight_g', 'cost_price', 'is_default',
+        'product_id', 'sku', 'barcode', 'shelf_code', 'name', 'unit', 'pack_qty', 'weight_g', 'cost_price', 'is_default',
         'sort_order', 'is_active', 'search_text', 'availability_status', 'backorder_limit_qty',
         'backorder_taken_qty', 'availability_source', 'oos_marked_by', 'oos_marked_at',
         'expected_restock_date', 'oos_review_at',

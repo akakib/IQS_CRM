@@ -1,7 +1,7 @@
 @php
     $blankPrices = $priceLists->mapWithKeys(fn ($l) => [$l->system_key => ['regular' => '', 'sale' => '']])->all();
     $initialVariants = old('variants', $variants ?: [[
-        'id' => null, 'name' => 'Default', 'sku' => '', 'barcode' => '', 'unit' => 'pcs', 'pack_qty' => 1,
+        'id' => null, 'name' => 'Default', 'sku' => '', 'barcode' => '', 'shelf_code' => '', 'unit' => 'pcs', 'pack_qty' => 1,
         'weight_g' => '', 'cost_price' => '', 'is_active' => true, 'prices' => $blankPrices,
     ]]);
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
@@ -50,7 +50,7 @@
             x-data="{
                 rows: {{ \Illuminate\Support\Js::from($initialVariants) }},
                 blank: {{ \Illuminate\Support\Js::from($blankPrices) }},
-                add() { this.rows.push({ id: null, name: '', sku: '', barcode: '', unit: 'pcs', pack_qty: 1, weight_g: '', cost_price: '', is_active: true, prices: JSON.parse(JSON.stringify(this.blank)) }) },
+                add() { this.rows.push({ id: null, name: '', sku: '', barcode: '', shelf_code: '', unit: 'pcs', pack_qty: 1, weight_g: '', cost_price: '', is_active: true, prices: JSON.parse(JSON.stringify(this.blank)) }) },
             }">
             <div class="space-y-4">
                 <template x-for="(row, i) in rows" :key="i">
@@ -74,6 +74,7 @@
                             <label class="col-span-2 text-xs text-gray-500">{{ __('Name') }}<input type="text" :name="`variants[${i}][name]`" x-model="row.name" required maxlength="150" placeholder="500 g" class="{{ $small }} mt-1"></label>
                             <label class="text-xs text-gray-500">SKU<input type="text" :name="`variants[${i}][sku]`" x-model="row.sku" required maxlength="60" class="{{ $small }} mt-1 font-mono"></label>
                             <label class="text-xs text-gray-500">{{ __('Barcode') }}<input type="text" :name="`variants[${i}][barcode]`" x-model="row.barcode" maxlength="60" class="{{ $small }} mt-1 font-mono"></label>
+                            <label class="text-xs text-gray-500">{{ __('Shelf') }}<input type="text" :name="`variants[${i}][shelf_code]`" x-model="row.shelf_code" maxlength="30" placeholder="A1" class="{{ $small }} mt-1 font-mono"></label>
                             <div class="text-xs text-gray-500">{{ __('Unit') }}
                                 <input type="hidden" :name="`variants[${i}][unit]`" :value="row.unit">
                                 <div class="mt-1 grid grid-cols-3 overflow-hidden rounded-md border border-gray-300 text-center">

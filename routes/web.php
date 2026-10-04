@@ -8,9 +8,11 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderSettingsController;
+use App\Http\Controllers\PackingController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\HandoverController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HotlineController;
 use App\Http\Controllers\IntegrationController;
@@ -24,6 +26,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\UserAccessController;
+use App\Http\Controllers\TelegramController;
 use App\Http\Controllers\TrackingSettingsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VerificationRuleController;
@@ -32,6 +35,12 @@ use Illuminate\Support\Facades\Route;
 // Called by other systems (no login; each verifies its own signature).
 Route::post('/webhooks/woocommerce', WooCommerceWebhookController::class)->middleware('throttle:120,1')->name('webhooks.woocommerce');
 Route::post('/webhooks/steadfast', SteadfastWebhookController::class)->middleware('throttle:300,1')->name('webhooks.steadfast');
+Route::post('/webhooks/telegram', [TelegramController::class, 'webhook'])->middleware('throttle:300,1')->name('webhooks.telegram');
+
+// Telegram Mini App (signs in with Telegram's signed initData, not a session).
+Route::get('/tg/app', [TelegramController::class, 'app'])->name('tg.app');
+Route::post('/tg/app/data', [TelegramController::class, 'appData'])->middleware('throttle:60,1')->name('tg.app.data');
+Route::post('/tg/app/report', [TelegramController::class, 'appReport'])->middleware('throttle:60,1')->name('tg.app.report');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
@@ -101,6 +110,28 @@ Route::middleware('auth')->group(function () {
     Route::get('/shipping/labels', [ShippingController::class, 'labels'])->middleware('can:shipping.view')->name('shipping.labels');
     Route::post('/shipping/resync', [ShippingController::class, 'resync'])->middleware('can:shipping.create')->name('shipping.resync');
     Route::post('/shipping/{order}/reprint', [ShippingController::class, 'reprint'])->middleware('can:shipping.create')->name('shipping.reprint');
+
+    // Packing and handover
+    Route::middleware('can:packing.view')->group(function () {
+        Route::get('/packing', [PackingController::class, 'index'])->name('packing.index');
+        Route::get('/packing/scan', [PackingController::class, 'scanPage'])->name('packing.scan');
+        Route::post('/packing/scan', [PackingController::class, 'scan'])->name('packing.scan.post');
+        Route::get('/packing/batches/{batch}', [PackingController::class, 'batch'])->whereNumber('batch')->name('packing.batch');
+        Route::post('/packing/report', [PackingController::class, 'report'])->name('packing.report');
+        Route::get('/packing/issues', [PackingController::class, 'issues'])->name('packing.issues');
+        Route::post('/packing/issues/{report}', [PackingController::class, 'resolve'])->whereNumber('report')->name('packing.issues.resolve');
+        Route::get('/handover', [HandoverController::class, 'index'])->name('handover.index');
+        Route::get('/handover/{session}', [HandoverController::class, 'show'])->whereNumber('session')->name('handover.show');
+        Route::get('/handover/{session}/manifest', [HandoverController::class, 'manifest'])->whereNumber('session')->name('handover.manifest');
+    });
+    Route::middleware('can:packing.create')->group(function () {
+        Route::post('/packing/release', [PackingController::class, 'release'])->name('packing.release');
+        Route::post('/packing/batches/{batch}/picked', [PackingController::class, 'picked'])->whereNumber('batch')->name('packing.picked');
+        Route::post('/packing/batches/{batch}/done', [PackingController::class, 'done'])->whereNumber('batch')->name('packing.done');
+        Route::post('/handover', [HandoverController::class, 'start'])->name('handover.start');
+        Route::post('/handover/{session}/scan', [HandoverController::class, 'scan'])->whereNumber('session')->name('handover.scan');
+        Route::post('/handover/{session}/close', [HandoverController::class, 'close'])->whereNumber('session')->name('handover.close');
+    });
 
     // Rider hotline and delivery issues
     Route::get('/hotline', [HotlineController::class, 'index'])->middleware('can:hotline.view')->name('hotline.index');

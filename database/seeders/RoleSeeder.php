@@ -25,7 +25,7 @@ class RoleSeeder extends Seeder
         'moderator' => ['Moderator', 'Sales and order confirmation.', ['products.view', 'customers.view', 'customers.create', 'customers.edit',
             'orders.view:own', 'orders.create', 'orders.edit'], ['cost_price', 'profit', 'salary']],
         'dollar_keeper' => ['Dollar Keeper', 'USD purchases and ad spend.', [], ['customer_contact', 'salary']],
-        'packaging' => ['Packaging', 'Picks and packs orders at the shop.', ['products.view'], ['customer_contact', 'cost_price', 'profit', 'salary']],
+        'packaging' => ['Packaging', 'Picks and packs orders at the shop.', ['products.view', 'packing.view', 'packing.create'], ['customer_contact', 'cost_price', 'profit', 'salary']],
         'store_keeper' => ['Store Keeper', 'Receives and moves stock.', ['locations.view', 'products.view'], ['customer_contact', 'profit', 'salary']],
         'hr' => ['HR', 'Staff records, attendance and payroll.', ['staff.view', 'staff.create', 'staff.edit', 'staff.export'], ['customer_contact', 'cost_price', 'profit']],
     ];

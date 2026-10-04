@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\Telegram\TelegramService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -10,9 +11,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Sends one queued Telegram/SMS copy of a notification. Real sending comes
- * with the Telegram bot (Step 4) and an SMS gateway; until then the channel
- * is a stub that only writes to the log and marks the delivery sent.
+ * Sends one queued Telegram/SMS copy of a notification. Telegram goes
+ * through the bot (fake mode without a token). SMS is still a stub until a
+ * gateway is chosen: it is logged and marked sent.
  */
 class SendNotificationDelivery implements ShouldQueue
 {
@@ -24,13 +25,13 @@ class SendNotificationDelivery implements ShouldQueue
 
     public function __construct(public int $deliveryId) {}
 
-    public function handle(): void
+    public function handle(TelegramService $telegram): void
     {
         $delivery = DB::table('notification_deliveries as d')
             ->join('app_notifications as n', 'n.id', '=', 'd.notification_id')
             ->join('users as u', 'u.id', '=', 'n.user_id')
             ->where('d.id', $this->deliveryId)->where('d.status', 'queued')
-            ->first(['d.id', 'd.channel', 'n.title', 'n.body', 'u.id as user_id', 'u.phone', 'u.telegram_user_id']);
+            ->first(['d.id', 'd.channel', 'n.title', 'n.body', 'n.link_url', 'n.priority', 'u.id as user_id', 'u.phone', 'u.telegram_user_id']);
 
         if (! $delivery) {
             return;
@@ -44,7 +45,18 @@ class SendNotificationDelivery implements ShouldQueue
             return;
         }
 
-        Log::info("[notification stub] {$delivery->channel} to user {$delivery->user_id}: {$delivery->title}");
+        if ($delivery->channel === 'telegram') {
+            $text = ($delivery->priority === 'urgent' ? '🔴 ' : '').'<b>'.e($delivery->title).'</b>'.($delivery->body ? "\n".e($delivery->body) : '');
+            $buttons = $delivery->link_url ? [[['text' => __('Open'), 'url' => $delivery->link_url]]] : [];
+            $sent = $telegram->send($address, $text, $buttons);
+            DB::table('notification_deliveries')->where('id', $delivery->id)->update($sent
+                ? ['status' => 'sent', 'sent_at' => now()]
+                : ['status' => 'failed', 'error' => 'Telegram did not accept the message.']);
+
+            return;
+        }
+
+        Log::info("[notification stub] sms to user {$delivery->user_id}: {$delivery->title}");
         DB::table('notification_deliveries')->where('id', $delivery->id)->update(['status' => 'sent', 'sent_at' => now()]);
     }
 }

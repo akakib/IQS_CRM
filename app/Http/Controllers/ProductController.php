@@ -65,9 +65,18 @@ class ProductController extends Controller
         return redirect()->route('products.edit', $product)->with('success', __('Product ":name" created.', ['name' => $product->name]));
     }
 
-    public function edit(Product $product): View
+    public function edit(Product $product, Request $request): View
     {
-        return view('products.edit', $this->formData($product));
+        $history = DB::table('price_history as h')
+            ->join('product_variants as v', 'v.id', '=', 'h.variant_id')
+            ->leftJoin('price_lists as l', 'l.id', '=', 'h.price_list_id')
+            ->leftJoin('users as u', 'u.id', '=', 'h.user_id')
+            ->where('v.product_id', $product->id)
+            ->when(! $request->user()->canSeeField('cost_price'), fn ($q) => $q->where('h.field', '!=', 'cost'))
+            ->orderByDesc('h.id')->limit(30)
+            ->get(['h.field', 'h.old_value', 'h.new_value', 'h.source', 'h.created_at', 'v.name as variant', 'l.name as list', 'u.name as user']);
+
+        return view('products.edit', $this->formData($product) + ['history' => $history]);
     }
 
     public function update(ProductRequest $request, Product $product): RedirectResponse

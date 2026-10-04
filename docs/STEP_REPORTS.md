@@ -76,7 +76,7 @@ Tests: 108 passing.
 ### 10-line manual test checklist
 1. Products → Import from website → upload your Woo export CSV → watch the progress bar reach Finished.
 2. Open an imported variable product: variants, SEO, category and images are there.
-3. Edit a price (online sale price) → save → price history row appears (Activity / product).
+3. Edit a price (online sale price) → save → the "Price history" box at the bottom of the product shows old → new.
 4. Products → Stock status → mark two variants Out of stock with an expected date.
 5. Search box on Products finds by name, SKU or barcode.
 6. Customers → New customer with +880 number → it is saved as 01XXXXXXXXX.

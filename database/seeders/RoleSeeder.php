@@ -19,11 +19,12 @@ class RoleSeeder extends Seeder
         'owner' => ['Owner', 'Full access to everything, including new modules.', [], []],
         'manager' => ['Manager', 'Operations lead.', [
             'staff.view', 'staff.create', 'staff.edit', 'locations.view', 'locations.create', 'locations.edit', 'roles.view',
+            'products.view', 'products.create', 'products.edit', 'products.availability', 'customers.view', 'customers.create', 'customers.edit',
         ], ['salary']],
-        'moderator' => ['Moderator', 'Sales and order confirmation.', [], ['cost_price', 'profit', 'salary']],
+        'moderator' => ['Moderator', 'Sales and order confirmation.', ['products.view', 'customers.view', 'customers.create', 'customers.edit'], ['cost_price', 'profit', 'salary']],
         'dollar_keeper' => ['Dollar Keeper', 'USD purchases and ad spend.', [], ['customer_contact', 'salary']],
-        'packaging' => ['Packaging', 'Picks and packs orders at the shop.', [], ['customer_contact', 'cost_price', 'profit', 'salary']],
-        'store_keeper' => ['Store Keeper', 'Receives and moves stock.', ['locations.view'], ['customer_contact', 'profit', 'salary']],
+        'packaging' => ['Packaging', 'Picks and packs orders at the shop.', ['products.view'], ['customer_contact', 'cost_price', 'profit', 'salary']],
+        'store_keeper' => ['Store Keeper', 'Receives and moves stock.', ['locations.view', 'products.view'], ['customer_contact', 'profit', 'salary']],
         'hr' => ['HR', 'Staff records, attendance and payroll.', ['staff.view', 'staff.create', 'staff.edit', 'staff.export'], ['customer_contact', 'cost_price', 'profit']],
     ];
 

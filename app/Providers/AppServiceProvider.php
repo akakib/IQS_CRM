@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\Catalog\Store\FakeStoreDriver;
+use App\Services\Catalog\Store\StoreDriver;
+use App\Services\Catalog\Store\WooCommerceDriver;
 use App\Services\Courier\CourierDriver;
 use App\Services\Courier\CourierManager;
 use App\Services\PermissionService;
@@ -28,6 +31,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(PermissionService::class);
         $this->app->singleton(CourierManager::class);
         $this->app->singleton(SettingsService::class);
+
+        // Website receiver: fake everywhere except production with STORE_DRIVER=woocommerce.
+        $this->app->singleton(StoreDriver::class, fn ($app) => $app->environment(['testing', 'staging', 'local']) || config('store.driver') !== 'woocommerce'
+            ? new FakeStoreDriver
+            : new WooCommerceDriver(config('store.woocommerce')));
         $this->app->bind(CourierDriver::class, fn ($app) => $app->make(CourierManager::class)->driver());
     }
 

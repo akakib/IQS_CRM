@@ -9,6 +9,14 @@ final class Catalog
 {
     public const ACTIONS = ['view', 'create', 'edit', 'approve', 'delete', 'export'];
 
+    /** Matrix columns: the standard actions, then any module-specific ones. @return list<string> */
+    public static function actions(): array
+    {
+        $extra = collect(config('permissions.modules', []))->flatten()->unique()->diff(self::ACTIONS)->values()->all();
+
+        return [...self::ACTIONS, ...$extra];
+    }
+
     /** @return array<string, array{label: string, actions: array<string, string>}> module => label + [action => label] */
     public static function modules(): array
     {

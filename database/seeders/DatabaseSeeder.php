@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             Location::firstOrCreate(['name' => $location['name']], $location);
         }
 
+        $this->call(CatalogSeeder::class);
         $this->call(RoleSeeder::class);
         $this->call(NotificationSeeder::class);
 

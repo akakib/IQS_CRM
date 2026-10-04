@@ -161,7 +161,7 @@ class RoleController extends Controller
         return [
             'role' => $role,
             'modules' => Catalog::modules(),
-            'actions' => Catalog::ACTIONS,
+            'actions' => Catalog::actions(),
             'grants' => array_flip($grants),
             'scopes' => $scopes,
             'masks' => array_flip($masks),

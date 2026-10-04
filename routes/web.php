@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\AvailabilityController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\LocationController;
@@ -39,6 +42,18 @@ Route::middleware('auth')->group(function () {
         ->middlewareFor(['create', 'store'], 'can:locations.create')
         ->middlewareFor(['edit', 'update'], 'can:locations.edit')
         ->middlewareFor('destroy', 'can:locations.delete');
+
+    // Catalog. Static paths before the resource so they are not read as {product}.
+    Route::get('/products/search', [ProductController::class, 'search'])->middleware('can:products.view')->name('products.search');
+    Route::get('/products/availability', [AvailabilityController::class, 'index'])->middleware('can:products.availability')->name('products.availability');
+    Route::post('/products/availability', [AvailabilityController::class, 'update'])->middleware('can:products.availability')->name('products.availability.update');
+    Route::resource('products', ProductController::class)->except('show')
+        ->middlewareFor('index', 'can:products.view')
+        ->middlewareFor(['create', 'store'], 'can:products.create')
+        ->middlewareFor(['edit', 'update'], 'can:products.edit')
+        ->middlewareFor('destroy', 'can:products.delete');
+    Route::resource('categories', CategoryController::class)->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('can:products.edit');
 
     Route::resource('users', UserController::class)->except(['show', 'destroy'])
         ->middlewareFor('index', 'can:staff.view')

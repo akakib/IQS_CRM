@@ -10,6 +10,8 @@ return [
     'modules' => [
         'staff' => ['view', 'create', 'edit', 'delete', 'export'],
         'locations' => ['view', 'create', 'edit', 'delete'],
+        'products' => ['view', 'create', 'edit', 'delete', 'export', 'availability'],
+        'customers' => ['view', 'create', 'edit', 'delete', 'export'],
         // Creating/editing roles and giving access is Owner-only (no permission
         // can grant it, so nobody can raise their own access).
         'roles' => ['view'],
@@ -20,6 +22,7 @@ return [
     // Display names where the plain action word would mislead.
     'action_labels' => [
         'staff.delete' => 'Deactivate',
+        'products.availability' => 'Stock status',
     ],
 
     // Fields a role can have hidden (masked).

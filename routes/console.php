@@ -18,5 +18,8 @@ Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3')
 
 Schedule::command('backup:database')->dailyAt('03:00');
 
+// Product changes -> website (one-way), with retry/backoff inside.
+Schedule::command('channel-sync:run')->everyMinute()->withoutOverlapping(5);
+
 // Access already stops at expires_at; this only clears the expired rows.
 Schedule::command('permissions:prune-expired')->hourly();

@@ -122,3 +122,40 @@ Tests: 141 passing.
 8. Try a discount above ৳200 as a Moderator → refused; as Owner → allowed.
 9. Add an advance with bKash TrxID → COD changes only after Verify.
 10. Settings → Statuses & reasons: rename "No answer" → the new name shows on orders.
+
+---
+
+## Step 3: Confirmation and courier (done 2026-10-05)
+
+### Built
+| Part | What |
+|---|---|
+| 3a | **Verification rules** (Settings → Verification rules): every new order is checked automatically (courier history per provider with a minimum parcel count, own history, COD, advance %, duplicate, blocked, pre-order). Outcomes: Record verified / **auto-confirm (skip the call)** / manual review / Hold for advance. Every decision stores its inputs ("why was this auto-confirmed?"). Test any order without changing it. On Confirmed: cost price frozen; out-of-stock → Hold; pre-order → Hold with expected date, pre-order limit enforced |
+| 3b | **Call queue**: tap-to-call, Take next, one-click outcomes. A website order can only be confirmed by hand after a logged call. No answer stops after 3 tries (setting) |
+| 3c | **Meta Conversions API Purchase**: you choose when it fires (created / verified / confirmed / delivered), value and channels; fires once per order; event ID matches the website pixel (setting). Test mode until production + keys |
+| 3d | **Courier booking**: select confirmed orders → Book and print. Shipment + label (barcode = order no + version) → Ready for packaging. 4×3 inch labels with Code 128 barcode, COD, recipient, items. New label voids the old one |
+| 3e | **Steadfast webhook** (Bearer token) + re-sync every 30 min: in transit / delivered / partial / returned update orders and customer counts; hold and approval-pending open a delivery issue for the owner |
+| 3f | **Rider hotline** (find by CN / phone / order no / name; solve small things here) and **Delivery issues** for the owner with SLA; overdue issues go to managers |
+
+Tests: 168 passing.
+
+### Decisions I took
+- If the handover scan is skipped, a courier pick-up still moves the order to In transit (with a note) instead of leaving it stuck.
+- A courier "cancelled" becomes Returned with "reason not set yet" plus an issue for the owner to record the real reason.
+- Seeded verification rules are the examples from your design; **please review the numbers** (80%, 3 parcels, ৳1,500).
+
+### Needs you
+- Real Steadfast: `STEADFAST_API_KEY`, `STEADFAST_SECRET_KEY` (production only), and the webhook URL + token from Settings → Website connection in the Steadfast panel. The Steadfast **fraud-check** endpoint must be confirmed from their in-panel API guide before I wire it (spec rule).
+- Meta: `META_PIXEL_ID`, `META_CAPI_TOKEN` in production, and the event ID your website pixel uses (Settings → General → Tracking).
+
+### 10-line manual test checklist
+1. Settings → Verification rules → Test on an order: see which rule matches and why.
+2. Create a chat order for a phone ending in 9 with total under ৳1,500 → it becomes Record verified automatically.
+3. Orders → Call queue → Take next → Confirmed.
+4. Courier booking → tick the order → Book and print → label prints with barcode.
+5. Edit that order's address → Courier booking shows "Label out of date" → New label.
+6. Courier booking → Re-sync (fake courier moves parcels along over ~2 hours) → order becomes Delivered.
+7. Hotline → search the CN → open a "Partial delivery" issue → the owner gets an urgent bell.
+8. Delivery issues → close it as Delivered → bell highlight clears.
+9. Settings → Ad tracking → see the Purchase event logged (test mode).
+10. Settings → Website connection → Steadfast URL and token are there for the Steadfast panel.

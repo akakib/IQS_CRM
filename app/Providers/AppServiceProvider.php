@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\Courier\CourierDriver;
+use App\Services\Courier\CourierManager;
 use App\Services\PermissionService;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Event;
@@ -20,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(PermissionService::class);
+        $this->app->singleton(CourierManager::class);
+        $this->app->bind(CourierDriver::class, fn ($app) => $app->make(CourierManager::class)->driver());
     }
 
     /**

@@ -27,6 +27,12 @@ class OrderStateMachine
         self::$listeners[] = $listener;
     }
 
+    /** Called before registering, so a re-booted app never runs a listener twice. */
+    public static function resetListeners(): void
+    {
+        self::$listeners = [];
+    }
+
     /**
      * @param  string  $source  user | rule | webhook | scan | system
      */

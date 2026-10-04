@@ -42,6 +42,7 @@ class WooOrderIntake
 
             $order = DB::transaction(fn () => $this->create($p));
             $this->finish($inboxId, 'processed', null, $order->id);
+            app(VerificationEngine::class)->run($order);
 
             return $order;
         } catch (Throwable $e) {

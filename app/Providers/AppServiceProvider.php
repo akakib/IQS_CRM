@@ -79,6 +79,10 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, fn (Login $e) => app(ActivityLogger::class)->log('auth.login', $e->user));
 
+        // Side effects of status changes (each module subscribes here).
+        \App\Services\Orders\OrderStateMachine::resetListeners();
+        \App\Services\Orders\OrderStateMachine::listen(fn ($order, $from, $to) => app(\App\Services\Orders\ConfirmationEffects::class)->handle($order, $from, $to));
+
         // Roles and access assignments: Owner only.
         Gate::define('access.manage', fn (User $user) => $user->isOwner());
 

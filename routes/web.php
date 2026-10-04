@@ -21,6 +21,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VerificationRuleController;
 use Illuminate\Support\Facades\Route;
 
 // Called by other systems (no login; each verifies its own signature).
@@ -111,6 +112,15 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings', [SettingsController::class, 'edit'])->middleware('can:settings.view')->name('settings.edit');
     Route::put('/settings', [SettingsController::class, 'update'])->middleware('can:settings.edit')->name('settings.update');
+
+    Route::get('/settings/verification', [VerificationRuleController::class, 'index'])->middleware('can:settings.view')->name('settings.verification');
+    Route::post('/settings/verification/test', [VerificationRuleController::class, 'test'])->middleware('can:settings.view')->name('settings.verification.test');
+    Route::middleware('can:settings.edit')->group(function () {
+        Route::post('/settings/verification', [VerificationRuleController::class, 'store'])->name('settings.verification.store');
+        Route::post('/settings/verification/{rule}/toggle', [VerificationRuleController::class, 'toggle'])->whereNumber('rule')->name('settings.verification.toggle');
+        Route::delete('/settings/verification/{rule}', [VerificationRuleController::class, 'destroy'])->whereNumber('rule')->name('settings.verification.destroy');
+    });
+    Route::post('/orders/{order}/verify', [VerificationRuleController::class, 'rerun'])->middleware('can:orders.approve')->name('orders.verify');
 
     Route::get('/settings/charges', [OrderSettingsController::class, 'charges'])->middleware('can:settings.view')->name('settings.charges');
     Route::get('/settings/reasons', [OrderSettingsController::class, 'reasons'])->middleware('can:settings.view')->name('settings.reasons');

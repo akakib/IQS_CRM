@@ -10,6 +10,7 @@ use App\Models\StatusReason;
 use App\Models\User;
 use App\Services\Orders\DeliveryCharges;
 use App\Services\Orders\OrderEditor;
+use App\Services\Orders\VerificationEngine;
 use App\Services\Orders\OrderService;
 use App\Services\Orders\OrderStateMachine;
 use App\Support\Lists\ListState;
@@ -112,6 +113,7 @@ class OrderController extends Controller
         ]);
 
         $order = $this->orders->create($data, $request->user());
+        app(VerificationEngine::class)->run($order);
 
         return redirect()->route('orders.show', $order)->with('success', __('Order :no created.', ['no' => $order->order_no]));
     }
@@ -134,8 +136,12 @@ class OrderController extends Controller
             ->where('a.order_id', $order->id)->where('a.approval_status', 'pending')
             ->get(['a.id', 'a.changes', 'a.amount_diff', 'a.created_at', 'u.name as by', 'r.label_en as reason']);
 
+        $verification = DB::table('verification_runs as v')->leftJoin('verification_rules as r', 'r.id', '=', 'v.matched_rule_id')
+            ->where('v.order_id', $order->id)->orderByDesc('v.id')->first(['v.outcome', 'v.inputs_snapshot', 'v.created_at', 'r.name as rule']);
+
         return view('orders.show', [
             'order' => $order,
+            'verification' => $verification,
             'amendments' => $amendments,
             'canEdit' => OrderStatus::map()[$order->status_id]['edit_policy'] !== 'locked'
                 && ($order->owner_id === $user->id || $user->permissionScope('orders.view') === 'all') && $user->can('orders.edit'),

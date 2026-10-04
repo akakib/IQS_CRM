@@ -165,6 +165,26 @@
                 @if ($order->customer_note)<p class="mt-3 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{{ $order->customer_note }}</p>@endif
             </x-card>
 
+            <x-card :title="__('Automatic checks')">
+                @if ($verification)
+                    @php($in = json_decode($verification->inputs_snapshot, true))
+                    <p class="text-sm text-gray-800">{{ ucfirst(str_replace('_', ' ', $verification->outcome)) }}</p>
+                    <p class="text-xs text-gray-500">{{ $verification->rule ?? __('no rule matched') }} · {{ \Illuminate\Support\Carbon::parse($verification->created_at)->diffForHumans() }}</p>
+                    <dl class="mt-2 space-y-0.5 text-xs">
+                        @foreach (($in['providers'] ?? []) as $p)
+                            <div class="flex justify-between"><dt class="text-gray-500">{{ ucfirst($p['key']) }}</dt><dd>{{ $p['success_rate'] === null ? __('no history') : $p['success_rate'].'%' }} · {{ $p['total_parcels'] }} {{ __('parcels') }}</dd></div>
+                        @endforeach
+                        <div class="flex justify-between"><dt class="text-gray-500">{{ __('New customer') }}</dt><dd>{{ ($in['is_new_customer'] ?? false) ? __('yes') : __('no') }}</dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">{{ __('Advance') }}</dt><dd>{{ $in['advance_paid_percent'] ?? 0 }}%</dd></div>
+                    </dl>
+                @else
+                    <p class="text-sm text-gray-400">{{ __('Not run yet.') }}</p>
+                @endif
+                @can('orders.approve')
+                    <form method="POST" action="{{ route('orders.verify', $order) }}" class="mt-3">@csrf<x-button size="sm" variant="secondary">{{ __('Run checks again') }}</x-button></form>
+                @endcan
+            </x-card>
+
             <x-card :title="__('Owner')">
                 <p class="text-sm text-gray-800">{{ $order->owner?->name ?? __('Not taken yet') }}</p>
                 @if ($staffOptions)

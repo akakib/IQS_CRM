@@ -47,3 +47,40 @@ Tests: 86 passing. `php artisan migrate:fresh --seed` works.
 8. Activity log shows every change above with before/after.
 9. Settings → Notifications → "Send me a test" → the bell shows 1.
 10. On your phone: Staff list shows cards, "Filters" opens a bottom sheet, the bell dropdown fits the screen.
+
+---
+
+## Step 1: Products + Customers (done 2026-10-05)
+
+### Built
+| Part | What |
+|---|---|
+| 1a | Categories (tree), Products (description, short description, **SEO title, meta description, focus keyword, slug**, image, gallery, tags, status), Variants (SKU, barcode, unit pcs/gram/box, pack size, ship weight, **cost price**), **3 price lists** (Online, Shop counter, B2B) each with **regular + sale (discount) price**, append-only **price history**, **Stock status** tab (In stock / Pre-order / Out of stock, bulk, expected date, review reminder, append-only events), product search for order entry (max 20, exact SKU/barcode first) |
+| 1a | **One-way website sync**: every price / stock-status / content change queues an update for linked variants; latest values sent, repeated edits merged, Pre-order published as in stock, retry with backoff, Manager alert after 5 failures. Staging uses a fake website driver (nothing is sent to your real shop) |
+| 1b | **Import from WooCommerce export CSV** (Products → Import from website): simple + variable + variations, Rank Math/Yoast SEO, categories, images, prices, stock status; matched by website id then SKU; runs in steps with a progress bar (no cron needed); never pushes back to the website |
+| 1c | **Customers**: phone number is the key (+880/880/01 formats normalised), several numbers and addresses (district list, delivery zone), one number = one customer, **merge duplicates**, risk level (normal/watch/blocked), marketing consent, **fraud check** per provider (own history + Steadfast; fake on staging; cached 24 h; every check kept) |
+
+Tests: 108 passing.
+
+### Decisions I took (tell me if you want them different)
+- Descriptions and SEO live here and go to the website (your instruction), so the website sync carries them.
+- A role that hides **cost price** can neither see nor change it; a role that hides **customer contact** sees masked numbers and cannot edit customers.
+- Delivery zones seeded as Inside Dhaka / Dhaka sub-area / Outside Dhaka (charges come in Step 2).
+- Re-importing the CSV overwrites names, descriptions, SEO and online prices from the file, but keeps IQS-only fields (unit, pack size, barcode, stock status).
+
+### Skipped / needs you
+- Real WooCommerce push needs `WOO_URL`, `WOO_KEY`, `WOO_SECRET` in a production `.env` (staging stays fake on purpose).
+- Real Steadfast fraud check needs the endpoint confirmed in Steadfast's in-panel API guide (spec: do not guess). Fake on staging.
+- Thana list is free text (64 districts are suggested); Steadfast thana ids come with Step 3.
+
+### 10-line manual test checklist
+1. Products → Import from website → upload your Woo export CSV → watch the progress bar reach Finished.
+2. Open an imported variable product: variants, SEO, category and images are there.
+3. Edit a price (online sale price) → save → price history row appears (Activity / product).
+4. Products → Stock status → mark two variants Out of stock with an expected date.
+5. Search box on Products finds by name, SKU or barcode.
+6. Customers → New customer with +880 number → it is saved as 01XXXXXXXXX.
+7. Try another customer with the same number → blocked with the owner's name.
+8. Customer page → Check now → Steadfast (fake) and own history appear.
+9. Merge a duplicate by its phone → numbers and addresses move over.
+10. Give a role "Hide customer contact" → that person sees 017******78 and cannot edit.

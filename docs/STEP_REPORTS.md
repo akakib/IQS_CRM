@@ -84,3 +84,41 @@ Tests: 108 passing.
 8. Customer page → Check now → Steadfast (fake) and own history appear.
 9. Merge a duplicate by its phone → numbers and addresses move over.
 10. Give a role "Hide customer contact" → that person sees 017******78 and cannot edit.
+
+---
+
+## Step 2: Order intake (done 2026-10-05)
+
+### Built
+| Part | What |
+|---|---|
+| 2a | Statuses, transitions, reasons (with "whose fault"), delivery-charge rules and payment methods are **database rows** with defaults. **One state machine** is the only way a status changes: checks permission, required reason, system-only steps (packing/handover/courier) and the gate "no packing without a consignment ID"; every change writes an event (for KPI/points) and a timeline note. Optimistic lock: two people on one order cannot overwrite each other |
+| 2b | **Quick order** for Messenger/WhatsApp/phone/B2B: phone lookup fills the customer and saved addresses, product search (Enter to add), list prices (agents cannot change prices), discount above the limit needs a manager, live total + delivery charge from rules, advance payment (counts only after a manager verifies; same TrxID cannot be used twice), possible-duplicate flag. **Orders list**: To take / Mine / All, filters, search by order no/phone/name. **Order page**: next-step buttons with reasons, timeline (calls, chats, notes, status changes), payments, owner change |
+| 2b | **Your claim rule**: a new website order notifies Moderators; the first to press **Assign to me** owns it; one person works one order at a time (setting, default 1) until they confirm / hold / no-answer / cancel it; only a manager can change the owner, with a reason (history kept) |
+| 2c | **Website orders by webhook** (signature-checked, duplicates ignored, works without a background worker): customer by phone, address, website prices and delivery charge, Facebook/UTM attribution; out-of-stock item → Hold. Failures show in Settings → Website connection with Retry |
+| 2d | **Order edits**: every change is an amendment with reason and a new version; Confirmed = edit now, after booking = manager approval, after handover = locked. Edited after packing → **RED repack** (content) or relabel (address only) + urgent alert. Advance larger than new total → refund due |
+| 2d | Settings → **Delivery charges** (zones, weight bands, free shipping over a total) and **Statuses & reasons** |
+
+Tests: 141 passing.
+
+### Decisions I took
+- Order numbers look like **IQ10001**.
+- Website orders keep the website's prices, discount and delivery charge (what the customer saw); chat orders use IQS prices and rules.
+- "Working on" an order = owning one in New or Record verified. Change the limit in Settings.
+- Default delivery charges seeded (Inside Dhaka 70/90/110, sub-area 100/130, outside 130/150/180 by weight). **Please check them** in Settings → Delivery charges.
+- Moderators see their own orders plus orders waiting to be taken.
+
+### Needs you
+- To receive real website orders on staging: WooCommerce → Settings → Advanced → Webhooks → Add (Order created), URL and secret from **Settings → Website connection**. Only do this when you want test orders flowing in from the live site.
+
+### 10-line manual test checklist
+1. Settings → Delivery charges: check the prices; add "free over ৳3000" if you offer it.
+2. Orders → Quick order: type an existing customer's phone → name and address fill in.
+3. Add 2 products by search, see delivery charge change with weight, create the order.
+4. Order page: Record verified (as Owner) → Confirmed; see each step in the timeline.
+5. Add a call note; it appears in the timeline with your name and time.
+6. Make a Moderator, create a website-style order (or use the webhook), log in as the Moderator: it is in "To take"; Assign to me; a second one is refused until the first is confirmed.
+7. Edit a confirmed order: change quantity with reason "Customer request" → version 2, note shows the difference.
+8. Try a discount above ৳200 as a Moderator → refused; as Owner → allowed.
+9. Add an advance with bKash TrxID → COD changes only after Verify.
+10. Settings → Statuses & reasons: rename "No answer" → the new name shows on orders.

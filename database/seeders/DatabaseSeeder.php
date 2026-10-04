@@ -2,24 +2,38 @@
 
 namespace Database\Seeders;
 
+use App\Enums\LocationType;
+use App\Models\Location;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
-     * Seed the application's database.
+     * Seed the application's database. Safe to run more than once.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        foreach ([
+            ['name' => 'Shop', 'type' => LocationType::Shop],
+            ['name' => 'Online', 'type' => LocationType::Online],
+            ['name' => 'Direct', 'type' => LocationType::Virtual],
+        ] as $location) {
+            Location::firstOrCreate(['name' => $location['name']], $location);
+        }
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // First admin comes from .env so no password lives in the repo.
+        $email = config('app.seed_admin.email');
+        $password = config('app.seed_admin.password');
+
+        if ($email && $password && ! User::where('email', $email)->exists()) {
+            User::create([
+                'name' => config('app.seed_admin.name'),
+                'email' => $email,
+                'password' => $password,
+                'email_verified_at' => now(),
+                'is_active' => true,
+            ]);
+        }
     }
 }

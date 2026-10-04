@@ -65,7 +65,15 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Dhaka'),
+
+    // First admin account created by DatabaseSeeder (read via config so it
+    // still works when config is cached on the server).
+    'seed_admin' => [
+        'name' => env('SEED_ADMIN_NAME', 'Admin'),
+        'email' => env('SEED_ADMIN_EMAIL'),
+        'password' => env('SEED_ADMIN_PASSWORD'),
+    ],
 
     /*
     |--------------------------------------------------------------------------

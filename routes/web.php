@@ -6,6 +6,7 @@ use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OrderSettingsController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -78,6 +79,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/claim', [OrderController::class, 'claim'])->middleware('can:orders.edit')->name('orders.claim');
     Route::post('/orders/{order}/transition', [OrderController::class, 'transition'])->middleware('can:orders.view')->name('orders.transition');
     Route::post('/orders/{order}/notes', [OrderController::class, 'note'])->middleware('can:orders.view')->name('orders.notes');
+    Route::get('/orders/{order}/edit', [OrderController::class, 'edit'])->middleware('can:orders.edit')->name('orders.edit');
+    Route::post('/orders/{order}/amend', [OrderController::class, 'amend'])->middleware('can:orders.edit')->name('orders.amend');
+    Route::post('/orders/{order}/amendments/{amendment}', [OrderController::class, 'decideAmendment'])->whereNumber('amendment')->middleware('can:orders.approve')->name('orders.amendments.decide');
     Route::post('/orders/{order}/reassign', [OrderController::class, 'reassign'])->middleware('can:orders.reassign')->name('orders.reassign');
     Route::post('/orders/{order}/payments/{payment}', [OrderController::class, 'verifyPayment'])->whereNumber('payment')->middleware('can:orders.approve')->name('orders.payments.verify');
 
@@ -107,6 +111,17 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings', [SettingsController::class, 'edit'])->middleware('can:settings.view')->name('settings.edit');
     Route::put('/settings', [SettingsController::class, 'update'])->middleware('can:settings.edit')->name('settings.update');
+
+    Route::get('/settings/charges', [OrderSettingsController::class, 'charges'])->middleware('can:settings.view')->name('settings.charges');
+    Route::get('/settings/reasons', [OrderSettingsController::class, 'reasons'])->middleware('can:settings.view')->name('settings.reasons');
+    Route::middleware('can:settings.edit')->group(function () {
+        Route::post('/settings/charges/zones', [OrderSettingsController::class, 'storeZone'])->name('settings.charges.zones.store');
+        Route::post('/settings/charges/rules', [OrderSettingsController::class, 'storeRule'])->name('settings.charges.rules.store');
+        Route::post('/settings/charges/rules/{rule}/toggle', [OrderSettingsController::class, 'toggleRule'])->whereNumber('rule')->name('settings.charges.rules.toggle');
+        Route::post('/settings/reasons', [OrderSettingsController::class, 'storeReason'])->name('settings.reasons.store');
+        Route::post('/settings/reasons/{reason}/toggle', [OrderSettingsController::class, 'toggleReason'])->whereNumber('reason')->name('settings.reasons.toggle');
+        Route::put('/settings/statuses/{status}', [OrderSettingsController::class, 'updateStatus'])->whereNumber('status')->name('settings.reasons.status');
+    });
 
     Route::get('/settings/notifications', [NotificationRuleController::class, 'index'])->middleware('can:settings.view')->name('settings.notifications');
     Route::middleware('can:settings.edit')->group(function () {

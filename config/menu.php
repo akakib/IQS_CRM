@@ -40,6 +40,8 @@ return [
     'settings' => ['Settings', [
         ['General', 'settings.edit', 'settings.edit', 'settings.view'],
         ['Notifications', 'settings.notifications', 'settings.notifications*', 'settings.view'],
+        ['Delivery charges', 'settings.charges', 'settings.charges*', 'settings.view'],
+        ['Statuses & reasons', 'settings.reasons', 'settings.reasons*', 'settings.view'],
         ['Activity log', 'activity.index', 'activity.*', 'activity.view'],
         ['Website connection', 'settings.integrations', 'settings.integrations*', 'access.manage'],
         ['System health', 'health', 'health', 'access.manage'],

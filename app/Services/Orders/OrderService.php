@@ -212,7 +212,7 @@ class OrderService
     }
 
     /** @return list<array> order_items rows with snapshots and weights */
-    public function buildItems(array $rows, ?User $by, bool $trustGivenPrice): array
+    public function buildItems(array $rows, ?User $by, bool $trustGivenPrice, array $alreadyOnOrder = []): array
     {
         $rows = array_values(array_filter($rows, fn ($r) => ! empty($r['variant_id']) && (float) ($r['qty'] ?? 0) > 0));
         if ($rows === []) {
@@ -224,9 +224,10 @@ class OrderService
             ->whereIn('id', array_column($rows, 'variant_id'))->get()->keyBy('id');
         $mayOverride = $trustGivenPrice || $by?->can('orders.approve');
 
-        return array_map(function ($r) use ($variants, $mayOverride, $trustGivenPrice) {
+        return array_map(function ($r) use ($variants, $mayOverride, $trustGivenPrice, $alreadyOnOrder) {
             $v = $variants[$r['variant_id']] ?? throw ValidationException::withMessages(['items' => __('A product in this order no longer exists.')]);
-            if (! $trustGivenPrice && $v->availability_status === 'out_of_stock') {
+            // A line already on the order may stay even if the item has since gone out of stock.
+            if (! $trustGivenPrice && $v->availability_status === 'out_of_stock' && ! in_array($v->id, $alreadyOnOrder, true)) {
                 throw ValidationException::withMessages(['items' => __(':p is out of stock.', ['p' => $v->product->name.' · '.$v->name])]);
             }
             $listPrice = (float) ($v->prices->first()?->effective() ?? 0);

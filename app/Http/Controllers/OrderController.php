@@ -9,6 +9,7 @@ use App\Models\PaymentMethod;
 use App\Models\StatusReason;
 use App\Models\User;
 use App\Services\Orders\DeliveryCharges;
+use App\Services\Orders\OrderEditor;
 use App\Services\Orders\OrderService;
 use App\Services\Orders\OrderStateMachine;
 use App\Support\Lists\ListState;
@@ -128,8 +129,16 @@ class OrderController extends Controller
             ->where('p.order_id', $order->id)->orderBy('p.id')
             ->get(['p.id', 'p.payment_type', 'p.amount', 'p.transaction_id', 'p.status', 'p.received_at', 'm.name as method']);
 
+        $amendments = DB::table('order_amendments as a')->join('users as u', 'u.id', '=', 'a.requested_by')
+            ->join('status_reasons as r', 'r.id', '=', 'a.reason_id')
+            ->where('a.order_id', $order->id)->where('a.approval_status', 'pending')
+            ->get(['a.id', 'a.changes', 'a.amount_diff', 'a.created_at', 'u.name as by', 'r.label_en as reason']);
+
         return view('orders.show', [
             'order' => $order,
+            'amendments' => $amendments,
+            'canEdit' => OrderStatus::map()[$order->status_id]['edit_policy'] !== 'locked'
+                && ($order->owner_id === $user->id || $user->permissionScope('orders.view') === 'all') && $user->can('orders.edit'),
             'notes' => $notes,
             'payments' => $payments,
             'statuses' => OrderStatus::map(),
@@ -193,6 +202,58 @@ class OrderController extends Controller
         $this->orders->verifyPayment($order, $payment, $data['decision'] === 'approve', $request->user());
 
         return back()->with('success', __('Payment updated.'));
+    }
+
+    public function edit(Order $order, Request $request): View
+    {
+        $this->authorizeWork($order, $request->user());
+        abort_if(OrderStatus::map()[$order->status_id]['edit_policy'] === 'locked', 403, __('This order can no longer be edited.'));
+        $order->load('items.variant:id,unit,weight_g');
+
+        return view('orders.edit', [
+            'order' => $order,
+            'zones' => DeliveryZone::where('is_active', true)->orderBy('sort_order')->pluck('name', 'id')->all(),
+            'reasons' => StatusReason::options('amendment'),
+            'policy' => OrderStatus::map()[$order->status_id]['edit_policy'],
+        ]);
+    }
+
+    public function amend(Order $order, Request $request, OrderEditor $editor): RedirectResponse
+    {
+        $this->authorizeWork($order, $request->user());
+        $data = $request->validate([
+            'lock_version' => ['required', 'integer'],
+            'reason_id' => ['required', Rule::exists('status_reasons', 'id')->where('reason_type', 'amendment')],
+            'items' => ['required', 'array', 'min:1', 'max:50'],
+            'items.*.variant_id' => ['required', 'integer'],
+            'items.*.qty' => ['required', 'numeric', 'gt:0'],
+            'items.*.line_discount' => ['nullable', 'numeric', 'min:0'],
+            'ship_name' => ['required', 'string', 'max:150'],
+            'ship_phone' => ['required', 'string', 'max:20'],
+            'ship_alt_phone' => ['nullable', 'string', 'max:20'],
+            'ship_address' => ['required', 'string', 'max:500'],
+            'ship_district' => ['nullable', 'string', 'max:60'],
+            'ship_thana' => ['nullable', 'string', 'max:80'],
+            'zone_id' => ['nullable', Rule::exists('delivery_zones', 'id')],
+        ]);
+
+        $result = $editor->request($order, $data, (int) $data['reason_id'], $request->user(), (int) $data['lock_version']);
+
+        return redirect()->route('orders.show', $order)->with('success', $result['applied'] ? __('Order updated.') : __('Change sent to a manager for approval.'));
+    }
+
+    public function decideAmendment(Order $order, int $amendment, Request $request, OrderEditor $editor): RedirectResponse
+    {
+        $data = $request->validate(['decision' => ['required', Rule::in(['approve', 'reject'])]]);
+        $editor->decide($order, $amendment, $data['decision'] === 'approve', $request->user());
+
+        return back()->with('success', $data['decision'] === 'approve' ? __('Change approved and applied.') : __('Change rejected.'));
+    }
+
+    private function authorizeWork(Order $order, User $user): void
+    {
+        abort_unless(Order::visibleTo($user)->whereKey($order->id)->exists(), 403);
+        abort_if($order->owner_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
     }
 
     /** Live delivery-charge preview for the order form (the server recomputes on save). */

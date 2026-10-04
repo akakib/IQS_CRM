@@ -17,6 +17,9 @@
             @if ($order->holdReason)<x-badge color="amber">{{ $order->holdReason->label_en }}{{ $order->hold_expected_date ? ' · '.$order->hold_expected_date->format('d M') : '' }}</x-badge>@endif
         </div>
         <div class="flex items-center gap-2">
+            @if ($canEdit)
+                <x-button variant="secondary" :href="route('orders.edit', $order)">{{ __('Edit order') }}</x-button>
+            @endif
             @if ($canClaim)
                 <form method="POST" action="{{ route('orders.claim', $order) }}">@csrf<x-button>{{ __('Assign to me') }}</x-button></form>
             @endif
@@ -25,6 +28,30 @@
 
     <div class="grid gap-6 xl:grid-cols-3">
         <div class="space-y-6 xl:col-span-2">
+            @foreach ($amendments as $a)
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p class="text-sm font-medium text-amber-900">{{ __('Change waiting for approval') }} · {{ $a->reason }}</p>
+                    <ul class="mt-1 list-inside list-disc text-sm text-amber-900">
+                        @foreach (json_decode($a->changes, true) as $c)
+                            <li>{{ match ($c['type']) {
+                                'added' => __('Add :i ×:q', ['i' => $c['item'], 'q' => $c['to'] + 0]),
+                                'removed' => __('Remove :i', ['i' => $c['item']]),
+                                'qty' => __(':i ×:a → ×:b', ['i' => $c['item'], 'a' => $c['from'] + 0, 'b' => $c['to'] + 0]),
+                                'price' => __(':i ৳:a → ৳:b', ['i' => $c['item'], 'a' => $c['from'], 'b' => $c['to']]),
+                                default => __(':f: :a → :b', ['f' => str_replace(['ship_', '_'], ['', ' '], $c['item']), 'a' => $c['from'], 'b' => $c['to']]),
+                            } }}</li>
+                        @endforeach
+                    </ul>
+                    <p class="mt-1 text-xs text-amber-800">{{ __('Total changes by ৳:d · asked by :n', ['d' => $a->amount_diff, 'n' => $a->by]) }}</p>
+                    @can('orders.approve')
+                        <div class="mt-3 flex gap-2">
+                            <form method="POST" action="{{ route('orders.amendments.decide', [$order, $a->id]) }}">@csrf<input type="hidden" name="decision" value="approve"><x-button size="sm">{{ __('Approve') }}</x-button></form>
+                            <form method="POST" action="{{ route('orders.amendments.decide', [$order, $a->id]) }}">@csrf<input type="hidden" name="decision" value="reject"><x-button size="sm" variant="secondary">{{ __('Reject') }}</x-button></form>
+                        </div>
+                    @endcan
+                </div>
+            @endforeach
+
             {{-- Actions: only the transitions this person may do from the current status. --}}
             @if ($canAct && $targets)
                 <x-card :title="__('Next step')" x-data="{ to: null, needsReason: false, reasonType: 'status', reason: '' }">

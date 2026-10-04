@@ -22,6 +22,8 @@ class SettingsTest extends TestCase
             'orders_packaging_cost' => '25.50',
             'orders_duplicate_window_hours' => '24',
             'orders_freeze_minutes_before_pickup' => '30',
+            'orders_max_working_orders' => '1',
+            'orders_discount_limit' => '200',
             'verification_rerun_on_edit' => '1',
         ];
     }

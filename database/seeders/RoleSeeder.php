@@ -20,8 +20,10 @@ class RoleSeeder extends Seeder
         'manager' => ['Manager', 'Operations lead.', [
             'staff.view', 'staff.create', 'staff.edit', 'locations.view', 'locations.create', 'locations.edit', 'roles.view',
             'products.view', 'products.create', 'products.edit', 'products.availability', 'customers.view', 'customers.create', 'customers.edit',
+            'orders.view', 'orders.create', 'orders.edit', 'orders.approve', 'orders.reassign', 'orders.export',
         ], ['salary']],
-        'moderator' => ['Moderator', 'Sales and order confirmation.', ['products.view', 'customers.view', 'customers.create', 'customers.edit'], ['cost_price', 'profit', 'salary']],
+        'moderator' => ['Moderator', 'Sales and order confirmation.', ['products.view', 'customers.view', 'customers.create', 'customers.edit',
+            'orders.view:own', 'orders.create', 'orders.edit'], ['cost_price', 'profit', 'salary']],
         'dollar_keeper' => ['Dollar Keeper', 'USD purchases and ad spend.', [], ['customer_contact', 'salary']],
         'packaging' => ['Packaging', 'Picks and packs orders at the shop.', ['products.view'], ['customer_contact', 'cost_price', 'profit', 'salary']],
         'store_keeper' => ['Store Keeper', 'Receives and moves stock.', ['locations.view', 'products.view'], ['customer_contact', 'profit', 'salary']],
@@ -41,9 +43,12 @@ class RoleSeeder extends Seeder
 
             $role = Role::create(['name' => $name, 'system_key' => $key, 'description' => $description]);
 
-            DB::table('role_permissions')->insert(array_map(fn ($g) => [
-                'role_id' => $role->id, 'permission_id' => $permissionIds[$g], 'data_scope' => 'all',
-            ], $grants));
+            // "key:own" grants with the own-records scope; plain keys get all.
+            DB::table('role_permissions')->insert(array_map(function ($g) use ($role, $permissionIds) {
+                [$key, $scope] = array_pad(explode(':', $g), 2, 'all');
+
+                return ['role_id' => $role->id, 'permission_id' => $permissionIds[$key], 'data_scope' => $scope];
+            }, $grants));
             DB::table('role_field_masks')->insert(array_map(fn ($f) => ['role_id' => $role->id, 'field' => $f], $masks));
         }
 

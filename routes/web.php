@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -62,6 +63,18 @@ Route::middleware('auth')->group(function () {
         ->middlewareFor('destroy', 'can:products.delete');
     Route::resource('categories', CategoryController::class)->only(['index', 'store', 'update', 'destroy'])
         ->middleware('can:products.edit');
+
+    // Orders
+    Route::get('/orders/delivery-charge', [OrderController::class, 'deliveryCharge'])->middleware('can:orders.create')->name('orders.delivery-charge');
+    Route::get('/orders', [OrderController::class, 'index'])->middleware('can:orders.view')->name('orders.index');
+    Route::get('/orders/create', [OrderController::class, 'create'])->middleware('can:orders.create')->name('orders.create');
+    Route::post('/orders', [OrderController::class, 'store'])->middleware('can:orders.create')->name('orders.store');
+    Route::get('/orders/{order}', [OrderController::class, 'show'])->middleware('can:orders.view')->name('orders.show');
+    Route::post('/orders/{order}/claim', [OrderController::class, 'claim'])->middleware('can:orders.edit')->name('orders.claim');
+    Route::post('/orders/{order}/transition', [OrderController::class, 'transition'])->middleware('can:orders.view')->name('orders.transition');
+    Route::post('/orders/{order}/notes', [OrderController::class, 'note'])->middleware('can:orders.view')->name('orders.notes');
+    Route::post('/orders/{order}/reassign', [OrderController::class, 'reassign'])->middleware('can:orders.reassign')->name('orders.reassign');
+    Route::post('/orders/{order}/payments/{payment}', [OrderController::class, 'verifyPayment'])->whereNumber('payment')->middleware('can:orders.approve')->name('orders.payments.verify');
 
     // Customers
     Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');

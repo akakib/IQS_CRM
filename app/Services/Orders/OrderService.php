@@ -115,6 +115,8 @@ class OrderService
                 $this->addPayment($order, $data['advance'] + ['payment_type' => 'advance'], $by);
             }
 
+            app(\App\Services\Tracking\TrackingService::class)->handle($order, 'order_created');
+
             if (! $order->owner_id) {
                 $this->notifications->send('new_order', __('New order :no · ৳:t', ['no' => $order->order_no, 't' => number_format((float) $order->grand_total)]),
                     $order->ship_name, ['link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'group_key' => 'new_order']);

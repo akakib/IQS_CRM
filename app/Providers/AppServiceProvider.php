@@ -82,6 +82,11 @@ class AppServiceProvider extends ServiceProvider
         // Side effects of status changes (each module subscribes here).
         \App\Services\Orders\OrderStateMachine::resetListeners();
         \App\Services\Orders\OrderStateMachine::listen(fn ($order, $from, $to) => app(\App\Services\Orders\ConfirmationEffects::class)->handle($order, $from, $to));
+        \App\Services\Orders\OrderStateMachine::listen(function ($order, $from, $to) {
+            if (in_array($to['key'], ['record_verified', 'confirmed', 'delivered'], true)) {
+                app(\App\Services\Tracking\TrackingService::class)->handle($order, $to['key']);
+            }
+        });
 
         // Roles and access assignments: Owner only.
         Gate::define('access.manage', fn (User $user) => $user->isOwner());

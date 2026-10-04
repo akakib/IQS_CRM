@@ -43,6 +43,7 @@ return [
         ['Notifications', 'settings.notifications', 'settings.notifications*', 'settings.view'],
         ['Verification rules', 'settings.verification', 'settings.verification*', 'settings.view'],
         ['Delivery charges', 'settings.charges', 'settings.charges*', 'settings.view'],
+        ['Ad tracking', 'settings.tracking', 'settings.tracking*', 'settings.view'],
         ['Statuses & reasons', 'settings.reasons', 'settings.reasons*', 'settings.view'],
         ['Activity log', 'activity.index', 'activity.*', 'activity.view'],
         ['Website connection', 'settings.integrations', 'settings.integrations*', 'access.manage'],

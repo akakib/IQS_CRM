@@ -21,6 +21,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserAccessController;
+use App\Http\Controllers\TrackingSettingsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VerificationRuleController;
 use Illuminate\Support\Facades\Route;
@@ -125,6 +126,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/settings/verification/{rule}', [VerificationRuleController::class, 'destroy'])->whereNumber('rule')->name('settings.verification.destroy');
     });
     Route::post('/orders/{order}/verify', [VerificationRuleController::class, 'rerun'])->middleware('can:orders.approve')->name('orders.verify');
+
+    Route::get('/settings/tracking', [TrackingSettingsController::class, 'index'])->middleware('can:settings.view')->name('settings.tracking');
+    Route::put('/settings/tracking/{event}', [TrackingSettingsController::class, 'update'])->whereNumber('event')->middleware('can:settings.edit')->name('settings.tracking.update');
 
     Route::get('/settings/charges', [OrderSettingsController::class, 'charges'])->middleware('can:settings.view')->name('settings.charges');
     Route::get('/settings/reasons', [OrderSettingsController::class, 'reasons'])->middleware('can:settings.view')->name('settings.reasons');

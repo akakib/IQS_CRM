@@ -18,6 +18,12 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    // Meta Conversions API (server-side Purchase). Real calls only in production.
+    'meta' => [
+        'pixel_id' => env('META_PIXEL_ID'),
+        'capi_token' => env('META_CAPI_TOKEN'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

@@ -25,6 +25,7 @@ class SettingsTest extends TestCase
             'orders_max_working_orders' => '1',
             'orders_max_no_answer' => '3',
             'orders_discount_limit' => '200',
+            'tracking_web_event_id' => 'wc_purchase_{external_ref}',
             'verification_rerun_on_edit' => '1',
         ];
     }

@@ -60,6 +60,7 @@
                         <p class="text-sm font-medium text-gray-800">{{ auth()->user()->name }}</p>
                         <p class="truncate text-xs text-gray-500">{{ auth()->user()->email }}</p>
                     </div>
+                    <a href="{{ route('profile.edit') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">{{ __('My profile') }}</a>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">{{ __('Log out') }}</button>

@@ -7,6 +7,9 @@
     @can('staff.edit')
         <a href="{{ route('users.edit', $user) }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Edit') }}</a>
     @endcan
+    @can('access.manage')
+        <a href="{{ route('users.access', $user) }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Access') }}</a>
+    @endcan
     @if (! $user->is(auth()->user()) && auth()->user()->can('staff.delete'))
         <form id="{{ $formId }}" method="POST" action="{{ route('users.status', $user) }}">
             @csrf

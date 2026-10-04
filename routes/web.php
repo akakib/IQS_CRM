@@ -4,6 +4,8 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -39,4 +41,15 @@ Route::middleware('auth')->group(function () {
     // Deactivate/activate is the "delete" action for staff (they are never deleted).
     Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])
         ->middleware('can:staff.delete')->name('users.status');
+
+    Route::get('/roles', [RoleController::class, 'index'])->middleware('can:roles.view')->name('roles.index');
+    Route::middleware('can:access.manage')->group(function () {
+        Route::resource('roles', RoleController::class)->except(['index', 'show']);
+
+        Route::get('/users/{user}/access', [UserAccessController::class, 'edit'])->name('users.access');
+        Route::post('/users/{user}/access/roles', [UserAccessController::class, 'storeRole'])->name('users.access.roles.store');
+        Route::delete('/users/{user}/access/roles/{assignment}', [UserAccessController::class, 'destroyRole'])->name('users.access.roles.destroy');
+        Route::post('/users/{user}/access/overrides', [UserAccessController::class, 'storeOverride'])->name('users.access.overrides.store');
+        Route::delete('/users/{user}/access/overrides/{override}', [UserAccessController::class, 'destroyOverride'])->name('users.access.overrides.destroy');
+    });
 });

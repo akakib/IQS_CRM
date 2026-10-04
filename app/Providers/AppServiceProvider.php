@@ -44,6 +44,9 @@ class AppServiceProvider extends ServiceProvider
             return $user->hasPermission($ability);
         });
 
+        // Roles and access assignments: Owner only.
+        Gate::define('access.manage', fn (User $user) => $user->isOwner());
+
         // @canseefield('cost_price') ... @endcanseefield
         Blade::if('canseefield', fn (string $field) => (bool) auth()->user()?->canSeeField($field));
     }

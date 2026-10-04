@@ -10,7 +10,14 @@ return [
     'modules' => [
         'staff' => ['view', 'create', 'edit', 'delete', 'export'],
         'locations' => ['view', 'create', 'edit', 'delete'],
-        'roles' => ['view', 'create', 'edit', 'delete'],
+        // Creating/editing roles and giving access is Owner-only (no permission
+        // can grant it, so nobody can raise their own access).
+        'roles' => ['view'],
+    ],
+
+    // Display names where the plain action word would mislead.
+    'action_labels' => [
+        'staff.delete' => 'Deactivate',
     ],
 
     // Fields a role can have hidden (masked).

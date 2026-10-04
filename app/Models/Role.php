@@ -20,6 +20,11 @@ class Role extends Model
             ->withPivot(['data_scope', 'location_ids']);
     }
 
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_roles')->withPivot(['starts_at', 'expires_at']);
+    }
+
     public function isOwner(): bool
     {
         return $this->system_key === self::OWNER;

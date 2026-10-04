@@ -13,6 +13,7 @@
         ['label' => __('Dashboard'), 'route' => 'dashboard', 'active' => 'dashboard', 'can' => null],
         ['label' => __('Staff'), 'route' => 'users.index', 'active' => 'users.*', 'can' => 'staff.view'],
         ['label' => __('Locations'), 'route' => 'locations.index', 'active' => 'locations.*', 'can' => 'locations.view'],
+        ['label' => __('Roles'), 'route' => 'roles.index', 'active' => 'roles.*', 'can' => 'roles.view'],
     ];
     // A user only sees the modules they can view.
     $menu = array_filter($menu, fn ($item) => ! $item['can'] || auth()->user()->can($item['can']));

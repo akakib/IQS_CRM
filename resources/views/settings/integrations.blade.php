@@ -19,6 +19,21 @@
             @endif
         </x-card>
 
+        <x-card :title="__('Steadfast → IQS (delivery status webhook)')">
+            <p class="mb-3 text-sm text-gray-600">{{ __('Steadfast merchant panel > webhook: paste this URL and set the Bearer token below.') }}</p>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ __('Callback URL') }}</p>
+            <p class="mb-3 break-all rounded-lg bg-gray-50 px-3 py-2 font-mono text-sm">{{ $steadfastUrl }}</p>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ __('Bearer token') }}</p>
+            @if ($steadfastToken)
+                <div x-data="{ show: false }" class="flex items-center gap-2">
+                    <p class="flex-1 break-all rounded-lg bg-gray-50 px-3 py-2 font-mono text-sm" x-text="show ? @js($steadfastToken) : '••••••••••••••••'"></p>
+                    <button type="button" @click="show = !show" class="text-sm text-green-900 hover:underline" x-text="show ? @js(__('Hide')) : @js(__('Show'))"></button>
+                </div>
+            @else
+                <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('Not set (STEADFAST_WEBHOOK_TOKEN).') }}</p>
+            @endif
+        </x-card>
+
         <x-card :title="__('IQS → website (product sync)')">
             <p class="text-sm text-gray-600">{{ __('Price, stock status, description and SEO changes are pushed to linked website products.') }}</p>
             <p class="mt-3 text-sm">{{ __('Current mode:') }}

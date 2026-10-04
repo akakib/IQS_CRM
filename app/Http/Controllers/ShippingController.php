@@ -65,6 +65,14 @@ class ShippingController extends Controller
         return view('shipping.labels', ['orders' => $orders, 'labels' => $labels]);
     }
 
+    /** Webhook fallback, on demand. */
+    public function resync(): RedirectResponse
+    {
+        \Illuminate\Support\Facades\Artisan::call('courier:resync');
+
+        return back()->with('success', trim(\Illuminate\Support\Facades\Artisan::output()));
+    }
+
     /** New label for the current version (after an address/COD change); voids the old one. */
     public function reprint(Order $order, Request $request, BookingService $booking): RedirectResponse
     {

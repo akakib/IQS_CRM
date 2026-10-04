@@ -3,6 +3,12 @@
         <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{{ __('Test mode: bookings use the fake courier. No real Steadfast parcel is created.') }}</div>
     @endif
 
+    <div class="mb-3 flex justify-end">
+        @can('shipping.create')
+            <form method="POST" action="{{ route('shipping.resync') }}">@csrf<x-button size="sm" variant="secondary">{{ __('Re-sync courier status') }}</x-button></form>
+        @endcan
+    </div>
+
     <x-tabs :tabs="['book' => [__('Ready to book'), '#book', $orders->count()], 'booked' => [__('Booked, waiting for packing'), '#booked', $booked->count()]]" active="book" />
 
     <section id="book" class="mb-8">

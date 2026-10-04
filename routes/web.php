@@ -13,6 +13,7 @@ use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\Webhooks\SteadfastWebhookController;
 use App\Http\Controllers\Webhooks\WooCommerceWebhookController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\Route;
 
 // Called by other systems (no login; each verifies its own signature).
 Route::post('/webhooks/woocommerce', WooCommerceWebhookController::class)->middleware('throttle:120,1')->name('webhooks.woocommerce');
+Route::post('/webhooks/steadfast', SteadfastWebhookController::class)->middleware('throttle:300,1')->name('webhooks.steadfast');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
@@ -96,6 +98,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/shipping', [ShippingController::class, 'index'])->middleware('can:shipping.view')->name('shipping.index');
     Route::post('/shipping/book', [ShippingController::class, 'book'])->middleware('can:shipping.create')->name('shipping.book');
     Route::get('/shipping/labels', [ShippingController::class, 'labels'])->middleware('can:shipping.view')->name('shipping.labels');
+    Route::post('/shipping/resync', [ShippingController::class, 'resync'])->middleware('can:shipping.create')->name('shipping.resync');
     Route::post('/shipping/{order}/reprint', [ShippingController::class, 'reprint'])->middleware('can:shipping.create')->name('shipping.reprint');
 
     // Customers

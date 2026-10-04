@@ -13,21 +13,17 @@ class SettingsTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Every setting at its default (so new settings never break this test), plus overrides. */
     private function payload(array $override = []): array
     {
-        return $override + [
-            'store_name' => 'Iqbal Store',
-            'store_hotline' => '01711111111',
-            'orders_pickup_cutoffs' => ['15:00'],
-            'orders_packaging_cost' => '25.50',
-            'orders_duplicate_window_hours' => '24',
-            'orders_freeze_minutes_before_pickup' => '30',
-            'orders_max_working_orders' => '1',
-            'orders_max_no_answer' => '3',
-            'orders_discount_limit' => '200',
-            'tracking_web_event_id' => 'wc_purchase_{external_ref}',
-            'verification_rerun_on_edit' => '1',
-        ];
+        $defaults = [];
+        foreach (config('settings') as $key => [$type, $default]) {
+            if ($key !== 'store.logo') {
+                $defaults[str_replace('.', '_', $key)] = $type === 'bool' ? ($default ? '1' : '0') : $default;
+            }
+        }
+
+        return $override + ['store_hotline' => '01711111111', 'orders_packaging_cost' => '25.50'] + $defaults;
     }
 
     public function test_defaults_apply_until_saved(): void

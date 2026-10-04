@@ -15,6 +15,8 @@ class IntegrationController extends Controller
         return view('settings.integrations', [
             'webhookUrl' => route('webhooks.woocommerce'),
             'secret' => (string) config('store.woocommerce.webhook_secret'),
+            'steadfastUrl' => route('webhooks.steadfast'),
+            'steadfastToken' => (string) config('courier.steadfast.webhook_token'),
             'storeDriver' => app(\App\Services\Catalog\Store\StoreDriver::class)->name(),
             'inbox' => DB::table('integration_inbox')->orderByDesc('id')->limit(30)
                 ->get(['id', 'source', 'external_id', 'topic', 'status', 'error', 'order_id', 'received_at']),

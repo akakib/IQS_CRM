@@ -18,6 +18,9 @@ Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3')
 
 Schedule::command('backup:database')->dailyAt('03:00');
 
+// Webhook fallback for parcels still on the way.
+Schedule::command('courier:resync')->everyThirtyMinutes()->withoutOverlapping(20);
+
 // Product changes -> website (one-way), with retry/backoff inside.
 Schedule::command('channel-sync:run')->everyMinute()->withoutOverlapping(5);
 

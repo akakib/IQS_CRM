@@ -12,7 +12,8 @@ return [
     ]],
     'orders' => ['Orders', [
         ['All orders', 'orders.index', 'orders.index', 'orders.view'],
-        ['Call queue', 'orders.queue', 'orders.queue', 'orders.view'],
+        ['Call queue', 'orders.queue', 'orders.queue', 'orders.edit'],
+        ['Quick order', 'orders.create', 'orders.create', 'orders.create'],
         ['Packing', 'packing.index', 'packing.*', 'packing.view'],
         ['Handover', 'handover.index', 'handover.*', 'packing.view'],
         ['Hotline', 'hotline.index', 'hotline.*', 'hotline.view'],

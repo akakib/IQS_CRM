@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\CallQueueController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
@@ -74,6 +75,9 @@ Route::middleware('auth')->group(function () {
     // Orders
     Route::get('/orders/delivery-charge', [OrderController::class, 'deliveryCharge'])->middleware('can:orders.create')->name('orders.delivery-charge');
     Route::get('/orders', [OrderController::class, 'index'])->middleware('can:orders.view')->name('orders.index');
+    Route::get('/orders/queue', [CallQueueController::class, 'index'])->middleware('can:orders.edit')->name('orders.queue');
+    Route::post('/orders/queue/next', [CallQueueController::class, 'takeNext'])->middleware('can:orders.edit')->name('orders.queue.next');
+    Route::post('/orders/{order}/call', [CallQueueController::class, 'logCall'])->middleware('can:orders.edit')->name('orders.queue.call');
     Route::get('/orders/create', [OrderController::class, 'create'])->middleware('can:orders.create')->name('orders.create');
     Route::post('/orders', [OrderController::class, 'store'])->middleware('can:orders.create')->name('orders.store');
     Route::get('/orders/{order}', [OrderController::class, 'show'])->middleware('can:orders.view')->name('orders.show');

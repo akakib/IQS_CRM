@@ -177,6 +177,12 @@ class OrderController extends Controller
             'hold_expected_date' => ['nullable', 'date', 'after_or_equal:today'],
         ]);
 
+        // Proof of a real call: a website order is confirmed by hand only after a logged call.
+        if ($data['to'] === 'confirmed' && $order->channel === 'web'
+            && ! DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'call')->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['status' => __('Log the call first (Call queue, or add a Call note below).')]);
+        }
+
         $this->machine->transition($order, $data['to'], $user, 'user', $data['reason_id'] ?? null, $data['note'] ?? null, (int) $data['lock_version']);
         if ($data['to'] === 'hold' && ! empty($data['hold_expected_date'])) {
             $order->forceFill(['hold_expected_date' => $data['hold_expected_date']])->save();

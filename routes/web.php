@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
+    Route::post('/locations/bulk', [LocationController::class, 'bulk'])->middleware('can:locations.edit')->name('locations.bulk');
     Route::resource('locations', LocationController::class)->except('show')
         ->middlewareFor('index', 'can:locations.view')
         ->middlewareFor(['create', 'store'], 'can:locations.create')
@@ -63,6 +64,15 @@ Route::middleware('auth')->group(function () {
         Route::delete('/settings/notifications/rules/{rule}', [NotificationRuleController::class, 'destroy'])->whereNumber('rule')->name('settings.notifications.rules.destroy');
         Route::post('/settings/notifications/test', [NotificationRuleController::class, 'test'])->name('settings.notifications.test');
     });
+
+    // Component library: local development only.
+    if (app()->environment('local', 'testing')) {
+        Route::view('/dev/components', 'dev.components')->name('dev.components');
+        Route::get('/dev/search-demo', fn (\Illuminate\Http\Request $r) => \App\Models\User::query()
+            ->where('name', 'like', $r->query('q', '').'%')->orderBy('name')->limit(20)
+            ->get(['id', 'name', 'email'])->map(fn ($u) => ['value' => $u->id, 'label' => $u->name, 'sub' => $u->email]))
+            ->name('dev.search-demo');
+    }
 
     Route::get('/activity', [ActivityLogController::class, 'index'])->middleware('can:activity.view')->name('activity.index');
 

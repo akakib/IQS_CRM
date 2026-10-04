@@ -6,6 +6,7 @@ use App\Enums\EmploymentType;
 use App\Http\Requests\UserRequest;
 use App\Models\Location;
 use App\Models\User;
+use App\Support\Lists\ListState;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,19 +15,14 @@ use Illuminate\View\View;
 
 class UserController extends Controller
 {
-    private const SORTS = ['name', 'email', 'created_at'];
-
-    private const PER_PAGE = [25, 50, 100];
-
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('q', ''));
-        $employment = EmploymentType::tryFrom((string) $request->query('employment_type'));
-        $locationId = $request->integer('location') ?: null;
-        $status = in_array($request->query('status'), ['active', 'inactive'], true) ? $request->query('status') : null;
-        $sort = in_array($request->query('sort'), self::SORTS, true) ? $request->query('sort') : 'name';
-        $dir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
-        $perPage = in_array((int) $request->query('per_page'), self::PER_PAGE, true) ? (int) $request->query('per_page') : 25;
+        $list = ListState::from($request, ['name', 'email', 'created_at'], [
+            'employment_type' => array_keys(EmploymentType::options()),
+            'location' => 'int',
+            'status' => ['active', 'inactive'],
+        ]);
+        $search = $list->search;
 
         // COUNT + SELECT + one eager load for location names.
         $users = User::query()
@@ -36,28 +32,18 @@ class UserController extends Controller
                 ->where('name', 'like', $search.'%')
                 ->orWhere('email', 'like', $search.'%')
                 ->orWhere('phone', 'like', $search.'%')))
-            ->when($employment, fn ($q) => $q->where('employment_type', $employment))
-            ->when($locationId, fn ($q) => $q->where('work_location_id', $locationId))
-            ->when($status, fn ($q) => $q->where('is_active', $status === 'active'))
-            ->orderBy($sort, $dir)
-            ->orderBy('id')
-            ->paginate($perPage)
+            ->when($list->filter('employment_type'), fn ($q, $type) => $q->where('employment_type', $type))
+            ->when($list->filter('location'), fn ($q, $id) => $q->where('work_location_id', $id))
+            ->when($list->filter('status'), fn ($q, $status) => $q->where('is_active', $status === 'active'))
+            ->tap(fn ($q) => $list->applySort($q))
+            ->paginate($list->perPage)
             ->withQueryString();
 
         return view('users.index', [
             'users' => $users,
-            'filters' => [
-                'q' => $search,
-                'employment_type' => $employment?->value,
-                'location' => $locationId,
-                'status' => $status,
-                'sort' => $sort,
-                'dir' => $dir,
-                'per_page' => $perPage,
-            ],
+            'list' => $list,
             'employmentOptions' => EmploymentType::options(),
             'locationOptions' => $this->locationOptions(),
-            'perPageOptions' => self::PER_PAGE,
         ]);
     }
 

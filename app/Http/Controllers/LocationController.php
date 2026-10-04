@@ -5,48 +5,35 @@ namespace App\Http\Controllers;
 use App\Enums\LocationType;
 use App\Http\Requests\LocationRequest;
 use App\Models\Location;
+use App\Support\Lists\ListState;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class LocationController extends Controller
 {
-    private const SORTS = ['name', 'type', 'updated_at'];
-
-    private const PER_PAGE = [25, 50, 100];
-
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('q', ''));
-        $type = LocationType::tryFrom((string) $request->query('type'));
-        $status = in_array($request->query('status'), ['active', 'inactive'], true) ? $request->query('status') : null;
-        $sort = in_array($request->query('sort'), self::SORTS, true) ? $request->query('sort') : 'name';
-        $dir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
-        $perPage = in_array((int) $request->query('per_page'), self::PER_PAGE, true) ? (int) $request->query('per_page') : 25;
+        $list = ListState::from($request, ['name', 'type', 'updated_at'], [
+            'type' => array_keys(LocationType::options()),
+            'status' => ['active', 'inactive'],
+        ]);
 
         // One COUNT + one SELECT of only the shown columns.
         $locations = Location::query()
             ->select(['id', 'name', 'type', 'is_active', 'updated_at'])
-            ->when($search !== '', fn ($q) => $q->where('name', 'like', $search.'%'))
-            ->when($type, fn ($q) => $q->where('type', $type))
-            ->when($status, fn ($q) => $q->where('is_active', $status === 'active'))
-            ->orderBy($sort, $dir)
-            ->orderBy('id')
-            ->paginate($perPage)
+            ->when($list->search !== '', fn ($q) => $q->where('name', 'like', $list->search.'%'))
+            ->when($list->filter('type'), fn ($q, $type) => $q->where('type', $type))
+            ->when($list->filter('status'), fn ($q, $status) => $q->where('is_active', $status === 'active'))
+            ->tap(fn ($q) => $list->applySort($q))
+            ->paginate($list->perPage)
             ->withQueryString();
 
         return view('locations.index', [
             'locations' => $locations,
-            'filters' => [
-                'q' => $search,
-                'type' => $type?->value,
-                'status' => $status,
-                'sort' => $sort,
-                'dir' => $dir,
-                'per_page' => $perPage,
-            ],
+            'list' => $list,
             'typeOptions' => LocationType::options(),
-            'perPageOptions' => self::PER_PAGE,
         ]);
     }
 
@@ -89,5 +76,25 @@ class LocationController extends Controller
 
         return redirect()->route('locations.index')
             ->with('success', __('Location ":name" deleted.', ['name' => $location->name]));
+    }
+
+    /** Batch first: activate or deactivate many at once (each change is logged). */
+    public function bulk(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', Rule::in(['activate', 'deactivate'])],
+            'ids' => ['required', 'array', 'max:500'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $active = $data['action'] === 'activate';
+        $changed = 0;
+        Location::whereIn('id', $data['ids'])->where('is_active', ! $active)->get()
+            ->each(function (Location $location) use ($active, &$changed) {
+                $location->update(['is_active' => $active]);
+                $changed++;
+            });
+
+        return back()->with('success', trans_choice(':count location updated.|:count locations updated.', $changed, ['count' => $changed]));
     }
 }

@@ -81,7 +81,7 @@
         </header>
 
         <main class="flex-1 p-4 md:p-6">
-            <x-flash />
+            <x-toaster />
             {{ $slot }}
         </main>
     </div>

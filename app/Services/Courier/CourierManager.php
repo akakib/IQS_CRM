@@ -31,7 +31,11 @@ class CourierManager
     /** Keys typed in Settings > Courier accounts win over the server .env. */
     private function savedKeys(string $courier): array
     {
-        $account = \App\Models\CourierAccount::defaultFor($courier);
+        try {
+            $account = \App\Models\CourierAccount::defaultFor($courier);
+        } catch (\Illuminate\Database\QueryException) {
+            return []; // table not there yet (mid-deploy, or a test without a database): use the server .env
+        }
 
         return $account ? ['api_key' => $account->api_key, 'secret_key' => $account->secret_key] : [];
     }

@@ -79,16 +79,16 @@
                     </div>
                     <div class="space-y-2">
                         <template x-for="(it, i) in items" :key="it.variant_id">
-                            <div class="grid grid-cols-12 items-center gap-2 rounded-lg border border-gray-100 p-2 text-sm">
+                            <div class="grid grid-cols-12 items-end gap-2 rounded-lg border border-gray-100 p-2 text-sm">
                                 <input type="hidden" :name="`items[${i}][variant_id]`" :value="it.variant_id">
-                                <div class="col-span-12 md:col-span-5"><p class="font-medium text-gray-800" x-text="it.label"></p><p class="text-xs text-gray-400" x-text="it.sub + ' · ' + money(it.price)"></p></div>
+                                <div class="col-span-12 self-center md:col-span-5"><p class="font-medium text-gray-800" x-text="it.label"></p><p class="text-xs text-gray-400" x-text="it.sub + ' · ' + money(it.price)"></p></div>
                                 <label class="col-span-4 text-xs text-gray-500 md:col-span-2"><span x-text="({ g: @js(__('Grams')), kg: @js(__('KG')), ml: @js(__('ML')), l: @js(__('Litres')), packet: @js(__('Packets')), box: @js(__('Boxes')) })[it.unit] || @js(__('Qty'))"></span>
                                     <input type="number" step="any" min="0.001" :name="`items[${i}][qty]`" x-model.number="it.qty" @input="recharge()" class="{{ $input }} mt-0.5 px-2 py-1"></label>
                                 <label class="col-span-4 text-xs text-gray-500 md:col-span-2">{{ __('Discount') }}
                                     <input type="number" step="0.01" min="0" :name="`items[${i}][line_discount]`" x-model.number="it.line_discount" class="{{ $input }} mt-0.5 px-2 py-1"></label>
-                                <p class="col-span-1 hidden text-right tabular-nums md:block" x-text="money(Math.max(0, it.qty * it.price - (it.line_discount || 0)))"></p>
+                                <p class="col-span-1 hidden border border-transparent py-2 text-right leading-5 tabular-nums md:block" x-text="money(Math.max(0, it.qty * it.price - (it.line_discount || 0)))"></p>
                                 <button type="button" :disabled="items.length < 2" @click="items.splice(i, 1)"
-                                    class="col-span-4 self-end rounded-lg border border-red-200 px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300 md:col-span-2">{{ __('Remove') }}</button>
+                                    class="col-span-4 rounded-lg border border-red-200 px-2 py-2.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300 md:col-span-2">{{ __('Remove') }}</button>
                             </div>
                         </template>
                     </div>

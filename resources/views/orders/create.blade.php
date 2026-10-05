@@ -145,9 +145,9 @@
                     <p x-show="!items.length" class="text-sm text-gray-400">{{ __('No products yet. Search above and press Enter.') }}</p>
                     <div class="space-y-2">
                         <template x-for="(it, i) in items" :key="it.variant_id">
-                            <div class="grid grid-cols-12 items-center gap-2 rounded-lg border border-gray-100 p-2 text-sm">
+                            <div class="grid grid-cols-12 items-end gap-2 rounded-lg border border-gray-100 p-2 text-sm">
                                 <input type="hidden" :name="`items[${i}][variant_id]`" :value="it.variant_id">
-                                <div class="col-span-12 md:col-span-5">
+                                <div class="col-span-12 self-center md:col-span-5">
                                     <p class="font-medium text-gray-800" x-text="it.label"></p>
                                     <p class="text-xs" :class="it.preorder ? 'text-amber-700' : 'text-gray-400'" x-text="it.preorder ? @js(__('Pre-order: order will wait on Hold')) : it.sub"></p>
                                 </div>
@@ -157,8 +157,8 @@
                                 <label class="col-span-4 text-xs text-gray-500 md:col-span-2">{{ __('Discount') }}
                                     <input type="number" step="0.01" min="0" :name="`items[${i}][line_discount]`" x-model.number="it.line_discount" @input="recharge()" class="{{ $input }} mt-0.5 px-2 py-1">
                                 </label>
-                                <p class="col-span-3 text-right tabular-nums md:col-span-2" x-text="money(lineTotal(it))"></p>
-                                <button type="button" @click="items.splice(i, 1); recharge()" class="col-span-1 text-gray-400 hover:text-red-600" aria-label="{{ __('Remove') }}">&times;</button>
+                                <p class="col-span-3 border border-transparent py-2 text-right leading-5 tabular-nums md:col-span-2" x-text="money(lineTotal(it))"></p>
+                                <button type="button" @click="items.splice(i, 1); recharge()" class="col-span-1 border border-transparent py-2 leading-5 text-gray-400 hover:text-red-600" aria-label="{{ __('Remove') }}">&times;</button>
                             </div>
                         </template>
                     </div>

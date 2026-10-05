@@ -56,6 +56,7 @@ return [
         ['Statuses & reasons', 'settings.reasons', 'settings.reasons*', 'settings.view', 'tag'],
         ['Activity log', 'activity.index', 'activity.*', 'activity.view', 'document'],
         ['Website connection', 'settings.integrations', 'settings.integrations*', 'access.manage', 'globe'],
+        ['Courier accounts', 'settings.couriers', 'settings.couriers*', 'access.manage', 'truck'],
         ['System health', 'health', 'health', 'access.manage', 'heart'],
         ['Components (dev)', 'dev.components', 'dev.*', 'access.manage', 'code'],
     ]],

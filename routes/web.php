@@ -282,6 +282,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:access.manage')->group(function () {
         Route::get('/health', HealthController::class)->name('health');
         Route::get('/settings/integrations', [IntegrationController::class, 'index'])->name('settings.integrations');
+        Route::get('/settings/couriers', [\App\Http\Controllers\CourierAccountController::class, 'index'])->name('settings.couriers');
+        Route::post('/settings/couriers', [\App\Http\Controllers\CourierAccountController::class, 'store'])->name('settings.couriers.store');
+        Route::put('/settings/couriers/{account}', [\App\Http\Controllers\CourierAccountController::class, 'update'])->whereNumber('account')->name('settings.couriers.update');
+        Route::post('/settings/couriers/{account}/check', [\App\Http\Controllers\CourierAccountController::class, 'check'])->whereNumber('account')->name('settings.couriers.check');
         Route::post('/settings/integrations/inbox/{inbox}/retry', [IntegrationController::class, 'retry'])->whereNumber('inbox')->name('settings.integrations.retry');
 
         Route::resource('roles', RoleController::class)->except(['index', 'show']);

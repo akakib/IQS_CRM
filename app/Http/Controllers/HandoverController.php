@@ -24,6 +24,11 @@ class HandoverController extends Controller
             'sessions' => DB::table('handover_sessions as s')->leftJoin('users as u', 'u.id', '=', 's.started_by')
                 ->orderByDesc('s.id')->limit(15)->get(['s.*', 'u.name as by']),
             'waiting' => Order::whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->count(),
+            // Riders seen before, newest phone first. A new name typed here is simply remembered next time.
+            'riders' => DB::table('handover_sessions')->whereNotNull('rider_name')->where('rider_name', '!=', '')
+                ->orderByDesc('id')->limit(300)->get(['rider_name as name', 'rider_phone as phone'])
+                ->unique(fn ($r) => mb_strtolower(trim($r->name)))->take(50)
+                ->map(fn ($r) => ['name' => trim($r->name), 'phone' => (string) $r->phone])->values(),
         ]);
     }
 

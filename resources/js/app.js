@@ -24,6 +24,7 @@ document.addEventListener('submit', (event) => {
         return;
     }
     form.dataset.submitting = '1';
+    rememberScroll();
     // After this tick, so the clicked button's own name/value is still sent.
     // Buttons inside the form, plus any that point at it from outside with form="id".
     const buttons = [...form.querySelectorAll('button[type=submit]:not([disabled]), button:not([type]):not([disabled])'),
@@ -43,3 +44,28 @@ window.addEventListener('pageshow', () => {
         });
     });
 });
+
+// Stay in place after a save. A form that sends the page back to itself (Hide,
+// Save, Add…) used to land at the top; the scroll position is noted when the
+// form is sent and put back when the same page returns within a few seconds.
+// A form that leads to another page is not affected.
+const SCROLL_KEY = 'iqs_scroll_back';
+
+function rememberScroll() {
+    try {
+        sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ path: location.pathname + location.search, y: window.scrollY, at: Date.now() }));
+    } catch (e) {}
+}
+
+(function restoreScroll() {
+    let saved = null;
+    try {
+        saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY));
+        sessionStorage.removeItem(SCROLL_KEY);
+    } catch (e) {}
+    if (!saved || Date.now() - saved.at > 15000 || saved.path !== location.pathname + location.search || !saved.y) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    const go = () => window.scrollTo(0, saved.y);
+    go();
+    requestAnimationFrame(go); // again once Alpine has drawn the page
+})();

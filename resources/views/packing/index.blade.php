@@ -21,8 +21,8 @@
         csrf: document.querySelector('meta[name=csrf-token]').content,
         async post(url, body) {
             const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf }, body: JSON.stringify(body) });
-            const json = await r.json().catch(() => ({}));
-            if (!r.ok) throw new Error(json.message || @js(__('Something went wrong. Try again.')));
+            const json = await r.json().catch(() => null);
+            if (!r.ok || json === null) throw new Error(json?.message || @js(__('Something went wrong. Try again.')));
             return json;
         },
         async scan(code) {

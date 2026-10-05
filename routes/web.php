@@ -138,7 +138,8 @@ Route::middleware('auth')->group(function () {
     // Packing and handover
     Route::middleware('can:packing.view')->group(function () {
         Route::get('/packing', [PackingController::class, 'index'])->name('packing.index');
-        Route::redirect('/packing/scan', '/packing')->name('packing.scan');
+        // GET only: Route::redirect answers every verb and, once routes are cached, swallowed the scan POST below.
+        Route::get('/packing/scan', fn () => redirect('/packing'))->name('packing.scan');
         Route::get('/packing/labels', [PackingController::class, 'labels'])->name('packing.labels');
         Route::post('/packing/{order}/label', [PackingController::class, 'label'])->name('packing.label');
         Route::get('/packing/orders/{order}', [PackingController::class, 'preview'])->name('packing.preview');

@@ -308,7 +308,7 @@
                                 @error('order')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                                 @error('status')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                             </form>
-                            <div class="sticky bottom-0 flex flex-wrap gap-2 rounded-b-xl border-t border-gray-200 bg-white p-3 sm:p-4">
+                            <div class="sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-b-xl border-t border-gray-200 bg-white p-3 sm:p-4">
                                 @foreach ($actions as [$action, $label, $k, $variant])
                                     @if (in_array($action, ['hold', 'cancel'], true))
                                         <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="openReason('{{ $action }}')" class="flex-1 whitespace-nowrap py-2.5 sm:py-3 xl:flex-none">

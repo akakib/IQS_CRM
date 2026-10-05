@@ -26,9 +26,11 @@
     $armedSeconds = $armed ? $secondsLeft($armed->action_due_at) : 0;
     $armedIsOpen = $armed && $order && $armed->id === $order->id;
     $canExtend = $armed && ! $armed->timer_extended_at && $extendsLeft > 0;
+    // embed=1: one order inside the Order activity popup (no list, no tabs, no header).
+    $embed = request()->boolean('embed');
 @endphp
 
-<x-layouts.app :heading="__('Order management')">
+<x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="__('Order management')">
 <div x-data="{
         reasonMode: null, reason: null,
         openReason(mode) { this.reasonMode = mode; this.reason = null },
@@ -54,6 +56,7 @@
     }" @keydown.window="keys($event)">
 
     {{-- New orders: nobody picks; "Take next" always gives the oldest one. --}}
+    @unless ($embed)
     <div @class(['mb-4 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         <div class="flex items-center gap-4">
             <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold tabular-nums {{ $waiting ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400' }}">{{ $waiting }}</div>
@@ -79,6 +82,7 @@
     <div @class(['hidden lg:block' => $showDetailOnPhone])>
         <x-tabs :tabs="collect($tabLabels)->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
     </div>
+    @endunless
 
 
     @if ($lost)
@@ -133,8 +137,9 @@
         </div>
     @endif
 
-    <div class="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+    <div @class(['grid gap-4', 'lg:grid-cols-[300px_minmax(0,1fr)]' => ! $embed])>
         {{-- My orders in this stage --}}
+        @unless ($embed)
         <aside @class(['lg:block', 'hidden' => $showDetailOnPhone])>
             <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                 <p class="border-b border-gray-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $tabLabels[$tab] }} · {{ __('oldest first') }}</p>
@@ -167,16 +172,22 @@
             @if ($list->hasPages())<div class="mt-3">{{ $list->links() }}</div>@endif
             <p class="mt-3 hidden text-[11px] text-gray-400 lg:block">{{ __('Keys: J / K next and previous order · the letter on a button presses it · T take next') }}</p>
         </aside>
+        @endunless
 
         {{-- The open order --}}
-        <section @class(['min-w-0', 'hidden lg:block' => ! $showDetailOnPhone])>
+        <section @class(['min-w-0', 'hidden lg:block' => ! $showDetailOnPhone && ! $embed])>
             @if (! $order)
                 <div class="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
                     <p class="text-sm font-medium text-gray-700">{{ __('This list is empty') }}</p>
                     <p class="mt-1 text-sm text-gray-500">{{ $waiting && $canTake ? __('Press Take next to get the oldest new order.') : __('New orders will show at the top when they arrive.') }}</p>
                 </div>
             @else
+                @unless ($embed)
                 <a href="{{ $url(['tab' => $tab]) }}" class="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-primary lg:hidden">&larr; {{ __('My orders') }} · {{ $tabLabels[$tab] }} ({{ $counts[$tab] }})</a>
+                @endunless
+                @if ($embed && $reassign)
+                    @include('desk._reassign', ['order' => $order, 'reassign' => $reassign])
+                @endif
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">
@@ -347,6 +358,8 @@
                                 @csrf
                                 <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">
                                 <input type="hidden" name="tab" value="{{ $tab }}">
+                            @if ($embed)<input type="hidden" name="embed" value="1">@endif
+                                @if ($embed)<input type="hidden" name="embed" value="1">@endif
                                 @if (in_array($key, ['record_verified', 'no_answer'], true))
                                     <input name="note" maxlength="500" placeholder="{{ __('Call note (optional)') }}" class="{{ $input }}">
                                 @endif
@@ -380,6 +393,7 @@
                             <input type="hidden" name="action" value="{{ $mode }}">
                             <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">
                             <input type="hidden" name="tab" value="{{ $tab }}">
+                            @if ($embed)<input type="hidden" name="embed" value="1">@endif
                             <input type="hidden" name="reason_id" :value="reason">
                             <h3 class="text-sm font-semibold text-gray-800">{{ $title }}</h3>
                             <div class="mt-3 space-y-1.5">
@@ -415,7 +429,7 @@
     <template x-teleport="body">
         <div x-data="{ open: false, src: '' }" x-show="open" x-cloak
             @open-order-edit.window="src = @js(route('orders.edit', ['order' => $order->id, 'embed' => 1])); open = true"
-            @message.window="if ($event.origin === location.origin && $event.data?.iqsOrderEdited) location.href = @js(route('desk.index', ['tab' => $tab, 'order' => $order->id]))"
+            @message.window="if ($event.origin === location.origin && $event.data?.iqsOrderEdited) location.href = @js(route('desk.index', $embed ? ['embed' => 1, 'order' => $order->id] : ['tab' => $tab, 'order' => $order->id]))"
             class="fixed inset-0 z-[120] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">
             <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-[92vh] sm:rounded-2xl">
                 <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-6">
@@ -427,4 +441,4 @@
         </div>
     </template>
 @endif
-</x-layouts.app>
+</x-dynamic-component>

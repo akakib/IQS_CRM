@@ -13,6 +13,7 @@ return [
         ['My points', 'points.mine', 'points.mine', null, 'star'],
     ]],
     'orders' => ['Orders', [
+        ['Order activity', 'orders.activity', 'orders.activity', 'orders.reassign', 'board'],
         ['Order management', 'desk.index', 'desk.index', 'orders.edit', 'clipboard'],
         ['All orders', 'orders.index', 'orders.index', 'orders.view', 'list'],
         ['Quick order', 'orders.create', 'orders.create', 'orders.create', 'plus'],

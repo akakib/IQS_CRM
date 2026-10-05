@@ -406,6 +406,55 @@ class DeskTest extends TestCase
         $this->desk()->takeNext($owner->fresh());
     }
 
+    private function manager(): User
+    {
+        $boss = User::factory()->create(['name' => 'Boss']);
+        $boss->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'orders.reassign'], [], 'Manager')->id);
+        app(\App\Services\PermissionService::class)->bump();
+
+        return $boss;
+    }
+
+    public function test_order_activity_board_shows_each_stage_with_who_holds_it_and_loads_more(): void
+    {
+        [$a, $b] = [$this->web(), $this->web()];
+        $this->desk()->takeNext($this->mahim); // a: Mahim is checking it
+        $this->actingAs($this->manager());
+
+        $this->get('/orders/activity')->assertOk()
+            ->assertSee('New, nobody took')->assertSee('Verify')
+            ->assertSee($b->order_no)->assertSee($a->order_no)->assertSee('Mahim')
+            ->assertSee('Waiting for someone to take it');
+        $this->get('/orders/activity', ['X-Board' => '1'])->assertOk()->assertDontSee('<html', false)->assertSee($a->order_no);
+        $this->get('/orders/activity?staff='.$this->mahim->id)->assertOk()->assertSee($a->order_no)->assertDontSee($b->order_no);
+        $this->get('/orders/activity?column=waiting&page=2')->assertOk()->assertDontSee($b->order_no); // only 2 orders: page 2 is empty
+
+        // Staff cannot open the board.
+        $this->actingAs($this->mahim)->get('/orders/activity')->assertForbidden();
+    }
+
+    public function test_the_board_popup_shows_the_order_lets_the_admin_act_and_hand_it_over(): void
+    {
+        $a = $this->web();
+        $this->desk()->takeNext($this->mahim);
+        $boss = $this->manager();
+        $this->actingAs($boss);
+
+        $this->get("/desk?embed=1&order={$a->id}")->assertOk()->assertSee($a->order_no)->assertSee('Give to someone else')->assertSee('Rima')
+            ->assertDontSee('Take next');
+
+        // An action from the popup comes back to the same order in the popup.
+        $this->post("/desk/{$a->id}/act", ['action' => 'verify', 'lock_version' => $a->fresh()->lock_version, 'embed' => 1])
+            ->assertRedirect(route('desk.index', ['embed' => 1, 'order' => $a->id]));
+        $this->assertSame('record_verified', $this->key($a));
+
+        // Hand it to Rima: written to the history with the admin's name.
+        $reason = DB::table('status_reasons')->where('reason_type', 'reassign')->value('id');
+        $this->from("/desk?embed=1&order={$a->id}")->post("/orders/{$a->id}/reassign", ['user_id' => $this->rima->id, 'reason_id' => $reason])->assertRedirect();
+        $this->assertSame($this->rima->id, $a->fresh()->moderator_id);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $a->id, 'note_type' => 'assignment', 'user_id' => $boss->id]);
+    }
+
     public function test_chat_orders_belong_to_their_creator_without_timer_or_limit(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]);

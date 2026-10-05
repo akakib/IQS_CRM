@@ -132,6 +132,13 @@ class DeskController extends Controller
             'oldestWaiting' => $waiting->oldest,
             'limit' => (int) settings('desk.active_limit'),
             'canTake' => $user->can('orders.take') && ! $user->isOwner(), // owners watch, staff take
+            // Order activity popup: the admin can hand the order to someone else.
+            'reassign' => $request->boolean('embed') && $order && $user->can('orders.reassign') ? [
+                'staff' => \App\Models\User::where('is_active', true)->orderBy('name')->get(['id', 'name', 'photo_path'])
+                    ->filter(fn ($u) => $u->id !== $order->moderator_id && $u->can('orders.take') && ! $u->isOwner())->values(),
+                'reasons' => \App\Models\StatusReason::options('reassign'),
+                'holder' => $order->moderator_id ? DB::table('users')->where('id', $order->moderator_id)->first(['id', 'name', 'photo_path']) : null,
+            ] : null,
             'reasons' => ['hold' => ($reasons['hold'] ?? collect())->pluck('label_en', 'id')->all(), 'cancel' => ($reasons['cancel'] ?? collect())->pluck('label_en', 'id')->all()],
             'returns' => array_values(array_filter(array_map('intval', explode(',', (string) settings('desk.no_response_returns'))))),
         ]);
@@ -198,12 +205,15 @@ class DeskController extends Controller
             'hold_expected_date' => ['nullable', 'date', 'after_or_equal:today'],
             'lock_version' => ['required', 'integer'],
             'tab' => ['nullable', Rule::in(self::TABS)],
+            'embed' => ['nullable', 'boolean'],
         ]);
+        // Opened from Order activity: stay on this order in the popup.
+        $embedded = $request->boolean('embed') ? ['embed' => 1, 'order' => $order->id] : null;
         // Time already up: the action does not count; the order goes back to New.
         if ($order->moderator_id === $user->id && $order->action_due_at && $order->action_due_at->isPast()) {
             $this->desk->release($order->id, 'timeout');
 
-            return redirect()->route('desk.index', array_filter(['tab' => $data['tab'] ?? null]))
+            return redirect()->route('desk.index', $embedded ?? array_filter(['tab' => $data['tab'] ?? null]))
                 ->with('error', __('Time ran out on :no. It went back to New.', ['no' => $order->order_no]));
         }
         if ($order->lock_version !== (int) $data['lock_version']) {
@@ -264,7 +274,7 @@ class DeskController extends Controller
                 $message = __(':no sent to packaging. Booking the courier…', ['no' => $order->order_no]);
         }
 
-        return redirect()->route('desk.index', array_filter($next))->with('success', $message);
+        return redirect()->route('desk.index', $embedded ?? array_filter($next))->with('success', $message);
     }
 
     /** "+5 min" on the running timer. */

@@ -105,6 +105,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/desk/{order}/extend', [DeskController::class, 'extend'])->middleware('can:orders.edit')->name('desk.extend');
 
     Route::get('/desk/control', [TeamController::class, 'control'])->middleware('can:orders.reassign')->name('desk.control');
+    Route::get('/orders/activity', [\App\Http\Controllers\OrderActivityController::class, 'index'])->middleware('can:orders.reassign')->name('orders.activity');
     Route::get('/attendance', [TeamController::class, 'attendance'])->middleware('can:attendance.view')->name('attendance.index');
     Route::middleware('can:attendance.edit')->group(function () {
         Route::post('/attendance/breaks/{break}', [TeamController::class, 'correctBreak'])->whereNumber('break')->name('attendance.breaks.correct');

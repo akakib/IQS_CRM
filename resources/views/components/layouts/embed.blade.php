@@ -11,5 +11,6 @@
 </head>
 <body class="bg-gray-50 font-sans text-gray-900 antialiased">
     <main class="p-4 sm:p-6">{{ $slot }}</main>
+    <x-toaster />
 </body>
 </html>

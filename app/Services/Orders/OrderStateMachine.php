@@ -60,6 +60,9 @@ class OrderStateMachine
             if ($source === 'user' && $rule->permission_key && ! $user?->can($rule->permission_key)) {
                 throw ValidationException::withMessages(['status' => __('You are not allowed to move orders to :to.', ['to' => $to['name']])]);
             }
+            if ($source === 'user' && $from['key'] === 'hold' && ! in_array($to['key'], $this->holdExits($fresh), true)) {
+                throw ValidationException::withMessages(['status' => __('This order was held after :to. It goes back to where it was, not an earlier step.', ['to' => $to['name']])]);
+            }
             if (($rule->requires_reason || $to['requires_reason']) && ! $reasonId) {
                 throw ValidationException::withMessages(['reason_id' => __('Choose a reason.')]);
             }
@@ -120,12 +123,14 @@ class OrderStateMachine
     public function allowedTargets(Order $order, User $user): array
     {
         $map = OrderStatus::map();
+        $exits = $map[$order->status_id]['key'] === 'hold' ? $this->holdExits($order) : null;
 
         return DB::table('order_status_transitions')
             ->where('from_status_id', $order->status_id)->where('is_active', true)->where('system_only', false)
             ->get()
             ->filter(fn ($t) => ! $t->permission_key || $user->can($t->permission_key))
             ->filter(fn ($t) => $map[$t->to_status_id]['active'])
+            ->filter(fn ($t) => $exits === null || in_array($map[$t->to_status_id]['key'], $exits, true))
             ->map(fn ($t) => [
                 'key' => $map[$t->to_status_id]['key'],
                 'name' => $map[$t->to_status_id]['name'],
@@ -135,6 +140,29 @@ class OrderStateMachine
                     'cancelled' => 'cancel', 'hold' => 'hold', 'returned' => 'return', default => 'status',
                 },
             ])->values()->all();
+    }
+
+    /**
+     * Where a held order may go: back to the step it was held from, never an
+     * earlier one. CN booked: packaging. Held after Confirmed: Confirmed (To send).
+     * Held before or during the call: the call again, or Confirmed.
+     */
+    public function holdExits(Order $order, ?string $heldFrom = null): array
+    {
+        if ($this->hasConsignment($order)) {
+            return ['ready_for_packaging', 'cancelled'];
+        }
+        $heldFrom ??= $this->heldFrom($order);
+
+        return $heldFrom === 'confirmed' ? ['confirmed', 'cancelled'] : ['record_verified', 'confirmed', 'cancelled'];
+    }
+
+    /** The status the order was in when it was last put on hold. */
+    public function heldFrom(Order $order): ?string
+    {
+        $from = DB::table('order_events')->where('order_id', $order->id)->where('to_status_id', OrderStatus::idFor('hold'))->orderByDesc('id')->value('from_status_id');
+
+        return $from ? (OrderStatus::map()[$from]['key'] ?? null) : null;
     }
 
     private function hasConsignment(Order $order): bool

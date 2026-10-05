@@ -215,7 +215,7 @@ class DeskController extends Controller
         abort_if($order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
 
         $data = $request->validate([
-            'action' => ['required', Rule::in(['verify', 'confirm', 'no_response', 'hold', 'cancel', 'resume', 'send', 'back_to_packaging'])],
+            'action' => ['required', Rule::in(['verify', 'confirm', 'no_response', 'hold', 'cancel', 'resume', 'send', 'back_to_packaging', 'back_to_send'])],
             'reason_id' => ['nullable', 'integer'],
             'note' => ['nullable', 'string', 'max:500'],
             'hold_expected_date' => ['nullable', 'date', 'after_or_equal:today'],
@@ -284,6 +284,11 @@ class DeskController extends Controller
                 $next = ['tab' => 'call', 'order' => $order->id];
                 $message = __('Back in your Call tab.');
                 break;
+            case 'back_to_send': // held after Confirmed: no second call needed
+                $this->machine->transition($order, 'confirmed', $user, 'user', null, $note);
+                $next = ['tab' => 'send', 'order' => $order->id];
+                $message = __(':no is back in To send.', ['no' => $order->order_no]);
+                break;
             case 'back_to_packaging':
                 $this->machine->transition($order, 'ready_for_packaging', $user, 'user', null, $note);
                 $message = __(':no is back in the packaging queue.', ['no' => $order->order_no]);
@@ -323,7 +328,8 @@ class DeskController extends Controller
         $heldBy = null;
         if ($key === 'hold') {
             $e = DB::table('order_events as e')->leftJoin('users as u', 'u.id', '=', 'e.user_id')
-                ->where('e.order_id', $order->id)->where('e.to_status_id', $order->status_id)->orderByDesc('e.id')->first(['e.source', 'u.name']);
+                ->where('e.order_id', $order->id)->where('e.to_status_id', $order->status_id)->orderByDesc('e.id')->first(['e.source', 'e.from_status_id', 'u.name']);
+            $heldFrom = $e?->from_status_id ? (OrderStatus::map()[$e->from_status_id]['key'] ?? null) : null;
             $heldBy = $e ? ($e->name ? $e->name.($e->source === 'scan' ? ' ('.__('packer').')' : '') : __('System')) : null;
         }
 
@@ -332,6 +338,7 @@ class DeskController extends Controller
             'notes' => $notes,
             'duplicates' => $duplicates,
             'heldBy' => $heldBy,
+            'heldFrom' => $heldFrom ?? null,
             'consignment' => $order->active_shipment_id ? DB::table('shipments')->where('id', $order->active_shipment_id)->value('consignment_id') : null,
         ];
     }

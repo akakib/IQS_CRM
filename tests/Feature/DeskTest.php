@@ -81,6 +81,34 @@ class DeskTest extends TestCase
         return $this->post("/desk/{$o->id}/act", ['action' => $action, 'lock_version' => $o->fresh()->lock_version] + $extra);
     }
 
+    public function test_a_held_order_goes_back_to_where_it_was_held_never_to_an_earlier_step(): void
+    {
+        $machine = app(\App\Services\Orders\OrderStateMachine::class);
+        $hold = \Illuminate\Support\Facades\DB::table('status_reasons')->where('reason_type', 'hold')->value('id');
+        $this->actingAs($this->mahim);
+
+        // Held during the call: the call comes back.
+        $calling = $this->web();
+        $this->desk()->assign($calling->id, $this->mahim->id, 'claimed');
+        $machine->transition($calling, 'record_verified', $this->mahim);
+        $machine->transition($calling->fresh(), 'hold', $this->mahim, 'user', $hold);
+        $this->get("/desk?tab=hold&order={$calling->id}")->assertSee('Resume, call next')->assertDontSee('Back to To send');
+        $this->assertEqualsCanonicalizing(['record_verified', 'confirmed', 'cancelled'], collect($machine->allowedTargets($calling->fresh(), $this->mahim))->pluck('key')->all());
+
+        // Held after Confirmed: straight back to To send, no second call.
+        $confirmed = $this->web();
+        $this->desk()->assign($confirmed->id, $this->mahim->id, 'claimed');
+        $machine->transition($confirmed, 'record_verified', $this->mahim);
+        $machine->transition($confirmed->fresh(), 'confirmed', $this->mahim);
+        $machine->transition($confirmed->fresh(), 'hold', $this->mahim, 'user', $hold);
+        $this->get("/desk?tab=hold&order={$confirmed->id}")->assertSee('Back to To send')->assertDontSee('Resume, call next');
+        $this->assertNotContains('record_verified', collect($machine->allowedTargets($confirmed->fresh(), $this->mahim))->pluck('key'));
+        $this->act($confirmed, 'resume')->assertSessionHasErrors('status');
+        $this->assertSame('hold', $this->key($confirmed));
+        $this->act($confirmed, 'back_to_send')->assertSessionHas('success');
+        $this->assertSame('confirmed', $this->key($confirmed));
+    }
+
     public function test_take_next_gives_the_oldest_order_and_stops_at_the_limit(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 2]);

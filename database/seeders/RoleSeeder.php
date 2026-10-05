@@ -31,18 +31,42 @@ class RoleSeeder extends Seeder
     ];
 
     /**
-     * Permissions added after the first install. If nobody at all holds one
-     * yet, these system roles get it, so a new feature works without the
+     * Roles created before a module existed never got its permissions. If
+     * nobody at all holds a permission yet, these system roles get it
+     * ("role:own" = own records only), so a new feature works without the
      * admin hunting for a tick box. Once any role has it, the admin decides.
      */
     private const LATER_GRANTS = [
+        'orders.view' => ['moderator:own', 'manager'],
+        'orders.create' => ['moderator', 'manager'],
+        'orders.edit' => ['moderator', 'manager'],
         'orders.take' => ['moderator'],
+        'orders.approve' => ['manager'],
+        'orders.reassign' => ['manager'],
+        'orders.export' => ['manager'],
+        'products.view' => ['moderator', 'manager', 'packaging', 'store_keeper'],
+        'products.create' => ['manager'],
+        'products.edit' => ['manager'],
+        'products.availability' => ['manager'],
+        'customers.view' => ['moderator', 'manager'],
+        'customers.create' => ['moderator', 'manager'],
+        'customers.edit' => ['moderator', 'manager'],
+        'packing.view' => ['packaging', 'manager'],
+        'packing.create' => ['packaging'],
         'packing.manage' => ['manager'],
+        'shipping.view' => ['manager'],
+        'shipping.create' => ['manager'],
+        'hotline.view' => ['manager', 'moderator'],
+        'hotline.create' => ['manager', 'moderator'],
         'attendance.view' => ['manager', 'hr'],
         'attendance.edit' => ['manager', 'hr'],
         'points.manage' => ['manager'],
         'kpi.view' => ['manager'],
         'analysis.view' => ['manager'],
+        'marketing.view' => ['manager', 'dollar_keeper'],
+        'marketing.create' => ['dollar_keeper'],
+        'activity.view' => ['manager'],
+        'settings.view' => ['manager'],
     ];
 
     public function run(): void
@@ -72,8 +96,11 @@ class RoleSeeder extends Seeder
             if (! $permissionId || DB::table('role_permissions')->where('permission_id', $permissionId)->exists()) {
                 continue;
             }
-            foreach (Role::whereIn('system_key', $roleKeys)->pluck('id') as $roleId) {
-                DB::table('role_permissions')->insert(['role_id' => $roleId, 'permission_id' => $permissionId, 'data_scope' => 'all']);
+            foreach ($roleKeys as $grant) {
+                [$roleKey, $scope] = array_pad(explode(':', $grant), 2, 'all');
+                if ($roleId = Role::where('system_key', $roleKey)->value('id')) {
+                    DB::table('role_permissions')->insert(['role_id' => $roleId, 'permission_id' => $permissionId, 'data_scope' => $scope]);
+                }
             }
         }
 

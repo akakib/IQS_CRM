@@ -10,6 +10,7 @@ use App\Services\Orders\OrderStateMachine;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -102,8 +103,12 @@ class DeskController extends Controller
 
     public function takeNext(Request $request): RedirectResponse
     {
+        // A double click must not hand out two orders: one Take next per person every 3 seconds.
+        if (! Cache::add('desk:take:'.$request->user()->id, 1, 3)) {
+            return redirect()->route('desk.index');
+        }
         $order = $this->desk->takeNext($request->user());
-        $tab = OrderStatus::map()[$order->status_id]['key'] === 'new' ? 'verify' : 'call';
+        $tab =OrderStatus::map()[$order->status_id]['key'] === 'new' ? 'verify' : 'call';
 
         return redirect()->route('desk.index', ['tab' => $tab, 'order' => $order->id])->with('success', __(':no is yours.', ['no' => $order->order_no]));
     }

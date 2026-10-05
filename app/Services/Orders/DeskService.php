@@ -284,7 +284,14 @@ class DeskService
         if (OrderStatus::map()[$order->status_id]['key'] !== 'confirmed') {
             throw ValidationException::withMessages(['order' => __('Only a confirmed order can go to packing.')]);
         }
-        DB::table('orders')->where('id', $order->id)->update(['booking_state' => 'queued', 'booking_attempts' => 0, 'booking_error' => null, 'updated_at' => now()]);
+        // Only one click wins: the state must still be "not sent" (or "failed" for a retry) at the moment of the update.
+        $queued = DB::table('orders')->where('id', $order->id)->whereIn('booking_state', ['none', 'failed'])->update([
+            'booking_state' => 'queued', 'booking_attempts' => 0, 'booking_error' => null,
+            'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now(),
+        ]);
+        if (! $queued) {
+            return; // already on its way
+        }
         $this->orders->note($order, 'courier', __('Sent to packing by :n. Booking the courier…', ['n' => $user->name]), $user);
 
         $orderId = $order->id;

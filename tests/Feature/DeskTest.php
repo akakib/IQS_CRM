@@ -88,9 +88,15 @@ class DeskTest extends TestCase
         $this->assertSame($this->mahim->id, $a->fresh()->moderator_id); // oldest first, not picked
         $this->assertNull($b->fresh()->moderator_id);
 
+        // A double click does not hand out a second order.
+        $this->post('/desk/next')->assertRedirect(route('desk.index'));
+        $this->assertNull($b->fresh()->moderator_id);
+
+        $this->travel(4)->seconds();
         $this->post('/desk/next');
         $this->assertSame($this->mahim->id, $b->fresh()->moderator_id);
 
+        $this->travel(4)->seconds();
         $this->post('/desk/next')->assertSessionHasErrors('order'); // holds 2 of 2
         $this->assertNull($c->fresh()->moderator_id);
 
@@ -222,6 +228,7 @@ class DeskTest extends TestCase
         }
 
         $this->act($a, 'send')->assertSessionHas('success'); // booking runs after the response (fake courier)
+        $this->assertSame(1, DB::table('shipments')->where('order_id', $a->id)->count());
 
         $a->refresh();
         $this->assertSame('ready_for_packaging', $this->key($a));
@@ -327,6 +334,7 @@ class DeskTest extends TestCase
         $this->actingAs($this->mahim);
         foreach (range(1, 3) as $i) {
             $this->post('/desk/next');
+            $this->travel(4)->seconds();
         }
 
         DB::flushQueryLog();

@@ -17,7 +17,7 @@ class ConfirmationSeeder extends Seeder
             $rules = [
                 ['Blocked customer', 10, 'manual_review', [['customer_is_blocked', null, '=', 'true']]],
                 ['Fully prepaid', 20, 'record_verified', [['advance_paid_percent', null, '>=', '100']]],              // still called: the call can add items
-                ['Trusted repeat customer', 30, 'record_verified_and_confirmed', [['own_delivered_count', null, '>=', '2'], ['own_return_count', null, '=', '0']]],
+                ['Trusted repeat customer', 30, 'record_verified', [['own_delivered_count', null, '>=', '2'], ['own_return_count', null, '=', '0']]],
                 ['Good Steadfast history', 40, 'record_verified', [['provider_success_rate', $steadfast, '>=', '75'], ['provider_total_parcels', $steadfast, '>=', '3']]],
                 ['Weak Steadfast history', 45, 'hold_for_advance', [['provider_success_rate', $steadfast, '<', '75'], ['provider_total_parcels', $steadfast, '>=', '3']]],
                 ['New to Steadfast (fewer than 3 parcels)', 50, 'hold_for_advance', [['provider_total_parcels', $steadfast, '<', '3']]],

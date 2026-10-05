@@ -130,7 +130,7 @@ class VerificationTest extends TestCase
         $this->assertSame('Weak Steadfast history', DB::table('verification_rules')->where('id', DB::table('verification_runs')->where('order_id', $order->id)->value('matched_rule_id'))->value('name'));
     }
 
-    public function test_trusted_repeat_customer_is_auto_confirmed_and_cost_is_frozen(): void
+    public function test_trusted_repeat_customer_still_gets_a_call_and_cost_is_frozen_on_confirm(): void
     {
         $customer = Customer::create(['name' => 'Loyal', 'primary_phone' => '01912345670']);
         DB::table('customer_phones')->insert(['customer_id' => $customer->id, 'phone' => '01912345670', 'is_primary' => true]);
@@ -138,9 +138,12 @@ class VerificationTest extends TestCase
 
         $order = $this->order('01912345670');
 
-        $this->assertSame('confirmed', $this->key($order));
-        $this->assertSame('350.00', $order->items->first()->cost_price_snapshot);
-        $this->assertSame(2, DB::table('order_events')->where('order_id', $order->id)->where('source', 'rule')->count());
+        // Called too: the call is also for upselling.
+        $this->assertSame('record_verified', $this->key($order));
+        $this->assertSame(1, DB::table('order_events')->where('order_id', $order->id)->where('source', 'rule')->count());
+
+        app(\App\Services\Orders\OrderStateMachine::class)->transition($order, 'confirmed', null, 'rule');
+        $this->assertSame('350.00', $order->fresh()->items->first()->cost_price_snapshot);
     }
 
     public function test_blocked_customer_always_goes_to_manual_review(): void

@@ -159,6 +159,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/packing/batches/{batch}/done', [PackingController::class, 'done'])->whereNumber('batch')->name('packing.done');
         Route::post('/handover', [HandoverController::class, 'start'])->name('handover.start');
         Route::post('/handover/{session}/scan', [HandoverController::class, 'scan'])->whereNumber('session')->name('handover.scan');
+        Route::post('/handover/{session}/manual', [HandoverController::class, 'manual'])->whereNumber('session')->name('handover.manual');
         Route::post('/handover/{session}/close', [HandoverController::class, 'close'])->whereNumber('session')->name('handover.close');
     });
 

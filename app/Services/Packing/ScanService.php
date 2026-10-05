@@ -18,6 +18,9 @@ use Illuminate\Validation\ValidationException;
  */
 class ScanService
 {
+    /** True while a parcel is being handed over by a tick instead of a label scan (written to the log). */
+    private bool $byHand = false;
+
     public function __construct(private OrderStateMachine $machine, private OrderService $orders) {}
 
     /**
@@ -137,8 +140,9 @@ class ScanService
     }
 
     /** @return array{ok: bool, level: string, result: string, message: string, order?: array} */
-    public function handover(int $sessionId, string $code, User $by): array
+    public function handover(int $sessionId, string $code, User $by, bool $byHand = false): array
     {
+        $this->byHand = $byHand;
         [$label, $order, $early] = $this->lookup($code);
         if ($early) {
             return $this->log('handover', $sessionId, $code, $order, $label, $early, $by);
@@ -166,12 +170,32 @@ class ScanService
         if ($key === 'packed') {
             $this->machine->transition($order, 'ready_for_pickup', $by, 'scan');
         }
-        $this->machine->transition($order, 'handed_over', $by, 'scan');
+        $this->machine->transition($order, 'handed_over', $by, 'scan', null, $byHand ? __('ticked by hand, label not scanned') : null);
 
         return $this->log('handover', $sessionId, $code, $order->refresh(), $label, [
             'ok' => true, 'level' => $order->edited_after_pack ? 'edited' : 'ok', 'result' => 'ok',
-            'message' => $order->edited_after_pack ? __('Handed over (edited order).') : __('Handed over.'),
+            'message' => $byHand ? __('Handed over (by hand).') : ($order->edited_after_pack ? __('Handed over (edited order).') : __('Handed over.')),
         ], $by);
+    }
+
+    /**
+     * Handover without a scanner: the same checks as a scan, run against the
+     * order's current label. What is lost is the proof that the parcel in
+     * hand carries that label, so every such handover is marked "by hand".
+     *
+     * @return array{ok: bool, level: string, result: string, message: string, order?: array}
+     */
+    public function handoverByHand(int $sessionId, Order $order, User $by): array
+    {
+        $barcode = DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')->orderByDesc('id')->value('barcode');
+        if (! $barcode) {
+            return ['ok' => false, 'level' => 'red', 'result' => 'blocked', 'message' => __('No label: book the courier first.'), 'order' => ['order_no' => $order->order_no]];
+        }
+        try {
+            return $this->handover($sessionId, $barcode, $by, true);
+        } finally {
+            $this->byHand = false;
+        }
     }
 
     /** @return array{0: ?object, 1: ?Order, 2: ?array} label, order, early failure */
@@ -222,7 +246,7 @@ class ScanService
         DB::table('scan_logs')->insert([
             'station' => $station, 'handover_session_id' => $sessionId, 'code' => mb_substr(strtoupper(trim($code)), 0, 80),
             'order_id' => $order?->id, 'label_id' => $label?->id, 'result' => $r['result'], 'message' => mb_substr($r['message'], 0, 255),
-            'user_id' => $by->id, 'created_at' => now(),
+            'user_id' => $by->id, 'manual' => $this->byHand, 'created_at' => now(),
         ]);
 
         if ($order) {

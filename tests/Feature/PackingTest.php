@@ -159,6 +159,30 @@ class PackingTest extends TestCase
         $this->assertSame(3, DB::table('scan_logs')->where('handover_session_id', $session)->count());
     }
 
+    public function test_handover_by_hand_runs_the_same_checks_and_is_marked_manual(): void
+    {
+        $good = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $edited = $this->booked('01812345678', [['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        $this->actingAs($this->packer);
+        $this->packIt($good);
+        $this->packIt($edited);
+        // Edited after packing: must be repacked, so it cannot leave, by scan or by hand.
+        app(OrderEditor::class)->request($edited->fresh(), ['items' => [['variant_id' => $this->nuts->id, 'qty' => 2]]],
+            DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'customer_request')->value('id'), $this->desk, $edited->fresh()->lock_version);
+
+        $this->post('/handover', ['rider_name' => 'Rafiq']);
+        $session = DB::table('handover_sessions')->value('id');
+        $this->get("/handover/{$session}?tab=manual")->assertOk()->assertSee('Manual')->assertSee($good->order_no);
+
+        $this->post("/handover/{$session}/manual", ['order_ids' => [$good->id, $edited->id]])->assertSessionHas('success');
+
+        $this->assertSame('handed_over', $this->key($good));
+        $this->assertDatabaseHas('scan_logs', ['handover_session_id' => $session, 'order_id' => $good->id, 'result' => 'ok', 'manual' => true]);
+        $this->assertNotSame('handed_over', $this->key($edited));
+        $this->assertStringContainsString($edited->order_no, session('refused')[0]);
+        $this->get("/handover/{$session}/manifest")->assertOk()->assertSee('ticked by hand');
+    }
+
     public function test_cancelled_or_held_order_is_refused_at_packing(): void
     {
         $order = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);

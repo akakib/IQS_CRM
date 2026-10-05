@@ -55,6 +55,25 @@ class HandoverController extends Controller
         return response()->json($scans->handover($session, $data['code'], $request->user()));
     }
 
+    /** Manual tab: hand over the ticked parcels without scanning. Each one passes the same checks as a scan. */
+    public function manual(int $session, Request $request, ScanService $scans): RedirectResponse
+    {
+        $s = DB::table('handover_sessions')->find($session);
+        abort_unless($s && ! $s->closed_at, 422, __('This handover is closed.'));
+        $data = $request->validate(['order_ids' => ['required', 'array', 'min:1', 'max:300'], 'order_ids.*' => ['integer']]);
+
+        $done = 0;
+        $refused = [];
+        foreach (Order::whereIn('id', $data['order_ids'])->get() as $order) {
+            $r = $scans->handoverByHand($session, $order, $request->user());
+            $r['ok'] ? $done++ : $refused[] = $order->order_no.': '.$r['message'];
+        }
+
+        return redirect()->route('handover.show', ['session' => $session, 'tab' => 'manual'])
+            ->with($done ? 'success' : 'error', trans_choice('{0} Nothing was handed over.|{1} :count parcel handed over by hand.|[2,*] :count parcels handed over by hand.', $done, ['count' => $done]))
+            ->with('refused', $refused);
+    }
+
     public function close(int $session, Request $request): RedirectResponse
     {
         $closed = DB::table('handover_sessions')->where('id', $session)->whereNull('closed_at')->update(['closed_at' => now(), 'closed_by' => $request->user()->id]);
@@ -82,13 +101,16 @@ class HandoverController extends Controller
         $handed = DB::table('scan_logs as l')->join('orders as o', 'o.id', '=', 'l.order_id')
             ->leftJoin('shipments as sh', 'sh.id', '=', 'o.active_shipment_id')
             ->where('l.handover_session_id', $session)->where('l.result', 'ok')
-            ->orderBy('l.id')->get(['o.id', 'o.order_no', 'o.ship_name', 'o.ship_thana', 'o.cod_amount', 'sh.consignment_id', 'l.created_at']);
+            ->orderBy('l.id')->get(['o.id', 'o.order_no', 'o.ship_name', 'o.ship_thana', 'o.cod_amount', 'sh.consignment_id', 'l.created_at', 'l.manual']);
 
         return [
             'handed' => $handed,
             // Ready but not scanned in this handover.
-            'missing' => Order::whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->whereNotIn('id', $handed->pluck('id'))
-                ->get(['id', 'order_no', 'ship_name', 'cod_amount']),
+            'missing' => DB::table('orders as o')->leftJoin('shipments as sh', 'sh.id', '=', 'o.active_shipment_id')
+                ->whereIn('o.status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->whereNotIn('o.id', $handed->pluck('id'))
+                ->orderBy('o.id')->limit(500)
+                ->selectRaw('o.id, o.order_no, o.ship_name, o.ship_district, o.ship_thana, o.cod_amount, sh.consignment_id,
+                    (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) as items')->get(),
             'bad' => DB::table('scan_logs')->where('handover_session_id', $session)->where('result', '!=', 'ok')->orderByDesc('id')->limit(30)->get(),
         ];
     }

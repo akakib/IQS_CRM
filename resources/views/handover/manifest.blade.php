@@ -29,8 +29,9 @@
         <thead><tr><th>#</th><th>{{ __('Order') }}</th><th>CN</th><th>{{ __('Customer') }}</th><th>{{ __('Area') }}</th><th class="r">{{ __('COD') }}</th></tr></thead>
         <tbody>
             @foreach ($handed as $i => $h)
-                <tr><td>{{ $i + 1 }}</td><td>{{ $h->order_no }}</td><td>{{ $h->consignment_id }}</td><td>{{ $h->ship_name }}</td><td>{{ $h->ship_thana }}</td><td class="r">{{ number_format((float) $h->cod_amount, 2) }}</td></tr>
+                <tr><td>{{ $i + 1 }}</td><td>{{ $h->order_no }}{{ $h->manual ? ' *' : '' }}</td><td>{{ $h->consignment_id }}</td><td>{{ $h->ship_name }}</td><td>{{ $h->ship_thana }}</td><td class="r">{{ number_format((float) $h->cod_amount, 2) }}</td></tr>
             @endforeach
+            @if ($handed->contains('manual', true))<tr><td colspan="6">* {{ __('ticked by hand, label not scanned') }}</td></tr>@endif
             <tr><th colspan="5">{{ __('Total: :n parcels', ['n' => $handed->count()]) }}</th><th class="r">{{ number_format((float) $handed->sum('cod_amount'), 2) }}</th></tr>
         </tbody>
     </table>

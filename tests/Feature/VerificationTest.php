@@ -122,7 +122,9 @@ class VerificationTest extends TestCase
 
         // The rest of the score, small, on the order and the desk.
         $this->blade('<x-steadfast-detail :detail="$d" />', ['d' => ['cancellation_ratio' => 84, 'return_ratio' => 84, 'fraud_categories' => ['fake_order' => 2], 'doubtful_reports' => true, 'level' => null]])
-            ->assertSee('Cancel 84%')->assertSee('Fake order ×2')->assertSee('Doubtful reports')->assertDontSee('Risk:');
+            ->assertDontSee('Cancel 84%')->assertSee('Fake order ×2')->assertSee('Doubtful reports')->assertDontSee('Risk:');
+        $this->blade('<x-steadfast-line :provider="$p" />', ['p' => ['key' => 'steadfast', 'success_rate' => 97.0, 'total_parcels' => 25, 'detail' => ['cancellation_ratio' => 2, 'volume_range' => '25+']]])
+            ->assertSeeInOrder(['text-green-700', 'D 97%', 'text-red-600', 'C 2%', '25+ parcels'], false);
         $this->assertSame(25, $r->totalParcels); // from volume_range; total_reports (0 here) is not parcels
         \Illuminate\Support\Facades\Http::assertSent(fn ($req) => str_ends_with($req->url(), 'fraud_check/score/01712345678') && $req->hasHeader('Api-Key', 'k'));
     }

@@ -1,4 +1,4 @@
-{{-- The rest of the Steadfast score, small: cancel and return rates, fraud
+{{-- The rest of the Steadfast score, small (D, C and parcels are in x-steadfast-line): fraud
      reports by kind, doubtful reports and the risk level (when Steadfast scoring
      is on). Reads the snapshot taken when the checks ran, so no extra query.
      <x-steadfast-detail :detail="$provider['detail'] ?? null" /> --}}
@@ -6,15 +6,6 @@
 
 @if (is_array($detail) && $detail)
     <div {{ $attributes->merge(['class' => 'mt-1 flex flex-wrap gap-1 text-[11px]']) }}>
-        @isset($detail['cancellation_ratio'])
-            <span class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-700">{{ __('Cancel :p%', ['p' => $detail['cancellation_ratio'] + 0]) }}</span>
-        @endisset
-        @isset($detail['return_ratio'])
-            <span class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-700">{{ __('Return :p%', ['p' => $detail['return_ratio'] + 0]) }}</span>
-        @endisset
-        @if (! empty($detail['volume_range']))
-            <span class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-700">{{ __('Parcels :r', ['r' => $detail['volume_range']]) }}</span>
-        @endif
         @if (! empty($detail['total_reports']))
             <span class="rounded bg-red-50 px-1.5 py-0.5 font-medium text-red-700">{{ __('Reports :n', ['n' => $detail['total_reports']]) }}</span>
         @endif

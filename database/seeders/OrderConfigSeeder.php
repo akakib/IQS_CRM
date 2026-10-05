@@ -93,6 +93,7 @@ class OrderConfigSeeder extends Seeder
         ['amendment', 'Customer request', 'customer', 'customer_request', 'manual'],
         ['amendment', 'Stock out, substitute given', 'none', 'stock_out_substitute', 'manual'],
         ['amendment', 'Entry error', 'sales', 'entry_error', 'manual'],
+        ['amendment', 'Advance payment changed the COD', 'none', 'payment_cod', 'manual'],
         ['amendment', 'Price error', 'sales', 'price_error', 'manual'],
         ['amendment', 'Advance payment verified', 'none', 'advance_verified', 'manual'],
         ['return', 'Customer refused at door', 'customer', 'refused', 'manual'],

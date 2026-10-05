@@ -13,6 +13,7 @@ return [
         'products' => ['view', 'create', 'edit', 'delete', 'export', 'availability'],
         'customers' => ['view', 'create', 'edit', 'delete', 'export'],
         'orders' => ['view', 'create', 'edit', 'approve', 'export', 'reassign', 'take'],
+        'payments' => ['verify'],
         'shipping' => ['view', 'create'],
         'hotline' => ['view', 'create'],
         'packaging' => ['view', 'create', 'manage'],
@@ -31,6 +32,7 @@ return [
 
     // Display names where the plain action word would mislead.
     'action_labels' => [
+        'payments.verify' => 'Check advance payments (TrxID and amount)',
         'staff.delete' => 'Deactivate',
         'products.availability' => 'Stock status',
         'points.manage' => 'Manage rules and reviews',

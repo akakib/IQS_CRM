@@ -230,7 +230,11 @@ class OrderService
         ]);
     }
 
-    /** Advance payments start as "pending verification"; only verified money reduces COD. */
+    /**
+     * Advance payments start as "pending verification". A small one (up to
+     * payments.trust_up_to for the order) lowers the COD at once and is checked
+     * later; a bigger one lowers it only when checked.
+     */
     public function addPayment(Order $order, array $p, ?User $by): void
     {
         $method = DB::table('payment_methods')->where('id', $p['method_id'] ?? 0)->first();
@@ -244,12 +248,26 @@ class OrderService
             throw ValidationException::withMessages(['advance.transaction_id' => __('This transaction ID was already used on another order.')]);
         }
 
+        $amount = round((float) $p['amount'], 2);
+        $type = $p['payment_type'] ?? 'advance';
+        $counted = (float) DB::table('order_payments')->where('order_id', $order->id)->where('status', 'pending_verification')->where('counts_now', true)->sum('amount');
+        $countsNow = $type === 'advance' && $amount > 0 && $counted + $amount <= (int) settings('payments.trust_up_to');
+        $oldCod = (float) $order->cod_amount;
         DB::table('order_payments')->insert([
             'order_id' => $order->id, 'payment_type' => $p['payment_type'] ?? 'advance', 'method_id' => $method->id,
             'amount' => round((float) $p['amount'], 2), 'transaction_id' => ($p['transaction_id'] ?? null) ? trim($p['transaction_id']) : null,
-            'sender_number' => Phone::normalize($p['sender_number'] ?? null), 'status' => 'pending_verification',
+            'sender_number' => Phone::normalize($p['sender_number'] ?? null), 'status' => 'pending_verification', 'counts_now' => $countsNow,
             'received_at' => now(), 'note' => $p['note'] ?? null, 'created_by' => $by?->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
+        if ($order->exists && $order->grand_total !== null) {
+            $this->calculator->applyPayments($order->refresh());
+            $this->afterPayment($order, $oldCod, $by);
+        }
+        app(\App\Services\NotificationService::class)->send('payment_to_check', __('Check payment: :no', ['no' => $order->order_no]),
+            __(':m ৳:a, TrxID :t', ['m' => $method->name, 'a' => number_format($amount, 2), 't' => $p['transaction_id'] ?? '-']).($countsNow ? ' '.__('(already lowered the COD)') : ' '.__('(the order waits for this check)')), [
+                'link' => route('payments.index'), 'subject' => ['order', $order->id],
+                'user_ids' => app(DeskService::class)->managerIds(), // others (e.g. an accounts person) via Settings > Notifications
+            ]);
         $this->note($order, 'payment', __('Advance ৳:a via :m (:t) recorded, waiting for verification.', ['a' => number_format((float) $p['amount'], 2), 'm' => $method->name, 't' => $p['transaction_id'] ?? '-']), $by);
     }
 
@@ -258,12 +276,65 @@ class OrderService
         DB::transaction(function () use ($order, $paymentId, $approve, $by) {
             $payment = DB::table('order_payments')->where('id', $paymentId)->where('order_id', $order->id)->where('status', 'pending_verification')->first();
             abort_unless($payment, 404);
+            $oldCod = (float) $order->fresh()->cod_amount;
             DB::table('order_payments')->where('id', $paymentId)->update([
                 'status' => $approve ? 'verified' : 'rejected', 'verified_by' => $by->id, 'verified_at' => now(), 'updated_at' => now(),
             ]);
             $this->calculator->applyPayments($order->refresh());
-            $this->note($order, 'payment', ($approve ? __('Payment ৳:a verified. COD is now ৳:c.', ['a' => $payment->amount, 'c' => $order->cod_amount]) : __('Payment ৳:a rejected.', ['a' => $payment->amount])), $by);
+            $this->note($order, 'payment', ($approve ? __('Payment ৳:a verified. COD is now ৳:c.', ['a' => $payment->amount, 'c' => $order->cod_amount]) : __('Payment ৳:a rejected (TrxID or amount did not match). COD is now ৳:c.', ['a' => $payment->amount, 'c' => $order->cod_amount])), $by);
+            if (! $approve && $order->moderator_id) {
+                app(\App\Services\NotificationService::class)->send('payment_to_check', __('Payment rejected: :no', ['no' => $order->order_no]),
+                    __('৳:a, TrxID :t did not match. Talk to the customer.', ['a' => $payment->amount, 't' => $payment->transaction_id ?? '-']), [
+                        'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$order->moderator_id],
+                    ]);
+            }
+            $this->afterPayment($order, $oldCod, $by);
         });
+    }
+
+    /** Is an advance on this order still waiting for its check without lowering the COD yet? */
+    public function hasUncheckedAdvance(Order $order): bool
+    {
+        return DB::table('order_payments')->where('order_id', $order->id)->where('payment_type', 'advance')
+            ->where('status', 'pending_verification')->where('counts_now', false)->exists();
+    }
+
+    /**
+     * After money came in or a check: the courier must collect the new COD
+     * (update it in the courier panel by hand, new label), and an order that
+     * only waited for its advance moves on and is booked.
+     */
+    private function afterPayment(Order $order, float $oldCod, ?User $by): void
+    {
+        $order->refresh();
+        $shipment = $order->active_shipment_id
+            ? DB::table('shipments')->where('id', $order->active_shipment_id)->whereNull('cancelled_at')->whereNull('final_at')->first(['id'])
+            : null;
+        if ($shipment && abs($oldCod - (float) $order->cod_amount) > 0.001 && $by) {
+            DB::table('order_amendments')->insert([
+                'order_id' => $order->id, 'from_version' => $order->current_version, 'to_version' => $order->current_version,
+                'status_at_time_id' => $order->status_id,
+                'reason_id' => DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'payment_cod')->value('id'),
+                'edit_class' => 'internal', 'changes' => json_encode(['cod_amount' => [$oldCod, (float) $order->cod_amount]]), 'proposed' => json_encode([]),
+                'amount_diff' => round((float) $order->cod_amount - $oldCod, 2), 'requested_by' => $by->id,
+                'courier_action' => 'update_cod', 'applied_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            if (in_array($order->status_id, OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']), true)) {
+                app(\App\Services\Courier\BookingService::class)->issueLabel($order, $shipment->id, null, __('COD changed by a payment'));
+            }
+            app(\App\Services\NotificationService::class)->send('cod_update_needed', __('Update the COD of :no at the courier', ['no' => $order->order_no]),
+                __('A payment changed the COD from ৳:a to ৳:b. Change it in the courier panel, then press Updated on the order. A new label is ready.', ['a' => $oldCod, 'b' => $order->cod_amount]), [
+                    'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+                    'user_ids' => array_values(array_filter([$order->moderator_id, ...app(DeskService::class)->managerIds()])),
+                ]);
+        }
+
+        // Held only for the advance: the money is in (or counts), so it goes on and is booked.
+        $advanceHold = DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id');
+        if (OrderStatus::map()[$order->status_id]['key'] === 'hold' && (int) $order->hold_reason_id === (int) $advanceHold
+            && (float) $order->advance_verified > 0 && ! $this->hasUncheckedAdvance($order) && ! $order->taken_back_at) {
+            app(OrderStateMachine::class)->transition($order, 'confirmed', null, 'rule', null, __('Advance received'));
+        }
     }
 
     /** @return list<array> order_items rows with snapshots and weights */

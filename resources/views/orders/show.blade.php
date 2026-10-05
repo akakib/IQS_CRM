@@ -104,25 +104,45 @@
                 </dl>
             </x-card>
 
-            @if ($payments->isNotEmpty())
+            @php $canAddPayment = auth()->user()->can('orders.edit') && ! \App\Models\OrderStatus::map()[$order->status_id]['final']; @endphp
+            @if ($payments->isNotEmpty() || $canAddPayment)
                 <x-card :title="__('Payments')">
                     @foreach ($payments as $p)
                         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-50 py-2 text-sm last:border-0">
                             <span>{{ ucfirst($p->payment_type) }} · {{ $p->method }} · <span class="font-mono">{{ $p->transaction_id ?? '-' }}</span> · <b>৳{{ number_format((float) $p->amount, 2) }}</b></span>
                             @if ($p->status === 'pending_verification')
-                                @can('orders.approve')
-                                    <span class="flex gap-2">
+                                @if (auth()->user()->can('payments.verify') || auth()->user()->can('orders.approve'))
+                                    <span class="flex flex-wrap items-center gap-2">
+                                        @if ($p->counts_now)<x-badge color="amber">{{ __('COD already lowered') }}</x-badge>@endif
                                         <form method="POST" action="{{ route('orders.payments.verify', [$order, $p->id]) }}">@csrf<input type="hidden" name="decision" value="approve"><x-button size="sm">{{ __('Verify') }}</x-button></form>
                                         <form method="POST" action="{{ route('orders.payments.verify', [$order, $p->id]) }}">@csrf<input type="hidden" name="decision" value="reject"><x-button size="sm" variant="secondary">{{ __('Reject') }}</x-button></form>
                                     </span>
                                 @else
-                                    <x-badge color="amber">{{ __('Waiting for verification') }}</x-badge>
-                                @endcan
+                                    <x-badge color="amber">{{ $p->counts_now ? __('To check · COD already lowered') : __('Waiting for the check') }}</x-badge>
+                                @endif
                             @else
                                 <x-badge :color="$p->status === 'verified' ? 'green' : 'red'">{{ ucfirst($p->status) }}</x-badge>
                             @endif
                         </div>
                     @endforeach
+                    @if ($payments->isEmpty())<p class="py-1 text-sm text-gray-500">{{ __('No payment yet.') }}</p>@endif
+                    @if ($canAddPayment)
+                        <details class="mt-2 rounded-lg border border-gray-200" @if ($errors->has('advance.*')) open @endif>
+                            <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-primary">+ {{ __('Add payment') }}</summary>
+                            <form method="POST" action="{{ route('orders.payments.store', $order) }}" class="grid gap-2 p-3 sm:grid-cols-2">
+                                @csrf
+                                <x-simple-select name="advance[method_id]" :options="$paymentMethods" :value="old('advance.method_id', array_key_first($paymentMethods))" full-width />
+                                <input name="advance[amount]" type="number" step="0.01" min="1" required value="{{ old('advance.amount') }}" placeholder="{{ __('Amount (৳)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                                <input name="advance[transaction_id]" maxlength="100" value="{{ old('advance.transaction_id') }}" placeholder="{{ __('TrxID') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none">
+                                <input name="advance[sender_number]" maxlength="20" value="{{ old('advance.sender_number') }}" placeholder="{{ __('Sender number (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none">
+                                @foreach (['advance.method_id', 'advance.amount', 'advance.transaction_id'] as $f)
+                                    @error($f)<p class="text-sm text-red-600 sm:col-span-2">{{ $message }}</p>@enderror
+                                @endforeach
+                                <p class="text-xs text-gray-500 sm:col-span-2">{{ __('Up to ৳:l lowers the COD at once; more waits for the check before the order can be confirmed.', ['l' => number_format((int) settings('payments.trust_up_to'))]) }}</p>
+                                <div class="sm:col-span-2"><x-button>{{ __('Save payment') }}</x-button></div>
+                            </form>
+                        </details>
+                    @endif
                 </x-card>
             @endif
 

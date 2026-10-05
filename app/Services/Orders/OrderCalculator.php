@@ -43,8 +43,9 @@ class OrderCalculator
     /** COD and payment status from verified payments. Saves the order. */
     public function applyPayments(Order $order): void
     {
-        $advance = (float) DB::table('order_payments')->where('order_id', $order->id)
-            ->where('status', 'verified')->whereIn('payment_type', ['advance', 'adjustment'])->sum('amount');
+        // Verified money, plus a small advance that counts before its check (see payments.trust_up_to).
+        $advance = (float) DB::table('order_payments')->where('order_id', $order->id)->whereIn('payment_type', ['advance', 'adjustment'])
+            ->where(fn ($q) => $q->where('status', 'verified')->orWhere(fn ($q) => $q->where('status', 'pending_verification')->where('counts_now', true)))->sum('amount');
         $refunded = (float) DB::table('order_payments')->where('order_id', $order->id)
             ->where('status', 'verified')->where('payment_type', 'refund')->sum('amount');
 

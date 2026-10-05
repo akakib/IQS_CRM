@@ -134,7 +134,7 @@ class OrderController extends Controller
             ->get(['n.id', 'n.note_type', 'n.body', 'n.created_at', 'n.status_at_time_id', 'u.name as user']);
         $payments = DB::table('order_payments as p')->join('payment_methods as m', 'm.id', '=', 'p.method_id')
             ->where('p.order_id', $order->id)->orderBy('p.id')
-            ->get(['p.id', 'p.payment_type', 'p.amount', 'p.transaction_id', 'p.status', 'p.received_at', 'm.name as method']);
+            ->get(['p.id', 'p.payment_type', 'p.amount', 'p.transaction_id', 'p.status', 'p.counts_now', 'p.received_at', 'm.name as method']);
 
         $amendments = DB::table('order_amendments as a')->join('users as u', 'u.id', '=', 'a.requested_by')
             ->join('status_reasons as r', 'r.id', '=', 'a.reason_id')
@@ -152,6 +152,7 @@ class OrderController extends Controller
                 && ($order->moderator_id === $user->id || $user->permissionScope('orders.view') === 'all') && $user->can('orders.edit'),
             'notes' => $notes,
             'payments' => $payments,
+            'paymentMethods' => DB::table('payment_methods')->where('is_active', true)->orderBy('id')->pluck('name', 'id')->all(),
             'statuses' => OrderStatus::map(),
             'targets' => $this->machine->allowedTargets($order, $user),
             'reasons' => ['cancel' => StatusReason::options('cancel'), 'hold' => StatusReason::options('hold'), 'status' => StatusReason::options('status'), 'return' => StatusReason::options('return'), 'reassign' => StatusReason::options('reassign')],
@@ -251,10 +252,26 @@ class OrderController extends Controller
 
     public function verifyPayment(Order $order, int $payment, Request $request): RedirectResponse
     {
+        abort_unless($request->user()->can('payments.verify') || $request->user()->can('orders.approve'), 403);
         $data = $request->validate(['decision' => ['required', Rule::in(['approve', 'reject'])]]);
         $this->orders->verifyPayment($order, $payment, $data['decision'] === 'approve', $request->user());
 
         return back()->with('success', __('Payment updated.'));
+    }
+
+    /** Money the customer sent after the order was placed (bKash and so on). */
+    public function storePayment(Order $order, Request $request): RedirectResponse
+    {
+        $this->authorizeWork($order, $request->user());
+        $data = $request->validate([
+            'advance.method_id' => ['required', 'integer'],
+            'advance.amount' => ['required', 'numeric', 'min:1'],
+            'advance.transaction_id' => ['nullable', 'string', 'max:100'],
+            'advance.sender_number' => ['nullable', 'string', 'max:20'],
+        ]);
+        $this->orders->addPayment($order, $data['advance'] + ['payment_type' => 'advance'], $request->user());
+
+        return back()->with('success', __('Payment saved. It is checked on the Payments page.'));
     }
 
     public function edit(Order $order, Request $request): View

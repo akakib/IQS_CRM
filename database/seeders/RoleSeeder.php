@@ -42,6 +42,7 @@ class RoleSeeder extends Seeder
         'orders.edit' => ['moderator', 'manager'],
         'orders.take' => ['moderator'],
         'orders.approve' => ['manager'],
+        'payments.verify' => ['manager'],
         'orders.reassign' => ['manager'],
         'orders.export' => ['manager'],
         'products.view' => ['moderator', 'manager', 'packaging', 'store_keeper'],

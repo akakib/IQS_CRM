@@ -499,6 +499,46 @@ class DeskTest extends TestCase
         $this->get('/orders?q='.$cn)->assertSee($a->order_no)->assertDontSee($b->order_no);
     }
 
+    public function test_payments_page_checks_advances_and_a_cod_change_after_booking_goes_to_the_courier(): void
+    {
+        $machine = app(OrderStateMachine::class);
+        $bkash = DB::table('payment_methods')->where('system_key', 'bkash')->value('id');
+        $manager = User::factory()->create();
+        $manager->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'payments.verify'], [], 'Accounts')->id);
+        app(\App\Services\PermissionService::class)->bump();
+
+        // A big advance (over ৳500) stops Confirm until it is checked.
+        $a = $this->web();
+        $machine->transition($a, 'record_verified', null, 'rule');
+        $this->desk()->assign($a->id, $this->mahim->id, 'claimed');
+        $this->actingAs($this->mahim)->post("/orders/{$a->id}/payments", ['advance' => ['method_id' => $bkash, 'amount' => 550, 'transaction_id' => 'BIG1']])->assertSessionHas('success');
+        $this->act($a, 'confirm')->assertSessionHasErrors('status');
+        $this->assertSame('record_verified', $this->key($a));
+
+        // Held for the advance: the check releases it and it is booked with the lower COD.
+        $hold = (int) DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id');
+        $machine->transition($a->fresh(), 'hold', $this->mahim, 'user', $hold);
+        $this->get('/payments')->assertForbidden(); // moderators do not check money
+        $this->actingAs($manager)->get('/payments')->assertOk()->assertSee('BIG1')->assertSee($a->order_no);
+        $pay = DB::table('order_payments')->where('transaction_id', 'BIG1')->value('id');
+        $this->post('/payments/decide', ['ids' => [$pay], 'decision' => 'approve'])->assertSessionHas('success');
+        $this->assertSame('ready_for_packaging', $this->key($a));
+        $this->assertSame((float) $a->fresh()->cod_amount, (float) DB::table('shipments')->where('order_id', $a->id)->value('cod_amount'));
+
+        // A small advance after booking lowers the COD at once: update it at the courier, new label.
+        $this->actingAs($this->mahim)->post("/orders/{$a->id}/payments", ['advance' => ['method_id' => $bkash, 'amount' => 30, 'transaction_id' => 'SMALL1']]);
+        $this->assertNotNull(app(OrderService::class)->pendingCodUpdate($a->fresh()));
+        $this->assertDatabaseHas('app_notifications', ['title' => "Update the COD of {$a->order_no} at the courier"]);
+
+        // Rejected (did not match the statement): COD goes back up, the courier must be told again.
+        $before = (float) $a->fresh()->cod_amount;
+        $small = DB::table('order_payments')->where('transaction_id', 'SMALL1')->value('id');
+        $this->actingAs($manager)->post('/payments/decide', ['ids' => [$small], 'decision' => 'reject']);
+        $this->assertSame('rejected', DB::table('order_payments')->where('id', $small)->value('status'));
+        $this->assertSame($before + 30, (float) $a->fresh()->cod_amount);
+        $this->get('/payments?status=rejected')->assertSee('SMALL1');
+    }
+
     public function test_confirm_warns_when_the_same_customer_has_another_open_order(): void
     {
         $first = $this->web();

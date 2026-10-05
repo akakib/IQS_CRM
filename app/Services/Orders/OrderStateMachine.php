@@ -60,6 +60,9 @@ class OrderStateMachine
             if ($source === 'user' && $rule->permission_key && ! $user?->can($rule->permission_key)) {
                 throw ValidationException::withMessages(['status' => __('You are not allowed to move orders to :to.', ['to' => $to['name']])]);
             }
+            if ($to['key'] === 'confirmed' && app(OrderService::class)->hasUncheckedAdvance($fresh)) {
+                throw ValidationException::withMessages(['status' => __('An advance is waiting for its check: check the TrxID and amount first (Payments to check), so the courier gets the right COD.')]);
+            }
             if ($to['key'] === 'confirmed' && $fresh->taken_back_at) {
                 throw ValidationException::withMessages(['status' => __('The old parcel still stands at the courier: delete it there and press "Deleted" first, so this order never has two parcels.')]);
             }

@@ -176,11 +176,21 @@ class OrderServiceTest extends TestCase
         $this->assertDatabaseHas('order_assignments', ['order_id' => $order->id, 'user_id' => $other->id, 'how' => 'reassigned', 'reason_id' => $reason]);
     }
 
-    public function test_only_verified_advance_reduces_cod_and_trx_id_is_unique(): void
+    public function test_a_small_advance_lowers_cod_at_once_a_big_one_after_its_check_and_trx_id_is_unique(): void
     {
         $bkash = DB::table('payment_methods')->where('system_key', 'bkash')->value('id');
+        // Bigger than payments.trust_up_to (500): the COD waits for the check, and so does Confirm.
+        $big = $this->make(['phone' => '01912345678', 'advance' => ['method_id' => $bkash, 'amount' => 700, 'transaction_id' => 'TRX900']]);
+        $this->assertSame('1290.00', $big->cod_amount);
+        $this->assertTrue(app(OrderService::class)->hasUncheckedAdvance($big));
+        app(OrderService::class)->verifyPayment($big, DB::table('order_payments')->where('order_id', $big->id)->value('id'), true, $this->owner());
+        $this->assertSame('590.00', $big->fresh()->cod_amount);
+        $this->assertFalse(app(OrderService::class)->hasUncheckedAdvance($big));
+
+        // Small: lowers the COD at once and is still checked later.
         $order = $this->make(['advance' => ['method_id' => $bkash, 'amount' => 290, 'transaction_id' => 'TRX123']]);
-        $this->assertSame('1290.00', $order->cod_amount);
+        $this->assertSame('1000.00', $order->cod_amount);
+        $this->assertSame('pending_verification', DB::table('order_payments')->where('order_id', $order->id)->value('status'));
 
         $payment = DB::table('order_payments')->where('order_id', $order->id)->value('id');
         app(OrderService::class)->verifyPayment($order, $payment, true, $this->owner());

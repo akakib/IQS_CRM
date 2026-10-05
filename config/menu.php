@@ -22,6 +22,7 @@ return [
         ['Handover', 'handover.index', 'handover.*', 'packaging.view', 'swap'],
         ['Hotline', 'hotline.index', 'hotline.*', 'hotline.view', 'phone'],
         ['Delivery issues', 'issues.index', 'issues.*', 'orders.view', 'alert'],
+        ['Payments to check', 'payments.index', 'payments.*', 'payments.verify', 'cash'],
         ['Control room', 'desk.control', 'desk.control', 'orders.reassign', 'monitor'],
     ]],
     'catalog' => ['Catalog', [

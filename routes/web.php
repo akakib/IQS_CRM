@@ -133,7 +133,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/amend', [OrderController::class, 'amend'])->middleware('can:orders.edit')->name('orders.amend');
     Route::post('/orders/{order}/amendments/{amendment}', [OrderController::class, 'decideAmendment'])->whereNumber('amendment')->middleware('can:orders.approve')->name('orders.amendments.decide');
     Route::post('/orders/{order}/reassign', [OrderController::class, 'reassign'])->middleware('can:orders.reassign')->name('orders.reassign');
-    Route::post('/orders/{order}/payments/{payment}', [OrderController::class, 'verifyPayment'])->whereNumber('payment')->middleware('can:orders.approve')->name('orders.payments.verify');
+    Route::post('/orders/{order}/payments/{payment}', [OrderController::class, 'verifyPayment'])->whereNumber('payment')->name('orders.payments.verify');
+    Route::post('/orders/{order}/payments', [OrderController::class, 'storePayment'])->middleware('can:orders.edit')->name('orders.payments.store');
+    Route::get('/payments', [\App\Http\Controllers\PaymentController::class, 'index'])->name('payments.index');
+    Route::post('/payments/decide', [\App\Http\Controllers\PaymentController::class, 'decide'])->name('payments.decide');
 
     // Courier desk
     Route::get('/shipping', [ShippingController::class, 'index'])->middleware('can:shipping.view')->name('shipping.index');

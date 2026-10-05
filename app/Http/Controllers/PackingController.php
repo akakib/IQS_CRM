@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderStatus;
-use App\Models\ProductVariant;
+use App\Models\StatusReason;
+use App\Models\User;
+use App\Services\ActivityLogger;
 use App\Services\Packing\BatchService;
 use App\Services\Packing\ScanService;
 use App\Services\Packing\StockIssueService;
@@ -15,26 +17,143 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
-/** Shop floor: release batches, pick lists, scan-to-pack, missing-item reports. */
+/**
+ * Packer portal: one shared queue for today's on-duty packers. Scanning a
+ * label makes the order yours; tick every item, then Packed. Packers see
+ * items and shelves only: no phone, no full address, no prices.
+ *
+ * Page load: shift (1), counts (1), queue (1), my day (2), new labels (1), hold reasons (1).
+ */
 class PackingController extends Controller
 {
-    public function index(): View
+    private const PER_PAGE = 25;
+
+    public function index(Request $request): View
     {
-        $waiting = Order::where('status_id', OrderStatus::idFor('ready_for_packaging'))->whereNull('batch_id')->count();
-        $batches = DB::table('batches as b')->leftJoin('users as u', 'u.id', '=', 'b.picked_by')
-            ->where('b.created_at', '>=', now()->subDays(3))->orderByDesc('b.id')
-            ->get(['b.*', 'u.name as picker']);
-        $counts = DB::table('orders')->whereIn('batch_id', $batches->pluck('id'))
-            ->selectRaw('batch_id, COUNT(*) as total, SUM(CASE WHEN status_id IN ('.implode(',', OrderStatus::idsFor(['packed', 'ready_for_pickup', 'handed_over', 'in_transit', 'delivered'])).') THEN 1 ELSE 0 END) as packed')
-            ->groupBy('batch_id')->get()->keyBy('batch_id');
+        $user = $request->user();
+        $today = today()->toDateString();
+        $onDuty = DB::table('packer_shifts as s')->join('users as u', 'u.id', '=', 's.user_id')->where('s.work_date', $today)->orderBy('u.name')->pluck('u.name', 'u.id');
+        $canManage = $user->can('packing.manage');
+        // No list set today = everyone with packing access works (so a forgotten list never stops the shop).
+        $working = $onDuty->isEmpty() || $onDuty->has($user->id) || $canManage;
+
+        $rfp = OrderStatus::idFor('ready_for_packaging');
+        $packed = implode(',', OrderStatus::idsFor(['packed', 'ready_for_pickup']));
+        $red = "(o.packed_version IS NOT NULL AND o.packed_version < o.current_version AND o.status_id IN ({$packed}))";
+        $orange = "(o.label_version < o.current_version AND o.status_id IN ({$rfp}, {$packed}))";
+        $inQueue = "(o.status_id = {$rfp} OR {$red} OR {$orange})";
+
+        $counts = (array) DB::table('orders as o')->whereRaw($inQueue)->selectRaw(
+            "COUNT(*) as `all`, SUM(CASE WHEN {$red} THEN 1 ELSE 0 END) as red,
+             SUM(CASE WHEN o.status_id = {$rfp} AND o.packer_id IS NULL THEN 1 ELSE 0 END) as waiting,
+             SUM(CASE WHEN o.packer_id = ? THEN 1 ELSE 0 END) as mine", [$user->id])->first();
+        $counts = array_map('intval', $counts);
+
+        $filter = in_array($request->query('show'), ['red', 'waiting', 'mine'], true) ? $request->query('show') : 'all';
+        $queue = DB::table('orders as o')
+            ->leftJoin('users as m', 'm.id', '=', 'o.moderator_id')->leftJoin('users as p', 'p.id', '=', 'o.packer_id')
+            ->whereRaw($inQueue)
+            ->when($filter === 'red', fn ($q) => $q->whereRaw($red))
+            ->when($filter === 'waiting', fn ($q) => $q->where('o.status_id', $rfp)->whereNull('o.packer_id'))
+            ->when($filter === 'mine', fn ($q) => $q->where('o.packer_id', $user->id))
+            ->orderByRaw("{$red} DESC, {$orange} DESC")->orderBy('o.packing_sent_at')->orderBy('o.id')
+            ->selectRaw("o.id, o.order_no, o.status_id, o.packing_sent_at, o.packing_started_at, o.packer_id, o.ship_district, o.ship_thana, o.edited_after_pack,
+                m.name as moderator, p.name as packer, {$red} as is_red, {$orange} as is_orange,
+                (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) as items")
+            ->paginate(self::PER_PAGE)->withQueryString();
+
+        $since = now()->startOfDay();
+        $mine = DB::table('orders')->where('packer_id', $user->id)->where('packed_at', '>=', $since)->get(['packing_started_at', 'packed_at']);
 
         return view('packing.index', [
-            'waiting' => $waiting,
-            'batches' => $batches,
+            'working' => $working,
+            'onDuty' => $onDuty,
+            'canManage' => $canManage,
+            'staff' => $canManage ? User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
             'counts' => $counts,
+            'filter' => $filter,
+            'queue' => $queue,
+            'myDay' => [
+                'packed' => $mine->count(),
+                'avg' => $mine->count() ? (int) round($mine->avg(fn ($o) => $o->packing_started_at ? max(0, strtotime($o->packed_at) - strtotime($o->packing_started_at)) : 0) / 60) : null,
+                'errors' => DB::table('scan_logs')->where('user_id', $user->id)->where('created_at', '>=', $since)->whereIn('result', ['blocked', 'unknown'])->count(),
+            ],
+            'newLabels' => DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')
+                ->whereNull('l.voided_at')->whereNull('l.printed_at')->whereRaw($inQueue)->count(),
+            'holdReasons' => StatusReason::options('hold'),
             'openIssues' => DB::table('stock_issue_reports')->where('status', 'open')->count(),
         ]);
     }
+
+    /** Today's on-duty packers (replaces the list). */
+    public function shift(Request $request, ActivityLogger $logger): RedirectResponse
+    {
+        $data = $request->validate(['user_ids' => ['array', 'max:50'], 'user_ids.*' => ['integer', Rule::exists('users', 'id')->where('is_active', true)]]);
+        $ids = array_values(array_unique(array_map('intval', $data['user_ids'] ?? [])));
+        $today = today()->toDateString();
+
+        DB::transaction(function () use ($ids, $today, $request) {
+            DB::table('packer_shifts')->where('work_date', $today)->whereNotIn('user_id', $ids ?: [0])->delete();
+            foreach ($ids as $id) {
+                DB::table('packer_shifts')->insertOrIgnore(['work_date' => $today, 'user_id' => $id, 'set_by' => $request->user()->id, 'created_at' => now()]);
+            }
+        });
+        $logger->log('packer_shift.set', ['packer_shift', 0], null, ['date' => $today, 'user_ids' => $ids]);
+
+        return back()->with('success', __('On-duty packers saved for today.'));
+    }
+
+    /** Scan = this order is mine; returns the checklist. */
+    public function scan(Request $request, ScanService $scans): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'max:80']]);
+
+        return response()->json($scans->open($data['code'], $request->user()));
+    }
+
+    /** Every item ticked: Packed. */
+    public function pack(Order $order, Request $request, ScanService $scans): JsonResponse
+    {
+        $data = $request->validate(['items' => ['required', 'array', 'max:200'], 'items.*' => ['integer']]);
+
+        return response()->json(['ok' => true, 'message' => $scans->finish($order, $data['items'], $request->user())]);
+    }
+
+    /** The packer cannot finish it: Hold with a reason. */
+    public function hold(Order $order, Request $request, ScanService $scans): RedirectResponse
+    {
+        $data = $request->validate([
+            'reason_id' => ['required', Rule::exists('status_reasons', 'id')->where('reason_type', 'hold')],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+        $scans->hold($order, (int) $data['reason_id'], $data['note'] ?? null, $request->user());
+
+        return redirect()->route('packing.index')->with('success', __(':no is on hold. The moderator and admin were told.', ['no' => $order->order_no]));
+    }
+
+    /** Print every label in the queue that has not been printed yet. */
+    public function labels(Request $request): View|RedirectResponse
+    {
+        $rfp = OrderStatus::idFor('ready_for_packaging');
+        $ids = DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')
+            ->whereNull('l.voided_at')->whereNull('l.printed_at')
+            ->whereIn('o.status_id', [$rfp, ...OrderStatus::idsFor(['packed', 'ready_for_pickup'])])
+            ->orderBy('o.packing_sent_at')->limit(100)->pluck('o.id');
+        if ($ids->isEmpty()) {
+            return redirect()->route('packing.index')->with('error', __('No new label to print.'));
+        }
+
+        $orders = Order::whereIn('id', $ids)->with('items:id,order_id,name_snapshot,qty,unit')->get();
+        $labels = DB::table('shipment_labels as l')->join('shipments as s', 's.id', '=', 'l.shipment_id')
+            ->whereIn('l.order_id', $ids)->whereNull('l.voided_at')
+            ->get(['l.order_id', 'l.barcode', 'l.cod_on_label', 's.consignment_id', 's.courier'])->keyBy('order_id');
+        DB::table('shipment_labels')->whereIn('order_id', $ids)->whereNull('voided_at')->whereNull('printed_at')
+            ->update(['printed_at' => now(), 'printed_by' => $request->user()->id]);
+
+        return view('shipping.labels', ['orders' => $orders, 'labels' => $labels]);
+    }
+
+    // ── Batches (older flow, kept for bulk pick lists; not in the menu) ──
 
     public function release(Request $request, BatchService $batches): RedirectResponse
     {
@@ -69,18 +188,6 @@ class PackingController extends Controller
         $n = $batches->done($batch, $request->user());
 
         return back()->with('success', trans_choice(':count parcel moved to the pickup shelf.|:count parcels moved to the pickup shelf.', $n, ['count' => $n]));
-    }
-
-    public function scanPage(): View
-    {
-        return view('packing.scan');
-    }
-
-    public function scan(Request $request, ScanService $scans): JsonResponse
-    {
-        $data = $request->validate(['code' => ['required', 'string', 'max:80']]);
-
-        return response()->json($scans->pack($data['code'], $request->user()));
     }
 
     public function report(Request $request, StockIssueService $issues): RedirectResponse|JsonResponse

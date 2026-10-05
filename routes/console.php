@@ -42,3 +42,6 @@ Schedule::command('ads:pull-spend')->everyThreeHours()->withoutOverlapping(30);
 
 // Dollar vendor balances due by tomorrow.
 Schedule::command('vendors:due-reminders')->dailyAt('10:00');
+
+// Order desk: timers, auto-assign, booking retries, breaks left open, packing digest.
+Schedule::command('desk:tick')->everyMinute()->withoutOverlapping(5);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\OrderStatus;
+use App\Models\User;
 use App\Services\Reports\KpiScorecard;
 use App\Services\Reports\OrderProfit;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ class ReportController extends Controller
 
         if ($user->can('orders.view')) {
             $tiles[] = [__('Orders today'), DB::table('orders')->where('created_at', '>=', $today)->count(), route('orders.index'), null];
-            $tiles[] = [__('Waiting to be taken'), DB::table('orders')->whereNull('moderator_id')->where('status_id', OrderStatus::idFor('new'))->count(), route('orders.queue'), null];
+            $tiles[] = [__('Waiting to be taken'), DB::table('orders')->whereNull('moderator_id')->where('status_id', OrderStatus::idFor('new'))->count(), route('desk.index'), null];
             $tiles[] = [__('Confirmed today'), $todayCount('confirmed'), null, null];
             $tiles[] = [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null];
         }
@@ -45,9 +46,22 @@ class ReportController extends Controller
     public function kpi(Request $request, KpiScorecard $kpi): View
     {
         [$from, $to] = $this->range($request);
+        $mode = $request->query('view') === 'cohort' ? 'cohort' : 'day';
+        $user = $request->user();
+        $seeAll = $user->can('kpi.view');
+        $canSetTargets = $seeAll && $user->can('settings.edit');
+        $data = $kpi->build($from, $to, $mode);
 
-        return view('reports.kpi', ['rows' => $kpi->rows($from, $to), 'from' => $from, 'to' => $to,
-            'weights' => ['volume' => settings('kpi.weight_volume'), 'speed' => settings('kpi.weight_speed'), 'quality' => settings('kpi.weight_quality')]]);
+        return view('reports.kpi', [
+            // Without kpi.view a person sees only their own row next to the team average.
+            'rows' => $seeAll ? $data['rows'] : array_values(array_filter($data['rows'], fn ($r) => $r['user_id'] === $user->id)),
+            'team' => $data['team'],
+            'from' => $from, 'to' => $to, 'mode' => $mode, 'seeAll' => $seeAll,
+            'showAmount' => (bool) settings('kpi.show_delivered_amount'),
+            'canSetTargets' => $canSetTargets,
+            'targets' => $canSetTargets ? $kpi->targets() : [],
+            'staff' => $canSetTargets ? User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
+        ]);
     }
 
     public function analysis(Request $request, OrderProfit $profit): View

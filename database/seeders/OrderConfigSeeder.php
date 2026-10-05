@@ -31,7 +31,7 @@ class OrderConfigSeeder extends Seeder
 
     /** [from, to, permission, requires reason, system only] */
     private const TRANSITIONS = [
-        ['new', 'record_verified', 'orders.approve', false, false],          // manual override; rules do it automatically
+        ['new', 'record_verified', 'orders.edit', false, false],             // manual review by the moderator; rules do the rest
         ['new', 'hold', 'orders.edit', true, false],
         ['new', 'cancelled', 'orders.edit', true, false],
         ['record_verified', 'confirmed', 'orders.edit', false, false],
@@ -45,6 +45,7 @@ class OrderConfigSeeder extends Seeder
         ['hold', 'record_verified', 'orders.edit', false, false],
         ['hold', 'confirmed', 'orders.edit', false, false],
         ['hold', 'cancelled', 'orders.edit', true, false],
+        ['hold', 'ready_for_packaging', 'orders.edit', false, false],        // packer hold solved: back to the packing queue (CN gate still applies)
         ['confirmed', 'hold', 'orders.edit', true, false],
         ['confirmed', 'cancelled', 'orders.edit', true, false],
         ['confirmed', 'ready_for_packaging', null, false, true],             // bulk booking (needs CN ID)
@@ -69,13 +70,15 @@ class OrderConfigSeeder extends Seeder
         ['cancelled', 'new', 'orders.approve', true, false],                 // reopen by mistake
     ];
 
-    /** [type, label, blame stage, system key, release mode] */
+    /** [type, label, blame stage, system key, release mode, counts as break (break reasons only)] */
     private const REASONS = [
         ['hold', 'Stock arriving (pre-order)', 'none', 'awaiting_stock', 'on_restock'],
         ['hold', 'Stock out', 'none', 'stock_out', 'manual'],
         ['hold', 'Deliver on a date', 'customer', 'scheduled', 'on_date'],
         ['hold', 'Customer asked to wait', 'customer', 'customer_wait', 'manual'],
         ['hold', 'Waiting for advance payment', 'none', 'advance_wait', 'manual'],
+        ['hold', 'Item not found while packing', 'none', 'item_not_found', 'manual'],
+        ['hold', 'Damaged or wrong item on the shelf', 'none', 'item_damaged', 'manual'],
         ['cancel', 'Customer cancelled', 'customer', 'customer_cancelled', 'manual'],
         ['cancel', 'Fake or prank order', 'customer', 'fake_order', 'manual'],
         ['cancel', 'Duplicate order', 'none', 'duplicate', 'manual'],
@@ -97,6 +100,13 @@ class OrderConfigSeeder extends Seeder
         ['reassign', 'Moderator on leave or off shift', 'none', 'on_leave', 'manual'],
         ['reassign', 'Moderator could not handle it', 'sales', 'moderator_error', 'manual'],
         ['reassign', 'Workload balance', 'none', 'workload', 'manual'],
+        // Breaks: the last value says whether it counts towards the daily break limit.
+        ['break', 'Lunch', 'none', 'lunch', 'manual', true],
+        ['break', 'Prayer', 'none', 'prayer', 'manual', true],
+        ['break', 'Washroom', 'none', 'washroom', 'manual', true],
+        ['break', 'Shop visit', 'none', 'shop_visit', 'manual', false],
+        ['break', 'Task from admin', 'none', 'admin_task', 'manual', false],
+        ['break', 'Other', 'none', 'other', 'manual', true],
     ];
 
     public function run(): void
@@ -125,12 +135,13 @@ class OrderConfigSeeder extends Seeder
         }
 
         $order = 0;
-        foreach (self::REASONS as [$type, $label, $blame, $key, $release]) {
+        foreach (self::REASONS as $reason) {
+            [$type, $label, $blame, $key, $release] = $reason;
             $order++;
             if (! DB::table('status_reasons')->where('reason_type', $type)->where('system_key', $key)->exists()) {
                 DB::table('status_reasons')->insert([
                     'reason_type' => $type, 'label_en' => $label, 'blame_stage' => $blame, 'system_key' => $key,
-                    'release_mode' => $release, 'is_active' => true, 'sort_order' => $order, 'created_at' => $now, 'updated_at' => $now,
+                    'release_mode' => $release, 'counts_as_break' => $reason[5] ?? true, 'is_active' => true, 'sort_order' => $order, 'created_at' => $now, 'updated_at' => $now,
                 ]);
             }
         }

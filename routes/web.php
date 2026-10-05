@@ -2,7 +2,8 @@
 
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\CallQueueController;
+use App\Http\Controllers\BreakController;
+use App\Http\Controllers\DeskController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\UserAccessController;
+use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TelegramController;
 use App\Http\Controllers\TrackingSettingsController;
 use App\Http\Controllers\UserController;
@@ -59,7 +61,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::redirect('/', '/dashboard');
     Route::get('/dashboard', [ReportController::class, 'dashboard'])->name('dashboard');
-    Route::get('/kpi', [ReportController::class, 'kpi'])->middleware('can:kpi.view')->name('kpi.index');
+    Route::get('/kpi', [ReportController::class, 'kpi'])->name('kpi.index'); // own numbers for everyone; kpi.view sees the team
     Route::get('/analysis', [ReportController::class, 'analysis'])->middleware('can:analysis.view')->name('analysis.index');
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
@@ -95,13 +97,28 @@ Route::middleware('auth')->group(function () {
     // Orders
     Route::get('/orders/delivery-charge', [OrderController::class, 'deliveryCharge'])->middleware('can:orders.create')->name('orders.delivery-charge');
     Route::get('/orders', [OrderController::class, 'index'])->middleware('can:orders.view')->name('orders.index');
-    Route::get('/orders/queue', [CallQueueController::class, 'index'])->middleware('can:orders.edit')->name('orders.queue');
-    Route::post('/orders/queue/next', [CallQueueController::class, 'takeNext'])->middleware('can:orders.edit')->name('orders.queue.next');
-    Route::post('/orders/{order}/call', [CallQueueController::class, 'logCall'])->middleware('can:orders.edit')->name('orders.queue.call');
+    // Order management desk (moderators). New orders are only ever given by Take next.
+    Route::get('/desk', [DeskController::class, 'index'])->middleware('can:orders.edit')->name('desk.index');
+    Route::post('/desk/next', [DeskController::class, 'takeNext'])->middleware('can:orders.take')->name('desk.next');
+    Route::post('/desk/{order}/act', [DeskController::class, 'act'])->middleware('can:orders.edit')->name('desk.act');
+
+    Route::get('/desk/control', [TeamController::class, 'control'])->middleware('can:orders.reassign')->name('desk.control');
+    Route::get('/attendance', [TeamController::class, 'attendance'])->middleware('can:attendance.view')->name('attendance.index');
+    Route::middleware('can:attendance.edit')->group(function () {
+        Route::post('/attendance/breaks/{break}', [TeamController::class, 'correctBreak'])->whereNumber('break')->name('attendance.breaks.correct');
+        Route::post('/attendance/days/{day}/extra', [TeamController::class, 'approveExtra'])->whereNumber('day')->name('attendance.extra');
+    });
+    Route::post('/users/{user}/schedule', [TeamController::class, 'schedule'])->middleware('can:staff.edit')->name('users.schedule');
+    Route::post('/kpi/targets', [TeamController::class, 'targets'])->middleware('can:settings.edit')->name('kpi.targets');
+
+    // Breaks: everyone.
+    Route::get('/breaks/reasons', [BreakController::class, 'reasons'])->name('breaks.reasons');
+    Route::post('/breaks', [BreakController::class, 'start'])->name('breaks.start');
+    Route::post('/breaks/end', [BreakController::class, 'end'])->name('breaks.end');
+
     Route::get('/orders/create', [OrderController::class, 'create'])->middleware('can:orders.create')->name('orders.create');
     Route::post('/orders', [OrderController::class, 'store'])->middleware('can:orders.create')->name('orders.store');
     Route::get('/orders/{order}', [OrderController::class, 'show'])->middleware('can:orders.view')->name('orders.show');
-    Route::post('/orders/{order}/claim', [OrderController::class, 'claim'])->middleware('can:orders.edit')->name('orders.claim');
     Route::post('/orders/{order}/transition', [OrderController::class, 'transition'])->middleware('can:orders.view')->name('orders.transition');
     Route::post('/orders/{order}/notes', [OrderController::class, 'note'])->middleware('can:orders.view')->name('orders.notes');
     Route::get('/orders/{order}/edit', [OrderController::class, 'edit'])->middleware('can:orders.edit')->name('orders.edit');
@@ -120,8 +137,8 @@ Route::middleware('auth')->group(function () {
     // Packing and handover
     Route::middleware('can:packing.view')->group(function () {
         Route::get('/packing', [PackingController::class, 'index'])->name('packing.index');
-        Route::get('/packing/scan', [PackingController::class, 'scanPage'])->name('packing.scan');
-        Route::post('/packing/scan', [PackingController::class, 'scan'])->name('packing.scan.post');
+        Route::redirect('/packing/scan', '/packing')->name('packing.scan');
+        Route::get('/packing/labels', [PackingController::class, 'labels'])->name('packing.labels');
         Route::get('/packing/batches/{batch}', [PackingController::class, 'batch'])->whereNumber('batch')->name('packing.batch');
         Route::post('/packing/report', [PackingController::class, 'report'])->name('packing.report');
         Route::get('/packing/issues', [PackingController::class, 'issues'])->name('packing.issues');
@@ -130,7 +147,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/handover/{session}', [HandoverController::class, 'show'])->whereNumber('session')->name('handover.show');
         Route::get('/handover/{session}/manifest', [HandoverController::class, 'manifest'])->whereNumber('session')->name('handover.manifest');
     });
+    Route::post('/packing/shift', [PackingController::class, 'shift'])->middleware('can:packing.manage')->name('packing.shift');
     Route::middleware('can:packing.create')->group(function () {
+        Route::post('/packing/scan', [PackingController::class, 'scan'])->name('packing.scan.post');
+        Route::post('/packing/orders/{order}/pack', [PackingController::class, 'pack'])->name('packing.pack');
+        Route::post('/packing/orders/{order}/hold', [PackingController::class, 'hold'])->name('packing.hold');
         Route::post('/packing/release', [PackingController::class, 'release'])->name('packing.release');
         Route::post('/packing/batches/{batch}/picked', [PackingController::class, 'picked'])->whereNumber('batch')->name('packing.picked');
         Route::post('/packing/batches/{batch}/done', [PackingController::class, 'done'])->whereNumber('batch')->name('packing.done');

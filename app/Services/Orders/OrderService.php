@@ -13,7 +13,7 @@ use App\Support\Phone;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Creating orders, assignment (claim / reassign), notes and payments. */
+/** Creating orders, reassigning, notes and payments. Taking orders lives in DeskService. */
 class OrderService
 {
     public function __construct(
@@ -73,6 +73,8 @@ class OrderService
                 'customer_id' => $customer->id,
                 'status_id' => OrderStatus::idFor('new'),
                 'moderator_id' => $isChat ? $by?->id : null,
+                'assigned_at' => $isChat && $by ? now() : null,
+                'queue_since' => $isChat && $by ? null : now(),
                 'created_by' => $by?->id,
                 'ship_name' => trim($data['name'] ?: $customer->name),
                 'ship_phone' => $phone,
@@ -119,38 +121,11 @@ class OrderService
 
             if (! $order->moderator_id) {
                 $this->notifications->send('new_order', __('New order :no · ৳:t', ['no' => $order->order_no, 't' => number_format((float) $order->grand_total)]),
-                    $order->ship_name, ['link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'group_key' => 'new_order']);
+                    $order->ship_name, ['link' => route('desk.index'), 'subject' => ['order', $order->id], 'group_key' => 'new_order']);
             }
 
             return $order->refresh();
         });
-    }
-
-    /**
-     * Take an unowned order. One person works on at most N orders at a time
-     * (setting), and the order is theirs from then on; only an admin can move it.
-     */
-    public function claim(Order $order, User $user): Order
-    {
-        $working = DB::table('orders')->where('moderator_id', $user->id)
-            ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->count();
-        if ($working >= (int) settings('orders.max_working_orders')) {
-            throw ValidationException::withMessages(['order' => __('Finish your current order first (confirm, hold, no answer or cancel it).')]);
-        }
-
-        // Atomic: of two people pressing at once, exactly one wins.
-        $won = DB::table('orders')->where('id', $order->id)->whereNull('moderator_id')
-            ->update(['moderator_id' => $user->id, 'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now()]);
-        if (! $won) {
-            throw ValidationException::withMessages(['order' => __('Someone else took this order a moment ago.')]);
-        }
-
-        $this->openAssignment($order, $user->id, 'claimed', null);
-        $this->note($order, 'assignment', __(':n took the order.', ['n' => $user->name]), $user);
-        $order->refresh();
-        app(\App\Services\Points\PointHooks::class)->claimed($order, $user);
-
-        return $order;
     }
 
     /** Admin only: move the order to another moderator, with a reason (it can count against the previous one). */
@@ -158,8 +133,9 @@ class OrderService
     {
         return DB::transaction(function () use ($order, $by, $to, $reasonId) {
             $previous = $order->moderator_id;
-            DB::table('order_assignments')->where('order_id', $order->id)->whereNull('ended_at')->update(['ended_at' => now()]);
-            $order->forceFill(['moderator_id' => $to->id, 'lock_version' => $order->lock_version + 1])->save();
+            DB::table('order_assignments')->where('order_id', $order->id)->whereNull('ended_at')->update(['ended_at' => now(), 'ended_reason' => 'reassigned']);
+            $order->forceFill(['moderator_id' => $to->id, 'assigned_at' => now(), 'queue_since' => null, 'action_due_at' => null,
+                'lock_version' => $order->lock_version + 1])->save();
             $this->openAssignment($order, $to->id, 'reassigned', $by->id, $reasonId);
 
             $reason = DB::table('status_reasons')->where('id', $reasonId)->value('label_en');
@@ -168,6 +144,13 @@ class OrderService
                 ['previous_moderator_id' => $previous, 'reason_id' => $reasonId]);
             $order->refresh();
             app(\App\Services\Points\PointHooks::class)->reassigned($order, $previous, $reasonId);
+
+            // Timers: the new moderator's clock starts, the previous one moves to their next order.
+            $desk = app(DeskService::class);
+            $desk->armTimer($to->id);
+            if ($previous) {
+                $desk->armTimer($previous);
+            }
 
             return $order;
         });

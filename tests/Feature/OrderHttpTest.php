@@ -34,7 +34,7 @@ class OrderHttpTest extends TestCase
         OrderStatus::forget();
 
         $this->agent = User::factory()->create(['name' => 'Mahim']);
-        $this->agent->roles()->attach($this->role(['orders.view' => 'own', 'orders.create', 'orders.edit', 'products.view', 'customers.view'], [], 'Moderator')->id);
+        $this->agent->roles()->attach($this->role(['orders.view' => 'own', 'orders.create', 'orders.edit', 'orders.take', 'products.view', 'customers.view'], [], 'Moderator')->id);
         app(\App\Services\PermissionService::class)->bump();
         Product::factory()->withVariant(600, ['sku' => 'DATE-500', 'weight_g' => 550])->create(['name' => 'Dates']);
         $this->variant = ProductVariant::firstWhere('sku', 'DATE-500');
@@ -65,7 +65,7 @@ class OrderHttpTest extends TestCase
         $this->assertSame('130.00', $order->delivery_charge);
     }
 
-    public function test_new_website_order_notifies_moderators_and_is_claimed_from_the_list(): void
+    public function test_new_website_order_notifies_moderators_and_is_given_by_take_next(): void
     {
         DB::table('notification_rules')->insert([
             'type_id' => DB::table('notification_types')->where('system_key', 'new_order')->value('id'),
@@ -77,8 +77,8 @@ class OrderHttpTest extends TestCase
         $this->assertDatabaseHas('app_notifications', ['user_id' => $this->agent->id, 'subject_type' => 'order', 'subject_id' => $order->id]);
 
         $this->actingAs($this->agent)->get('/orders?tab=take')->assertOk()->assertSee($order->order_no);
-        $this->get("/orders/{$order->id}")->assertOk()->assertSee('Assign to me');
-        $this->post("/orders/{$order->id}/claim")->assertSessionHas('success');
+        $this->get("/orders/{$order->id}")->assertOk()->assertDontSee('Assign to me');
+        $this->post('/desk/next')->assertSessionHas('success');
         $this->assertSame($this->agent->id, $order->fresh()->moderator_id);
         $this->get('/orders?tab=mine')->assertSee($order->order_no);
     }
@@ -86,7 +86,7 @@ class OrderHttpTest extends TestCase
     public function test_owner_moves_status_from_the_order_page_with_reason(): void
     {
         $order = $this->webOrder();
-        app(OrderService::class)->claim($order, $this->agent);
+        app(\App\Services\Orders\DeskService::class)->assign($order->id, $this->agent->id, 'claimed');
         app(\App\Services\Orders\OrderStateMachine::class)->transition($order, 'record_verified', null, 'rule');
         $order->refresh();
 
@@ -105,7 +105,7 @@ class OrderHttpTest extends TestCase
         $other->roles()->attach(DB::table('user_roles')->where('user_id', $this->agent->id)->value('role_id'));
         app(\App\Services\PermissionService::class)->bump();
         $order = $this->webOrder();
-        app(OrderService::class)->claim($order, $other);
+        app(\App\Services\Orders\DeskService::class)->assign($order->id, $other->id, 'claimed');
 
         $this->actingAs($this->agent)->get("/orders/{$order->id}")->assertForbidden();
         $this->post("/orders/{$order->id}/transition", ['to' => 'hold', 'lock_version' => 0])->assertForbidden();

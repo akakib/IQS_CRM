@@ -160,7 +160,7 @@ return new class extends Migration
             $table->foreignId('order_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained();
             $table->enum('role', ['moderator', 'temporary']);
-            $table->enum('how', ['claimed', 'created', 'assigned', 'reassigned']);
+            $table->enum('how', ['claimed', 'created', 'assigned', 'reassigned', 'auto']);
             $table->foreignId('assigned_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('reason_id')->nullable()->constrained('status_reasons')->nullOnDelete();
             $table->string('reason', 150)->nullable();

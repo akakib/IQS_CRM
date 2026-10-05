@@ -32,6 +32,14 @@ class Order extends Model
             'confirmed_at' => 'datetime',
             'pickup_date' => 'date',
             'hold_expected_date' => 'date',
+            'had_setback' => 'boolean',
+            'queue_since' => 'datetime',
+            'assigned_at' => 'datetime',
+            'action_due_at' => 'datetime',
+            'next_call_at' => 'datetime',
+            'packing_sent_at' => 'datetime',
+            'packing_started_at' => 'datetime',
+            'packed_at' => 'datetime',
         ];
     }
 
@@ -48,6 +56,11 @@ class Order extends Model
     public function moderator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'moderator_id');
+    }
+
+    public function packer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'packer_id');
     }
 
     public function zone(): BelongsTo

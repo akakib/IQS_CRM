@@ -34,6 +34,7 @@
             </div>
 
             <div class="flex items-center gap-3">
+            <x-break-control part="button" />
             <x-notification-bell />
             <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                 <button type="button" @click="open = !open" class="flex items-center gap-2 text-gray-700">
@@ -63,5 +64,6 @@
         </main>
     </div>
 </div>
+<x-break-control part="screen" />
 </body>
 </html>

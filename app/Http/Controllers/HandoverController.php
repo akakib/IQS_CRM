@@ -57,7 +57,13 @@ class HandoverController extends Controller
 
     public function close(int $session, Request $request): RedirectResponse
     {
-        DB::table('handover_sessions')->where('id', $session)->whereNull('closed_at')->update(['closed_at' => now(), 'closed_by' => $request->user()->id]);
+        $closed = DB::table('handover_sessions')->where('id', $session)->whereNull('closed_at')->update(['closed_at' => now(), 'closed_by' => $request->user()->id]);
+        if ($closed) {
+            // Packed but not scanned in this handover: they wait for the next pickup.
+            Order::whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))
+                ->where(fn ($q) => $q->whereNull('pickup_date')->orWhere('pickup_date', '<=', today()))
+                ->update(['pickup_date' => today()->addDay()]);
+        }
 
         return redirect()->route('handover.manifest', $session);
     }

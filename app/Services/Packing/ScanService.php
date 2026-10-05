@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Orders\OrderService;
 use App\Services\Orders\OrderStateMachine;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Packing and handover scans (DB_DESIGN 3.5). Every scan is logged, good or
@@ -19,8 +20,13 @@ class ScanService
 {
     public function __construct(private OrderStateMachine $machine, private OrderService $orders) {}
 
-    /** @return array{ok: bool, level: string, result: string, message: string, order?: array} */
-    public function pack(string $code, User $by): array
+    /**
+     * Packing scan, step 1: scanning the label opens the order and makes the
+     * scanner its packer. Nothing is packed yet; step 2 is finish().
+     *
+     * @return array{ok: bool, level: string, result: string, message: string, order?: array, checklist?: array}
+     */
+    public function open(string $code, User $by): array
     {
         [$label, $order, $early] = $this->lookup($code);
         if ($early) {
@@ -35,32 +41,99 @@ class ScanService
             return $this->log('packing', null, $code, $order, $label, $this->fail('blocked', __('Skip: an item was reported missing. Admin is deciding.')), $by);
         }
 
-        // Re-scan of an edited, already packed order: the box was fixed and the NEW label applied.
+        $repack = false;
         if (in_array($key, ['packed', 'ready_for_pickup'], true)) {
-            if ($mark === 'repack' && $isCurrent) {
-                $order->forceFill(['packed_version' => $order->current_version])->save();
-                $this->orders->note($order, 'system', __('Repacked and new label scanned by :n.', ['n' => $by->name]), $by);
-
-                return $this->log('packing', null, $code, $order, $label, ['ok' => true, 'level' => 'edited', 'result' => 'repack_done', 'message' => __('Repack done. Edited order.')], $by);
+            if ($mark !== 'repack') {
+                return $this->log('packing', null, $code, $order, $label, $this->fail('duplicate', __('Already packed.'), 'warn'), $by);
             }
-            if ($mark === 'repack') {
+            if (! $isCurrent) {
                 return $this->log('packing', null, $code, $order, $label, $this->fail('blocked', __('Edited after packing: repack. :d Print and scan the NEW label.', ['d' => $this->diff($order)])), $by);
             }
-
-            return $this->log('packing', null, $code, $order, $label, $this->fail('duplicate', __('Already packed.'), 'warn'), $by);
-        }
-
-        if ($key !== 'ready_for_packaging') {
+            $repack = true; // new label on an edited order: fix the box, tick the items again
+        } elseif ($key !== 'ready_for_packaging') {
             return $this->log('packing', null, $code, $order, $label, $this->fail('blocked', __('Do not pack: order is :s.', ['s' => OrderStatus::map()[$order->status_id]['name']])), $by);
-        }
-        if (! $isCurrent) {
+        } elseif (! $isCurrent) {
             return $this->log('packing', null, $code, $order, $label, $this->fail('blocked', __('Old label: the order changed. Print the new label first.')), $by);
         }
 
-        $this->machine->transition($order, 'packed', $by, 'scan');
-        $order->refresh()->forceFill(['packed_version' => $order->current_version])->save();
+        if ((int) $order->packer_id !== $by->id) {
+            $previous = $order->packer_id ? DB::table('users')->where('id', $order->packer_id)->value('name') : null;
+            $order->forceFill(['packer_id' => $by->id, 'packing_started_at' => now()])->save();
+            $this->orders->note($order, 'system', $previous
+                ? __('Packing taken over by :n (was :p).', ['n' => $by->name, 'p' => $previous])
+                : __('Packing started by :n.', ['n' => $by->name]), $by);
+        }
 
-        return $this->log('packing', null, $code, $order, $label, ['ok' => true, 'level' => 'ok', 'result' => 'ok', 'message' => __('Packed.')], $by);
+        $r = $this->log('packing', null, $code, $order, $label, [
+            'ok' => true, 'level' => $repack ? 'edited' : 'ok', 'result' => 'ok',
+            'message' => $repack ? __('Repack: fix the box, then tick every item.') : __('Yours. Tick every item, then press Packed.'),
+        ], $by);
+        $r['checklist'] = $this->checklist($order, $repack);
+
+        return $r;
+    }
+
+    /** @return array{id: int, order_no: string, repack: bool, diff: ?string, moderator: ?string, items: list<array>} what the packer ticks (no customer details, no prices) */
+    public function checklist(Order $order, bool $repack): array
+    {
+        return [
+            'id' => $order->id,
+            'order_no' => $order->order_no,
+            'repack' => $repack,
+            'diff' => $repack ? $this->diff($order) : null,
+            'moderator' => $order->moderator_id ? DB::table('users')->where('id', $order->moderator_id)->value('name') : null,
+            'items' => DB::table('order_items as i')->join('product_variants as v', 'v.id', '=', 'i.variant_id')
+                ->where('i.order_id', $order->id)->orderBy('v.shelf_code')->orderBy('i.id')
+                ->get(['i.id', 'i.name_snapshot as name', 'i.qty', 'i.unit', 'v.shelf_code as shelf'])
+                ->map(fn ($i) => ['id' => $i->id, 'name' => $i->name, 'qty' => rtrim(rtrim((string) $i->qty, '0'), '.').($i->unit === 'g' ? ' g' : ''), 'shelf' => $i->shelf])->all(),
+        ];
+    }
+
+    /**
+     * Packing, step 2: every item was ticked. The server checks the list
+     * itself, so a half-ticked order can never become Packed.
+     *
+     * @param  list<int>  $tickedItemIds
+     */
+    public function finish(Order $order, array $tickedItemIds, User $by): string
+    {
+        if ((int) $order->packer_id !== $by->id) {
+            throw ValidationException::withMessages(['order' => __('Scan the label first: this order is not with you.')]);
+        }
+        $itemIds = DB::table('order_items')->where('order_id', $order->id)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+        $ticked = collect($tickedItemIds)->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+        if ($itemIds !== $ticked) {
+            throw ValidationException::withMessages(['items' => __('Tick every item first.')]);
+        }
+
+        $key = OrderStatus::map()[$order->status_id]['key'];
+        if ($key === 'ready_for_packaging') {
+            $this->machine->transition($order, 'packed', $by, 'scan');
+            $order->refresh()->forceFill(['packed_version' => $order->current_version])->save();
+
+            return __(':no packed.', ['no' => $order->order_no]);
+        }
+        if (in_array($key, ['packed', 'ready_for_pickup'], true) && $order->packMark() === 'repack' && (int) $order->label_version === (int) $order->current_version) {
+            $order->forceFill(['packed_version' => $order->current_version, 'packed_at' => now()])->save();
+            $this->orders->note($order, 'system', __('Repacked and new label scanned by :n.', ['n' => $by->name]), $by);
+
+            return __(':no repacked.', ['no' => $order->order_no]);
+        }
+
+        throw ValidationException::withMessages(['order' => __('Do not pack: order is :s.', ['s' => OrderStatus::map()[$order->status_id]['name']])]);
+    }
+
+    /** A packer cannot finish the order (item missing, damaged): Hold with a reason; the moderator and managers are told. */
+    public function hold(Order $order, int $reasonId, ?string $note, User $by): void
+    {
+        $this->machine->transition($order, 'hold', $by, 'scan', $reasonId, $note);
+        $order->forceFill(['packer_id' => null, 'packing_started_at' => null])->save();
+
+        $reason = DB::table('status_reasons')->where('id', $reasonId)->value('label_en');
+        app(\App\Services\NotificationService::class)->send('order_held_by_packer', __(':no held by packer :n', ['no' => $order->order_no, 'n' => $by->name]), trim($reason.($note ? ' · '.$note : '')), [
+            'link' => route('orders.show', $order), 'subject' => ['order', $order->id],
+            'user_ids' => array_filter(array_merge([$order->moderator_id], app(\App\Services\Orders\DeskService::class)->managerIds())),
+        ]);
     }
 
     /** @return array{ok: bool, level: string, result: string, message: string, order?: array} */
@@ -156,7 +229,6 @@ class ScanService
             $r['order'] = [
                 'order_no' => $order->order_no,
                 'items' => $order->items->map(fn ($i) => $i->name_snapshot.' ×'.rtrim(rtrim((string) $i->qty, '0'), '.').($i->unit === 'g' ? ' g' : ''))->all(),
-                'cod' => (float) $order->cod_amount,
             ];
         }
 

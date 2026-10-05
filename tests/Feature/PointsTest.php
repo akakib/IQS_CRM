@@ -70,38 +70,56 @@ class PointsTest extends TestCase
         return (float) DB::table('point_ledger')->where('user_id', $this->agent->id)->where('status', $status)->sum('points');
     }
 
-    public function test_confirm_points_wait_for_delivery_and_settle(): void
+    public function test_only_the_outcome_scores_and_a_saved_order_earns_more(): void
     {
         $order = $this->order();
         $this->move($order, 'confirmed', $this->agent);
-        $this->assertSame(1.0, $this->points('pending'));
+        $this->assertSame(0.0, $this->points('pending') + $this->points('final')); // nothing for taking or confirming
 
         $this->move($order, 'delivered', null);
-        $this->assertSame(0.0, $this->points('pending'));
-        $this->assertSame(4.0, $this->points('final')); // confirm +1, delivered +3
+        $this->assertSame(3.0, $this->points('final'));
+
+        // Had a No response or Hold on the way, then delivered: 3 + 2 bonus.
+        $saved = $this->order();
+        $saved->forceFill(['had_setback' => true])->save();
+        $this->move($saved, 'delivered', null);
+        $this->assertSame(8.0, $this->points('final'));
     }
 
-    public function test_cancel_by_sales_mistake_revokes_confirm_and_takes_points(): void
+    public function test_cancel_by_sales_mistake_costs_one_point_and_customer_cancel_nothing(): void
     {
         $order = $this->order();
-        $this->move($order, 'confirmed', $this->agent);
         $this->move($order, 'cancelled', $this->agent, 'entry_error');
+        $this->assertSame(-1.0, $this->points('final'));
 
-        $this->assertSame(-2.0, $this->points('final'));
-        $this->assertSame(1.0, (float) DB::table('point_ledger')->where('status', 'revoked')->sum('points'));
+        $other = $this->order();
+        $this->move($other, 'cancelled', $this->agent, 'customer_cancelled');
+        $this->assertSame(-1.0, $this->points('final'));
     }
 
-    public function test_risky_order_delivered_earns_the_bonus_and_reversal_claws_it_back(): void
+    public function test_admin_can_pay_more_for_a_channel_and_a_reversed_delivery_is_clawed_back(): void
     {
-        $order = $this->order();
-        DB::table('verification_runs')->insert(['order_id' => $order->id, 'outcome' => 'manual_review', 'inputs_snapshot' => '{}', 'ran_by' => 'system']);
-        $this->move($order, 'confirmed', $this->agent);
+        $rule = DB::table('point_rules')->insertGetId(['trigger_key' => 'order_delivered', 'name' => 'Chat order bonus', 'points' => 2, 'recipient' => 'order_moderator',
+            'settle_on' => 'order_final', 'requires_delivery' => false, 'is_active' => true, 'sort_order' => 99, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('point_rule_conditions')->insert(['rule_id' => $rule, 'field' => 'channel', 'operator' => '=', 'value' => 'messenger']);
+
+        $order = $this->order(); // a Messenger order
         $this->move($order, 'delivered', null);
-        $this->assertSame(9.0, $this->points('final')); // +1 +3 +5
+        $this->assertSame(5.0, $this->points('final'));
 
         // Courier corrects it to returned: delivery points go.
         $this->move($order, 'returned', null);
-        $this->assertSame(1.0, $this->points('final'));
+        $this->assertSame(0.0, $this->points('final'));
+    }
+
+    public function test_missed_timer_costs_a_point_and_more_after_three_in_a_day(): void
+    {
+        $hooks = app(PointHooks::class);
+        $hooks->timerMissed($this->order(), $this->agent->id, 1);
+        $this->assertSame(-1.0, $this->points('final'));
+
+        $hooks->timerMissed($this->order(), $this->agent->id, 4);
+        $this->assertSame(-3.0, $this->points('final')); // -1 and -1 more for the 4th today
     }
 
     public function test_monthly_minus_cap_limits_losses(): void

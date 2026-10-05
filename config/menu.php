@@ -12,22 +12,22 @@ return [
         ['My points', 'points.mine', 'points.mine', null],
     ]],
     'orders' => ['Orders', [
+        ['Order management', 'desk.index', 'desk.index', 'orders.edit'],
         ['All orders', 'orders.index', 'orders.index', 'orders.view'],
-        ['Call queue', 'orders.queue', 'orders.queue', 'orders.edit'],
         ['Quick order', 'orders.create', 'orders.create', 'orders.create'],
         ['Courier booking', 'shipping.index', 'shipping.*', 'shipping.view'],
-        ['Packing', 'packing.index', 'packing.index', 'packing.view'],
-        ['Scan to pack', 'packing.scan', 'packing.scan', 'packing.view'],
+        ['Packing', 'packing.index', 'packing.*', 'packing.view'],
         ['Handover', 'handover.index', 'handover.*', 'packing.view'],
         ['Hotline', 'hotline.index', 'hotline.*', 'hotline.view'],
         ['Delivery issues', 'issues.index', 'issues.*', 'orders.view'],
+        ['Control room', 'desk.control', 'desk.control', 'orders.reassign'],
     ]],
     'catalog' => ['Catalog', [
         ['Products', 'products.index', 'products.*', 'products.view'],
         ['Customers', 'customers.index', 'customers.*', 'customers.view'],
     ]],
     'analysis' => ['Analysis', [
-        ['Dashboard & KPI', 'kpi.index', 'kpi.*', 'kpi.view'],
+        ['KPI', 'kpi.index', 'kpi.*', null],
         ['Order P&L', 'analysis.index', 'analysis.*', 'analysis.view'],
     ]],
     'marketing' => ['Marketing', [
@@ -41,6 +41,7 @@ return [
     'team' => ['Team', [
         ['Staff', 'users.index', 'users.*', 'staff.view'],
         ['Roles', 'roles.index', 'roles.*', 'roles.view'],
+        ['Attendance & breaks', 'attendance.index', 'attendance.*', 'attendance.view'],
         ['Points review', 'points.review', 'points.review*', 'points.manage'],
     ]],
     'settings' => ['Settings', [

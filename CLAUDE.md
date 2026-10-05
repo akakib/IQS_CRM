@@ -333,15 +333,42 @@ Agreed with the owner on 2026-10-05:
 - Products keep description, regular/sale/discount price, SEO title and
   description and every other needed field IN THIS SYSTEM; the one-way sync to
   WooCommerce carries them too (overrides "descriptions/SEO stay in Woo").
-- Orders: a new order notifies employees; the first one to press "Assign to me"
-  becomes the owner (replaces round-robin). One person works one order at a
-  time. Only Admin can reassign or release.
-- Points (speed + fewer mistakes) and KPI (order volume) are SEPARATE. Every
-  point value is admin-configurable (point_rules); points are pending until the
+- Words: the person working an order is its MODERATOR (`orders.moderator_id`;
+  UI says "Assigned to"). "Owner" means only the business Owner role.
+- Order management desk (2026-10-05, replaces "Assign to me" and the Call queue):
+  - New website orders are never picked: "Take next" gives the OLDEST waiting
+    order. Nobody takes it in 15 min -> auto-assigned to the active moderator
+    (seen in the last 10 min, not on break, inside their shift) with the fewest.
+  - Limit 5 website orders per moderator (new + record verified). Chat orders
+    belong to their creator, have no timer and do not count.
+  - Action timer 10 min, on ONE order at a time (the oldest); missed -> order
+    goes back to New, counted as "released", minus point.
+  - No response returns to the same moderator after 30 min, 5 h, 24 h (moved
+    to the next shift start if outside hours); after the last one the order
+    is cancelled as unreachable (0 points, counts in the KPI cancel rate).
+  - "Send to packing" books the courier after the response; the order reaches
+    the packing queue only with a CN. Cron (`desk:tick`) retries and sweeps.
+  - Timers are columns checked at click time; cron only catches what nobody
+    touched. Keep it that way (shared hosting).
+- Packing: one shared queue for today's on-duty packers; scanning the label
+  claims the order; Packed only when every item is ticked (server-checked).
+  A packer who cannot finish puts the order on Hold with a reason. Packers
+  never see phone, full address or prices. Telegram: digest + exceptions only.
+- Breaks: everyone. Reason required (admin-editable, each flagged "counts as
+  break" or "work away"); full-screen lock until "Start work"; server refuses
+  actions meanwhile; un-called orders return to New without penalty. Left
+  open -> closed at shift end and flagged. Daily limit only warns (red).
+- Working days: per person (`work_schedules`), else the office default in
+  Settings. Using the system on an off day = an "extra day" (needs approval
+  before it counts for pay). Full HR/payroll is a later step.
+- Points: every value is admin-configurable (point_rules); pending until the
   order is final; reverted statuses claw points back; fake-status penalties
-  only after a Manager confirms. Risky (not record-verified) orders sent anyway
-  earn a big plus when delivered and the same minus when returned by the
-  customer.
+  only after a Manager confirms. Scoring is outcome-based: nothing for
+  taking/confirming; delivered +3, saved order +2 more, moderator-caused
+  cancel -1 / return -3, missed timer -1. Rules can depend on the channel.
+- KPI = counts and rates per moderator (no weighted score), two views (ended
+  in the period / cohort), monthly targets per person (`kpi_targets`).
+  Points and KPI stay SEPARATE.
 - Roles: Owner has everything; role = shared rules; per-staff Allow/Deny on
   top (deny wins); temporary roles/permissions with expiry; new modules start
   NOT allowed. Managing roles/access is Owner-only.

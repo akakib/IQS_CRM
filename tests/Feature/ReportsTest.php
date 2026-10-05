@@ -76,11 +76,12 @@ class ReportsTest extends TestCase
     public function test_kpi_scores_the_order_moderator(): void
     {
         $this->deliveredOrder();
-        $rows = app(KpiScorecard::class)->rows(today()->toDateString(), today()->toDateString());
+        $data = app(KpiScorecard::class)->build(today()->toDateString(), today()->toDateString());
 
-        $this->assertSame('Mahim', $rows[0]['name']);
-        $this->assertSame(1, $rows[0]['confirmed']);
-        $this->assertSame(100.0, $rows[0]['delivered_rate']);
+        $this->assertSame('Mahim', $data['rows'][0]['name']);
+        $this->assertSame(1, $data['rows'][0]['delivered']);
+        $this->assertSame(100.0, $data['rows'][0]['delivery_rate']);
+        $this->assertSame(100.0, $data['team']['delivery_rate']);
     }
 
     public function test_pages_render_and_profit_is_masked(): void
@@ -97,7 +98,8 @@ class ReportsTest extends TestCase
         $viewer->roles()->attach($this->role(['analysis.view'], ['profit'], 'Viewer')->id);
         app(\App\Services\PermissionService::class)->bump();
         $this->actingAs($viewer)->get(route('analysis.index'))->assertOk()->assertDontSee('Profit before ads');
-        $this->get(route('kpi.index'))->assertForbidden();
+        // KPI: without kpi.view a person sees only their own row, never the team.
+        $this->get(route('kpi.index'))->assertOk()->assertDontSee('Mahim');
     }
 
     public function test_owner_summary_command_runs(): void

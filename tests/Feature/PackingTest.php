@@ -80,6 +80,13 @@ class PackingTest extends TestCase
         return DB::table('shipment_labels')->where('order_id', $o->id)->whereNull('voided_at')->value('barcode');
     }
 
+    /** Scan the label (claims the order), tick every item, press Packed. */
+    private function packIt(Order $o, ?string $code = null): void
+    {
+        $this->postJson('/packing/scan', ['code' => $code ?? $this->label($o)])->assertJson(['ok' => true]);
+        $this->postJson("/packing/orders/{$o->id}/pack", ['items' => DB::table('order_items')->where('order_id', $o->id)->pluck('id')->all()])->assertJson(['ok' => true]);
+    }
+
     public function test_release_posts_one_pick_list_sorted_by_shelf_without_customer_details(): void
     {
         $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
@@ -104,8 +111,14 @@ class PackingTest extends TestCase
         $order = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 2]]);
         $this->actingAs($this->packer);
 
-        $this->postJson('/packing/scan', ['code' => $this->label($order)])->assertJson(['ok' => true, 'level' => 'ok']);
+        // Scan = mine, with a checklist. Not packed until every item is ticked.
+        $this->postJson('/packing/scan', ['code' => $this->label($order)])->assertJson(['ok' => true, 'level' => 'ok'])->assertJsonPath('checklist.order_no', $order->order_no);
+        $this->assertSame('ready_for_packaging', $this->key($order));
+        $this->assertSame($this->packer->id, $order->fresh()->packer_id);
+        $this->postJson("/packing/orders/{$order->id}/pack", ['items' => []])->assertStatus(422);
+        $this->packIt($order);
         $this->assertSame('packed', $this->key($order));
+        $this->assertNotNull($order->fresh()->packed_at);
         $this->postJson('/packing/scan', ['code' => $this->label($order)])->assertJson(['ok' => false, 'result' => 'duplicate']);
 
         // Content edit after packing (manager approves since status needs approval).
@@ -119,7 +132,9 @@ class PackingTest extends TestCase
 
         app(BookingService::class)->issueLabel($order->fresh(), $order->fresh()->active_shipment_id, $this->desk, 'repack');
         $this->postJson('/packing/scan', ['code' => $old])->assertJson(['ok' => false])->assertJsonFragment(['result' => 'blocked']); // voided now
-        $this->postJson('/packing/scan', ['code' => $order->order_no.'-2'])->assertJson(['ok' => true, 'result' => 'repack_done', 'level' => 'edited']);
+        $this->postJson('/packing/scan', ['code' => $order->order_no.'-2'])->assertJson(['ok' => true, 'level' => 'edited'])->assertJsonPath('checklist.repack', true);
+        $this->assertSame('repack', $order->fresh()->packMark()); // still red until the items are ticked again
+        $this->packIt($order, $order->order_no.'-2');
         $this->assertSame('edited', $order->fresh()->packMark());
     }
 
@@ -128,8 +143,8 @@ class PackingTest extends TestCase
         $a = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
         $b = $this->booked('01812345678', [['variant_id' => $this->nuts->id, 'qty' => 1]]);
         $this->actingAs($this->packer);
-        $this->postJson('/packing/scan', ['code' => $this->label($a)]);
-        $this->postJson('/packing/scan', ['code' => $this->label($b)]);
+        $this->packIt($a);
+        $this->packIt($b);
 
         $this->post('/handover', ['rider_name' => 'Rafiq', 'rider_phone' => '01911111111']);
         $session = DB::table('handover_sessions')->value('id');

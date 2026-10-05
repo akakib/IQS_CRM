@@ -20,9 +20,6 @@
             @if ($canEdit)
                 <x-button variant="secondary" :href="route('orders.edit', $order)">{{ __('Edit order') }}</x-button>
             @endif
-            @if ($canClaim)
-                <form method="POST" action="{{ route('orders.claim', $order) }}">@csrf<x-button>{{ __('Assign to me') }}</x-button></form>
-            @endif
         </div>
     </div>
 

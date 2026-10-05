@@ -12,10 +12,11 @@ return [
         'locations' => ['view', 'create', 'edit', 'delete'],
         'products' => ['view', 'create', 'edit', 'delete', 'export', 'availability'],
         'customers' => ['view', 'create', 'edit', 'delete', 'export'],
-        'orders' => ['view', 'create', 'edit', 'approve', 'export', 'reassign'],
+        'orders' => ['view', 'create', 'edit', 'approve', 'export', 'reassign', 'take'],
         'shipping' => ['view', 'create'],
         'hotline' => ['view', 'create'],
-        'packing' => ['view', 'create'],
+        'packing' => ['view', 'create', 'manage'],
+        'attendance' => ['view', 'edit'],
         // Creating/editing roles and giving access is Owner-only (no permission
         // can grant it, so nobody can raise their own access).
         'roles' => ['view'],
@@ -33,6 +34,11 @@ return [
         'staff.delete' => 'Deactivate',
         'products.availability' => 'Stock status',
         'points.manage' => 'Manage rules and reviews',
+        'packing.manage' => 'Set on-duty packers',
+        'attendance.view' => 'See breaks and working days',
+        'attendance.edit' => 'Correct breaks, approve extra days',
+        'orders.reassign' => 'Reassign and control room',
+        'orders.take' => 'Take orders from the queue (moderator)',
         'marketing.create' => 'Add spend and USD lots',
     ],
 

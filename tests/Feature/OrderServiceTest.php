@@ -100,52 +100,10 @@ class OrderServiceTest extends TestCase
         $this->assertSame('500.00', $order->discount_total);
     }
 
-    public function test_website_order_is_unowned_and_one_person_claims_one_at_a_time(): void
-    {
-        $web1 = $this->make([], null, 'web');
-        $web2 = $this->make(['phone' => '01812345678'], null, 'web');
-        $this->assertNull($web1->moderator_id);
-
-        app(OrderService::class)->claim($web1, $this->agent);
-        $this->assertSame($this->agent->id, $web1->fresh()->moderator_id);
-
-        try {
-            app(OrderService::class)->claim($web2, $this->agent);
-            $this->fail('Second claim should be refused');
-        } catch (ValidationException $e) {
-            $this->assertStringContainsString('Finish your current order', $e->getMessage());
-        }
-
-        $other = User::factory()->create();
-        $this->expectException(ValidationException::class);
-        app(OrderService::class)->claim($web1, $other); // already taken
-    }
-
-    public function test_finishing_the_call_frees_the_agent_to_claim_again(): void
-    {
-        $web1 = $this->make([], null, 'web');
-        $web2 = $this->make(['phone' => '01812345678'], null, 'web');
-        $sm = app(OrderStateMachine::class);
-
-        app(OrderService::class)->claim($web1, $this->agent);
-        $sm->transition($web1, 'record_verified', $this->owner(), 'user');
-        $sm->transition($web1, 'confirmed', $this->agent, 'user');
-
-        app(OrderService::class)->claim($web2, $this->agent);
-        $this->assertSame($this->agent->id, $web2->fresh()->moderator_id);
-    }
-
     public function test_state_machine_rules_reasons_and_events(): void
     {
         $order = $this->make();
         $sm = app(OrderStateMachine::class);
-
-        // Staff cannot record-verify (rules or a manager override do).
-        try {
-            $sm->transition($order, 'record_verified', $this->agent);
-            $this->fail('Agent should not verify');
-        } catch (ValidationException) {
-        }
 
         $sm->transition($order, 'record_verified', $this->owner(), 'rule');
         $this->assertNotNull($order->fresh()->verified_at);

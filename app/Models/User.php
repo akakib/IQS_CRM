@@ -54,6 +54,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'last_seen_at' => 'datetime',
             'employment_type' => EmploymentType::class,
         ];
     }

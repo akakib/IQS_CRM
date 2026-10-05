@@ -31,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(PermissionService::class);
         $this->app->singleton(CourierManager::class);
         $this->app->singleton(SettingsService::class);
+        $this->app->scoped(\App\Services\Work\WorkCalendar::class);
 
         // Website receiver: fake everywhere except production with STORE_DRIVER=woocommerce.
         $this->app->singleton(StoreDriver::class, fn ($app) => $app->environment(['testing', 'staging', 'local']) || config('store.driver') !== 'woocommerce'
@@ -89,6 +90,8 @@ class AppServiceProvider extends ServiceProvider
         });
 
         \App\Services\Orders\OrderStateMachine::listen(fn ($order, $from, $to, $user = null) => app(\App\Services\Points\PointHooks::class)->transition($order, $from, $to, $user));
+
+        \App\Services\Orders\OrderStateMachine::listen(fn ($order, $from, $to, $user = null) => app(\App\Services\Orders\DeskService::class)->onTransition($order, $from, $to, $user));
 
         // Roles and access assignments: Owner only.
         Gate::define('access.manage', fn (User $user) => $user->isOwner());

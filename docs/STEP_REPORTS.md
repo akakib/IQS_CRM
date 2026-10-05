@@ -310,3 +310,70 @@ Tests: 191 passing.
 8. Create a few orders today → the day row shows the order count and the cost per order.
 9. Deliver one → delivered revenue and delivered ROAS go up.
 10. Analysis → Order P&L → Ad cost and Profit after ads tiles; a role with the profit mask does not see profit.
+
+---
+
+## Order management desk, packer portal, breaks (done 2026-10-05)
+
+Built outside the numbered steps at the owner's request. It replaces the Call queue and "Assign to me".
+
+### Built
+- **Order management** (top of the Orders menu), in the app's own theme:
+  - **Take next** gives the oldest waiting website order. Nobody picks from a list.
+  - Tabs: Verify (only orders the rules sent to manual review), Call, Call again, On hold, To send, Packing.
+  - Left: my orders in that stage. Middle: the order (phone with copy and QR to dial from a PC, customer history, duplicate check, items with stock, full history). Bottom: the actions for that stage.
+  - Keys on a PC: J/K next and previous, the letter on a button presses it, T takes next, number keys pick a reason. On a phone: list, tap, detail.
+- **Rules the desk enforces**
+  - At most 5 website orders in hand (setting). Chat orders belong to whoever created them, with no timer, and do not use up the limit.
+  - **10-minute action timer** on one order at a time (the oldest). Missed: the order goes back to New, it counts as "timed out" and costs a point.
+  - **No response**: the order leaves the Call tab and comes back to the same moderator after 30 minutes, then 5 hours, then 24 hours (at the next shift start if that falls outside office hours). After the last one it is cancelled as "could not reach customer".
+  - An order nobody takes in 15 minutes is given to the active moderator with the fewest orders. Nobody active: it waits and managers get an alert.
+  - **Send to packing** is one button. The courier is booked right after the click (fake courier until the Steadfast key is set); the order reaches the packers only once it has a CN. Three failed bookings: the moderator and managers are told and a retry button shows.
+- **Packer portal** (Packing in the menu), built for a phone or tablet:
+  - Admin sets today's on-duty packers. All of them share one queue: repack (red) first, then new label (orange), then oldest.
+  - Scanning the label makes the order yours and opens a big checklist. **Packed works only when every item is ticked** (checked on the server too).
+  - The moderator sees "Packing: name, since time" and then "Packed by name at time".
+  - Cannot finish it? **Hold** with a reason. The moderator and managers are alerted and the order shows who held it.
+  - "Print new labels" prints every label not printed yet. "My day": packed count, average time, scan errors.
+  - Packers never see phone numbers, full addresses or prices on screen.
+  - Handover: to hand over / scanned / left, with sound. Finishing moves unscanned parcels to the next pickup.
+- **Breaks** (button in the header, for everyone):
+  - Choose a reason (Lunch, Prayer, Washroom, Shop visit, Task from admin, Other; editable in Settings, each marked "counts as break" or "work away").
+  - The whole screen is covered with the name, ID and a running timer until **Start work**. The server refuses any action meanwhile.
+  - Orders not called yet go back to New without a penalty.
+  - Over the daily limit (60 minutes, setting) the screen and the reports turn red; nobody is blocked.
+  - Left on break and went home: closed at the end of that person's shift, marked "did not come back", managers alerted. An admin can correct the time with a note.
+- **Office days per person** (Staff, edit page) or the office default (Settings, Working hours). Using the system on an off day is recorded as an **extra day**, counted for pay only after approval.
+- **Attendance & breaks** (Team menu): day view (first and last seen, every break) and month view (days worked, extra days, break time, days over the limit).
+- **Control room** (Orders menu): waiting orders by age, orders per stage with the oldest untouched, and per moderator: holding, oldest, No response, on hold, timed out today, breaks today.
+- **Scoring** is by outcome: delivered +3, saved order (had No response or Hold, then delivered) +2 more, moderator-caused cancel -1, moderator-caused return -3, missed timer -1 (-2 from the 4th in a day). Nothing for taking or confirming. Rules can now depend on the **channel**, so chat orders can earn or lose more. All values stay editable.
+- **KPI** is counts and rates per moderator with a team average: delivered, delivery %, cancel %, return %, saved, No response now, timed out. Two views (ended in the period / taken in the period). Monthly **targets** per person. A moderator sees only their own row.
+- Telegram: one packing digest every 30 minutes plus exceptions (cancelled, on hold, repack). No per-order messages. The nightly owner summary lists each moderator's delivered count and break minutes.
+- Permissions granted automatically where nobody had them yet: orders.take (Moderator), packing.manage, attendance, points.manage, kpi.view, analysis.view (Manager).
+
+Tests: 198 passing.
+
+### Assumptions made (say if any should change)
+- Four call attempts in total: the first call plus the three returns. The cancel after the last one gives 0 points.
+- The timer runs on one order at a time, not on all five at once.
+- "Active" means used the system in the last 10 minutes (an open but idle tab does not count).
+- The risky-order plus/minus rules are switched off. Packer +1, entry-error minus and fake status -10 stay.
+- If no on-duty list is set for the day, everyone with packing access can pack.
+- Batches and the Telegram pick list are no longer in the menu (the shared queue replaces them).
+
+### Needs you
+- **Add the cron** in hPanel (Advanced, Cron Jobs), every minute: `cd ~/domains/iqs.top5way.com/public_html && php artisan schedule:run >> /dev/null 2>&1`. Without it: auto-assign, break auto-close, booking retries and the digests do not run. Taking orders, timers on Take next, No response returns and booking still work.
+- SMS to the customer after the first No response needs an SMS gateway account. The setting exists and is off.
+- Staff need their office days set if they differ from the default (Friday off, 9:00 to 22:00).
+
+### 10-line manual test checklist
+1. Order management: press Take next. The oldest order opens with a 10-minute timer.
+2. Press Record OK (if it is in Verify), then Call verified, then Send to packing. Within seconds the Packing tab shows the CN.
+3. Take another, press No response. It moves to Call again with the return time.
+4. Take another and wait 10 minutes (or set the timer to 1 minute in Settings). Press Take next again: the missed order is back in New and My points shows -1.
+5. Press Break, choose Lunch. The screen locks with the timer. Press Start work.
+6. Packing: scan (or type) the label, tick the items, press Packed. The moderator's Packing tab shows "Packed by".
+7. Packing: scan another order and press Hold with a reason. The order page shows who held it.
+8. Control room: check waiting orders, stages and the moderator table.
+9. Attendance & breaks: today's break is listed; open Month.
+10. KPI: set a target for one person and see it under their delivered count.

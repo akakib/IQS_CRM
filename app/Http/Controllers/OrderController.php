@@ -150,16 +150,8 @@ class OrderController extends Controller
             'statuses' => OrderStatus::map(),
             'targets' => $this->machine->allowedTargets($order, $user),
             'reasons' => ['cancel' => StatusReason::options('cancel'), 'hold' => StatusReason::options('hold'), 'status' => StatusReason::options('status'), 'return' => StatusReason::options('return'), 'reassign' => StatusReason::options('reassign')],
-            'canClaim' => $order->moderator_id === null && in_array($order->status_id, OrderStatus::idsFor(['new', 'record_verified']), true) && $user->can('orders.edit'),
             'staffOptions' => $user->can('orders.reassign') ? User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
         ]);
-    }
-
-    public function claim(Order $order, Request $request): RedirectResponse
-    {
-        $this->orders->claim($order, $request->user());
-
-        return back()->with('success', __('Order :no is yours now.', ['no' => $order->order_no]));
     }
 
     public function transition(Order $order, Request $request): RedirectResponse
@@ -180,7 +172,7 @@ class OrderController extends Controller
         // Proof of a real call: a website order is confirmed by hand only after a logged call.
         if ($data['to'] === 'confirmed' && $order->channel === 'web'
             && ! DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'call')->exists()) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['status' => __('Log the call first (Call queue, or add a Call note below).')]);
+            throw \Illuminate\Validation\ValidationException::withMessages(['status' => __('Log the call first (Order management, or add a Call note below).')]);
         }
 
         $this->machine->transition($order, $data['to'], $user, 'user', $data['reason_id'] ?? null, $data['note'] ?? null, (int) $data['lock_version']);

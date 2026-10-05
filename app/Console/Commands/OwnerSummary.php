@@ -38,6 +38,26 @@ class OwnerSummary extends Command
             $text .= "\n⚠️ ".__('Open delivery issues: :i · Points flags to review: :f', ['i' => $issues, 'f' => $flags]);
         }
 
+        // Per moderator: delivered count and rate, orders that timed out, break minutes.
+        $kpi = app(\App\Services\Reports\KpiScorecard::class)->build($day, $day)['rows'];
+        $breaks = DB::table('staff_breaks')->whereBetween('started_at', $range)->where('counts_as_break', true)
+            ->groupBy('user_id')->selectRaw('user_id, SUM(COALESCE(minutes, 0)) as minutes')->pluck('minutes', 'user_id');
+        $names = $breaks->isEmpty() ? collect() : DB::table('users')->whereIn('id', $breaks->keys())->pluck('name', 'id');
+        if ($kpi) {
+            $text .= "\n\n<b>".__('Team')."</b>";
+            foreach (array_slice($kpi, 0, 15) as $r) {
+                $text .= "\n".__(':n: :d delivered:rate:t', [
+                    'n' => $r['name'], 'd' => $r['delivered'],
+                    'rate' => $r['delivery_rate'] !== null ? ' ('.$r['delivery_rate'].'%)' : '',
+                    't' => $r['released'] ? ' · '.__(':k timed out', ['k' => $r['released']]) : '',
+                ]);
+            }
+        }
+        if ($breaks->isNotEmpty()) {
+            $limit = (int) settings('work.break_limit_minutes');
+            $text .= "\n\n<b>".__('Breaks')."</b>\n".$breaks->map(fn ($m, $id) => ($names[$id] ?? '#'.$id).' '.(int) $m.'m'.($limit > 0 && $m > $limit ? ' ⚠️' : ''))->join(' · ');
+        }
+
         $telegram->send(config('services.telegram.owner_chat_id'), $text);
         $this->info('Sent.');
 

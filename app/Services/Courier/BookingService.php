@@ -24,7 +24,7 @@ class BookingService
      * @param  list<int>  $orderIds
      * @return array{booked: list<string>, failed: array<string, string>}
      */
-    public function book(array $orderIds, User $by): array
+    public function book(array $orderIds, ?User $by): array
     {
         $confirmed = OrderStatus::idFor('confirmed');
         $orders = Order::whereIn('id', $orderIds)->where('status_id', $confirmed)->get()->keyBy('order_no');
@@ -72,10 +72,11 @@ class BookingService
                     $shipmentId = DB::table('shipments')->insertGetId([
                         'order_id' => $order->id, 'courier' => $driver->name(), 'consignment_id' => $r->consignmentId,
                         'tracking_code' => $r->trackingCode, 'cod_amount' => $order->cod_amount, 'courier_status' => $r->status,
-                        'booked_by' => $by->id, 'booked_at' => now(), 'is_active' => true, 'raw_booking' => json_encode($r->raw),
+                        'booked_by' => $by?->id, 'booked_at' => now(), 'is_active' => true, 'raw_booking' => json_encode($r->raw),
                         'created_at' => now(), 'updated_at' => now(),
                     ]);
-                    $order->forceFill(['active_shipment_id' => $shipmentId, 'pickup_date' => $order->pickup_date ?? now()->toDateString()])->save();
+                    $order->forceFill(['active_shipment_id' => $shipmentId, 'pickup_date' => $order->pickup_date ?? now()->toDateString(),
+                        'booking_state' => 'none', 'booking_error' => null, 'packing_sent_at' => now()])->save();
                     $this->issueLabel($order, $shipmentId, $by, null);
                     $this->orders->note($order, 'courier', __('Booked with :c · CN :cn · COD ৳:cod', ['c' => ucfirst($driver->name()), 'cn' => $r->consignmentId, 'cod' => $order->cod_amount]), $by);
                     $this->machine->transition($order, 'ready_for_packaging', $by, 'system', null, 'CN '.$r->consignmentId);

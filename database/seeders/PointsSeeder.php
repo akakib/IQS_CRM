@@ -15,20 +15,19 @@ class PointsSeeder extends Seeder
     {
         // [trigger, name, points, recipient, settle_on, requires_delivery, conditions [field, op, value]]
         $rules = [
-            ['order_claimed', 'Took an order', 1, 'order_moderator', 'order_final', false, []],
-            ['order_confirmed', 'Confirmed an order (counts only if delivered)', 1, 'order_moderator', 'order_final', true, [['by_rule', '=', 'false']]],
             ['order_delivered', 'Order delivered', 3, 'order_moderator', 'order_final', false, []],
-            ['order_delivered', 'Risky order sent and delivered', 5, 'order_moderator', 'order_final', false, [['risky', '=', 'true']]],
+            ['order_delivered', 'Saved order bonus (had No response or Hold, then delivered)', 2, 'order_moderator', 'order_final', false, [['saved', '=', 'true']]],
             ['order_partial', 'Partial delivery', 1, 'order_moderator', 'order_final', false, []],
-            ['order_cancelled', 'Cancelled by a sales mistake', -2, 'order_moderator', 'order_final', false, [['blame', '=', 'sales']]],
+            ['order_cancelled', 'Cancelled by a sales mistake', -1, 'order_moderator', 'order_final', false, [['blame', '=', 'sales']]],
             ['order_returned', 'Returned by a sales mistake', -3, 'order_moderator', 'order_final', false, [['blame', '=', 'sales']]],
             ['order_returned', 'Returned by a packing mistake', -3, 'packer', 'order_final', false, [['blame', '=', 'packing']]],
-            ['order_returned', 'Risky order sent and refused by the customer', -5, 'order_moderator', 'order_final', false, [['risky', '=', 'true'], ['blame', '=', 'customer']]],
             ['order_packed', 'Packed within 30 minutes of release', 1, 'packer', 'order_final', false, [['minutes_since_release', '<=', '30']]],
             ['amendment', 'Entry error fixed before packing', -1, 'order_moderator', 'immediate', false, [['blame', '=', 'sales'], ['after_pack', '=', 'false']]],
             ['amendment', 'Entry error fixed after packing', -2, 'order_moderator', 'immediate', false, [['blame', '=', 'sales'], ['after_pack', '=', 'true']]],
             ['order_reassigned', 'Order taken away for own mistake', -1, 'previous_moderator', 'immediate', false, [['blame', '=', 'sales']]],
             ['issue_escalated', 'Delivery issue not handled in time', -1, 'order_moderator', 'immediate', false, []],
+            ['timer_missed', 'Action timer missed', -1, 'actor', 'immediate', false, []],
+            ['timer_missed', 'Action timer missed again (more than 3 today)', -1, 'actor', 'immediate', false, [['releases_today', '>', '3']]],
             ['fake_status', 'Fake status change (confirmed by a manager)', -10, 'actor', 'immediate', false, []],
         ];
 

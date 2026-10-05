@@ -34,7 +34,7 @@
             </div>
             <div class="px-4 pt-3">
                 <p class="text-xs font-medium uppercase text-gray-500">{{ __('Voice on this device') }}</p>
-                <p class="mt-1 text-xs text-gray-500">{{ __('Tap one to hear it. Bangla and India voices sound closest to a Bangladeshi accent.') }}</p>
+                <p class="mt-1 text-xs text-gray-500">{{ __('Tap one to hear it. Without a choice, an Indian accent voice is used.') }}</p>
             </div>
             <div class="mt-2 max-h-64 overflow-y-auto px-2 pb-2">
                 <template x-for="v in voices" :key="v.name">

@@ -1,21 +1,21 @@
 // <x-voice-alerts>: spoken alerts for moderators, in English, with their own name.
 // The page asks the server every 30 seconds what is new for this person and
 // says it out loud with the browser's own voice (nothing is sent anywhere):
-//   a new order given to them, a No response order back to call,
-//   a timer that started on an order they do not have open, two minutes left,
-//   new orders waiting while they have room for one.
+//   a new order started (its timer began), a new order given to them,
+//   a No response order back to call, two minutes left on the current order,
+//   new orders waiting while they have room for one. No order numbers.
 // What was already said is remembered for the browser tab (sessionStorage), so
 // a page reload does not repeat it. The very first check only records the state.
 //
 // Voice: each device has different voices. The speaker menu lists the ones that
 // fit (English, plus Bangla and Hindi voices, which read English with a South
 // Asian accent) and remembers the choice per browser. Without a choice, an
-// English (India) voice is preferred: the closest to a Bangladeshi accent.
+// Indian accent is used: an English (India) voice, else a Hindi voice reading English.
 //
 // Browsers only allow sound after the person has clicked or typed on the page.
 // An alert that arrives before that waits and is said on the next click.
 const SEEN_KEY = 'iqs_voice_seen';
-const PICK_KEY = 'iqs_voice_pick';
+const PICK_KEY = 'iqs_voice_choice'; // renamed once so earlier test picks fall back to the Indian accent
 
 export default function voiceAlerts({ url, name, interval = 30000 }) {
     return {
@@ -76,7 +76,7 @@ export default function voiceAlerts({ url, name, interval = 30000 }) {
 
         test() {
             window.speechSynthesis?.cancel();
-            this.say(`${name}, you have a new order, ${spell('IQ10001')}.`, true);
+            this.say(`${name}, new order. Your time has started.`, true);
         },
 
         load() {
@@ -114,16 +114,14 @@ export default function voiceAlerts({ url, name, interval = 30000 }) {
             };
 
             if (prev && !d.on_break) {
-                const fresh = d.mine.filter((o) => !prev.mine.includes(o.id) && o.id !== open);
-                if (fresh.length === 1) this.say(`${name}, you have a new order, ${spell(fresh[0].no)}.`);
-                if (fresh.length > 1) this.say(`${name}, you have ${fresh.length} new orders.`);
-
-                d.returned
-                    .filter((o) => !prev.back.includes(o.id) && o.id !== open)
-                    .forEach((o) => this.say(`${name}, time to call ${spell(o.no)} again.`));
-
-                if (d.timed && d.timed.id !== prev.timed && d.timed.id !== open) {
-                    this.say(`${name}, your timer has started on ${spell(d.timed.no)}.`);
+                // A timer started (Take next, opening the next order, or the untouched-order rule): a new order is on.
+                if (d.timed && d.timed.id !== prev.timed) {
+                    this.say(`${name}, new order. Your time has started.`);
+                } else if (d.mine.some((o) => !prev.mine.includes(o.id) && o.id !== open)) {
+                    this.say(`${name}, you have a new order.`); // given to them, not opened yet
+                }
+                if (d.returned.some((o) => !prev.back.includes(o.id) && o.id !== open)) {
+                    this.say(`${name}, time to call a customer again.`);
                 }
                 if (d.can_take && d.waiting > prev.waiting && Date.now() - seen.saidWaitingAt > 180000) {
                     this.say(`${name}, new orders are waiting.`);
@@ -137,7 +135,7 @@ export default function voiceAlerts({ url, name, interval = 30000 }) {
                 const key = `${d.timed.id}:${d.timed.due}`;
                 if (seen.warned !== key && d.timed.left > 110) {
                     this.warnTimer = setTimeout(() => {
-                        this.say(`${name}, two minutes left on ${spell(d.timed.no)}.`);
+                        this.say(`${name}, two minutes left on current order.`);
                         const now = this.load();
                         if (now) this.store({ ...now, warned: key });
                     }, Math.max(0, (d.timed.left - 120) * 1000));
@@ -148,12 +146,7 @@ export default function voiceAlerts({ url, name, interval = 30000 }) {
 
         say(text, evenWhenOff = false) {
             if ((!this.on && !evenWhenOff) || !('speechSynthesis' in window)) return;
-            // No click on this page yet: the browser would refuse the sound. Hold it until the next click.
-            if (navigator.userActivation && !navigator.userActivation.hasBeenActive) {
-                this.queue.push(text);
-                this.waiting = true;
-                return;
-            }
+            // Said right away; if the browser refuses (no click yet), the line is held for the next click (onerror below).
             const u = new SpeechSynthesisUtterance(text);
             const voice = chosenVoice(this.pick);
             u.lang = voice?.lang || 'en-IN';
@@ -179,22 +172,10 @@ export default function voiceAlerts({ url, name, interval = 30000 }) {
     };
 }
 
-const DIGITS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
-
-// "IQ10009" read as "I Q, one zero zero zero nine": clear in any voice, and a
-// Bangla or Hindi voice does not switch to its own language for the digits.
-function spell(orderNo) {
-    const s = String(orderNo || '');
-    const letters = s.replace(/[^A-Za-z]/g, '').toUpperCase().split('').join(' ');
-    const digits = s.replace(/\D/g, '').split('').map((d) => DIGITS[d]).join(' ');
-
-    return [letters, digits].filter(Boolean).join(', ');
-}
-
 // English voices, plus Bangla and Hindi ones (they read English with a South Asian accent).
 function usableVoices() {
     const all = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [];
-    const rank = (v) => (v.lang.startsWith('bn') ? 0 : v.lang === 'en-IN' ? 1 : v.lang.startsWith('hi') ? 2 : v.lang === 'en-GB' ? 3 : 4);
+    const rank = (v) => (v.lang === 'en-IN' ? 0 : v.lang.startsWith('hi') ? 1 : v.lang.startsWith('bn') ? 2 : v.lang === 'en-GB' ? 3 : 4);
 
     return all.filter((v) => /^(en|bn|hi)/i.test(v.lang)).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
 }
@@ -206,13 +187,16 @@ function voiceLabel(v) {
     return `${short} (${where})`;
 }
 
-// The voice picked in this browser; otherwise English (India), then any English voice.
+// The voice picked in this browser; otherwise an Indian accent: an English (India)
+// voice, else a Hindi one (it reads English sentences with an Indian accent; Chrome on
+// Windows has "Google Hindi" but no English India voice), then any English voice.
 function chosenVoice(pick) {
     const voices = usableVoices();
 
     return (
         (pick && voices.find((v) => v.name === pick)) ||
         voices.find((v) => v.lang === 'en-IN') ||
+        voices.find((v) => v.lang?.startsWith('hi')) ||
         voices.find((v) => v.lang === 'en-GB') ||
         voices.find((v) => v.lang?.startsWith('en')) ||
         null

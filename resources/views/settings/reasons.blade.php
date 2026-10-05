@@ -21,17 +21,27 @@
 
         <div class="space-y-6">
             <x-card :title="__('Add a reason')">
-                <form method="POST" action="{{ route('settings.reasons.store') }}" class="space-y-2">
+                {{-- Each kind of reason asks only what matters for it: whose fault (points) for order reasons, break limit for break reasons. --}}
+                <form method="POST" action="{{ route('settings.reasons.store') }}" class="space-y-2"
+                    x-data="{ type: 'cancel', types: {{ \Illuminate\Support\Js::from(array_keys($typeLabels)) }} }"
+                    @select-change="if (types.includes($event.detail)) type = $event.detail">
                     @csrf
                     <x-simple-select name="reason_type" :options="$typeLabels" value="cancel" full-width class="w-full" />
                     <input name="label_en" required maxlength="150" placeholder="{{ __('Reason text') }}" class="{{ $input }}">
-                    <p class="text-xs text-gray-500">{{ __('Whose fault is it? (used for points: only that stage loses points)') }}</p>
-                    <x-simple-select name="blame_stage" :options="$blame" value="none" full-width class="w-full" />
-                    <label class="flex items-center gap-2 text-sm text-gray-600">
-                        <input type="hidden" name="counts_as_break" value="0">
-                        <input type="checkbox" name="counts_as_break" value="1" checked class="rounded border-gray-300 text-primary">
-                        {{ __('Break reasons only: counts towards the daily break limit (untick for work away from the desk)') }}
-                    </label>
+                    <div x-show="type !== 'break'">
+                        <p class="mb-1 text-xs text-gray-500">{{ __('Whose fault is it? (used for points: only that stage loses points)') }}</p>
+                        <x-simple-select name="blame_stage" :options="$blame" value="none" full-width class="w-full" />
+                    </div>
+                    <div x-show="type === 'break'" x-cloak class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <label class="flex items-start gap-2 text-sm text-gray-700">
+                            <input type="hidden" name="counts_as_break" value="0">
+                            <input type="checkbox" name="counts_as_break" value="1" checked class="mt-0.5 rounded border-gray-300 text-primary">
+                            <span>
+                                <span class="font-medium">{{ __('Counts towards the daily break limit') }}</span>
+                                <span class="mt-0.5 block text-xs text-gray-500">{{ __('Ticked: personal time (lunch, prayer, washroom). Unticked: work away from the desk (an errand the admin gave), so it is not counted as a break.') }}</span>
+                            </span>
+                        </label>
+                    </div>
                     <x-button>{{ __('Add reason') }}</x-button>
                 </form>
             </x-card>

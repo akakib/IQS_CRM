@@ -59,8 +59,9 @@
         @if (request('embed'))<input type="hidden" name="embed" value="1">@endif
         <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">
 
-        <div class="grid gap-6 xl:grid-cols-3">
-            <div class="space-y-6 xl:col-span-2">
+        {{-- One column in the popup: products, total, delivery, reason. On a wide page the total and the reason sit on the right. --}}
+        <div class="grid items-start gap-6 xl:grid-cols-3">
+            <div class="xl:col-span-2">
                 <x-card :title="__('Products')">
                     {{-- Add: search and pick. Remove: the button on each line (an order keeps at least one product). --}}
                     <label class="mb-1 block text-sm font-medium text-gray-700">{{ __('Add a product') }}</label>
@@ -95,7 +96,27 @@
                     <p x-show="items.length < 2" class="mt-2 text-xs text-gray-500">{{ __('To swap the product, add the new one first, then remove this one.') }}</p>
                     <p class="mt-2 text-xs text-gray-400">{{ __('Lines already on the order keep the price they were sold at. Totals, delivery and COD are recalculated on save.') }}</p>
                 </x-card>
-
+            </div>
+            <div class="xl:col-start-3 xl:row-start-1">
+                {{-- Totals as they will be after saving. --}}
+                <x-card :title="__('Total')">
+                    <dl class="space-y-2 text-sm" x-init="$watch('items', () => recharge(), { deep: true })">
+                        <div class="flex justify-between"><dt class="text-gray-500">{{ __('Subtotal') }}</dt><dd class="tabular-nums" x-text="money(subtotal())"></dd></div>
+                        <div class="flex justify-between" x-show="lineDiscounts() > 0"><dt class="text-gray-500">{{ __('Line discounts') }}</dt><dd class="tabular-nums" x-text="'−' + money(lineDiscounts())"></dd></div>
+                        <div class="flex items-center justify-between gap-2"><dt class="text-gray-500">{{ __('Order discount') }}</dt>
+                            <dd><input type="number" step="0.01" min="0" name="order_discount" x-model.number="orderDiscount" @input="recharge()" class="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm tabular-nums focus:border-primary focus:outline-none"></dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">{{ $order->channel === 'web' ? __('Delivery (as sold)') : __('Delivery (from rules)') }}</dt><dd class="tabular-nums" x-text="money(delivery)"></dd></div>
+                        <div class="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold"><dt>{{ __('New total') }}</dt><dd class="tabular-nums" x-text="money(total())"></dd></div>
+                        <div class="flex justify-between text-xs text-gray-500"><dt>{{ __('Total before this change') }}</dt><dd class="tabular-nums">৳{{ number_format((float) $order->grand_total, 2) }}</dd></div>
+                        @if ($paid > 0)
+                            <div class="flex justify-between"><dt class="text-gray-500">{{ __('Advance paid') }}</dt><dd class="tabular-nums">−৳{{ number_format($paid, 2) }}</dd></div>
+                        @endif
+                        <div class="flex justify-between font-medium"><dt>{{ __('Cash to collect (COD)') }}</dt><dd class="tabular-nums" x-text="money(Math.max(0, total() - {{ $paid }}))"></dd></div>
+                    </dl>
+                    <p x-show="discount() > {{ $discountLimit }} && discount() > {{ (float) $order->discount_total }}" x-cloak class="mt-2 text-xs text-amber-700">{{ __('Discount above ৳:n needs a manager: the change will wait for approval.', ['n' => number_format($discountLimit)]) }}</p>
+                </x-card>
+            </div>
+            <div class="xl:col-span-2">
                 <x-card :title="__('Delivery details')">
                     <div class="grid gap-x-4 md:grid-cols-2">
                         <x-form.input name="ship_name" :label="__('Name')" :value="$order->ship_name" required />
@@ -116,26 +137,7 @@
                     </div>
                 </x-card>
             </div>
-
-            <div class="space-y-6">
-                {{-- Totals as they will be after saving. --}}
-                <x-card :title="__('Total')">
-                    <dl class="space-y-2 text-sm" x-init="$watch('items', () => recharge(), { deep: true })">
-                        <div class="flex justify-between"><dt class="text-gray-500">{{ __('Subtotal') }}</dt><dd class="tabular-nums" x-text="money(subtotal())"></dd></div>
-                        <div class="flex justify-between" x-show="lineDiscounts() > 0"><dt class="text-gray-500">{{ __('Line discounts') }}</dt><dd class="tabular-nums" x-text="'−' + money(lineDiscounts())"></dd></div>
-                        <div class="flex items-center justify-between gap-2"><dt class="text-gray-500">{{ __('Order discount') }}</dt>
-                            <dd><input type="number" step="0.01" min="0" name="order_discount" x-model.number="orderDiscount" @input="recharge()" class="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm tabular-nums focus:border-primary focus:outline-none"></dd></div>
-                        <div class="flex justify-between"><dt class="text-gray-500">{{ $order->channel === 'web' ? __('Delivery (as sold)') : __('Delivery (from rules)') }}</dt><dd class="tabular-nums" x-text="money(delivery)"></dd></div>
-                        <div class="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold"><dt>{{ __('New total') }}</dt><dd class="tabular-nums" x-text="money(total())"></dd></div>
-                        <div class="flex justify-between text-xs text-gray-500"><dt>{{ __('Total before this change') }}</dt><dd class="tabular-nums">৳{{ number_format((float) $order->grand_total, 2) }}</dd></div>
-                        @if ($paid > 0)
-                            <div class="flex justify-between"><dt class="text-gray-500">{{ __('Advance paid') }}</dt><dd class="tabular-nums">−৳{{ number_format($paid, 2) }}</dd></div>
-                        @endif
-                        <div class="flex justify-between font-medium"><dt>{{ __('Cash to collect (COD)') }}</dt><dd class="tabular-nums" x-text="money(Math.max(0, total() - {{ $paid }}))"></dd></div>
-                    </dl>
-                    <p x-show="discount() > {{ $discountLimit }} && discount() > {{ (float) $order->discount_total }}" x-cloak class="mt-2 text-xs text-amber-700">{{ __('Discount above ৳:n needs a manager: the change will wait for approval.', ['n' => number_format($discountLimit)]) }}</p>
-                </x-card>
-
+            <div class="space-y-6 xl:col-start-3 xl:row-start-2">
                 <x-card :title="__('Why the change?')">
                     <div x-ref="reason" @click="needReason = false" :class="needReason && 'rounded-lg ring-2 ring-red-500 ring-offset-2'">
                     <x-simple-select name="reason_id" :options="['' => __('Choose a reason')] + $reasons" :value="(string) old('reason_id', '')" full-width class="w-full" />

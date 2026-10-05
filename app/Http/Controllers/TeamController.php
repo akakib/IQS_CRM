@@ -75,6 +75,59 @@ class TeamController extends Controller
         ]);
     }
 
+    /**
+     * The rows behind one number on the Control room, for its popup. Each box
+     * uses the same condition as its count, so the list is exactly what was
+     * counted. 15 a page.
+     *
+     * box: waiting | fresh | mid | old | stage | holding | no_response | on_hold | to_send | timed_out | breaks
+     */
+    public function controlList(Request $request): View
+    {
+        $data = $request->validate([
+            'box' => ['required', 'in:waiting,fresh,mid,old,stage,holding,no_response,on_hold,to_send,timed_out,breaks'],
+            'status' => ['nullable', 'integer'], 'user' => ['nullable', 'integer'],
+        ]);
+        $s = fn (string $key) => OrderStatus::idFor($key);
+        $now = now();
+        $box = $data['box'];
+        $user = (int) ($data['user'] ?? 0);
+        $query = ['box' => $box, 'status' => $data['status'] ?? null, 'user' => $user ?: null];
+
+        if ($box === 'breaks') {
+            $rows = DB::table('staff_breaks as b')->leftJoin('status_reasons as r', 'r.id', '=', 'b.reason_id')
+                ->where('b.user_id', $user)->where('b.started_at', '>=', $now->copy()->startOfDay())->where('b.counts_as_break', true)
+                ->orderByDesc('b.started_at')
+                ->select(['b.started_at', 'b.ended_at', 'b.minutes', 'b.auto_closed', 'r.label_en as reason'])
+                ->paginate(15)->withPath(route('desk.control.list'))->appends(array_filter($query));
+
+            return view('desk._control_breaks', ['rows' => $rows]);
+        }
+
+        $orders = DB::table('orders as o')->leftJoin('users as m', 'm.id', '=', 'o.moderator_id');
+        $since = 'COALESCE(o.queue_since, o.created_at)';
+        $waiting = fn ($q) => $q->whereNull('o.moderator_id')->whereIn('o.status_id', [$s('new'), $s('record_verified'), $s('no_answer')]);
+        match ($box) {
+            'waiting' => $waiting($orders),
+            'fresh' => $waiting($orders)->whereRaw("{$since} > ?", [$now->copy()->subMinutes(5)]),
+            'mid' => $waiting($orders)->whereRaw("{$since} <= ? AND {$since} > ?", [$now->copy()->subMinutes(5), $now->copy()->subMinutes(15)]),
+            'old' => $waiting($orders)->whereRaw("{$since} <= ?", [$now->copy()->subMinutes(15)]),
+            'stage' => $orders->where('o.status_id', (int) ($data['status'] ?? 0)),
+            'holding' => $orders->where('o.moderator_id', $user)->whereIn('o.status_id', [$s('new'), $s('record_verified')]),
+            'no_response' => $orders->where('o.moderator_id', $user)->where('o.status_id', $s('no_answer')),
+            'on_hold' => $orders->where('o.moderator_id', $user)->where('o.status_id', $s('hold')),
+            'to_send' => $orders->where('o.moderator_id', $user)->where('o.status_id', $s('confirmed')),
+            'timed_out' => $orders->join('order_assignments as a', 'a.order_id', '=', 'o.id')->where('a.user_id', $user)
+                ->where('a.ended_reason', 'timeout')->where('a.ended_at', '>=', $now->copy()->startOfDay()),
+        };
+        $rows = $orders->orderByRaw($box === 'stage' ? 'o.updated_at' : $since)->orderBy('o.id')
+            ->select(['o.id', 'o.order_no', 'o.ship_name', 'o.ship_phone', 'o.grand_total', 'o.status_id', 'o.created_at', 'o.updated_at', 'o.queue_since', 'o.assigned_at',
+                'm.name as moderator', 'm.photo_path as moderator_photo', ...($box === 'timed_out' ? ['a.ended_at as timed_out_at'] : [])])
+            ->paginate(15)->withPath(route('desk.control.list'))->appends(array_filter($query));
+
+        return view('desk._control_orders', ['rows' => $rows, 'statuses' => OrderStatus::map(), 'box' => $box]);
+    }
+
     /** Attendance and breaks: ?date=Y-m-d for one day, ?month=Y-m for the month summary. */
     public function attendance(Request $request, WorkCalendar $calendar): View
     {

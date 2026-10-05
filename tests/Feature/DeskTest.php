@@ -496,6 +496,25 @@ class DeskTest extends TestCase
         $this->assertSame('Boss', $presence->editorOtherThan($a->id, $this->mahim->id)['name']);
     }
 
+    public function test_control_room_numbers_open_exactly_those_orders_page_by_page(): void
+    {
+        $orders = collect(range(1, 17))->map(fn () => $this->web());
+        $this->desk()->takeNext($this->mahim); // the oldest is now Mahim's
+        $this->actingAs($this->manager());
+
+        // 16 waiting, nobody took: page 1 has 15, page 2 has the last one.
+        $first = $this->get('/desk/control/list?box=waiting')->assertOk()->assertSee('16 orders')->assertSee($orders[1]->order_no)
+            ->assertDontSee($orders[0]->order_no);
+        $this->get('/desk/control/list?box=waiting&page=2')->assertOk()->assertSee($orders[16]->order_no)->assertDontSee($orders[1]->order_no);
+
+        // A person's number: what that person holds.
+        $this->get('/desk/control/list?box=holding&user='.$this->mahim->id)->assertOk()->assertSee('1 order')->assertSee($orders[0]->order_no);
+
+        // A stage: same as its count.
+        $this->get('/desk/control/list?box=stage&status='.OrderStatus::idFor('new'))->assertOk()->assertSee('17 orders');
+        $this->get('/desk/control/list?box=breaks&user='.$this->mahim->id)->assertOk()->assertSee('No break today.');
+    }
+
     public function test_chat_orders_belong_to_their_creator_without_timer_or_limit(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]);

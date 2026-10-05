@@ -12,6 +12,12 @@
         @isset($detail['return_ratio'])
             <span class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-700">{{ __('Return :p%', ['p' => $detail['return_ratio'] + 0]) }}</span>
         @endisset
+        @if (! empty($detail['volume_range']))
+            <span class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-700">{{ __('Parcels :r', ['r' => $detail['volume_range']]) }}</span>
+        @endif
+        @if (! empty($detail['total_reports']))
+            <span class="rounded bg-red-50 px-1.5 py-0.5 font-medium text-red-700">{{ __('Reports :n', ['n' => $detail['total_reports']]) }}</span>
+        @endif
         @foreach (($detail['fraud_categories'] ?? []) as $kind => $n)
             <span class="rounded bg-red-50 px-1.5 py-0.5 font-medium text-red-700">{{ ucfirst(str_replace('_', ' ', (string) $kind)) }} ×{{ $n }}</span>
         @endforeach

@@ -102,7 +102,9 @@ class SteadfastDriver implements CourierDriver
             throw new RuntimeException('Steadfast score failed: HTTP '.$response->status());
         }
         $d = $response->json() ?? [];
-        $total = (int) ($d['total_reports'] ?? 0);
+        // Parcels = volume_range ("25+", "3-5": the lower number). total_reports is NOT parcels: it is
+        // reports by other merchants (a 97% / 25+ customer comes back with total_reports 0).
+        $total = preg_match('/\d+/', (string) ($d['volume_range'] ?? ''), $m) ? (int) $m[0] : 0;
         $rate = isset($d['delivery_ratio']) ? (float) $d['delivery_ratio'] : null;
 
         return new FraudCheckResult($phone, $total, (int) round($total * (float) ($rate ?? 0) / 100),

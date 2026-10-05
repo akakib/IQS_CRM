@@ -49,7 +49,7 @@
     }" @keydown.window="keys($event)">
 
     {{-- New orders: nobody picks; "Take next" always gives the oldest one. --}}
-    <div class="mb-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div @class(['mb-4 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         <div class="flex items-center gap-4">
             <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold tabular-nums {{ $waiting ? 'bg-green-900 text-white' : 'bg-gray-100 text-gray-400' }}">{{ $waiting }}</div>
             <div>
@@ -71,7 +71,9 @@
         @endif
     </div>
 
-    <x-tabs :tabs="collect($tabLabels)->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
+    <div @class(['hidden lg:block' => $showDetailOnPhone])>
+        <x-tabs :tabs="collect($tabLabels)->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
+    </div>
 
     <div class="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
         {{-- My orders in this stage --}}
@@ -116,20 +118,22 @@
                     <p class="mt-1 text-sm text-gray-500">{{ $waiting && $canTake ? __('Press Take next to get the oldest new order.') : __('New orders will show at the top when they arrive.') }}</p>
                 </div>
             @else
-                <a href="{{ $url(['tab' => $tab]) }}" class="mb-3 inline-block text-sm text-green-900 hover:underline lg:hidden">&larr; {{ $tabLabels[$tab] }}</a>
+                <a href="{{ $url(['tab' => $tab]) }}" class="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-green-900 lg:hidden">&larr; {{ __('My orders') }} · {{ $tabLabels[$tab] }} ({{ $counts[$tab] }})</a>
 
                 @if ($timed)
                     <a href="{{ $url(['tab' => $statuses[$timed->status_id]['key'] === 'new' ? 'verify' : 'call', 'order' => $timed->id]) }}"
                         class="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100">
-                        <span>{{ __('Your timer is running on :no. Finish that one first.', ['no' => $timed->order_no]) }}</span>
+                        <span>{{ $secondsLeft($timed->action_due_at) > 0
+                            ? __('Your timer is running on :no. Finish that one first.', ['no' => $timed->order_no])
+                            : __('Time is up on :no. Act on it now, or it goes back to New.', ['no' => $timed->order_no]) }}</span>
                         <x-countdown :seconds="$secondsLeft($timed->action_due_at)" />
                     </a>
                 @endif
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div class="min-w-0">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                                     <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-green-900 hover:underline">{{ $order->order_no }}</a>
                                     <span>{{ ucfirst($order->channel) }}</span>
@@ -141,8 +145,8 @@
                                 <h2 class="mt-1 text-2xl font-semibold text-gray-900">{{ $order->ship_name }}</h2>
                                 <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
                             </div>
-                            <div class="text-right">
-                                <p class="text-2xl font-semibold tabular-nums text-gray-900">{{ $money($order->grand_total) }}</p>
+                            <div class="shrink-0 text-right">
+                                <p class="text-xl font-semibold tabular-nums text-gray-900 sm:text-2xl">{{ $money($order->grand_total) }}</p>
                                 <p class="text-xs text-gray-500">{{ __('COD :c · delivery :d', ['c' => $money($order->cod_amount), 'd' => $money($order->delivery_charge)]) }}</p>
                             </div>
                         </div>
@@ -161,8 +165,8 @@
                             </div>
                         @endif
 
-                        <div class="mt-4 grid gap-3 md:grid-cols-3">
-                            <div class="rounded-lg border border-gray-200 p-4">
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                            <div class="min-w-0 rounded-lg border border-gray-200 p-4 sm:col-span-2 2xl:col-span-1">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Phone') }}</p>
                                 <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" />
                             </div>
@@ -222,17 +226,14 @@
 
                         <details class="mt-3 rounded-lg border border-gray-200" @if ($detail['notes']->count() <= 4) open @endif>
                             <summary class="cursor-pointer px-4 py-2.5 text-sm font-medium text-gray-700">{{ __('History') }} <span class="text-gray-400">({{ $detail['notes']->count() }})</span></summary>
-                            <div class="space-y-2 border-t border-gray-100 px-4 py-3">
+                            <div class="space-y-3 border-t border-gray-100 px-4 py-3">
                                 <form method="POST" action="{{ route('orders.notes', $order) }}" class="flex gap-2">
                                     @csrf
                                     <input type="hidden" name="type" value="manual">
                                     <input name="body" required maxlength="2000" placeholder="{{ __('Add a note') }}" class="{{ $input }}">
                                     <x-button size="sm" variant="secondary">{{ __('Add') }}</x-button>
                                 </form>
-                                @foreach ($detail['notes'] as $n)
-                                    <p class="text-xs text-gray-600"><span class="mr-1">{{ $noteIcon[$n->note_type] ?? '·' }}</span>{{ $n->body }}
-                                        <span class="text-gray-400">· {{ $n->user ?? __('System') }} · {{ Carbon::parse($n->created_at)->format('d M, g:i A') }}</span></p>
-                                @endforeach
+                                <x-timeline :entries="$detail['notes']" class="pt-2" />
                             </div>
                         </details>
                     </div>
@@ -250,29 +251,32 @@
                             };
                         @endphp
                         @if ($actions)
-                            <form method="POST" action="{{ route('desk.act', $order) }}" class="sticky bottom-0 rounded-b-xl border-t border-gray-200 bg-white p-4">
+                            {{-- The form holds only the note; the buttons below belong to it through form="desk-act",
+                                 so the bar can stick to the bottom of the card without covering the order on a phone. --}}
+                            <form id="desk-act" method="POST" action="{{ route('desk.act', $order) }}" class="px-5 pb-4">
                                 @csrf
                                 <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">
                                 <input type="hidden" name="tab" value="{{ $tab }}">
                                 @if (in_array($key, ['record_verified', 'no_answer'], true))
-                                    <input name="note" maxlength="500" placeholder="{{ __('Call note (optional)') }}" class="{{ $input }} mb-3">
+                                    <input name="note" maxlength="500" placeholder="{{ __('Call note (optional)') }}" class="{{ $input }}">
                                 @endif
-                                @error('order')<p class="mb-2 text-sm text-red-600">{{ $message }}</p>@enderror
-                                @error('status')<p class="mb-2 text-sm text-red-600">{{ $message }}</p>@enderror
-                                <div class="grid grid-cols-2 gap-2 sm:flex">
-                                    @foreach ($actions as [$action, $label, $k, $variant])
-                                        @if (in_array($action, ['hold', 'cancel'], true))
-                                            <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="openReason('{{ $action }}')" class="py-3">
-                                                {{ $label }} <kbd class="rounded bg-black/5 px-1.5 text-[11px] uppercase">{{ $k }}</kbd>
-                                            </x-button>
-                                        @else
-                                            <x-button name="action" value="{{ $action }}" :variant="$variant" data-key="{{ $k }}" class="py-3 {{ $variant === 'primary' ? 'col-span-2 sm:flex-1 text-base' : '' }}">
-                                                {{ $label }} <kbd class="rounded {{ $variant === 'primary' ? 'bg-white/20' : 'bg-black/5' }} px-1.5 text-[11px] uppercase">{{ $k }}</kbd>
-                                            </x-button>
-                                        @endif
-                                    @endforeach
-                                </div>
+                                @error('order')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                                @error('status')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                             </form>
+                            <div class="sticky bottom-0 flex flex-wrap gap-2 rounded-b-xl border-t border-gray-200 bg-white p-3 sm:p-4">
+                                @foreach ($actions as [$action, $label, $k, $variant])
+                                    @if (in_array($action, ['hold', 'cancel'], true))
+                                        <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="openReason('{{ $action }}')" class="flex-1 whitespace-nowrap py-2.5 sm:py-3 xl:flex-none">
+                                            {{ $label }} <kbd class="hidden rounded bg-black/5 px-1.5 text-[11px] uppercase sm:inline">{{ $k }}</kbd>
+                                        </x-button>
+                                    @else
+                                        <x-button form="desk-act" name="action" value="{{ $action }}" :variant="$variant" data-key="{{ $k }}"
+                                            class="whitespace-nowrap {{ $variant === 'primary' ? 'w-full py-3 text-base xl:w-auto xl:flex-1' : 'flex-1 py-2.5 sm:py-3 xl:flex-none' }}">
+                                            {{ $label }} <kbd class="hidden rounded {{ $variant === 'primary' ? 'bg-white/20' : 'bg-black/5' }} px-1.5 text-[11px] uppercase sm:inline">{{ $k }}</kbd>
+                                        </x-button>
+                                    @endif
+                                @endforeach
+                            </div>
                         @endif
                     @endif
                 </div>

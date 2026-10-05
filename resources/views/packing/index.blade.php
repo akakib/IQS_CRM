@@ -20,7 +20,7 @@
             try { this.last = await this.post(@js(route('packing.scan.post')), { code }) }
             catch (e) { this.last = { ok: false, level: 'red', message: e.message } }
             this.list = this.last.checklist ?? null; this.ticked = []; this.holding = false;
-            $dispatch('scan-result', { ok: this.last.ok, message: this.last.message });
+            $dispatch('scan-result', { ok: this.last.ok, message: '' }); // the result is shown in the box below, once
         },
         tick(id) { this.ticked = this.ticked.includes(id) ? this.ticked.filter(i => i !== id) : [...this.ticked, id] },
         get allTicked() { return this.list && this.ticked.length === this.list.items.length },
@@ -74,7 +74,7 @@
     @endunless
 
     @if ($canPack)
-        <x-scan-input :placeholder="__('Scan a parcel label to start packing it')" />
+        <x-scan-input :placeholder="__('Scan a label')" />
 
         {{-- Scan result that is not a checklist (blocked, already packed…) --}}
         <div x-show="last && !list" x-cloak class="mt-3 rounded-xl border-2 p-4"
@@ -93,6 +93,7 @@
                     </div>
                     <span class="text-sm font-semibold tabular-nums text-gray-600" x-text="ticked.length + ' / ' + list.items.length"></span>
                 </div>
+                <p x-show="!list.repack" class="bg-green-50 px-4 py-2 text-sm font-medium text-green-900" x-text="last?.message"></p>
                 <p x-show="list.repack" class="bg-red-50 px-4 py-2 text-sm font-medium text-red-700">{{ __('Edited after packing. Change the box:') }} <span x-text="list.diff"></span></p>
                 <div class="divide-y divide-gray-100">
                     <template x-for="i in list.items" :key="i.id">

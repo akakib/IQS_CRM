@@ -88,7 +88,9 @@ class DeskController extends Controller
         }
 
         $waiting = $this->desk->waitingQuery()->selectRaw('COUNT(*) as n, MIN(created_at) as oldest')->first();
+        // Packer-only hold reasons (item not found on the shelf) are not offered to moderators.
         $reasons = DB::table('status_reasons')->whereIn('reason_type', ['hold', 'cancel'])->where('is_active', true)
+            ->where(fn ($q) => $q->whereNull('system_key')->orWhereNotIn('system_key', ['item_not_found', 'item_damaged']))
             ->orderBy('sort_order')->get(['id', 'reason_type', 'label_en'])->groupBy('reason_type');
 
         return view('desk.index', [

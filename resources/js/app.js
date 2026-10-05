@@ -21,7 +21,10 @@ document.addEventListener('submit', (event) => {
     }
     form.dataset.submitting = '1';
     // After this tick, so the clicked button's own name/value is still sent.
-    setTimeout(() => form.querySelectorAll('button[type=submit]:not([disabled]), button:not([type]):not([disabled])').forEach((b) => {
+    // Buttons inside the form, plus any that point at it from outside with form="id".
+    const buttons = [...form.querySelectorAll('button[type=submit]:not([disabled]), button:not([type]):not([disabled])'),
+        ...(form.id ? document.querySelectorAll(`button[form="${form.id}"]:not([disabled])`) : [])];
+    setTimeout(() => buttons.forEach((b) => {
         b.disabled = true;
         b.dataset.locked = '1';
     }), 0);
@@ -30,7 +33,7 @@ document.addEventListener('submit', (event) => {
 window.addEventListener('pageshow', () => {
     document.querySelectorAll('form[data-submitting]').forEach((form) => {
         delete form.dataset.submitting;
-        form.querySelectorAll('button[data-locked]').forEach((b) => {
+        document.querySelectorAll('button[data-locked]').forEach((b) => {
             b.disabled = false;
             delete b.dataset.locked;
         });

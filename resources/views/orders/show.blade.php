@@ -135,17 +135,7 @@
                     <input name="body" required maxlength="2000" placeholder="{{ __('What happened? e.g. called, customer will confirm tonight') }}" class="{{ $input }}">
                     <x-button class="shrink-0">{{ __('Add') }}</x-button>
                 </form>
-                <ol class="space-y-3">
-                    @foreach ($notes as $n)
-                        <li class="flex gap-3 text-sm">
-                            <span class="mt-0.5 w-5 shrink-0 text-center text-gray-400">{{ $noteIcon[$n->note_type] ?? '•' }}</span>
-                            <div class="min-w-0">
-                                <p class="text-gray-800">{{ $n->body }}</p>
-                                <p class="text-xs text-gray-400">{{ $n->user ?? __('System') }} · {{ \Illuminate\Support\Carbon::parse($n->created_at)->format('d M Y, g:i A') }} · {{ $statuses[$n->status_at_time_id]['name'] ?? '' }}</p>
-                            </div>
-                        </li>
-                    @endforeach
-                </ol>
+                <x-timeline :entries="$notes" with-year />
             </x-card>
         </div>
 

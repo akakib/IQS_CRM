@@ -60,12 +60,24 @@
 
             @can('settings.edit')
                 <x-card :title="__('Add a rule')" x-data="{ conds: [], provFields: {{ \Illuminate\Support\Js::from($providerFields) }} }">
-                    <form method="POST" action="{{ route('settings.verification.store') }}" class="space-y-2">
+                    <form method="POST" action="{{ route('settings.verification.store') }}" class="space-y-3">
                         @csrf
-                        <input name="name" required maxlength="150" placeholder="{{ __('Rule name') }}" class="{{ $input }}">
-                        <input name="priority" type="number" min="1" max="999" value="45" class="{{ $input }}" aria-label="{{ __('Priority') }}">
-                        <x-simple-select name="outcome" :options="$outcomes" value="record_verified" full-width class="w-full" />
-                        <x-simple-select name="applies_to_channel" :options="['all' => __('All channels'), 'web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone')]" value="all" full-width class="w-full" />
+                        <label class="block text-xs font-medium text-gray-600">{{ __('Rule name') }}
+                            <input name="name" required maxlength="150" placeholder="{{ __('e.g. Repeat customer, small order') }}" class="{{ $input }} mt-1">
+                        </label>
+                        <label class="block text-xs font-medium text-gray-600">{{ __('Position in the list') }}
+                            <input name="priority" type="number" min="1" max="999" value="{{ old('priority', 45) }}" placeholder="45" class="{{ $input }} mt-1">
+                            <span class="mt-1 block text-[11px] font-normal text-gray-400">{{ __('Rules are checked from the smallest number up; the first one that matches decides. 45 puts this rule between #40 and #50.') }}</span>
+                        </label>
+                        <div>
+                            <p class="mb-1 text-xs font-medium text-gray-600">{{ __('What happens when it matches') }}</p>
+                            <x-simple-select name="outcome" :options="$outcomes" value="record_verified" full-width class="w-full" />
+                        </div>
+                        <div>
+                            <p class="mb-1 text-xs font-medium text-gray-600">{{ __('Which orders it applies to') }}</p>
+                            <x-simple-select name="applies_to_channel" :options="['all' => __('All channels'), 'web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone')]" value="all" full-width class="w-full" />
+                        </div>
+                        <p class="text-xs font-medium text-gray-600">{{ __('Conditions (all must be true). None = matches every order.') }}</p>
                         <template x-for="(c, i) in conds" :key="i">
                             <div class="rounded-lg border border-gray-200 p-2">
                                 <div class="mb-1 flex flex-wrap gap-1">

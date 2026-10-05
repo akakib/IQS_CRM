@@ -85,13 +85,26 @@
             </x-card>
 
             <x-card :title="__('Add a rule')" x-data="{ conds: [] }">
-                <form method="POST" action="{{ route('settings.points.store') }}" class="space-y-2">
+                <form method="POST" action="{{ route('settings.points.store') }}" class="space-y-3">
                     @csrf
-                    <x-simple-select name="trigger_key" :options="collect($triggers)->map(fn ($t) => __($t[0]))->all()" :value="array_key_first($triggers)" full-width class="w-full" />
-                    <input name="name" required maxlength="150" placeholder="{{ __('Rule name') }}" class="{{ $input }}">
-                    <input name="points" type="number" step="0.5" required placeholder="{{ __('Points, e.g. 2 or -3') }}" class="{{ $input }}">
-                    <x-simple-select name="recipient" :options="$recipients" value="order_moderator" full-width class="w-full" />
-                    <x-simple-select name="settle_on" :options="$settle" value="order_final" full-width class="w-full" />
+                    <div>
+                        <p class="mb-1 text-xs font-medium text-gray-600">{{ __('When this happens') }}</p>
+                        <x-simple-select name="trigger_key" :options="collect($triggers)->map(fn ($t) => __($t[0]))->all()" :value="array_key_first($triggers)" full-width class="w-full" />
+                    </div>
+                    <label class="block text-xs font-medium text-gray-600">{{ __('Rule name') }}
+                        <input name="name" required maxlength="150" placeholder="{{ __('e.g. Messenger order delivered') }}" class="{{ $input }} mt-1">
+                    </label>
+                    <label class="block text-xs font-medium text-gray-600">{{ __('Points (minus for a penalty)') }}
+                        <input name="points" type="number" step="0.5" required placeholder="{{ __('e.g. 2 or -3') }}" class="{{ $input }} mt-1">
+                    </label>
+                    <div>
+                        <p class="mb-1 text-xs font-medium text-gray-600">{{ __('Who gets the points') }}</p>
+                        <x-simple-select name="recipient" :options="$recipients" value="order_moderator" full-width class="w-full" />
+                    </div>
+                    <div>
+                        <p class="mb-1 text-xs font-medium text-gray-600">{{ __('When the points count') }}</p>
+                        <x-simple-select name="settle_on" :options="$settle" value="order_final" full-width class="w-full" />
+                    </div>
                     <label class="flex items-center gap-2 text-sm text-gray-600">
                         <input type="hidden" name="requires_delivery" value="0">
                         <input type="checkbox" name="requires_delivery" value="1" class="rounded border-gray-300 text-green-900"> {{ __('Only if the order is delivered') }}

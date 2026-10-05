@@ -18,6 +18,8 @@ return [
     'orders.duplicate_window_hours' => ['int', 24, 'Same phone counts as duplicate within (hours)', 'Orders', ['required', 'integer', 'min:0', 'max:720']],
     'orders.freeze_minutes_before_pickup' => ['int', 30, 'Freeze content edits before pickup (minutes)', 'Orders', ['required', 'integer', 'min:0', 'max:600']],
     'orders.issue_sla_minutes' => ['int', 60, 'Minutes the assigned moderator has to handle a delivery issue', 'Orders', ['required', 'integer', 'min:5', 'max:1440']],
+    'advance.wait_days' => ['int', 2, 'Days an order waits for its advance. Halfway the moderator is reminded; after this many days it is cancelled (No advance payment)', 'Payments', ['required', 'integer', 'min:1', 'max:30']],
+    'payments.online_gateways' => ['string', 'bkash,nagad,sslcommerz,aamarpay,shurjopay', 'Website payment methods that confirm the money themselves (comma separated, matched against the method name). Paid through these = verified; anything else goes to Payments to check', 'Payments', ['required', 'string', 'max:300']],
     'payments.trust_up_to' => ['int', 500, 'An advance up to this amount (৳) lowers the COD at once and is checked later on the Payments page. A bigger one waits for the check before the order can be confirmed', 'Payments', ['required', 'integer', 'min:0', 'max:100000']],
     'delivery.mode' => ['string', 'area', 'How delivery is charged: area = by delivery area rules, flat = one charge for the whole country', 'Delivery', ['required', 'in:area,flat']],
     'delivery.flat_charge' => ['decimal', 0, 'One delivery charge for the whole country (৳)', 'Delivery', ['required', 'numeric', 'min:0', 'max:100000']],

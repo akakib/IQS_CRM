@@ -522,10 +522,7 @@ class DeskTest extends TestCase
         $this->actingAs($manager)->get('/payments')->assertOk()->assertSee('BIG1')->assertSee($a->order_no);
         $pay = DB::table('order_payments')->where('transaction_id', 'BIG1')->value('id');
         $this->post('/payments/decide', ['ids' => [$pay], 'decision' => 'approve'])->assertSessionHas('success');
-        $this->assertSame('record_verified', $this->key($a)); // held during the call: back to Call
-        $this->actingAs($this->mahim);
-        $this->act($a, 'confirm')->assertSessionHas('success');
-        $this->assertSame('ready_for_packaging', $this->key($a));
+        $this->assertSame('ready_for_packaging', $this->key($a)); // the call was logged already: straight to booking, no second call
         $this->assertSame((float) $a->fresh()->cod_amount, (float) DB::table('shipments')->where('order_id', $a->id)->value('cod_amount'));
 
         // A small advance after booking lowers the COD at once: update it at the courier, new label.

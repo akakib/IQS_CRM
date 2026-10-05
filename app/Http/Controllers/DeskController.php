@@ -160,6 +160,9 @@ class DeskController extends Controller
     {
         $user = $request->user();
         $this->desk->bookDue(); // every few seconds while anyone works: no booking waits for cron
+        if (Cache::add('desk:hold-followup', 1, now()->addMinutes(10))) {
+            $this->desk->followUpHolds();
+        }
         if (! $user->current_break_id) {
             if (Cache::add('desk:auto-assign', 1, 60)) {
                 $this->desk->autoAssign();
@@ -206,7 +209,7 @@ class DeskController extends Controller
             }
         }
         $order = $this->desk->takeNext($user);
-        $tab = OrderStatus::map()[$order->status_id]['key'] === 'new' ? 'verify' : 'call';
+        $tab = match (OrderStatus::map()[$order->status_id]['key']) { 'new' => 'verify', 'hold' => 'hold', default => 'call' };
 
         return redirect()->route('desk.index', ['tab' => $tab, 'order' => $order->id])->with('success', __(':no is yours.', ['no' => $order->order_no]));
     }

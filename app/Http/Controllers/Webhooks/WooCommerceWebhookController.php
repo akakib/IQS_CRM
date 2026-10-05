@@ -37,11 +37,12 @@ class WooCommerceWebhookController extends Controller
 
         $topic = (string) $request->header('X-WC-Webhook-Topic');
         $payload = json_decode($body, true);
-        if ($topic !== 'order.created' || ! isset($payload['id'])) {
-            return response()->json(['status' => 'ignored']); // IQS owns the order after intake
+        if (! in_array($topic, ['order.created', 'order.updated'], true) || ! isset($payload['id'])) {
+            return response()->json(['status' => 'ignored']);
         }
 
-        $externalId = 'order:'.$payload['id'];
+        // One row per distinct body: a retry of the same webhook is a duplicate, a real change is new.
+        $externalId = 'order:'.$payload['id'].':'.substr(sha1($body), 0, 16);
         $inboxId = DB::table('integration_inbox')->where('source', 'woocommerce')->where('external_id', $externalId)->value('id');
         if ($inboxId) {
             return response()->json(['status' => 'duplicate']);

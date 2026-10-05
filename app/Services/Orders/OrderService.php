@@ -287,6 +287,9 @@ class OrderService
             ]);
             $this->calculator->applyPayments($order->refresh());
             $this->note($order, 'payment', ($approve ? __('Payment ৳:a verified. COD is now ৳:c.', ['a' => $payment->amount, 'c' => $order->cod_amount]) : __('Payment ৳:a rejected (TrxID or amount did not match). COD is now ৳:c.', ['a' => $payment->amount, 'c' => $order->cod_amount])), $by);
+            if (! $approve) {
+                $this->backOnAdvanceHold($order, $by);
+            }
             if (! $approve && $order->moderator_id) {
                 app(\App\Services\NotificationService::class)->send('payment_to_check', __('Payment rejected: :no', ['no' => $order->order_no]),
                     __('৳:a, TrxID :t did not match. Talk to the customer.', ['a' => $payment->amount, 't' => $payment->transaction_id ?? '-']), [
@@ -327,6 +330,31 @@ class OrderService
                     'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$asker],
                 ]);
         }
+    }
+
+    /**
+     * The advance this order needed turned out fake (rejected) before the
+     * courier was booked: back on the advance hold, with its moderator.
+     * Booked already: the COD update at the courier (afterPayment) covers it.
+     */
+    private function backOnAdvanceHold(Order $order, User $by): void
+    {
+        $order->refresh();
+        $machine = app(OrderStateMachine::class);
+        if (! $order->advance_required || $order->advance_waived_at || $order->active_shipment_id
+            || ! in_array(OrderStatus::map()[$order->status_id]['key'], ['record_verified', 'no_answer', 'confirmed'], true)
+            || (float) $order->advance_verified + 0.001 >= (float) $order->advance_required) {
+            return;
+        }
+        $order->forceFill(['advance_hold_since' => now(), 'advance_reminded_at' => null])->save();
+        $machine->transition($order, 'hold', null, 'system', app(DeskService::class)->advanceReasonId(), __('Advance rejected: ৳:a needed again', ['a' => number_format((float) $order->advance_required - (float) $order->advance_verified)]));
+    }
+
+    /** "Will send the advance by": the call happened, the date is noted, the hold stays. */
+    public function advanceWillPayBy(Order $order, User $by, string $date): void
+    {
+        $order->forceFill(['hold_expected_date' => $date, 'hold_date_notified_at' => null])->save();
+        $this->note($order, 'call', __('Called: will send the advance by :d', ['d' => \Illuminate\Support\Carbon::parse($date)->format('d M')]), $by, ['outcome' => 'will_pay']);
     }
 
     /** Is an advance on this order still waiting for its check without lowering the COD yet? */
@@ -371,8 +399,10 @@ class OrderService
         $machine = app(OrderStateMachine::class);
         if (OrderStatus::map()[$order->status_id]['key'] === 'hold' && (int) $order->hold_reason_id === (int) $advanceHold
             && (float) $order->advance_verified > 0 && $machine->advanceSettled($order) && ! $this->hasUncheckedAdvance($order) && ! $order->taken_back_at) {
-            // Held by a rule before the call: to Call (the call can still add items). Held after Confirmed: on to booking.
-            $machine->transition($order, $machine->heldFrom($order) === 'confirmed' ? 'confirmed' : 'record_verified', null, 'rule', null, __('Advance received'));
+            // Held after Confirmed, or (a website order) already called while asking for the advance: on to booking.
+            // Not called yet: to Call (address check, upsell). Chat orders: their moderator presses Confirm.
+            $called = $order->channel === 'web' && DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'call')->exists();
+            $machine->transition($order, $machine->heldFrom($order) === 'confirmed' || $called ? 'confirmed' : 'record_verified', null, 'rule', null, __('Advance received'));
         }
     }
 

@@ -269,9 +269,23 @@ class OrderController extends Controller
             'advance.transaction_id' => ['nullable', 'string', 'max:100'],
             'advance.sender_number' => ['nullable', 'string', 'max:20'],
         ]);
+        // From the advance box on a website order: the moderator called and the customer sent it, so the call is logged
+        // and (once the advance counts) the order goes on to booking instead of a second call.
+        if ($request->boolean('called') && $order->channel === 'web' && $order->advance_required) {
+            $this->orders->note($order, 'call', trim(__('Called: customer sent the advance').($request->input('note') ? ' · '.$request->input('note') : '')), $request->user(), ['outcome' => 'confirmed']);
+        }
         $this->orders->addPayment($order, $data['advance'] + ['payment_type' => 'advance'], $request->user());
 
         return back()->with('success', __('Payment saved. It is checked on the Payments page.'));
+    }
+
+    public function advanceWillPayBy(Order $order, Request $request): RedirectResponse
+    {
+        $this->authorizeWork($order, $request->user());
+        $data = $request->validate(['date' => ['required', 'date', 'after_or_equal:today']]);
+        $this->orders->advanceWillPayBy($order, $request->user(), $data['date']);
+
+        return back()->with('success', __('Noted. You are reminded on :d.', ['d' => \Illuminate\Support\Carbon::parse($data['date'])->format('d M')]));
     }
 
     /** "Ask admin: process without advance". */

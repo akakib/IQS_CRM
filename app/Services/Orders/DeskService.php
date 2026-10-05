@@ -11,6 +11,7 @@ use App\Services\Points\PointHooks;
 use App\Services\Work\WorkCalendar;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -48,6 +49,31 @@ class DeskService
             ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified', 'no_answer']));
     }
 
+    /** One person holds at most this many orders waiting for an advance (they do not count in the active limit). */
+    public const ADVANCE_CAP = 5;
+
+    /**
+     * Orders held for an advance that nobody owns yet. The call to ask for the
+     * advance (and check the address, and upsell) is a call like any other, so
+     * these are taken from the queue too: after the New and Call orders.
+     */
+    public function waitingAdvanceQuery()
+    {
+        return DB::table('orders')->whereNull('moderator_id')->where('status_id', OrderStatus::idFor('hold'))
+            ->where('hold_reason_id', $this->advanceReasonId())->whereNull('advance_waived_at')->whereNotNull('advance_required');
+    }
+
+    public function advanceReasonId(): ?int
+    {
+        return DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id');
+    }
+
+    private function advanceHeldCount(int $userId): int
+    {
+        return DB::table('orders')->where('moderator_id', $userId)->where('status_id', OrderStatus::idFor('hold'))
+            ->where('hold_reason_id', $this->advanceReasonId())->whereNull('advance_waived_at')->count();
+    }
+
     /** Website orders this person still has to act on (the limit counts these). */
     public function activeCount(int $userId): int
     {
@@ -82,17 +108,20 @@ class DeskService
             throw ValidationException::withMessages(['order' => __('You are on a break. Press Start work first.')]);
         }
         $limit = (int) settings('desk.active_limit');
-        if ($this->activeCount($user->id) >= $limit) {
-            throw ValidationException::withMessages(['order' => $limit === 1 ? __('Finish the order you have before taking the next one.') : __('You already hold :n orders. Finish one first.', ['n' => $limit])]);
-        }
-
+        $full = $this->activeCount($user->id) >= $limit;
         $this->sweepExpired(); // timers that ran out free their orders right now
 
         // Of two people pressing at once, each gets a different order.
         for ($try = 0; $try < 5; $try++) {
-            $id = $this->waitingQuery()->orderBy('id')->value('id');
+            $id = $full ? null : $this->waitingQuery()->orderBy('id')->value('id');
             if (! $id) {
-                throw ValidationException::withMessages(['order' => __('No order is waiting.')]);
+                // Nothing to verify or call (or hands full): an order waiting for its advance, which is outside the limit.
+                $id = $this->advanceHeldCount($user->id) < self::ADVANCE_CAP ? $this->waitingAdvanceQuery()->orderBy('id')->value('id') : null;
+            }
+            if (! $id) {
+                throw ValidationException::withMessages(['order' => $full
+                    ? ($limit === 1 ? __('Finish the order you have before taking the next one.') : __('You already hold :n orders. Finish one first.', ['n' => $limit]))
+                    : __('No order is waiting.')]);
             }
             if ($this->assign($id, $user->id, 'claimed')) {
                 return Order::findOrFail($id);
@@ -306,9 +335,6 @@ class DeskService
         $due = $this->waitingQuery()->where('channel', 'web')
             ->where('queue_since', '<=', now()->subMinutes((int) settings('desk.auto_assign_minutes')))
             ->orderBy('id')->limit(50)->pluck('order_no', 'id');
-        if ($due->isEmpty()) {
-            return 0;
-        }
 
         $limit = (int) settings('desk.active_limit');
         $load = [];
@@ -337,8 +363,32 @@ class DeskService
             }
         }
 
+        // Advance holds nobody took in an hour: same idea, outside the active limit, up to the cap each.
+        $advance = $this->waitingAdvanceQuery()->where('queue_since', '<=', now()->subMinutes(60))->orderBy('id')->limit(50)->pluck('order_no', 'id');
+        $room = [];
+        foreach ($this->activeModerators() as $userId) {
+            if (($n = $this->advanceHeldCount($userId)) < self::ADVANCE_CAP) {
+                $room[$userId] = $n;
+            }
+        }
+        foreach ($advance as $orderId => $orderNo) {
+            if ($room === []) {
+                break;
+            }
+            asort($room);
+            $userId = array_key_first($room);
+            if ($this->assign($orderId, $userId, 'auto')) {
+                $this->notifications->send('order_assigned', __('Order :no was given to you (ask for the advance)', ['no' => $orderNo]), null, [
+                    'link' => route('desk.index', ['tab' => 'hold', 'order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId],
+                ]);
+                if (++$room[$userId] >= self::ADVANCE_CAP) {
+                    unset($room[$userId]);
+                }
+            }
+        }
+
         // Managers are told when orders wait and nobody is free, at most once every 30 minutes (this runs every minute).
-        $left = $due->count() - $assigned;
+        $left = $due->count() - $assigned + $this->waitingAdvanceQuery()->where('queue_since', '<=', now()->subMinutes(60))->count();
         if ($left > 0 && Cache::add('desk:unassigned-alert', 1, now()->addMinutes(30))) {
             $this->notifications->send('orders_unassigned', trans_choice('{1} 1 order is waiting and nobody is free to take it|[2,*] :n orders are waiting and nobody is free to take them', $left, ['n' => $left]), null, [
                 'link' => route('orders.activity'), 'user_ids' => $this->managerIds(),
@@ -611,6 +661,64 @@ class DeskService
         if ($done) {
             $this->systemNote($order->id, __('Box opened and items put back on the shelf by :n.', ['n' => $by->name]), $by->id);
         }
+    }
+
+    /**
+     * Follow-up on holds, from cron and (throttled) from the desk pulse:
+     *  - a hold whose announced date is reached: the moderator is told once;
+     *  - an advance not paid by half the wait: the moderator (or the managers) reminded once;
+     *  - an advance not paid by the full wait: cancelled, "No advance payment".
+     * Each step is marked on the order, so running this every minute changes nothing twice.
+     *
+     * @return array{dated: int, reminded: int, cancelled: int}
+     */
+    public function followUpHolds(): array
+    {
+        $hold = OrderStatus::idFor('hold');
+        $out = ['dated' => 0, 'reminded' => 0, 'cancelled' => 0];
+
+        foreach (DB::table('orders')->where('status_id', $hold)->whereNotNull('hold_expected_date')->where('hold_expected_date', '<=', today())
+            ->whereNull('hold_date_notified_at')->limit(100)->get(['id', 'order_no', 'moderator_id', 'hold_expected_date']) as $o) {
+            DB::table('orders')->where('id', $o->id)->update(['hold_date_notified_at' => now()]);
+            $this->notifications->send('hold_date_reached', __('Hold date reached: :no', ['no' => $o->order_no]),
+                __('The customer said :d. Call them.', ['d' => \Illuminate\Support\Carbon::parse($o->hold_expected_date)->format('d M')]), [
+                    'link' => route('desk.index', ['tab' => 'hold', 'order' => $o->id]), 'subject' => ['order', $o->id],
+                    'user_ids' => array_filter([$o->moderator_id]) ?: $this->managerIds(),
+                ]);
+            $out['dated']++;
+        }
+
+        $days = max(1, (int) settings('advance.wait_days'));
+        $advance = DB::table('orders')->where('status_id', $hold)->where('hold_reason_id', $this->advanceReasonId())
+            ->whereNull('advance_waived_at')->whereNotNull('advance_hold_since');
+        // A date the customer gave moves the clock: no reminder (the date notice covers it) and no cancel before the day after it.
+        $dated = fn ($q) => $q->whereNull('hold_expected_date');
+        foreach ((clone $advance)->where($dated)->whereNull('advance_reminded_at')->where('advance_hold_since', '<=', now()->subHours($days * 12))
+            ->limit(100)->get(['id', 'order_no', 'moderator_id', 'advance_required', 'advance_verified']) as $o) {
+            DB::table('orders')->where('id', $o->id)->update(['advance_reminded_at' => now()]);
+            $this->notifications->send('hold_date_reached', __('Advance still missing: :no', ['no' => $o->order_no]),
+                __('৳:a not received yet. It is cancelled by itself after :d days.', ['a' => number_format((float) $o->advance_required - (float) $o->advance_verified), 'd' => $days]), [
+                    'link' => route('desk.index', ['tab' => 'hold', 'order' => $o->id]), 'subject' => ['order', $o->id],
+                    'user_ids' => array_filter([$o->moderator_id]) ?: $this->managerIds(),
+                ]);
+            $out['reminded']++;
+        }
+        $reason = DB::table('status_reasons')->where('reason_type', 'cancel')->where('system_key', 'no_advance')->value('id');
+        foreach ((clone $advance)->where('advance_hold_since', '<=', now()->subDays($days))
+            ->where(fn ($q) => $q->whereNull('hold_expected_date')->orWhere('hold_expected_date', '<', today()->subDay()))->limit(100)->pluck('id') as $id) {
+            $order = Order::find($id);
+            if (! $order || app(OrderStateMachine::class)->advanceSettled($order)) {
+                continue;
+            }
+            try {
+                app(OrderStateMachine::class)->transition($order, 'cancelled', null, 'system', $reason, __('No advance in :d days', ['d' => $days]));
+                $out['cancelled']++;
+            } catch (\Throwable $e) {
+                Log::warning("No-advance cancel of order {$id} failed: {$e->getMessage()}");
+            }
+        }
+
+        return $out;
     }
 
     /** Booking failed: a note on the order and a notice to its moderator and the managers. */

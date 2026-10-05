@@ -99,7 +99,7 @@ class VerificationEngine
             })(),
             'hold_for_advance' => (function () use ($order, $ruleName) {
                 // The delivery charge in advance; an admin can let it go without (Ask admin).
-                $order->forceFill(['advance_required' => max((float) $order->delivery_charge, 1)])->save();
+                $order->forceFill(['advance_required' => max((float) $order->delivery_charge, 1), 'advance_hold_since' => now(), 'advance_reminded_at' => null])->save();
                 $this->machine->transition($order, 'hold', null, 'rule',
                     DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id'),
                     __(':r: delivery charge ৳:a in advance', ['r' => $ruleName, 'a' => number_format((float) $order->delivery_charge)]));

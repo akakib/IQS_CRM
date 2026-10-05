@@ -35,6 +35,7 @@ class PackagingController extends Controller
         $today = today()->toDateString();
         $onDuty = DB::table('packer_shifts as s')->join('users as u', 'u.id', '=', 's.user_id')->where('s.work_date', $today)->orderBy('u.name')->pluck('u.name', 'u.id');
         $canManage = $user->can('packaging.manage');
+        app(\App\Services\Orders\DeskService::class)->bookDue();
         // No list set today = everyone with packaging access works (so a forgotten list never stops the shop).
         $working = $onDuty->isEmpty() || $onDuty->has($user->id) || $canManage;
 

@@ -49,8 +49,8 @@ class DeskController extends Controller
             'call' => ['(status_id = ? OR (status_id = ? AND (next_call_at IS NULL OR next_call_at <= ?)))', [$s('record_verified'), $s('no_answer'), $now]],
             'again' => ['(status_id = ? AND next_call_at > ?)', [$s('no_answer'), $now]],
             'hold' => ['status_id = ?', [$s('hold')]],
-            'send' => ["(status_id = ? AND booking_state = 'none')", [$s('confirmed')]],
-            'packaging' => ["((status_id = ? AND booking_state <> 'none') OR status_id IN (?, ?, ?))", [$s('confirmed'), ...$packaging]],
+            'send' => ["(status_id = ? AND booking_state IN ('none', 'failed'))", [$s('confirmed')]], // Booking failed (shown only when there is one)
+            'packaging' => ["((status_id = ? AND booking_state = 'queued') OR status_id IN (?, ?, ?))", [$s('confirmed'), ...$packaging]],
         ];
 
         $select = [];
@@ -75,6 +75,7 @@ class DeskController extends Controller
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab')
             : ($toTimed ? ($timed->status_id === $s('new') ? 'verify' : 'call') : (collect(self::TABS)->first(fn ($t) => $counts[$t] > 0) ?? 'call'));
 
+        $this->desk->bookDue(); // anything past its Undo time is booked after this page is sent
         $page = max(1, (int) $request->query('page', 1));
         $rows = DB::table('orders')->leftJoin('users as pk', 'pk.id', '=', 'orders.packer_id')
             ->where('moderator_id', $user->id)->whereRaw($where[$tab][0], $where[$tab][1])
@@ -260,8 +261,9 @@ class DeskController extends Controller
                     $this->orders->note($order, 'call', trim(__('Called: customer confirmed').($note ? ' · '.$note : '')), $user, ['outcome' => 'confirmed']);
                 }
                 $this->machine->transition($order, 'confirmed', $user);
-                $next = ['tab' => 'send', 'order' => $order->id];
-                $message = __('Confirmed. Send it to packaging.');
+                $next = ['tab' => 'call'];
+                $message = __(':no confirmed. Booking the courier.', ['no' => $order->order_no]);
+                session()->flash('undo', ['id' => $order->id, 'no' => $order->order_no, 'until' => now()->addSeconds(DeskService::UNDO_SECONDS)->getTimestamp()]);
                 break;
             case 'no_response':
                 $message = $this->desk->noResponse($order, $user, $note) === 'cancelled'
@@ -284,10 +286,11 @@ class DeskController extends Controller
                 $next = ['tab' => 'call', 'order' => $order->id];
                 $message = __('Back in your Call tab.');
                 break;
-            case 'back_to_send': // held after Confirmed: no second call needed
+            case 'back_to_send': // held after Confirmed: no second call needed, straight to booking
                 $this->machine->transition($order, 'confirmed', $user, 'user', null, $note);
-                $next = ['tab' => 'send', 'order' => $order->id];
-                $message = __(':no is back in To send.', ['no' => $order->order_no]);
+                $next = ['tab' => 'hold'];
+                $message = __(':no confirmed. Booking the courier.', ['no' => $order->order_no]);
+                session()->flash('undo', ['id' => $order->id, 'no' => $order->order_no, 'until' => now()->addSeconds(DeskService::UNDO_SECONDS)->getTimestamp()]);
                 break;
             case 'back_to_packaging':
                 $this->machine->transition($order, 'ready_for_packaging', $user, 'user', null, $note);
@@ -299,6 +302,26 @@ class DeskController extends Controller
         }
 
         return redirect()->route('desk.index', $embedded ?? array_filter($next))->with('success', $message);
+    }
+
+    /** Undo a confirm in its first seconds: back to the Call tab, nothing booked. */
+    public function undo(Order $order, Request $request): RedirectResponse
+    {
+        abort_unless($order->moderator_id === $request->user()->id || $request->user()->permissionScope('orders.view') === 'all', 403);
+        if (! $this->desk->undoConfirm($order, $request->user())) {
+            return back()->with('error', __('Too late: :no is already being booked.', ['no' => $order->order_no]));
+        }
+
+        return redirect()->route('desk.index', array_filter(['tab' => 'call', 'order' => $order->id, 'embed' => $request->boolean('embed') ? 1 : null]))
+            ->with('success', __('Confirm undone. :no is back in Call.', ['no' => $order->order_no]));
+    }
+
+    /** The Undo bar ran out: book what is due now. */
+    public function bookDue(): \Illuminate\Http\JsonResponse
+    {
+        $this->desk->bookDue();
+
+        return response()->json(['ok' => true]);
     }
 
     /** "+5 min" on the running timer. */
@@ -321,6 +344,7 @@ class DeskController extends Controller
             ->get(['n.note_type', 'n.body', 'n.created_at', 'n.meta', 'u.name as user']);
 
         // Same customer, another order still open or placed in the last 7 days.
+        // (Open ones get a warning on Confirm: the courier is booked right away.)
         $duplicates = DB::table('orders')->where('customer_id', $order->customer_id)->where('id', '!=', $order->id)
             ->where('created_at', '>=', now()->subDays(7))->orderByDesc('id')->limit(5)->get(['id', 'order_no', 'status_id', 'grand_total', 'created_at']);
 
@@ -339,6 +363,7 @@ class DeskController extends Controller
             'duplicates' => $duplicates,
             'heldBy' => $heldBy,
             'heldFrom' => $heldFrom ?? null,
+            'openDuplicates' => $duplicates->filter(fn ($d) => ! (OrderStatus::map()[$d->status_id]['final'] ?? false) && OrderStatus::map()[$d->status_id]['key'] !== 'cancelled')->values(),
             'consignment' => $order->active_shipment_id ? DB::table('shipments')->where('id', $order->active_shipment_id)->value('consignment_id') : null,
         ];
     }

@@ -72,7 +72,7 @@
         <x-list.table>
             <x-slot:head>
                 <th>{{ __('Person') }}</th><th>{{ __('Now') }}</th><th class="text-right">{{ __('Holding') }}</th><th class="text-right">{{ __('Oldest') }}</th>
-                <th class="text-right">{{ __('No response') }}</th><th class="text-right">{{ __('On hold') }}</th><th class="text-right">{{ __('To send') }}</th>
+                <th class="text-right">{{ __('No response') }}</th><th class="text-right">{{ __('On hold') }}</th><th class="text-right">{{ __('Booking failed') }}</th>
                 <th class="text-right">{{ __('Timed out today') }}</th><th class="text-right">{{ __('Breaks today') }}</th>
             </x-slot:head>
             @foreach ($rows as $r)
@@ -84,7 +84,7 @@
                     <td class="text-right tabular-nums {{ $r->oldest && Carbon::parse($r->oldest)->lt(now()->subMinutes(30)) ? 'text-red-600' : '' }}">{{ $ago($r->oldest) }}</td>
                     <td class="text-right"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('No response')), { box: 'no_response', user: {{ $r->id }} })">{{ $r->no_response }}</button></td>
                     <td class="text-right"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('On hold')), { box: 'on_hold', user: {{ $r->id }} })">{{ $r->on_hold }}</button></td>
-                    <td class="text-right"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('To send')), { box: 'to_send', user: {{ $r->id }} })">{{ $r->to_send }}</button></td>
+                    <td class="text-right"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Booking failed')), { box: 'to_send', user: {{ $r->id }} })">{{ $r->to_send }}</button></td>
                     <td class="text-right {{ $r->released ? 'font-semibold text-red-600' : '' }}"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Timed out today')), { box: 'timed_out', user: {{ $r->id }} })">{{ $r->released }}</button></td>
                     <td class="text-right {{ $r->over ? 'font-semibold text-red-600' : '' }}"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Breaks today')), { box: 'breaks', user: {{ $r->id }} })">{{ $r->break_minutes }} {{ __('min') }} <span class="text-xs text-gray-400">({{ $r->breaks }})</span></button></td>
                 </tr>

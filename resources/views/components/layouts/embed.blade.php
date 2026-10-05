@@ -13,5 +13,6 @@
 <body class="bg-gray-50 font-sans text-gray-900 antialiased" x-data>
     <main class="p-4 sm:p-6">{{ $slot }}</main>
     <x-toaster />
+            <x-undo-confirm />
 </body>
 </html>

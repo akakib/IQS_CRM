@@ -395,6 +395,40 @@ class DeskService
         return 'no_answer';
     }
 
+    /** Seconds to Undo a confirm before the courier is booked. */
+    public const UNDO_SECONDS = 10;
+
+    /**
+     * Undo a confirm while the courier is not booked yet: back to the Call tab.
+     * Only one of Undo and booking can win: the row must still be waiting.
+     */
+    public function undoConfirm(Order $order, User $user): bool
+    {
+        $undone = DB::table('orders')->where('id', $order->id)->where('status_id', OrderStatus::idFor('confirmed'))
+            ->where('booking_state', 'queued')->where('booking_attempts', 0)->where('book_after', '>', now())
+            ->update(['booking_state' => 'none', 'book_after' => null, 'updated_at' => now()]);
+        if (! $undone) {
+            return false;
+        }
+        app(OrderStateMachine::class)->transition($order->fresh(), 'record_verified', $user, 'system', null, __('Confirm undone'));
+
+        return true;
+    }
+
+    /**
+     * Book every confirmed order whose Undo time is over, after the response.
+     * Called by the Undo bar when its time runs out and by the desk and
+     * packaging pages, so booking never waits for cron. Retries stay with cron.
+     */
+    public function bookDue(): void
+    {
+        $due = DB::table('orders')->where('booking_state', 'queued')->where('booking_attempts', 0)
+            ->where('status_id', OrderStatus::idFor('confirmed'))->where('book_after', '<=', now())->exists();
+        if ($due) {
+            app()->terminating(fn () => Cache::lock('desk:book-due', 60)->get(fn () => $this->runBookings(null, null, true)));
+        }
+    }
+
     /** One button: book the courier in the background, then the order shows up for the packers. */
     public function sendToPackaging(Order $order, User $user): void
     {
@@ -403,7 +437,7 @@ class DeskService
         }
         // Only one click wins: the state must still be "not sent" (or "failed" for a retry) at the moment of the update.
         $queued = DB::table('orders')->where('id', $order->id)->whereIn('booking_state', ['none', 'failed'])->update([
-            'booking_state' => 'queued', 'booking_attempts' => 0, 'booking_error' => null,
+            'booking_state' => 'queued', 'booking_attempts' => 0, 'booking_error' => null, 'book_after' => null,
             'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now(),
         ]);
         if (! $queued) {
@@ -422,9 +456,11 @@ class DeskService
      *
      * @param  list<int>|null  $orderIds  null = every queued order (cron retry)
      */
-    public function runBookings(?array $orderIds = null, ?int $byUserId = null): void
+    public function runBookings(?array $orderIds = null, ?int $byUserId = null, bool $firstTryOnly = false): void
     {
         $rows = DB::table('orders')->where('booking_state', 'queued')->where('status_id', OrderStatus::idFor('confirmed'))
+            ->where(fn ($q) => $q->whereNull('book_after')->orWhere('book_after', '<=', now())) // still inside the Undo time: wait
+            ->when($firstTryOnly, fn ($q) => $q->where('booking_attempts', 0))
             ->when($orderIds !== null, fn ($q) => $q->whereIn('id', $orderIds))
             ->orderBy('id')->limit(50)->get(['id', 'order_no', 'moderator_id', 'booking_attempts']);
         if ($rows->isEmpty()) {
@@ -447,7 +483,7 @@ class DeskService
             if ($failed) {
                 $this->systemNote($row->id, __('Courier booking failed 3 times: :e', ['e' => $result['failed'][$row->order_no]]), null);
                 $this->notifications->send('booking_failed', __('Booking failed: :no', ['no' => $row->order_no]), (string) $result['failed'][$row->order_no], [
-                    'link' => route('desk.index', ['tab' => 'packaging', 'order' => $row->id]), 'subject' => ['order', $row->id],
+                    'link' => route('desk.index', ['tab' => 'send', 'order' => $row->id]), 'subject' => ['order', $row->id],
                     'user_ids' => array_filter(array_merge([$row->moderator_id], $this->managerIds())),
                 ]);
             }
@@ -471,9 +507,10 @@ class DeskService
         if ($to['key'] === 'packed') {
             $set['packed_at'] = now();
         }
-        // Confirmed by a rule with no moderator: nobody is there to press Send to packaging.
-        if ($to['key'] === 'confirmed' && ! $order->moderator_id && $order->channel === 'web') {
-            $set['booking_state'] = 'queued';
+        // Confirmed = book the courier. A person gets a few seconds to Undo first; a rule books at once.
+        if ($to['key'] === 'confirmed') {
+            $set += ['booking_state' => 'queued', 'booking_attempts' => 0, 'booking_error' => null,
+                'book_after' => $actor ? now()->addSeconds(self::UNDO_SECONDS) : now()];
         }
         if ($set) {
             DB::table('orders')->where('id', $order->id)->update($set);

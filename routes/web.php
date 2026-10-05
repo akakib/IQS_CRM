@@ -102,6 +102,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/desk/next', [DeskController::class, 'takeNext'])->middleware('can:orders.take')->name('desk.next');
     Route::get('/desk/pulse', [DeskController::class, 'pulse'])->middleware('can:orders.take')->name('desk.pulse');
     Route::post('/desk/{order}/act', [DeskController::class, 'act'])->middleware('can:orders.edit')->name('desk.act');
+    Route::post('/desk/{order}/undo', [\App\Http\Controllers\DeskController::class, 'undo'])->whereNumber('order')->name('desk.undo');
+    Route::post('/desk/book-due', [\App\Http\Controllers\DeskController::class, 'bookDue'])->name('desk.book-due');
     Route::post('/desk/{order}/extend', [DeskController::class, 'extend'])->middleware('can:orders.edit')->name('desk.extend');
 
     Route::get('/desk/control', [TeamController::class, 'control'])->middleware('can:orders.reassign')->name('desk.control');

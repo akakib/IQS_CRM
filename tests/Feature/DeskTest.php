@@ -92,21 +92,22 @@ class DeskTest extends TestCase
         $this->desk()->assign($calling->id, $this->mahim->id, 'claimed');
         $machine->transition($calling, 'record_verified', $this->mahim);
         $machine->transition($calling->fresh(), 'hold', $this->mahim, 'user', $hold);
-        $this->get("/desk?tab=hold&order={$calling->id}")->assertSee('Resume, call next')->assertDontSee('Back to To send');
+        $this->get("/desk?tab=hold&order={$calling->id}")->assertSee('Resume, call next');
         $this->assertEqualsCanonicalizing(['record_verified', 'confirmed', 'cancelled'], collect($machine->allowedTargets($calling->fresh(), $this->mahim))->pluck('key')->all());
 
-        // Held after Confirmed: straight back to To send, no second call.
+        // Held after Confirmed: straight to booking, no second call.
         $confirmed = $this->web();
         $this->desk()->assign($confirmed->id, $this->mahim->id, 'claimed');
         $machine->transition($confirmed, 'record_verified', $this->mahim);
         $machine->transition($confirmed->fresh(), 'confirmed', $this->mahim);
         $machine->transition($confirmed->fresh(), 'hold', $this->mahim, 'user', $hold);
-        $this->get("/desk?tab=hold&order={$confirmed->id}")->assertSee('Back to To send')->assertDontSee('Resume, call next');
+        $this->get("/desk?tab=hold&order={$confirmed->id}")->assertSee('Send to packaging')->assertDontSee('Resume, call next');
         $this->assertNotContains('record_verified', collect($machine->allowedTargets($confirmed->fresh(), $this->mahim))->pluck('key'));
         $this->act($confirmed, 'resume')->assertSessionHasErrors('status');
         $this->assertSame('hold', $this->key($confirmed));
-        $this->act($confirmed, 'back_to_send')->assertSessionHas('success');
+        $this->act($confirmed, 'back_to_send')->assertSessionHas('undo');
         $this->assertSame('confirmed', $this->key($confirmed));
+        $this->assertSame('queued', $confirmed->fresh()->booking_state);
     }
 
     public function test_take_next_gives_the_oldest_order_and_stops_at_the_limit(): void
@@ -317,7 +318,21 @@ class DeskTest extends TestCase
         } catch (ValidationException) {
         }
 
-        $this->act($a, 'send')->assertSessionHas('success'); // booking runs after the response (fake courier)
+        // Confirm books by itself, after a few seconds to Undo. Undo: back to Call, nothing booked.
+        $this->assertSame('queued', $a->fresh()->booking_state);
+        $this->post("/desk/{$a->id}/undo")->assertSessionHas('success');
+        $this->assertSame('record_verified', $this->key($a));
+        $this->assertSame('none', $a->fresh()->booking_state);
+        $this->post('/desk/book-due');
+        $this->assertSame(0, DB::table('shipments')->where('order_id', $a->id)->count());
+
+        // Confirm again; inside the Undo time nothing is booked, after it the bar (or any desk page) books it.
+        $this->act($a, 'confirm')->assertSessionHas('undo');
+        $this->post('/desk/book-due');
+        $this->assertSame(0, DB::table('shipments')->where('order_id', $a->id)->count());
+        $this->travel(11)->seconds();
+        $this->post("/desk/{$a->id}/undo")->assertSessionHas('error'); // too late
+        $this->post('/desk/book-due')->assertOk(); // booking runs after the response (fake courier)
         $this->assertSame(1, DB::table('shipments')->where('order_id', $a->id)->count());
 
         $a->refresh();
@@ -326,6 +341,21 @@ class DeskTest extends TestCase
         $this->assertNotNull($a->packaging_sent_at);
         $this->assertSame('none', $a->booking_state);
         $this->get('/desk?tab=packaging')->assertSee($a->order_no)->assertSee('Waiting for a packer')->assertSee('No packer yet');
+    }
+
+    public function test_confirm_warns_when_the_same_customer_has_another_open_order(): void
+    {
+        $first = $this->web();
+        $second = app(OrderService::class)->create([
+            'channel' => 'web', 'phone' => '0'.($this->phone - 1), 'name' => 'Customer', 'address_line' => 'Road 1',
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
+        ], null, 'webhook');
+        $this->assertSame($first->customer_id, $second->customer_id);
+        app(OrderStateMachine::class)->transition($second, 'record_verified', null, 'rule');
+        $this->desk()->assign($second->id, $this->mahim->id, 'claimed');
+
+        $this->actingAs($this->mahim)->get("/desk?tab=call&order={$second->id}")
+            ->assertSee('Confirm anyway')->assertSee($first->order_no);
     }
 
     public function test_by_default_the_next_order_cannot_be_taken_before_the_current_one_is_finished(): void
@@ -656,8 +686,8 @@ class DeskTest extends TestCase
         DB::enableQueryLog();
         $this->get('/desk')->assertOk()->assertSee('Take next')->assertSee('Record OK, call next');
         // user + permissions (2), counts, list, waiting, reasons, order, customer, items, notes, duplicates
-        // + expired-timer check (2) and extra-time count (1)
-        $this->assertLessThanOrEqual(15, count(DB::getQueryLog()));
+        // + expired-timer check (2), extra-time count (1) and the due-booking check (1)
+        $this->assertLessThanOrEqual(16, count(DB::getQueryLog()));
         DB::disableQueryLog();
 
         $this->get('/desk/control')->assertForbidden();

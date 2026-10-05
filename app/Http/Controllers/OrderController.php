@@ -182,6 +182,9 @@ class OrderController extends Controller
         if ($data['to'] === 'hold' && ! empty($data['hold_expected_date'])) {
             $order->forceFill(['hold_expected_date' => $data['hold_expected_date']])->save();
         }
+        if ($data['to'] === 'confirmed') {
+            session()->flash('undo', ['id' => $order->id, 'no' => $order->order_no, 'until' => now()->addSeconds(\App\Services\Orders\DeskService::UNDO_SECONDS)->getTimestamp()]);
+        }
 
         return back()->with('success', __('Order :no is now :s.', ['no' => $order->order_no, 's' => OrderStatus::map()[$order->status_id]['name']]));
     }

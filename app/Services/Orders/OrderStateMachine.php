@@ -144,7 +144,7 @@ class OrderStateMachine
 
     /**
      * Where a held order may go: back to the step it was held from, never an
-     * earlier one. CN booked: packaging. Held after Confirmed: Confirmed (To send).
+     * earlier one. CN booked: packaging. Held after Confirmed: Confirmed (books the courier).
      * Held before or during the call: the call again, or Confirmed.
      */
     public function holdExits(Order $order, ?string $heldFrom = null): array

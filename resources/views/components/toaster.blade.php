@@ -4,7 +4,7 @@
         items: [],
         init() {
             window.toast = (m, t) => this.push(m, t);
-            @if (session('success')) this.push(@js(session('success')), 'success'); @endif
+            @if (session('success') && ! session('undo')) this.push(@js(session('success')), 'success'); @endif
             @if (session('error')) this.push(@js(session('error')), 'error'); @endif
         },
         push(message, type = 'success') {

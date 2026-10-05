@@ -2,7 +2,7 @@
     use Illuminate\Support\Carbon;
     use Illuminate\Support\Js;
 
-    $tabLabels = ['verify' => __('Verify'), 'call' => __('Call'), 'again' => __('Call again'), 'hold' => __('On hold'), 'send' => __('To send'), 'packaging' => __('Packaging')];
+    $tabLabels = ['verify' => __('Verify'), 'call' => __('Call'), 'again' => __('Call again'), 'hold' => __('On hold'), 'send' => __('Booking failed'), 'packaging' => __('Packaging')];
     $url = fn (array $q) => route('desk.index', $q);
     $key = $order ? $statuses[$order->status_id]['key'] : null;
     $isMine = $order && $order->moderator_id === auth()->id();
@@ -381,7 +381,7 @@
                                 in_array($key, ['record_verified', 'no_answer'], true) => [['confirm', $order->channel === 'web' ? __('Call verified') : __('Confirm'), 'v', 'primary'], ['no_response', __('No response'), 'n', 'secondary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 $key === 'hold' => [match (true) {
                                     (bool) $detail['consignment'] => ['back_to_packaging', __('Back to packaging'), 'p', 'primary'],
-                                    $detail['heldFrom'] === 'confirmed' => ['back_to_send', __('Back to To send'), 's', 'primary'],
+                                    $detail['heldFrom'] === 'confirmed' => ['back_to_send', __('Send to packaging'), 'p', 'primary'],
                                     default => ['resume', __('Resume, call next'), 'r', 'primary'],
                                 }, ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 $key === 'confirmed' && $order->booking_state === 'none' => [['send', __('Send to packaging'), 'p', 'primary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
@@ -411,12 +411,19 @@
                                 @if (in_array($key, ['record_verified', 'no_answer'], true))
                                     <input name="note" maxlength="500" placeholder="{{ __('Call note (optional)') }}" class="{{ $input }}">
                                 @endif
+                                @if ($detail['openDuplicates']->isNotEmpty())<input type="hidden" name="action" value="confirm">@endif {{-- used when "Confirm anyway" submits the form --}}
                                 @error('order')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                                 @error('status')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                             </form>
                             <div class="lockable sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-b-xl border-t border-gray-200 bg-white p-3 sm:p-4">
                                 @foreach ($actions as [$action, $label, $k, $variant])
-                                    @if (in_array($action, ['hold', 'cancel'], true))
+                                    @if ($action === 'confirm' && $detail['openDuplicates']->isNotEmpty())
+                                        {{-- The courier is booked right away: a second open order of the same customer is merged first, not shipped twice. --}}
+                                        <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="$dispatch('open-confirm', { id: 'confirm-duplicate', form: 'desk-act' })"
+                                            class="whitespace-nowrap w-full py-3 text-base xl:w-auto xl:flex-1">
+                                            {{ $label }} <kbd class="hidden rounded bg-white/20 px-1.5 text-[11px] uppercase sm:inline">{{ $k }}</kbd>
+                                        </x-button>
+                                    @elseif (in_array($action, ['hold', 'cancel'], true))
                                         <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="openReason('{{ $action }}')" class="flex-1 whitespace-nowrap py-2.5 sm:py-3 xl:flex-none">
                                             {{ $label }} <kbd class="hidden rounded bg-black/5 px-1.5 text-[11px] uppercase sm:inline">{{ $k }}</kbd>
                                         </x-button>
@@ -431,6 +438,11 @@
                         @endif
                     @endif
                 </div>
+
+                @if ($order && $detail['openDuplicates']->isNotEmpty())
+                    <x-confirm-modal id="confirm-duplicate" :verb="__('Confirm anyway')" :danger="false"
+                        :message="__('This customer has another open order (:list). Confirm books the courier right away: merge them first if they go in one parcel.', ['list' => $detail['openDuplicates']->pluck('order_no')->join(', ')])" />
+                @endif
 
                 {{-- Hold / Cancel: a reason is required. Number keys pick one. --}}
                 @foreach (['hold' => __('Put on hold: why?'), 'cancel' => __('Cancel the order: why?')] as $mode => $title)

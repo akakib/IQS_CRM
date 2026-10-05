@@ -106,7 +106,7 @@ class OrderActivityController extends Controller
             'call' => ['label' => __('Call'), 'sql' => 'o.moderator_id IS NOT NULL AND (o.status_id = ? OR (o.status_id = ? AND (o.next_call_at IS NULL OR o.next_call_at <= ?)))', 'bind' => [$s('record_verified'), $s('no_answer'), $now], 'tone' => 'amber'],
             'again' => ['label' => __('Call again'), 'sql' => 'o.moderator_id IS NOT NULL AND o.status_id = ? AND o.next_call_at > ?', 'bind' => [$s('no_answer'), $now], 'tone' => 'orange'],
             'hold' => ['label' => __('On hold'), 'sql' => 'o.status_id = ?', 'bind' => [$s('hold')], 'tone' => 'red'],
-            'send' => ['label' => __('To send'), 'sql' => "o.status_id = ? AND o.booking_state IN ('none', 'failed')", 'bind' => [$s('confirmed')], 'tone' => 'green'],
+            'send' => ['label' => __('Booking failed'), 'sql' => "o.status_id = ? AND o.booking_state IN ('none', 'failed')", 'bind' => [$s('confirmed')], 'tone' => 'green'],
             'packaging' => ['label' => __('Packaging'), 'sql' => "((o.status_id = ? AND o.booking_state = 'queued') OR o.status_id = ?)", 'bind' => [$s('confirmed'), $s('ready_for_packaging')], 'tone' => 'purple'],
             'packed' => ['label' => __('Packed'), 'sql' => 'o.status_id IN (?, ?)', 'bind' => [$s('packed'), $s('ready_for_pickup')], 'tone' => 'purple'],
             'shipped' => ['label' => __('With the courier'), 'sql' => 'o.status_id IN (?, ?)', 'bind' => [$s('handed_over'), $s('in_transit')], 'tone' => 'teal'],

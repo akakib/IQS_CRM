@@ -48,6 +48,7 @@ class OrderConfigSeeder extends Seeder
         ['hold', 'ready_for_packaging', 'orders.edit', false, false],        // packer hold solved: back to the packaging queue (CN gate still applies)
         ['confirmed', 'hold', 'orders.edit', true, false],
         ['confirmed', 'cancelled', 'orders.edit', true, false],
+        ['confirmed', 'record_verified', null, false, true],                 // Undo within seconds of Call verified (before the courier is booked)
         ['confirmed', 'ready_for_packaging', null, false, true],             // bulk booking (needs CN ID)
         ['ready_for_packaging', 'packed', null, false, true],                // label scan
         ['ready_for_packaging', 'cancelled', 'orders.approve', true, false],

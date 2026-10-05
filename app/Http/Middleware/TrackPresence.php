@@ -17,7 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class TrackPresence
 {
-    private const BACKGROUND = ['notifications.count', 'notifications.feed', 'desk.pulse'];
+    private const BACKGROUND = ['notifications.count', 'notifications.feed', 'desk.pulse', 'orders.presence'];
 
     private const ALLOWED_ON_BREAK = ['breaks.end', 'logout'];
 

@@ -455,6 +455,47 @@ class DeskTest extends TestCase
         $this->assertDatabaseHas('order_notes', ['order_id' => $a->id, 'note_type' => 'assignment', 'user_id' => $boss->id]);
     }
 
+    public function test_one_person_edits_at_a_time_others_wait_and_the_moderators_timer_is_held(): void
+    {
+        $a = $this->web();
+        $this->desk()->takeNext($this->mahim); // Mahim's 10-minute timer runs
+        $boss = $this->manager();
+        $presence = app(\App\Services\Orders\OrderPresence::class);
+
+        // Both have it open: each sees the other.
+        $presence->checkIn($a->fresh(), $this->mahim, 'view');
+        $seen = $presence->checkIn($a->fresh(), $boss, 'view');
+        $this->assertSame('Mahim', $seen['others'][0]['name']);
+
+        // The boss opens the edit form: Mahim sees who, and his actions are refused.
+        $this->assertTrue($presence->checkIn($a->fresh(), $boss, 'edit')['editing']);
+        $this->assertSame('Boss', $presence->checkIn($a->fresh(), $this->mahim, 'edit')['editor']['name']);
+        $this->actingAs($this->mahim)->post("/desk/{$a->id}/act", ['action' => 'verify', 'lock_version' => $a->fresh()->lock_version])->assertSessionHasErrors('order');
+        $this->assertSame('new', $this->key($a));
+
+        // While the boss edits, Mahim's timer does not run down.
+        $due = $a->fresh()->action_due_at;
+        $this->travel(10)->seconds();
+        $presence->checkIn($a->fresh(), $boss, 'edit');
+        $this->assertTrue($a->fresh()->action_due_at->greaterThan($due));
+
+        // The boss leaves: Mahim can work again.
+        $presence->checkIn($a->fresh(), $boss, 'leave');
+        $this->assertNull($presence->editorOtherThan($a->id, $this->mahim->id));
+        $this->post("/desk/{$a->id}/act", ['action' => 'verify', 'lock_version' => $a->fresh()->lock_version])->assertSessionHas('success');
+
+        // A screen that stops checking in (tab closed) stops counting after a short while.
+        $presence->checkIn($a->fresh(), $boss, 'edit');
+        $this->travel(\App\Services\Orders\OrderPresence::STALE + 1)->seconds();
+        $this->assertNull($presence->editorOtherThan($a->id, $this->mahim->id));
+
+        // A manager can take over from someone who is editing.
+        $presence->checkIn($a->fresh(), $this->mahim, 'edit');
+        $this->assertSame('Mahim', $presence->checkIn($a->fresh(), $boss, 'edit')['editor']['name']);
+        $this->assertTrue($presence->checkIn($a->fresh(), $boss, 'edit', true)['editing']);
+        $this->assertSame('Boss', $presence->editorOtherThan($a->id, $this->mahim->id)['name']);
+    }
+
     public function test_chat_orders_belong_to_their_creator_without_timer_or_limit(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]);

@@ -188,6 +188,7 @@
                 @if ($embed && $reassign)
                     @include('desk._reassign', ['order' => $order, 'reassign' => $reassign])
                 @endif
+                <x-order-presence :order="$order" mode="view" />
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">
@@ -202,7 +203,7 @@
                                     @if ($order->no_response_count)<x-badge color="amber">{{ __('No response ×:n', ['n' => $order->no_response_count]) }}</x-badge>@endif
                                     {{-- Wrong item, address or phone: fix it in the popup without leaving this page. --}}
                                     @if (($statuses[$order->status_id]['edit_policy'] ?? 'locked') !== 'locked')
-                                        <button type="button" @click="$dispatch('open-order-edit')" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">
+                                        <button type="button" @click="$dispatch('open-order-edit')" class="lockable inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.86 4.49l2.65 2.65M4 20l1-4L16.5 4.5a1.87 1.87 0 012.65 2.65L7.65 18.65 4 20z"/></svg>
                                             {{ __('Edit order') }}
                                         </button>
@@ -366,7 +367,7 @@
                                 @error('order')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                                 @error('status')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                             </form>
-                            <div class="sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-b-xl border-t border-gray-200 bg-white p-3 sm:p-4">
+                            <div class="lockable sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-b-xl border-t border-gray-200 bg-white p-3 sm:p-4">
                                 @foreach ($actions as [$action, $label, $k, $variant])
                                     @if (in_array($action, ['hold', 'cancel'], true))
                                         <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="openReason('{{ $action }}')" class="flex-1 whitespace-nowrap py-2.5 sm:py-3 xl:flex-none">

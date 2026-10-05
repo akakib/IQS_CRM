@@ -17,7 +17,7 @@
             x-text="editing ? @js(__('Cancel')) : @js($reassign['holder'] ? __('Give to someone else') : __('Give to someone'))"></button>
     </div>
 
-    <form id="reassign-form" x-show="editing" x-cloak method="POST" action="{{ route('orders.reassign', $order) }}" class="mt-4 space-y-3 border-t border-gray-100 pt-4">
+    <form id="reassign-form" x-show="editing" x-cloak method="POST" action="{{ route('orders.reassign', $order) }}" class="lockable mt-4 space-y-3 border-t border-gray-100 pt-4">
         @csrf
         <input type="hidden" name="user_id" :value="to">
         <div>

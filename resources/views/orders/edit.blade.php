@@ -18,6 +18,8 @@
         <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">@foreach ($errors->all() as $e)<p>{{ $e }}</p>@endforeach</div>
     @endif
 
+    <x-order-presence :order="$order" mode="edit" />
+
     <form method="POST" action="{{ route('orders.amend', $order) }}"
         @submit="if (!$el.querySelector('input[name=reason_id]')?.value) { $event.preventDefault(); needReason = true; $nextTick(() => $refs.reason.scrollIntoView({ behavior: 'smooth', block: 'center' })) }"
         x-data="{
@@ -146,7 +148,7 @@
                     @error('reason_id')<p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>@enderror
                     <p class="mt-2 text-xs text-gray-500">{{ __('"Entry error" counts against whoever made the mistake.') }}</p>
                 </x-card>
-                <x-button class="w-full">{{ __('Save change') }}</x-button>
+                <x-button class="lockable w-full">{{ __('Save change') }}</x-button>
             </div>
         </div>
     </form>

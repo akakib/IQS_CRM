@@ -124,6 +124,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders/{order}', [OrderController::class, 'show'])->middleware('can:orders.view')->name('orders.show');
     Route::post('/orders/{order}/transition', [OrderController::class, 'transition'])->middleware('can:orders.view')->name('orders.transition');
     Route::post('/orders/{order}/notes', [OrderController::class, 'note'])->middleware('can:orders.view')->name('orders.notes');
+    Route::post('/orders/{order}/presence', [OrderController::class, 'presence'])->middleware('can:orders.view')->name('orders.presence');
     Route::get('/orders/{order}/edit', [OrderController::class, 'edit'])->middleware('can:orders.edit')->name('orders.edit');
     Route::post('/orders/{order}/amend', [OrderController::class, 'amend'])->middleware('can:orders.edit')->name('orders.amend');
     Route::post('/orders/{order}/amendments/{amendment}', [OrderController::class, 'decideAmendment'])->whereNumber('amendment')->middleware('can:orders.approve')->name('orders.amendments.decide');

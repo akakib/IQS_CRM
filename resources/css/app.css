@@ -162,3 +162,9 @@ html.dark .shadow-xl {
 .note-in {
     animation: note-in 0.35s ease-out;
 }
+
+/* Someone else is editing the order on screen (see <x-order-presence>): its action controls are off. */
+html[data-order-locked] .lockable {
+    pointer-events: none;
+    opacity: 0.4;
+}

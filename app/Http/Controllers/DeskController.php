@@ -219,6 +219,9 @@ class DeskController extends Controller
         if ($order->lock_version !== (int) $data['lock_version']) {
             throw ValidationException::withMessages(['order' => __('This order just changed. Look again before acting.')]);
         }
+        if ($other = app(\App\Services\Orders\OrderPresence::class)->editorOtherThan($order->id, $user->id)) {
+            throw ValidationException::withMessages(['order' => __(':n is editing this order. Wait until they finish.', ['n' => $other['name']])]);
+        }
         // One order at a time: while the clock runs on another order, a waiting order cannot be worked on.
         $other = $order->moderator_id === $user->id && $order->channel === 'web' && ! $order->action_due_at
             && in_array(OrderStatus::map()[$order->status_id]['key'], ['new', 'record_verified', 'no_answer'], true)

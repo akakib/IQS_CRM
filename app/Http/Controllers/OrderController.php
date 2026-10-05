@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class OrderController extends Controller
@@ -184,6 +185,16 @@ class OrderController extends Controller
         return back()->with('success', __('Order :no is now :s.', ['no' => $order->order_no, 's' => OrderStatus::map()[$order->status_id]['name']]));
     }
 
+    /** Screens with this order open check in here every few seconds (who else is on it, who is editing). */
+    public function presence(Order $order, Request $request, \App\Services\Orders\OrderPresence $presence): JsonResponse
+    {
+        abort_unless(Order::visibleTo($request->user())->whereKey($order->id)->exists(), 403);
+        $data = $request->validate(['mode' => ['required', Rule::in(['view', 'edit', 'leave'])], 'take_over' => ['nullable', 'boolean']]);
+
+        return response()->json($presence->checkIn($order, $request->user(), $data['mode'],
+            ($data['take_over'] ?? false) && $request->user()->can('orders.reassign')));
+    }
+
     public function note(Order $order, Request $request): RedirectResponse|JsonResponse
     {
         abort_unless(Order::visibleTo($request->user())->whereKey($order->id)->exists(), 403);
@@ -280,6 +291,9 @@ class OrderController extends Controller
     public function amend(Order $order, Request $request, OrderEditor $editor): RedirectResponse|Response
     {
         $this->authorizeWork($order, $request->user());
+        if ($other = app(\App\Services\Orders\OrderPresence::class)->editorOtherThan($order->id, $request->user()->id)) {
+            throw ValidationException::withMessages(['order' => __(':n is editing this order. Wait until they finish.', ['n' => $other['name']])]);
+        }
         $data = $request->validate([
             'lock_version' => ['required', 'integer'],
             'reason_id' => ['required', Rule::exists('status_reasons', 'id')->where('reason_type', 'amendment')],

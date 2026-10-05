@@ -157,9 +157,10 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
             if (!voice || (!this.on && !evenWhenOff) || !('speechSynthesis' in window)) return;
             // Said right away; if the browser refuses (no click yet), the line is held for the next click (onerror below).
             const u = new SpeechSynthesisUtterance(text);
-            const voice = chosenVoice(this.pick);
-            u.lang = voice?.lang || 'en-IN';
-            if (voice) u.voice = voice;
+            // (Not named "voice": that is the on/off switch from the server, read on the first line above.)
+            const picked = chosenVoice(this.pick);
+            u.lang = picked?.lang || 'en-IN';
+            if (picked) u.voice = picked;
             u.rate = 0.92;
             u.onerror = (e) => {
                 if (e.error === 'not-allowed') {

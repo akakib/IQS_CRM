@@ -3,12 +3,12 @@
      test. A dot shows an alert is waiting for a click, because browsers only
      play sound after one. The name is said as set in Staff ("Name for voice
      alerts"), else the first word of the name. --}}
-@if (auth()->user()?->can('orders.take') && ! auth()->user()->isOwner() && settings('desk.voice_alerts'))
+@if (auth()->user()?->can('orders.take') && ! auth()->user()->isOwner())
     @php
         $spoken = trim((string) auth()->user()->voice_name) ?: \Illuminate\Support\Str::of(auth()->user()->name)->trim()->before(' ')->toString();
     @endphp
     <div class="relative"
-        x-data="voiceAlerts({ url: @js(route('desk.pulse')), name: @js($spoken) })"
+        x-data="voiceAlerts({ url: @js(route('desk.pulse')), name: @js($spoken), voice: @js((bool) settings('desk.voice_alerts')) })" @if (! settings('desk.voice_alerts')) x-show="false" @endif
         @click.outside="menu = false" @keydown.escape.window="menu = false">
         <button type="button" @click="menu = !menu; if (menu) loadVoices()"
             :aria-label="@js(__('Voice alerts'))"

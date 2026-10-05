@@ -9,6 +9,7 @@ use App\Services\Courier\BookingService;
 use App\Services\NotificationService;
 use App\Services\Points\PointHooks;
 use App\Services\Work\WorkCalendar;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -327,7 +328,7 @@ class DeskService
             if ($this->assign($orderId, $userId, 'auto')) {
                 $assigned++;
                 $this->notifications->send('order_assigned', __('Order :no was given to you', ['no' => $orderNo]), null, [
-                    'link' => route('desk.index', ['order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId], 'group_key' => 'order_assigned',
+                    'link' => route('desk.index', ['order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId],
                 ]);
                 if (++$load[$userId] >= $limit) {
                     unset($load[$userId]);
@@ -335,9 +336,11 @@ class DeskService
             }
         }
 
-        if ($assigned < $due->count()) {
-            $this->notifications->send('orders_unassigned', __(':n orders waiting and nobody free to take them', ['n' => $due->count() - $assigned]), null, [
-                'link' => route('desk.control'), 'user_ids' => $this->managerIds(), 'group_key' => 'orders_unassigned',
+        // Managers are told when orders wait and nobody is free, at most once every 30 minutes (this runs every minute).
+        $left = $due->count() - $assigned;
+        if ($left > 0 && Cache::add('desk:unassigned-alert', 1, now()->addMinutes(30))) {
+            $this->notifications->send('orders_unassigned', trans_choice('{1} 1 order is waiting and nobody is free to take it|[2,*] :n orders are waiting and nobody is free to take them', $left, ['n' => $left]), null, [
+                'link' => route('orders.activity'), 'user_ids' => $this->managerIds(),
             ]);
         }
 

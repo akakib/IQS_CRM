@@ -19,17 +19,17 @@
     <p class="mb-4 text-sm text-gray-500">{{ __('Who holds what and where orders are stuck. Tap any number to see those orders. Reload for the latest numbers.') }}</p>
 
     <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <button type="button" class="text-left" @click="show(@js(__('Waiting, nobody took')), { box: 'waiting' })">
-    <x-stat-tile :label="__('Waiting, nobody took')" :value="(int) $age['total']" :hint="$age['total'] ? __('oldest :t', ['t' => $ago($age['oldest'])]) : null" :trend="$age['old'] ? 'down' : null" />
+        <button type="button" class="flex h-full flex-col text-left" @click="show(@js(__('Waiting, nobody took')), { box: 'waiting' })">
+    <x-stat-tile class="h-full w-full" :label="__('Waiting, nobody took')" :value="(int) $age['total']" :hint="$age['total'] ? __('oldest :t', ['t' => $ago($age['oldest'])]) : null" :trend="$age['old'] ? 'down' : null" />
         </button>
-        <button type="button" class="text-left" @click="show(@js(__('Waiting under 5 minutes')), { box: 'fresh' })">
-    <x-stat-tile :label="__('Under 5 minutes')" :value="(int) $age['fresh']" />
+        <button type="button" class="flex h-full flex-col text-left" @click="show(@js(__('Waiting under 5 minutes')), { box: 'fresh' })">
+    <x-stat-tile class="h-full w-full" :label="__('Under 5 minutes')" :value="(int) $age['fresh']" />
         </button>
-        <button type="button" class="text-left" @click="show(@js(__('Waiting 5 to 15 minutes')), { box: 'mid' })">
-    <x-stat-tile :label="__('5 to 15 minutes')" :value="(int) $age['mid']" />
+        <button type="button" class="flex h-full flex-col text-left" @click="show(@js(__('Waiting 5 to 15 minutes')), { box: 'mid' })">
+    <x-stat-tile class="h-full w-full" :label="__('5 to 15 minutes')" :value="(int) $age['mid']" />
         </button>
-        <button type="button" class="text-left" @click="show(@js(__('Waiting over 15 minutes')), { box: 'old' })">
-    <x-stat-tile :label="__('Over 15 minutes')" :value="(int) $age['old']" :trend="$age['old'] ? 'down' : null" :hint="$age['old'] ? __('auto-assign should have taken these') : null" />
+        <button type="button" class="flex h-full flex-col text-left" @click="show(@js(__('Waiting over 15 minutes')), { box: 'old' })">
+    <x-stat-tile class="h-full w-full" :label="__('Over 15 minutes')" :value="(int) $age['old']" :trend="$age['old'] ? 'down' : null" :hint="$age['old'] ? __('auto-assign should have taken these') : null" />
         </button>
     </div>
 

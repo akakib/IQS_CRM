@@ -87,7 +87,9 @@ class DeskController extends Controller
         // (An order just taken back is not reopened, even if the address still names it.)
         $openId = ($lost ? 0 : (int) $request->query('order')) ?: ($toTimed ? $timed->id : ($rows->first()->id ?? 0));
         $order = $openId ? Order::with(['customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en', 'packer:id,name,photo_path', 'moderator:id,name,photo_path'])->find($openId) : null;
+        $notYours = null;
         if ($order && $order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all') {
+            $notYours = $order->order_no; // e.g. a notification opened after the order moved on
             $order = null;
         }
 
@@ -125,6 +127,7 @@ class DeskController extends Controller
             'timed' => $timed && (! $order || $order->id !== $timed->id) ? $timed : null,
             'blocked' => $timed && $openNeedsTimer && $order->id !== $timed->id,
             'lost' => $lost,
+            'notYours' => $notYours,
             'extendMinutes' => (int) settings('desk.extend_minutes'),
             'extendsLeft' => $counts['timed'] ? max(0, (int) settings('desk.extend_daily_limit') - $this->desk->extensionsToday($user->id)) : 0,
             'statuses' => OrderStatus::map(),
@@ -171,9 +174,9 @@ class DeskController extends Controller
 
         return response()->json([
             'on_break' => (bool) $user->current_break_id,
-            'mine' => $active->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no])->values(),
+            'mine' => $active->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no, 'tab' => $o->status_id === $s('new') ? 'verify' : 'call'])->values(),
             'returned' => $rows->where('status_id', $s('no_answer'))->filter(fn ($o) => $o->next_call_at && $o->next_call_at <= now()->toDateTimeString())
-                ->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no])->values(),
+                ->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no, 'tab' => 'call'])->values(),
             'timed' => $timed ? ['id' => $timed->id, 'no' => $timed->order_no, 'due' => $timed->action_due_at,
                 'left' => (int) max(0, now()->diffInSeconds(\Illuminate\Support\Carbon::parse($timed->action_due_at), false))] : null,
             'waiting' => (int) $this->desk->waitingQuery()->count(),
@@ -187,8 +190,19 @@ class DeskController extends Controller
         if (! Cache::add('desk:take:'.$request->user()->id, 1, 3)) {
             return redirect()->route('desk.index');
         }
-        $order = $this->desk->takeNext($request->user());
-        $tab =OrderStatus::map()[$order->status_id]['key'] === 'new' ? 'verify' : 'call';
+        $user = $request->user();
+        // Take next = "my next piece of work". Hands full (an order was given to them meanwhile): open what they hold.
+        if (! $user->isOwner() && $this->desk->activeCount($user->id) >= (int) settings('desk.active_limit')) {
+            $held = $this->desk->timedOrder($user->id)
+                ?? DB::table('orders')->where('moderator_id', $user->id)->where('channel', 'web')
+                    ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->orderBy('assigned_at')->orderBy('id')->first(['id', 'order_no', 'status_id']);
+            if ($held) {
+                return redirect()->route('desk.index', ['tab' => $held->status_id === OrderStatus::idFor('new') ? 'verify' : 'call', 'order' => $held->id])
+                    ->with('success', __('You already have :no: opened it. Finish it, then take the next.', ['no' => $held->order_no]));
+            }
+        }
+        $order = $this->desk->takeNext($user);
+        $tab = OrderStatus::map()[$order->status_id]['key'] === 'new' ? 'verify' : 'call';
 
         return redirect()->route('desk.index', ['tab' => $tab, 'order' => $order->id])->with('success', __(':no is yours.', ['no' => $order->order_no]));
     }

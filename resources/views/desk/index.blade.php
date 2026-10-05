@@ -85,6 +85,26 @@
     @endunless
 
 
+    @if ($notYours ?? null)
+        <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ __(':no is no longer yours: it was finished or given to someone else.', ['no' => $notYours]) }}</div>
+    @endif
+    {{-- A new order came to me while this page was open (given automatically, or a call-again came back). --}}
+    @php
+        $busy = $order && $isMine && in_array($key ?? '', ['new', 'record_verified', 'no_answer'], true);
+    @endphp
+    <div x-data="{ fresh: null }" x-cloak x-show="fresh"
+        @desk-new-order.window="
+            const o = $event.detail;
+            const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement.value;
+            if (!@js($busy) && !typing) { window.location.href = @js(route('desk.index')) + '?tab=' + o.tab + '&order=' + o.id } else { fresh = o }"
+        class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-900">
+        <p><b x-text="fresh?.no"></b> {{ __('is yours now. Open it when you finish this one.') }}</p>
+        <span class="flex shrink-0 items-center gap-2">
+            <a :href="fresh ? @js(route('desk.index')) + '?tab=' + fresh.tab + '&order=' + fresh.id : '#'" class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark">{{ __('Open') }}</a>
+            <button type="button" @click="fresh = null" class="text-green-700 hover:text-green-900" aria-label="{{ __('Close') }}">&times;</button>
+        </span>
+    </div>
+
     @if ($lost)
         <div class="mb-3 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" x-data="{ show: true }" x-show="show">
             <p>{{ trans_choice('{1} Time ran out on :list. It went back to New and anyone can take it.|[2,*] Time ran out on :list. They went back to New and anyone can take them.', count($lost), ['list' => implode(', ', $lost)]) }}</p>

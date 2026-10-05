@@ -18,7 +18,7 @@
 const SEEN_KEY = 'iqs_voice_seen';
 const PICK_KEY = 'iqs_voice_choice'; // renamed once so earlier test picks fall back to the Indian accent
 
-export default function voiceAlerts({ url, name, interval = 30000 }) {
+export default function voiceAlerts({ url, name, voice = true, interval = 30000 }) {
     return {
         name,
         on: true,
@@ -115,6 +115,12 @@ export default function voiceAlerts({ url, name, interval = 30000 }) {
                 warned: prev?.warned || null,
             };
 
+            // Order management listens: a new order in hand shows up without a reload.
+            if (prev) {
+                const appeared = [...d.mine.filter((o) => !prev.mine.includes(o.id)), ...d.returned.filter((o) => !prev.back.includes(o.id))].filter((o) => o.id !== open);
+                if (appeared.length) window.dispatchEvent(new CustomEvent('desk-new-order', { detail: appeared[0] }));
+            }
+
             if (prev && !d.on_break) {
                 // A timer they did not start themselves: the order sat unopened for 15 minutes and its clock began.
                 // (Take next or opening an order starts the clock on the order on screen: no voice, they know.)
@@ -148,7 +154,7 @@ export default function voiceAlerts({ url, name, interval = 30000 }) {
         },
 
         say(text, evenWhenOff = false) {
-            if ((!this.on && !evenWhenOff) || !('speechSynthesis' in window)) return;
+            if (!voice || (!this.on && !evenWhenOff) || !('speechSynthesis' in window)) return;
             // Said right away; if the browser refuses (no click yet), the line is held for the next click (onerror below).
             const u = new SpeechSynthesisUtterance(text);
             const voice = chosenVoice(this.pick);

@@ -99,7 +99,7 @@ class DeskTest extends TestCase
         $this->assertSame($this->mahim->id, $b->fresh()->moderator_id);
 
         $this->travel(4)->seconds();
-        $this->post('/desk/next')->assertSessionHasErrors('order'); // holds 2 of 2
+        $this->post('/desk/next')->assertRedirect(route('desk.index', ['tab' => 'verify', 'order' => $a->id])); // holds 2 of 2: opens what is in hand
         $this->assertNull($c->fresh()->moderator_id);
 
         $this->get('/desk')->assertOk()->assertSee($a->order_no)->assertSee('Finish one first');
@@ -308,14 +308,15 @@ class DeskTest extends TestCase
 
         $this->actingAs($this->mahim)->post('/desk/next');
         $this->travel(4)->seconds();
-        $this->post('/desk/next')->assertSessionHasErrors('order');
+        $this->post('/desk/next')->assertRedirect(route('desk.index', ['tab' => 'verify', 'order' => $a->id]))
+            ->assertSessionHas('success', 'You already have '.$a->order_no.': opened it. Finish it, then take the next.');
         $this->assertNull($b->fresh()->moderator_id);
         $this->get('/desk')->assertOk()->assertSee('Finish this order first');
 
         // Verified but not called yet: still the same unfinished order.
         $this->act($a, 'verify');
         $this->travel(4)->seconds();
-        $this->post('/desk/next')->assertSessionHasErrors('order');
+        $this->post('/desk/next')->assertRedirect(route('desk.index', ['tab' => 'call', 'order' => $a->id]));
 
         // Called and confirmed: the next one can be taken.
         $this->act($a->fresh(), 'confirm');
@@ -515,6 +516,13 @@ class DeskTest extends TestCase
         // A stage: same as its count.
         $this->get('/desk/control/list?box=stage&status='.OrderStatus::idFor('new'))->assertOk()->assertSee('17 orders');
         $this->get('/desk/control/list?box=breaks&user='.$this->mahim->id)->assertOk()->assertSee('No break today.');
+    }
+
+    public function test_opening_an_order_that_is_no_longer_yours_says_so(): void
+    {
+        $a = $this->web();
+        $this->desk()->assign($a->id, $this->rima->id, 'auto');
+        $this->actingAs($this->mahim)->get('/desk?order='.$a->id)->assertOk()->assertSee($a->order_no.' is no longer yours', false);
     }
 
     public function test_chat_orders_belong_to_their_creator_without_timer_or_limit(): void

@@ -97,8 +97,13 @@ class VerificationEngine
                 $this->machine->transition($order, 'record_verified', null, 'rule', null, $ruleName);
                 $this->machine->transition($order, 'confirmed', null, 'rule', null, __('Auto-confirmed: :r', ['r' => $ruleName]));
             })(),
-            'hold_for_advance' => $this->machine->transition($order, 'hold', null, 'rule',
-                DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id'), $ruleName),
+            'hold_for_advance' => (function () use ($order, $ruleName) {
+                // The delivery charge in advance; an admin can let it go without (Ask admin).
+                $order->forceFill(['advance_required' => max((float) $order->delivery_charge, 1)])->save();
+                $this->machine->transition($order, 'hold', null, 'rule',
+                    DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id'),
+                    __(':r: delivery charge ৳:a in advance', ['r' => $ruleName, 'a' => number_format((float) $order->delivery_charge)]));
+            })(),
             default => null, // manual_review: stays New for a person to look at
         };
 

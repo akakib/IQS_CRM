@@ -274,6 +274,24 @@ class OrderController extends Controller
         return back()->with('success', __('Payment saved. It is checked on the Payments page.'));
     }
 
+    /** "Ask admin: process without advance". */
+    public function askWaiver(Order $order, Request $request): RedirectResponse
+    {
+        $this->authorizeWork($order, $request->user());
+        $data = $request->validate(['why' => ['required', 'string', 'min:5', 'max:300']]);
+        $this->orders->requestAdvanceWaiver($order, $request->user(), $data['why']);
+
+        return back()->with('success', __('Asked. You get a notice when an admin decides.'));
+    }
+
+    public function decideWaiver(Order $order, Request $request): RedirectResponse
+    {
+        $data = $request->validate(['decision' => ['required', 'in:allow,refuse']]);
+        $this->orders->decideAdvanceWaiver($order, $request->user(), $data['decision'] === 'allow');
+
+        return back()->with('success', $data['decision'] === 'allow' ? __(':no goes on without advance.', ['no' => $order->order_no]) : __(':no keeps waiting for the advance.', ['no' => $order->order_no]));
+    }
+
     public function edit(Order $order, Request $request): View
     {
         $this->authorizeWork($order, $request->user());

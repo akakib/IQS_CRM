@@ -67,22 +67,67 @@ class VerificationTest extends TestCase
         $this->assertEquals(92.31, collect($inputs['providers'])->firstWhere('key', 'steadfast')['success_rate']);
     }
 
-    public function test_new_customer_small_order_verified_big_order_held_for_advance(): void
+    public function test_new_to_steadfast_waits_for_the_delivery_charge_in_advance(): void
     {
-        $small = $this->order('01712345679', 1);   // ends in 9: no history anywhere
-        $this->assertSame('record_verified', $this->key($small));
-
-        $big = $this->order('01812345679', 4);     // 2000 + delivery > 1500
-        $this->assertSame('hold', $this->key($big));
-        $this->assertSame('advance_wait', DB::table('status_reasons')->where('id', $big->hold_reason_id)->value('system_key'));
+        $order = $this->order('01712345679', 1);   // ends in 9: no Steadfast parcels
+        $this->assertSame('hold', $this->key($order));
+        $this->assertSame('advance_wait', DB::table('status_reasons')->where('id', $order->hold_reason_id)->value('system_key'));
+        $this->assertSame((float) $order->delivery_charge, (float) $order->advance_required);
     }
 
-    public function test_risky_history_falls_through_to_manual_review(): void
+    public function test_advance_hold_needs_the_delivery_charge_or_an_admins_yes(): void
+    {
+        (new \Database\Seeders\RoleSeeder)->run();
+        $mod = \App\Models\User::factory()->create();
+        $admin = \App\Models\User::factory()->create();
+        $mod->roles()->attach(\App\Models\Role::firstWhere('system_key', 'moderator')->id);
+        $admin->roles()->attach(\App\Models\Role::firstWhere('system_key', 'manager')->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $bkash = DB::table('payment_methods')->where('system_key', 'bkash')->value('id');
+
+        // 1. The moderator cannot just resume it.
+        $a = $this->order('01712345679');
+        $a->forceFill(['moderator_id' => $mod->id])->save();
+        $this->actingAs($mod);
+        try {
+            app(\App\Services\Orders\OrderStateMachine::class)->transition($a->fresh(), 'record_verified', $mod);
+            $this->fail('Resumed without advance');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertStringContainsString('needs ৳', collect($e->errors())->flatten()->first());
+        }
+        $this->get("/orders/{$a->id}")->assertSee('Advance needed')->assertSee('Ask admin: process without advance');
+
+        // 2. The delivery charge comes in: the order goes to Call by itself.
+        $this->post("/orders/{$a->id}/payments", ['advance' => ['method_id' => $bkash, 'amount' => (float) $a->advance_required, 'transaction_id' => 'DC1']]);
+        $this->assertSame('record_verified', $this->key($a->fresh()));
+
+        // 3. Asked without advance: the admin allows, it goes to Call.
+        $b = $this->order('01812345679');
+        $b->forceFill(['moderator_id' => $mod->id])->save();
+        $this->post("/orders/{$b->id}/advance-waiver", ['why' => 'Old shop customer'])->assertSessionHas('success');
+        $this->assertNotNull($b->fresh()->advance_waiver_requested_at);
+        $this->post("/orders/{$b->id}/advance-waiver/decide", ['decision' => 'allow'])->assertForbidden();
+        $this->actingAs($admin)->get("/orders/{$b->id}")->assertSee('Old shop customer')->assertSee('Process without advance');
+        $this->post("/orders/{$b->id}/advance-waiver/decide", ['decision' => 'allow'])->assertSessionHas('success');
+        $this->assertSame('record_verified', $this->key($b->fresh()));
+        $this->assertNotNull($b->fresh()->advance_waived_by);
+    }
+
+    public function test_real_steadfast_score_is_read_from_the_score_endpoint(): void
+    {
+        \Illuminate\Support\Facades\Http::fake(['*fraud_check/score/*' => \Illuminate\Support\Facades\Http::response(['delivery_ratio' => 81.5, 'cancellation_ratio' => 10, 'return_ratio' => 8.5, 'total_reports' => 20])]);
+        $r = (new \App\Services\Courier\SteadfastDriver(['api_key' => 'k', 'secret_key' => 's', 'base_url' => 'https://portal.packzy.com/api/v1']))->fraudCheck('01712345678');
+        $this->assertSame(81.5, $r->successRate);
+        $this->assertSame(20, $r->totalParcels);
+        \Illuminate\Support\Facades\Http::assertSent(fn ($req) => str_ends_with($req->url(), 'fraud_check/score/01712345678') && $req->hasHeader('Api-Key', 'k'));
+    }
+
+    public function test_weak_history_below_75_percent_waits_for_the_advance(): void
     {
         $order = $this->order('01700000000'); // 37.5% on 8 parcels
 
-        $this->assertSame('new', $this->key($order));
-        $this->assertSame('manual_review', DB::table('verification_runs')->where('order_id', $order->id)->value('outcome'));
+        $this->assertSame('hold', $this->key($order));
+        $this->assertSame('Weak Steadfast history', DB::table('verification_rules')->where('id', DB::table('verification_runs')->where('order_id', $order->id)->value('matched_rule_id'))->value('name'));
     }
 
     public function test_trusted_repeat_customer_is_auto_confirmed_and_cost_is_frozen(): void

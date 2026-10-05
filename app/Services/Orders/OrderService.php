@@ -252,16 +252,21 @@ class OrderService
         $type = $p['payment_type'] ?? 'advance';
         $counted = (float) DB::table('order_payments')->where('order_id', $order->id)->where('status', 'pending_verification')->where('counts_now', true)->sum('amount');
         $countsNow = $type === 'advance' && $amount > 0 && $counted + $amount <= (int) settings('payments.trust_up_to');
+        $paidOnline = ($p['status'] ?? null) === 'verified'; // the website's payment gateway already confirmed it
         $oldCod = (float) $order->cod_amount;
         DB::table('order_payments')->insert([
             'order_id' => $order->id, 'payment_type' => $p['payment_type'] ?? 'advance', 'method_id' => $method->id,
             'amount' => round((float) $p['amount'], 2), 'transaction_id' => ($p['transaction_id'] ?? null) ? trim($p['transaction_id']) : null,
-            'sender_number' => Phone::normalize($p['sender_number'] ?? null), 'status' => 'pending_verification', 'counts_now' => $countsNow,
+            'sender_number' => Phone::normalize($p['sender_number'] ?? null), 'status' => $paidOnline ? 'verified' : 'pending_verification', 'counts_now' => $countsNow,
+            'verified_at' => $paidOnline ? now() : null, 'note' => $p['note'] ?? null,
             'received_at' => now(), 'note' => $p['note'] ?? null, 'created_by' => $by?->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
         if ($order->exists && $order->grand_total !== null) {
             $this->calculator->applyPayments($order->refresh());
             $this->afterPayment($order, $oldCod, $by);
+        }
+        if ($paidOnline) {
+            return;
         }
         app(\App\Services\NotificationService::class)->send('payment_to_check', __('Check payment: :no', ['no' => $order->order_no]),
             __(':m ৳:a, TrxID :t', ['m' => $method->name, 'a' => number_format($amount, 2), 't' => $p['transaction_id'] ?? '-']).($countsNow ? ' '.__('(already lowered the COD)') : ' '.__('(the order waits for this check)')), [
@@ -290,6 +295,38 @@ class OrderService
             }
             $this->afterPayment($order, $oldCod, $by);
         });
+    }
+
+    /** A moderator asks an admin to let an advance-hold order go without the advance. */
+    public function requestAdvanceWaiver(Order $order, User $by, string $why): void
+    {
+        $order->forceFill(['advance_waiver_requested_at' => now(), 'advance_waiver_requested_by' => $by->id, 'advance_waiver_note' => $why])->save();
+        $this->note($order, 'system', __('Asked an admin to process it without advance: :w', ['w' => $why]), $by);
+        app(\App\Services\NotificationService::class)->send('payment_to_check', __('Without advance? :no', ['no' => $order->order_no]),
+            __(':n asks: :w (advance needed ৳:a)', ['n' => $by->name, 'w' => $why, 'a' => number_format((float) $order->advance_required)]), [
+                'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+                'user_ids' => app(DeskService::class)->managerIds(),
+            ]);
+    }
+
+    /** An admin allows (the order goes to Call) or refuses (it keeps waiting for the advance). */
+    public function decideAdvanceWaiver(Order $order, User $by, bool $allow): void
+    {
+        $asker = $order->advance_waiver_requested_by;
+        if ($allow) {
+            $order->forceFill(['advance_waived_by' => $by->id, 'advance_waived_at' => now(), 'advance_waiver_requested_at' => null])->save();
+            $machine = app(OrderStateMachine::class);
+            $machine->transition($order, $machine->heldFrom($order) === 'confirmed' ? 'confirmed' : 'record_verified', $by, 'user', null, __('Allowed without advance by :n', ['n' => $by->name]));
+        } else {
+            $order->forceFill(['advance_waiver_requested_at' => null])->save();
+            $this->note($order, 'system', __('Without advance refused by :n: it waits for the advance.', ['n' => $by->name]), $by);
+        }
+        if ($asker && $asker !== $by->id) {
+            app(\App\Services\NotificationService::class)->send('payment_to_check', ($allow ? __('Allowed without advance: :no', ['no' => $order->order_no]) : __('Advance still needed: :no', ['no' => $order->order_no])),
+                $allow ? __(':n allowed it. It is in your Call tab.', ['n' => $by->name]) : __(':n refused. Ask the customer for the delivery charge.', ['n' => $by->name]), [
+                    'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$asker],
+                ]);
+        }
     }
 
     /** Is an advance on this order still waiting for its check without lowering the COD yet? */
@@ -331,9 +368,11 @@ class OrderService
 
         // Held only for the advance: the money is in (or counts), so it goes on and is booked.
         $advanceHold = DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id');
+        $machine = app(OrderStateMachine::class);
         if (OrderStatus::map()[$order->status_id]['key'] === 'hold' && (int) $order->hold_reason_id === (int) $advanceHold
-            && (float) $order->advance_verified > 0 && ! $this->hasUncheckedAdvance($order) && ! $order->taken_back_at) {
-            app(OrderStateMachine::class)->transition($order, 'confirmed', null, 'rule', null, __('Advance received'));
+            && (float) $order->advance_verified > 0 && $machine->advanceSettled($order) && ! $this->hasUncheckedAdvance($order) && ! $order->taken_back_at) {
+            // Held by a rule before the call: to Call (the call can still add items). Held after Confirmed: on to booking.
+            $machine->transition($order, $machine->heldFrom($order) === 'confirmed' ? 'confirmed' : 'record_verified', null, 'rule', null, __('Advance received'));
         }
     }
 

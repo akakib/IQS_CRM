@@ -223,6 +223,7 @@
                 <x-cod-update :order="$order" />
                 <x-courier-cancel :order="$order" />
                 <x-take-back :order="$order" class="mb-3" />
+                <x-advance-wait :order="$order" />
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">
@@ -393,6 +394,9 @@
                                 $key === 'confirmed' && $order->booking_state === 'failed' => [['send', __('Try booking again'), 'p', 'primary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 default => [],
                             };
+                            if ($key === 'hold' && ! auth()->user()->can('orders.approve') && ! app(\App\Services\Orders\OrderStateMachine::class)->advanceSettled($order)) {
+                                $actions = array_values(array_filter($actions, fn ($a) => $a[0] === 'cancel'));
+                            }
                             // The clock is running on another order: this one waits its turn.
                             if ($blocked) {
                                 $actions = [];

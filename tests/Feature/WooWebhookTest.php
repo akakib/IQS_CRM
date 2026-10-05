@@ -58,6 +58,28 @@ class WooWebhookTest extends TestCase
         ], $body);
     }
 
+    public function test_website_payment_comes_in_with_the_order(): void
+    {
+        (new \Database\Seeders\ConfirmationSeeder)->run();
+
+        // Paid through the bKash gateway: verified at once, the order is fully prepaid and goes to Call.
+        $this->send($this->payload(['payment_method' => 'bkash', 'payment_method_title' => 'bKash', 'transaction_id' => 'BK123', 'date_paid' => '2026-10-06T10:00:00']))->assertOk();
+        $paid = Order::firstWhere('external_ref', '5001');
+        $this->assertDatabaseHas('order_payments', ['order_id' => $paid->id, 'transaction_id' => 'BK123', 'status' => 'verified']);
+        $this->assertSame('0.00', $paid->fresh()->cod_amount);
+        $this->assertSame('record_verified', OrderStatus::map()[$paid->fresh()->status_id]['key']);
+
+        // Only a TrxID typed by the customer (manual bKash): to check on the Payments page.
+        $this->send($this->payload(['id' => 5002, 'number' => '5002', 'status' => 'on-hold', 'payment_method' => 'manual_bkash', 'payment_method_title' => 'bKash (send money)',
+            'billing' => ['phone' => '+8801712345671'], 'meta_data' => [['key' => '_bkash_trx_id', 'value' => 'MAN55']]]))->assertOk();
+        $manual = Order::firstWhere('external_ref', '5002');
+        $this->assertDatabaseHas('order_payments', ['order_id' => $manual->id, 'transaction_id' => 'MAN55', 'status' => 'pending_verification']);
+
+        // Cash on delivery: no payment.
+        $this->send($this->payload(['id' => 5003, 'number' => '5003', 'billing' => ['phone' => '+8801712345672']]))->assertOk();
+        $this->assertSame(0, DB::table('order_payments')->where('order_id', Order::firstWhere('external_ref', '5003')->id)->count());
+    }
+
     public function test_signed_order_webhook_creates_an_unowned_web_order(): void
     {
         $this->send($this->payload())->assertOk()->assertJson(['status' => 'received']);

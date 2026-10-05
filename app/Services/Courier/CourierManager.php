@@ -23,6 +23,23 @@ class CourierManager
         return $this->isForcedFake() ? 'fake' : (string) config('courier.driver', 'fake');
     }
 
+    /**
+     * For the Steadfast score only. It just reads a phone's history, nothing is
+     * booked, so the test server uses the real Steadfast too once keys are saved
+     * (booking there stays fake). Tests always get the fake one.
+     */
+    public function scoreDriver(): CourierDriver
+    {
+        if (app()->environment('testing')) {
+            return $this->driver();
+        }
+        $keys = array_merge(array_filter(config('courier.steadfast', [])), $this->savedKeys('steadfast'));
+
+        return filled($keys['api_key'] ?? null) && filled($keys['secret_key'] ?? null)
+            ? new SteadfastDriver(array_merge(config('courier.steadfast', []), $keys))
+            : $this->driver();
+    }
+
     public function isForcedFake(): bool
     {
         return app()->environment(['testing', 'staging', 'local']) && ! config('courier.allow_real_in_local');

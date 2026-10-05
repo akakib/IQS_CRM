@@ -90,9 +90,23 @@ class SteadfastDriver implements CourierDriver
         return []; // only the webhook's tracking_update messages are used for now
     }
 
+    /**
+     * Steadfast network history of a phone: /fraud_check/score/{phone} (the
+     * old /fraud_check/{phone} was retired on 2026-09-27). It gives
+     * percentages and the number of parcels, the same call Akrub uses live.
+     */
     public function fraudCheck(string $phone): FraudCheckResult
     {
-        throw new RuntimeException('Steadfast fraud check endpoint is not confirmed yet; ask before enabling.');
+        $response = $this->client()->timeout(6)->get('fraud_check/score/'.rawurlencode($phone));
+        if (! $response->successful()) {
+            throw new RuntimeException('Steadfast score failed: HTTP '.$response->status());
+        }
+        $d = $response->json() ?? [];
+        $total = (int) ($d['total_reports'] ?? 0);
+        $rate = isset($d['delivery_ratio']) ? (float) $d['delivery_ratio'] : null;
+
+        return new FraudCheckResult($phone, $total, (int) round($total * (float) ($rate ?? 0) / 100),
+            (int) round($total * (float) ($d['cancellation_ratio'] ?? 0) / 100), $d, $rate);
     }
 
     public function parseWebhook(array $payload): ?CourierUpdate

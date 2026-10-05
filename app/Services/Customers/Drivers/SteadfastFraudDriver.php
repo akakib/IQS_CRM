@@ -7,13 +7,13 @@ use App\Services\Courier\CourierManager;
 use App\Services\Courier\Data\FraudCheckResult;
 use App\Services\Customers\FraudCheckDriver;
 
-/** Steadfast network history, through the courier driver (fake on staging). */
+/** Steadfast network history (the real score once keys are saved, even on the test server: it only reads). */
 class SteadfastFraudDriver implements FraudCheckDriver
 {
     public function __construct(private CourierManager $courier) {}
 
     public function check(Customer $customer, string $phone, ?array $credentials): FraudCheckResult
     {
-        return $this->courier->driver()->fraudCheck($phone);
+        return $this->courier->scoreDriver()->fraudCheck($phone);
     }
 }

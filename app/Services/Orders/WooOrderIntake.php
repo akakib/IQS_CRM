@@ -98,6 +98,7 @@ class WooOrderIntake
         ], null, 'webhook');
 
         $this->orders->note($order, 'system', __('Imported from website order #:n (:m).', ['n' => $p['number'] ?? $p['id'], 'm' => $p['payment_method_title'] ?? $p['payment_method'] ?? 'COD']), null);
+        $this->payment($order, $p, $meta);
 
         if ((float) ($p['total'] ?? 0) && abs((float) $p['total'] - (float) $order->grand_total) > 0.5) {
             $this->orders->note($order, 'system', __('Website total was ৳:w, IQS computed ৳:i. Please check.', ['w' => $p['total'], 'i' => $order->grand_total]), null);
@@ -113,6 +114,35 @@ class WooOrderIntake
     }
 
     /** @return array{0: list<array>, 1: list<string>} items and names of out-of-stock ones */
+    /**
+     * Money already paid on the website. Paid through a gateway (WooCommerce
+     * says date_paid): verified. Only a TrxID typed by the customer (manual
+     * bKash, order on hold): to check on the Payments page. Cash on delivery: none.
+     */
+    private function payment(Order $order, array $p, \Illuminate\Support\Collection $meta): void
+    {
+        $gateway = strtolower((string) ($p['payment_method'] ?? '').' '.($p['payment_method_title'] ?? ''));
+        if ($gateway === ' ' || str_contains($gateway, 'cod') || str_contains($gateway, 'cash on delivery')) {
+            return;
+        }
+        $methodKey = collect(['bkash', 'nagad', 'rocket', 'bank', 'card'])->first(fn ($k) => str_contains($gateway, $k)) ?? 'card';
+        $methodId = DB::table('payment_methods')->where('system_key', $methodKey)->value('id');
+        $trx = trim((string) ($p['transaction_id'] ?? '')) ?: (string) ($meta->first(fn ($v, $k) => is_scalar($v) && preg_match('/trx|transaction/i', (string) $k)) ?? '');
+        $paid = filled($p['date_paid'] ?? null) || filled($p['date_paid_gmt'] ?? null);
+        if (! $methodId || (! $paid && $trx === '')) {
+            return;
+        }
+        try {
+            $this->orders->addPayment($order->refresh(), [
+                'payment_type' => 'advance', 'method_id' => $methodId, 'amount' => (float) ($p['total'] ?? 0), 'transaction_id' => $trx ?: null,
+                'status' => $paid ? 'verified' : null,
+                'note' => $paid ? __('Paid on the website') : __('TrxID typed on the website; amount = website total, check it'),
+            ], null);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->orders->note($order, 'system', __('Website payment not added: :e', ['e' => collect($e->errors())->flatten()->first()]), null);
+        }
+    }
+
     private function items(array $lines): array
     {
         if ($lines === []) {

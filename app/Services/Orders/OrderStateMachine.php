@@ -60,6 +60,9 @@ class OrderStateMachine
             if ($source === 'user' && $rule->permission_key && ! $user?->can($rule->permission_key)) {
                 throw ValidationException::withMessages(['status' => __('You are not allowed to move orders to :to.', ['to' => $to['name']])]);
             }
+            if ($source === 'user' && $from['key'] === 'hold' && in_array($to['key'], ['record_verified', 'confirmed'], true) && ! $this->advanceSettled($fresh) && ! $user?->can('orders.approve')) {
+                throw ValidationException::withMessages(['status' => __('This order needs ৳:a in advance (the delivery charge). Add the payment, or ask an admin to allow it without advance.', ['a' => number_format((float) $fresh->advance_required)])]);
+            }
             if ($to['key'] === 'confirmed' && app(OrderService::class)->hasUncheckedAdvance($fresh)) {
                 throw ValidationException::withMessages(['status' => __('An advance is waiting for its check: check the TrxID and amount first (Payments to check), so the courier gets the right COD.')]);
             }
@@ -161,6 +164,15 @@ class OrderStateMachine
         $heldFrom ??= $this->heldFrom($order);
 
         return $heldFrom === 'confirmed' ? ['confirmed', 'cancelled'] : ['record_verified', 'confirmed', 'cancelled'];
+    }
+
+    /** Not an advance hold, or the advance is in (counted), or an admin allowed it without. */
+    public function advanceSettled(Order $order): bool
+    {
+        $advanceHold = DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id');
+
+        return (int) $order->hold_reason_id !== (int) $advanceHold || ! $order->advance_required || $order->advance_waived_at
+            || (float) $order->advance_verified + 0.001 >= (float) $order->advance_required;
     }
 
     /** The status the order was in when it was last put on hold. */

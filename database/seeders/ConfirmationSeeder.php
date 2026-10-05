@@ -16,11 +16,11 @@ class ConfirmationSeeder extends Seeder
             $steadfast = DB::table('fraud_check_providers')->where('system_key', 'steadfast')->value('id');
             $rules = [
                 ['Blocked customer', 10, 'manual_review', [['customer_is_blocked', null, '=', 'true']]],
-                ['Fully prepaid', 20, 'record_verified_and_confirmed', [['advance_paid_percent', null, '>=', '100']]],
+                ['Fully prepaid', 20, 'record_verified', [['advance_paid_percent', null, '>=', '100']]],              // still called: the call can add items
                 ['Trusted repeat customer', 30, 'record_verified_and_confirmed', [['own_delivered_count', null, '>=', '2'], ['own_return_count', null, '=', '0']]],
-                ['Good Steadfast history', 40, 'record_verified', [['provider_success_rate', $steadfast, '>=', '80'], ['provider_total_parcels', $steadfast, '>=', '3']]],
-                ['New customer, small order', 50, 'record_verified', [['is_new_customer', null, '=', 'true'], ['cod_amount', null, '<=', '1500']]],
-                ['New customer, big order', 60, 'hold_for_advance', [['is_new_customer', null, '=', 'true'], ['cod_amount', null, '>', '1500']]],
+                ['Good Steadfast history', 40, 'record_verified', [['provider_success_rate', $steadfast, '>=', '75'], ['provider_total_parcels', $steadfast, '>=', '3']]],
+                ['Weak Steadfast history', 45, 'hold_for_advance', [['provider_success_rate', $steadfast, '<', '75'], ['provider_total_parcels', $steadfast, '>=', '3']]],
+                ['New to Steadfast (fewer than 3 parcels)', 50, 'hold_for_advance', [['provider_total_parcels', $steadfast, '<', '3']]],
                 ['Everything else', 999, 'manual_review', []],
             ];
             foreach ($rules as [$name, $priority, $outcome, $conditions]) {

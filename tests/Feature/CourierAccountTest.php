@@ -50,4 +50,26 @@ class CourierAccountTest extends TestCase
         $this->actingAs($staff)->get('/settings/couriers')->assertForbidden();
         $this->post('/settings/couriers', ['name' => 'x', 'api_key' => 'a', 'secret_key' => 'b'])->assertForbidden();
     }
+
+    public function test_a_webhook_token_typed_in_settings_is_accepted_and_refused_calls_are_shown(): void
+    {
+        config(['courier.steadfast.webhook_token' => '']);
+        $this->actingAs($this->owner());
+        $this->post('/settings/couriers', ['name' => 'Main', 'api_key' => 'APIKEY-1234567890', 'secret_key' => 'SECRET-abcdefghij', 'webhook_token' => 'hook-Token_123=']);
+
+        // Wrong token: refused, and the page warns about it.
+        $this->withToken('wrong')->postJson('/webhooks/steadfast', ['notification_type' => 'iqs_test'])->assertStatus(401);
+        $this->get('/settings/couriers')->assertSee('the token did not match');
+
+        // The saved token works; the test ping stores nothing.
+        $this->travel(1)->minutes();
+        $this->withToken('hook-Token_123=')->postJson('/webhooks/steadfast', ['notification_type' => 'iqs_test'])->assertOk();
+        $this->assertSame(0, DB::table('courier_events')->count());
+        $this->get('/settings/couriers')->assertDontSee('the token did not match')->assertDontSee('hook-Token_123=');
+
+        // The button calls the own URL with the saved token.
+        Http::fake(['*' => Http::response(['status' => 'test ok'])]);
+        $this->post('/settings/couriers/'.CourierAccount::firstOrFail()->id.'/test-webhook')->assertSessionHas('success');
+        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer hook-Token_123=') && str_ends_with($r->url(), '/webhooks/steadfast'));
+    }
 }

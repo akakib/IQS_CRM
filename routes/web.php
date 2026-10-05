@@ -286,6 +286,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/settings/couriers', [\App\Http\Controllers\CourierAccountController::class, 'store'])->name('settings.couriers.store');
         Route::put('/settings/couriers/{account}', [\App\Http\Controllers\CourierAccountController::class, 'update'])->whereNumber('account')->name('settings.couriers.update');
         Route::post('/settings/couriers/{account}/check', [\App\Http\Controllers\CourierAccountController::class, 'check'])->whereNumber('account')->name('settings.couriers.check');
+        Route::post('/settings/couriers/{account}/test-webhook', [\App\Http\Controllers\CourierAccountController::class, 'testWebhook'])->whereNumber('account')->name('settings.couriers.test-webhook');
         Route::post('/settings/integrations/inbox/{inbox}/retry', [IntegrationController::class, 'retry'])->whereNumber('inbox')->name('settings.integrations.retry');
 
         Route::resource('roles', RoleController::class)->except(['index', 'show']);

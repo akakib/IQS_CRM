@@ -19,6 +19,7 @@ const PICK_KEY = 'iqs_voice_choice'; // renamed once so earlier test picks fall 
 
 export default function voiceAlerts({ url, name, interval = 30000 }) {
     return {
+        name,
         on: true,
         menu: false,
         waiting: false, // an alert is held back until the next click

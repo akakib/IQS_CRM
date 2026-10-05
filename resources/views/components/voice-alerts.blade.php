@@ -47,6 +47,22 @@
                 </template>
                 <p x-show="!voices.length" class="px-2 py-3 text-sm text-gray-500">{{ __('This browser has no voice. Try Chrome or Edge.') }}</p>
             </div>
+            {{-- TEMP (voice testing, remove after the owner has listened): every alert on demand, no waiting. --}}
+            <div class="border-t border-gray-100 px-3 pt-3">
+                <p class="mb-2 text-xs font-medium uppercase text-amber-700">{{ __('Try each alert (temporary)') }}</p>
+                <div class="grid grid-cols-1 gap-1.5">
+                    @foreach ([
+                        __('New order, timer started') => ':n, new order. Your time has started.',
+                        __('Two minutes left') => ':n, two minutes left on current order.',
+                        __('Order given, not opened') => ':n, you have a new order.',
+                        __('Call again') => ':n, time to call a customer again.',
+                        __('Orders waiting') => ':n, new orders are waiting.',
+                    ] as $label => $line)
+                        <button type="button" @click="window.speechSynthesis?.cancel(); say(@js($line).replace(':n', name), true)"
+                            class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-left text-xs text-amber-900 hover:bg-amber-100">{{ $label }}</button>
+                    @endforeach
+                </div>
+            </div>
             <div class="border-t border-gray-100 p-3">
                 <button type="button" @click="test()" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Test the voice') }}</button>
             </div>

@@ -9,7 +9,8 @@
     <x-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-gray-50 font-sans text-gray-900 antialiased">
+{{-- x-data: popups teleported to the body (e.g. Edit order) need an Alpine root here too. --}}
+<body class="bg-gray-50 font-sans text-gray-900 antialiased" x-data>
     <main class="p-4 sm:p-6">{{ $slot }}</main>
     <x-toaster />
 </body>

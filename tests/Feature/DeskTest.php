@@ -442,7 +442,9 @@ class DeskTest extends TestCase
         $this->actingAs($boss);
 
         $this->get("/desk?embed=1&order={$a->id}")->assertOk()->assertSee($a->order_no)->assertSee('Give to someone else')->assertSee('Rima')
-            ->assertDontSee('Take next');
+            ->assertDontSee('Take next')
+            ->assertSee('antialiased" x-data>', false)  // the popup page has an Alpine root, so its Edit popup can open
+            ->assertSee('/orders/'.$a->id.'/edit?embed=1', false);
 
         // An action from the popup comes back to the same order in the popup.
         $this->post("/desk/{$a->id}/act", ['action' => 'verify', 'lock_version' => $a->fresh()->lock_version, 'embed' => 1])

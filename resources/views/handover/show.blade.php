@@ -86,7 +86,7 @@
                         <button type="button" @click="toggleAll()" class="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" x-text="allPicked ? @js(__('Clear')) : @js(__('Select all'))"></button>
                     </div>
 
-                    <div class="space-y-2 pb-24">
+                    <div class="space-y-2 pb-6">
                         @foreach ($missing as $m)
                             <label x-show="shown({ no: @js($m->order_no), cn: @js((string) $m->consignment_id) })"
                                 class="flex cursor-pointer items-center gap-4 rounded-xl border bg-white p-4"
@@ -96,16 +96,24 @@
                                     <span class="block font-mono text-base font-bold text-gray-900">{{ $m->order_no }}</span>
                                     <span class="block text-xs text-gray-500">{{ __('CN :cn', ['cn' => $m->consignment_id ?: '-']) }} · {{ $m->ship_district ?: $m->ship_thana ?: '-' }} · {{ trans_choice(':count item|:count items', $m->items) }}</span>
                                 </span>
+                                {{-- One parcel at a time: no need to tick and scroll to the bottom. --}}
+                                <button type="button"
+                                    @click.prevent.stop="$dispatch('open-confirm', { id: 'manual-handover-confirm', form: 'hand-one-{{ $m->id }}', label: @js($m->order_no), verb: @js(__('Hand over')), message: @js(__('Confirm the rider has this parcel in hand. It will be recorded as handed over by hand.')), danger: false })"
+                                    class="shrink-0 rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-primary hover:text-white">{{ __('Hand over') }}</button>
                             </label>
                         @endforeach
                     </div>
                 </form>
+                {{-- One small form per parcel for its own Hand over button (forms cannot sit inside the form above). --}}
+                @foreach ($missing as $m)
+                    <form id="hand-one-{{ $m->id }}" method="POST" action="{{ route('handover.manual', $session->id) }}" class="hidden">@csrf<input type="hidden" name="order_ids[]" value="{{ $m->id }}"></form>
+                @endforeach
 
                 <div class="sticky bottom-0 z-10 -mx-4 border-t border-gray-200 bg-white p-3 md:mx-0 md:rounded-xl md:border">
                     <button type="button" :disabled="picked.length === 0"
                         @click="$dispatch('open-confirm', { id: 'manual-handover-confirm', form: 'manual-handover', label: picked.length + ' ' + @js(__('parcels')), verb: @js(__('Hand over')), message: @js(__('Confirm the rider has these parcels in hand. They will be recorded as handed over by hand.')), danger: false })"
                         class="w-full rounded-xl bg-primary px-4 py-3.5 text-base font-semibold text-white hover:bg-primary-dark disabled:opacity-40"
-                        x-text="picked.length ? @js(__('Hand over selected')) + ' (' + picked.length + ')' : @js(__('Tick the parcels the rider took'))"></button>
+                        x-text="picked.length ? @js(__('Hand over selected')) + ' (' + picked.length + ')' : @js(__('Tick several to hand them over together'))"></button>
                 </div>
                 <x-confirm-modal id="manual-handover-confirm" :verb="__('Hand over')" :danger="false" />
             @endif

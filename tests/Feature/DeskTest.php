@@ -885,8 +885,8 @@ class DeskTest extends TestCase
         DB::enableQueryLog();
         $this->get('/desk')->assertOk()->assertSee('Take next')->assertSee('Record OK, call next');
         // user + permissions (2), counts, list, waiting, reasons, order, customer, items, notes, duplicates
-        // + expired-timer check (2), extra-time count (1) and the due-booking check (1)
-        $this->assertLessThanOrEqual(16, count(DB::getQueryLog()));
+        // + expired-timer check (2), extra-time count (1), the due-booking check (1) and the Steadfast snapshot (1)
+        $this->assertLessThanOrEqual(17, count(DB::getQueryLog()));
         DB::disableQueryLog();
 
         $this->get('/desk/control')->assertForbidden();

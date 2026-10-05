@@ -184,7 +184,8 @@
                     <p class="text-xs text-gray-500">{{ $verification->rule ?? __('no rule matched') }} · {{ \Illuminate\Support\Carbon::parse($verification->created_at)->diffForHumans() }}</p>
                     <dl class="mt-2 space-y-0.5 text-xs">
                         @foreach (($in['providers'] ?? []) as $p)
-                            <div class="flex justify-between"><dt class="text-gray-500">{{ ucfirst($p['key']) }}</dt><dd>{{ $p['success_rate'] === null ? __('no history') : $p['success_rate'].'%' }} · {{ $p['total_parcels'] }} {{ __('parcels') }}</dd></div>
+                            <div class="flex justify-between"><dt class="text-gray-500">{{ ucfirst($p['key']) }}</dt><dd>{{ $p['success_rate'] === null ? __('no history') : __(':p% delivered', ['p' => $p['success_rate'] + 0]) }} · {{ $p['total_parcels'] }} {{ __('parcels') }}</dd></div>
+                            <x-steadfast-detail :detail="$p['detail'] ?? null" class="mb-1 justify-end" />
                         @endforeach
                         <div class="flex justify-between"><dt class="text-gray-500">{{ __('New customer') }}</dt><dd>{{ ($in['is_new_customer'] ?? false) ? __('yes') : __('no') }}</dd></div>
                         <div class="flex justify-between"><dt class="text-gray-500">{{ __('Advance') }}</dt><dd>{{ $in['advance_paid_percent'] ?? 0 }}%</dd></div>

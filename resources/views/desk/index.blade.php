@@ -293,6 +293,10 @@
                                     <p class="text-base font-semibold text-gray-900">{{ __('New customer') }}</p>
                                     <p class="mt-1 text-xs text-gray-500">{{ __('First order with us') }}</p>
                                 @endif
+                                @if ($s = $detail['steadfast'])
+                                    <p class="mt-2 text-xs font-medium text-gray-700">{{ __('Steadfast') }}: {{ $s['success_rate'] === null ? __('no history') : __(':p% delivered', ['p' => $s['success_rate'] + 0]) }} · {{ $s['total_parcels'] }} {{ __('parcels') }}</p>
+                                    <x-steadfast-detail :detail="$s['detail'] ?? null" />
+                                @endif
                             </div>
                             <div class="rounded-lg border border-gray-200 p-4">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Duplicate check') }}</p>

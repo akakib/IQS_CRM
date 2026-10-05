@@ -340,6 +340,8 @@ class DeskController extends Controller
             'items' => $items,
             'notes' => $notes,
             'duplicates' => $duplicates,
+            // Steadfast history as read when the checks ran (one row, no call to Steadfast here).
+            'steadfast' => collect(json_decode((string) DB::table('verification_runs')->where('order_id', $order->id)->latest('id')->value('inputs_snapshot'), true)['providers'] ?? [])->firstWhere('key', 'steadfast'),
             'heldBy' => $heldBy,
             'heldFrom' => $heldFrom ?? null,
             'openDuplicates' => $duplicates->filter(fn ($d) => ! (OrderStatus::map()[$d->status_id]['final'] ?? false) && OrderStatus::map()[$d->status_id]['key'] !== 'cancelled')->values(),

@@ -122,6 +122,8 @@ class VerificationEngine
                 'key' => $key,
                 'success_rate' => $check->success_rate === null ? null : (float) $check->success_rate,
                 'total_parcels' => (int) $check->total_parcels,
+                // The rest of the score, shown small on the order (cancel/return rates, fraud reports, risk level).
+                'detail' => array_intersect_key((array) $check->raw_response, array_flip(['cancellation_ratio', 'return_ratio', 'volume_range', 'fraud_categories', 'doubtful_reports', 'level', 'score', 'reasons'])),
             ];
         }
         $rates = collect($byProvider)->pluck('success_rate')->filter(fn ($r) => $r !== null);

@@ -118,6 +118,11 @@ class VerificationTest extends TestCase
         \Illuminate\Support\Facades\Http::fake(['*fraud_check/score/*' => \Illuminate\Support\Facades\Http::response(['delivery_ratio' => 81.5, 'cancellation_ratio' => 10, 'return_ratio' => 8.5, 'total_reports' => 20])]);
         $r = (new \App\Services\Courier\SteadfastDriver(['api_key' => 'k', 'secret_key' => 's', 'base_url' => 'https://portal.packzy.com/api/v1']))->fraudCheck('01712345678');
         $this->assertSame(81.5, $r->successRate);
+        $this->assertSame(10, $r->raw['cancellation_ratio']);
+
+        // The rest of the score, small, on the order and the desk.
+        $this->blade('<x-steadfast-detail :detail="$d" />', ['d' => ['cancellation_ratio' => 84, 'return_ratio' => 84, 'fraud_categories' => ['fake_order' => 2], 'doubtful_reports' => true, 'level' => null]])
+            ->assertSee('Cancel 84%')->assertSee('Fake order ×2')->assertSee('Doubtful reports')->assertDontSee('Risk:');
         $this->assertSame(20, $r->totalParcels);
         \Illuminate\Support\Facades\Http::assertSent(fn ($req) => str_ends_with($req->url(), 'fraud_check/score/01712345678') && $req->hasHeader('Api-Key', 'k'));
     }

@@ -7,6 +7,7 @@ use App\Models\OrderStatus;
 use App\Services\Orders\DeskService;
 use App\Services\Orders\OrderService;
 use App\Services\Orders\OrderStateMachine;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -133,6 +134,43 @@ class DeskController extends Controller
             'canTake' => $user->can('orders.take'),
             'reasons' => ['hold' => ($reasons['hold'] ?? collect())->pluck('label_en', 'id')->all(), 'cancel' => ($reasons['cancel'] ?? collect())->pluck('label_en', 'id')->all()],
             'returns' => array_values(array_filter(array_map('intval', explode(',', (string) settings('desk.no_response_returns'))))),
+        ]);
+    }
+
+    /**
+     * Voice alerts ask this every 30 seconds: what this moderator has now.
+     * Also a cron stand-in while someone is at work: the untouched-order timer
+     * for them, and (at most once a minute for everyone) handing out orders
+     * nobody took. Not counted as presence (see TrackPresence).
+     */
+    public function pulse(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->current_break_id) {
+            if (Cache::add('desk:auto-assign', 1, 60)) {
+                $this->desk->autoAssign();
+            }
+            if (! DB::table('orders')->where('moderator_id', $user->id)->whereNotNull('action_due_at')->exists()) {
+                $this->desk->armUntouched($user->id);
+            }
+        }
+
+        $s = fn (string $key) => OrderStatus::idFor($key);
+        $rows = DB::table('orders')->where('moderator_id', $user->id)->where('channel', 'web')
+            ->whereIn('status_id', [$s('new'), $s('record_verified'), $s('no_answer')])
+            ->get(['id', 'order_no', 'status_id', 'next_call_at', 'action_due_at']);
+        $timed = $rows->whereNotNull('action_due_at')->sortBy('action_due_at')->first();
+        $active = $rows->whereIn('status_id', [$s('new'), $s('record_verified')]);
+
+        return response()->json([
+            'on_break' => (bool) $user->current_break_id,
+            'mine' => $active->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no])->values(),
+            'returned' => $rows->where('status_id', $s('no_answer'))->filter(fn ($o) => $o->next_call_at && $o->next_call_at <= now()->toDateTimeString())
+                ->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no])->values(),
+            'timed' => $timed ? ['id' => $timed->id, 'no' => $timed->order_no, 'due' => $timed->action_due_at,
+                'left' => (int) max(0, now()->diffInSeconds(\Illuminate\Support\Carbon::parse($timed->action_due_at), false))] : null,
+            'waiting' => (int) $this->desk->waitingQuery()->count(),
+            'can_take' => $active->count() < (int) settings('desk.active_limit'),
         ]);
     }
 

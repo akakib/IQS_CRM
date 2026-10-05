@@ -364,6 +364,28 @@ class DeskTest extends TestCase
         $this->assertNotNull($a->fresh()->action_due_at);
     }
 
+    public function test_voice_pulse_reports_what_the_moderator_has_and_does_not_count_as_presence(): void
+    {
+        [$a, $b] = [$this->web(), $this->web()];
+        $this->actingAs($this->mahim)->post('/desk/next');
+        $this->mahim->forceFill(['last_seen_at' => now()->subMinutes(30)])->save();
+
+        $this->getJson('/desk/pulse')->assertOk()
+            ->assertJsonPath('on_break', false)
+            ->assertJsonPath('mine.0.no', $a->order_no)
+            ->assertJsonPath('timed.id', $a->id)
+            ->assertJsonPath('waiting', 1)
+            ->assertJsonPath('can_take', true);
+        $this->assertTrue($this->mahim->fresh()->last_seen_at->lt(now()->subMinutes(29))); // an open tab is not "active"
+
+        // Without cron, the pulse hands out an order nobody took (at most once a minute).
+        $this->travel(16)->minutes();
+        $this->get('/desk'); // seen at work
+        \Illuminate\Support\Facades\Cache::forget('desk:auto-assign');
+        $this->getJson('/desk/pulse')->assertOk();
+        $this->assertNotNull($b->fresh()->moderator_id);
+    }
+
     public function test_chat_orders_belong_to_their_creator_without_timer_or_limit(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]);

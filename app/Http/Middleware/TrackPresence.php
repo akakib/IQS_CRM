@@ -12,12 +12,12 @@ use Symfony\Component\HttpFoundation\Response;
  * Two small jobs for every signed-in request:
  *  1. Presence: at most once a minute, note that the person is here
  *     (users.last_seen_at + today's work_days row). The bell's background
- *     poll does not count, so an idle open tab is not "active".
+ *     poll and the voice-alert poll do not count, so an idle open tab is not "active".
  *  2. Break lock: while on a break nothing can be changed except ending it.
  */
 class TrackPresence
 {
-    private const BACKGROUND = ['notifications.count', 'notifications.feed'];
+    private const BACKGROUND = ['notifications.count', 'notifications.feed', 'desk.pulse'];
 
     private const ALLOWED_ON_BREAK = ['breaks.end', 'logout'];
 

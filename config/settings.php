@@ -33,6 +33,7 @@ return [
     'desk.auto_assign_minutes' => ['int', 15, 'Give an order nobody took to the least busy active moderator after (minutes)', 'Order desk', ['required', 'integer', 'min:1', 'max:1440']],
     'desk.active_window_minutes' => ['int', 10, 'A moderator counts as active when they used the system in the last (minutes)', 'Order desk', ['required', 'integer', 'min:1', 'max:120']],
     'desk.no_response_returns' => ['string', '30,300,1440', 'No response: minutes until the order comes back, one per try (after the last one it is cancelled)', 'Order desk', ['required', 'regex:/^\d+(,\d+){0,5}$/']],
+    'desk.voice_alerts' => ['bool', true, 'Spoken alerts for moderators: new order, timer started, call again, two minutes left (each person can mute)', 'Order desk', ['boolean']],
     'desk.sms_after_no_response' => ['bool', false, 'After the first No response, message the customer to call back (needs an SMS gateway)', 'Order desk', ['boolean']],
     'work.start' => ['string', '09:00', 'Office opens (HH:MM)', 'Working hours', ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/']],
     'work.end' => ['string', '22:00', 'Office closes (HH:MM)', 'Working hours', ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/']],

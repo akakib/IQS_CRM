@@ -407,6 +407,7 @@
     </div>
 </div>
 
+<script>window.iqsOpenOrder = {{ ($order ?? null)?->id ?? 'null' }};</script>
 {{-- Edit popup: the full edit form in a large window over this page. It closes
      only with its Close button (a stray click outside must not lose typing).
      After a save the form tells this page, which reloads on the same order. --}}

@@ -189,7 +189,7 @@ function voiceLabel(v) {
 }
 
 // Known male Indian voices: Edge (Prabhat, Madhur, Aarav, Kunal, Rehaan), Windows (Ravi, Hemant), iPhone (Rishi).
-const MALE = /(Prabhat|Madhur|Aarav|Kunal|Rehaan|Ravi|Hemant|Rishi)/i;
+const MALE = /\b(Prabhat|Madhur|Aarav|Kunal|Rehaan|Ravi|Hemant|Rishi)\b/i;
 
 // The voice picked in this browser; otherwise an Indian accent: an English (India)
 // voice, else a Hindi one (it reads English sentences with an Indian accent; Chrome on

@@ -29,5 +29,6 @@ return [
     'kpi.weight_speed' => ['int', 20, 'KPI weight: speed (%)', 'KPI', ['required', 'integer', 'min:0', 'max:100']],
     'kpi.weight_quality' => ['int', 40, 'KPI weight: quality, delivered rate (%)', 'KPI', ['required', 'integer', 'min:0', 'max:100']],
     'analysis.cod_fee_percent' => ['decimal', 1, 'Courier COD fee on cash collected (%)', 'Reports', ['required', 'numeric', 'min:0', 'max:10']],
+    'marketing.fallback_rate' => ['decimal', 125, 'BDT per USD for ad spend not covered by any dollar lot', 'Reports', ['required', 'numeric', 'min:1', 'max:1000']],
     'reports.owner_summary_time' => ['string', '22:00', 'Time of the nightly owner summary on Telegram (HH:MM)', 'Reports', ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/']],
 ];

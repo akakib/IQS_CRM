@@ -22,6 +22,7 @@ return [
     'meta' => [
         'pixel_id' => env('META_PIXEL_ID'),
         'capi_token' => env('META_CAPI_TOKEN'),
+        'ads_token' => env('META_ADS_TOKEN'), // Marketing API (ads_read); empty = fake spend
     ],
 
     // Shop-team bot. Empty token = fake mode (messages are only logged).

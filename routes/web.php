@@ -19,6 +19,8 @@ use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\Webhooks\SteadfastWebhookController;
 use App\Http\Controllers\Webhooks\WooCommerceWebhookController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\MarketingController;
+use App\Http\Controllers\UsdLotController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationRuleController;
 use App\Http\Controllers\PointsController;
@@ -210,6 +212,20 @@ Route::middleware('auth')->group(function () {
             ->get(['id', 'name', 'email'])->map(fn ($u) => ['value' => $u->id, 'label' => $u->name, 'sub' => $u->email]))
             ->name('dev.search-demo');
     }
+
+    // Marketing: ad spend, ROAS and dollar lots.
+    Route::get('/marketing', [MarketingController::class, 'index'])->middleware('can:marketing.view')->name('marketing.index');
+    Route::get('/usd-lots', [UsdLotController::class, 'index'])->middleware('can:marketing.view')->name('usd-lots.index');
+    Route::middleware('can:marketing.create')->group(function () {
+        Route::post('/marketing/accounts', [MarketingController::class, 'storeAccount'])->name('marketing.accounts.store');
+        Route::post('/marketing/accounts/{account}/toggle', [MarketingController::class, 'toggleAccount'])->whereNumber('account')->name('marketing.accounts.toggle');
+        Route::post('/marketing/spend', [MarketingController::class, 'storeSpend'])->name('marketing.spend.store');
+        Route::post('/marketing/import', [MarketingController::class, 'import'])->name('marketing.import');
+        Route::post('/marketing/pull', [MarketingController::class, 'pull'])->name('marketing.pull');
+        Route::post('/usd-lots', [UsdLotController::class, 'storeLot'])->name('usd-lots.store');
+        Route::post('/usd-lots/vendors', [UsdLotController::class, 'storeVendor'])->name('usd-lots.vendors.store');
+        Route::post('/usd-lots/payments', [UsdLotController::class, 'storePayment'])->name('usd-lots.payments.store');
+    });
 
     // Points: everyone sees their own; managing rules and reviews needs points.manage.
     Route::get('/points', [PointsController::class, 'mine'])->name('points.mine');

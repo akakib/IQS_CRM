@@ -36,3 +36,9 @@ Schedule::command('permissions:prune-expired')->hourly();
 // Owner's nightly numbers on Telegram, at the time set in Settings.
 Schedule::command('reports:owner-summary')->everyMinute()
     ->when(fn () => now()->format('H:i') === (string) settings('reports.owner_summary_time'));
+
+// Ad spend (last 3 days re-pulled) and FIFO dollar cost.
+Schedule::command('ads:pull-spend')->everyThreeHours()->withoutOverlapping(30);
+
+// Dollar vendor balances due by tomorrow.
+Schedule::command('vendors:due-reminders')->dailyAt('10:00');

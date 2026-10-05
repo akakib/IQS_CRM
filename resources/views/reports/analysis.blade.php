@@ -12,7 +12,7 @@
 @endphp
 
 <x-layouts.app :heading="__('Order P&L')">
-    <p class="mb-4 text-sm text-gray-500">{{ __('Orders that ended (delivered, partial or returned) in the period. Ad cost is not included yet.') }}</p>
+    <p class="mb-4 text-sm text-gray-500">{{ __('Orders that ended (delivered, partial or returned) in the period. Ad cost: the ad cost of the day an order was placed, shared equally over the orders of that day (real taka from the dollar lots).') }}</p>
 
     <form method="GET" action="{{ route('analysis.index') }}" x-ref="f" @select-change="setTimeout(() => $refs.f.requestSubmit(), 0)"
         class="mb-4 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 md:flex-row md:flex-wrap md:items-center">
@@ -34,9 +34,11 @@
             <x-stat-tile :label="__('Product cost')" :value="$tk($totals['cogs'])" />
         @endif
         <x-stat-tile :label="__('Delivery, COD fee, packaging')" :value="$tk($totals['delivery'] + $totals['cod_fee'] + $totals['packaging'])" />
+        <x-stat-tile :label="__('Ad cost')" :value="$tk($totals['ad_cost'])" />
         @if ($seeProfit)
-            <x-stat-tile :label="__('Profit before ads')" :value="$tk($totals['profit'])" :trend="$totals['profit'] >= 0 ? 'up' : 'down'"
-                :hint="$totals['revenue'] > 0 ? __(':p% of revenue', ['p' => round(100 * $totals['profit'] / $totals['revenue'], 1)]) : null" />
+            <x-stat-tile :label="__('Profit before ads')" :value="$tk($totals['profit_before_ads'])" :trend="$totals['profit_before_ads'] >= 0 ? 'up' : 'down'" />
+            <x-stat-tile :label="__('Profit after ads')" :value="$tk($totals['profit'])" :trend="$totals['profit'] >= 0 ? 'up' : 'down'"
+                :hint="$totals['revenue'] > 0 ? __('Margin :p%', ['p' => round(100 * $totals['profit'] / $totals['revenue'], 1)]) : null" />
         @endif
     </div>
 
@@ -51,8 +53,8 @@
                 @if ($lineLevel)<th class="text-right">{{ __('Qty') }}</th>@endif
                 <th class="text-right">{{ __('Revenue') }}</th>
                 @if ($seeCost)<th class="text-right">{{ __('Product cost') }}</th>@endif
-                @unless ($lineLevel)<th class="text-right">{{ __('Delivery + COD + pack') }}</th>@endunless
-                @if ($seeProfit)<th class="text-right">{{ $lineLevel ? __('Gross profit') : __('Profit') }}</th>@endif
+                @unless ($lineLevel)<th class="text-right">{{ __('Delivery + COD + pack') }}</th><th class="text-right">{{ __('Ad cost') }}</th>@endunless
+                @if ($seeProfit)<th class="text-right">{{ $lineLevel ? __('Gross profit') : __('Profit after ads') }}</th>@endif
             </x-slot:head>
             @foreach ($rows as $r)
                 <tr class="border-t border-gray-100 [&_td]:px-4 [&_td]:py-3">
@@ -61,7 +63,7 @@
                     @if ($lineLevel)<td class="text-right tabular-nums">{{ rtrim(rtrim(number_format((float) $r->qty, 3), '0'), '.') }}</td>@endif
                     <td class="text-right tabular-nums">{{ $tk($r->revenue) }}</td>
                     @if ($seeCost)<td class="text-right tabular-nums">{{ $tk($r->cogs) }}</td>@endif
-                    @unless ($lineLevel)<td class="text-right tabular-nums">{{ $tk($r->delivery + $r->cod_fee + $r->packaging) }}</td>@endunless
+                    @unless ($lineLevel)<td class="text-right tabular-nums">{{ $tk($r->delivery + $r->cod_fee + $r->packaging) }}</td><td class="text-right tabular-nums">{{ $tk($r->ad_cost) }}</td>@endunless
                     @if ($seeProfit)<td @class(['text-right font-semibold tabular-nums', 'text-green-800' => $r->profit >= 0, 'text-red-700' => $r->profit < 0])>{{ $tk($r->profit) }}</td>@endif
                 </tr>
             @endforeach

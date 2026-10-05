@@ -8,13 +8,14 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Order P&L for orders that reached delivered / partial / returned in a date
- * range. Ad cost is not included here (Step 6 adds it on top).
+ * range.
  *
  *   revenue   delivered: money collected + verified advance; returned: verified advance kept
  *   cogs      cost snapshot frozen at confirmation (partial: scaled by what was collected)
  *   delivery  courier charge on the shipment (estimate: the order's delivery charge)
  *   cod_fee   courier COD fee % on the cash collected
  *   packaging per shipped order (setting)
+ *   ad_cost   the order's share of its placing day's ad cost (ad_cost_days, FIFO taka)
  */
 class OrderProfit
 {
@@ -41,6 +42,7 @@ class OrderProfit
         return DB::table('orders as o')
             ->joinSub($finals, 'f', 'f.order_id', '=', 'o.id')
             ->leftJoin('shipments as s', 's.id', '=', 'o.active_shipment_id')
+            ->leftJoin('ad_cost_days as ad', fn ($j) => $j->on(DB::raw('DATE(o.created_at)'), '=', 'ad.day'))
             ->whereIn('o.status_id', $settled)
             ->when($channel, fn ($q) => $q->where('o.channel', $channel))
             ->selectRaw("o.id, o.order_no, o.channel, o.owner_id, f.final_at,
@@ -49,24 +51,26 @@ class OrderProfit
                 CASE WHEN $isDelivered THEN $cogs * (CASE WHEN $share < 1 THEN $share ELSE 1 END) ELSE 0 END as cogs,
                 COALESCE(s.delivery_charge, o.delivery_charge) as delivery,
                 CASE WHEN $isDelivered THEN $collected * $pct ELSE 0 END as cod_fee,
-                $packaging as packaging");
+                $packaging as packaging,
+                CASE WHEN o.channel = 'b2b' THEN 0 ELSE COALESCE(ad.per_order, 0) END as ad_cost");
     }
 
-    /** @return array{revenue: float, cogs: float, delivery: float, cod_fee: float, packaging: float, profit: float, orders: int, delivered: int} */
+    /** @return array{revenue: float, cogs: float, delivery: float, cod_fee: float, packaging: float, ad_cost: float, profit_before_ads: float, profit: float, orders: int, delivered: int} */
     public function totals(string $from, string $to, ?string $channel = null): array
     {
         $t = DB::query()->fromSub($this->orders($from, $to, $channel), 'x')
-            ->selectRaw('COUNT(*) as orders, SUM(delivered) as delivered, SUM(revenue) as revenue, SUM(cogs) as cogs, SUM(delivery) as delivery, SUM(cod_fee) as cod_fee, SUM(packaging) as packaging')
+            ->selectRaw('COUNT(*) as orders, SUM(delivered) as delivered, SUM(revenue) as revenue, SUM(cogs) as cogs, SUM(delivery) as delivery, SUM(cod_fee) as cod_fee, SUM(packaging) as packaging, SUM(ad_cost) as ad_cost')
             ->first();
         $r = array_map(fn ($v) => (float) $v, (array) $t);
-        $r['profit'] = $r['revenue'] - $r['cogs'] - $r['delivery'] - $r['cod_fee'] - $r['packaging'];
+        $r['profit_before_ads'] = $r['revenue'] - $r['cogs'] - $r['delivery'] - $r['cod_fee'] - $r['packaging'];
+        $r['profit'] = $r['profit_before_ads'] - $r['ad_cost'];
         $r['orders'] = (int) $r['orders'];
         $r['delivered'] = (int) $r['delivered'];
 
         return $r;
     }
 
-    /** Grouped rows, paginated. Product/category rows are line level: revenue, cogs and gross profit only. */
+    /** Grouped rows, paginated. Product/category rows are line level: revenue, cogs and gross profit only (no ads). */
     public function grouped(string $group, string $from, string $to, ?string $channel, int $perPage)
     {
         if (in_array($group, ['product', 'category'], true)) {
@@ -91,8 +95,8 @@ class OrderProfit
         return DB::query()->fromSub($this->orders($from, $to, $channel), 'x')
             ->groupByRaw($key)
             ->selectRaw("$key as g, COUNT(*) as orders, SUM(delivered) as delivered, SUM(revenue) as revenue, SUM(cogs) as cogs,
-                SUM(delivery) as delivery, SUM(cod_fee) as cod_fee, SUM(packaging) as packaging,
-                SUM(revenue) - SUM(cogs) - SUM(delivery) - SUM(cod_fee) - SUM(packaging) as profit")
+                SUM(delivery) as delivery, SUM(cod_fee) as cod_fee, SUM(packaging) as packaging, SUM(ad_cost) as ad_cost,
+                SUM(revenue) - SUM(cogs) - SUM(delivery) - SUM(cod_fee) - SUM(packaging) - SUM(ad_cost) as profit")
             ->orderByRaw($group === 'day' ? 'g DESC' : 'revenue DESC')->paginate($perPage)->withQueryString();
     }
 }

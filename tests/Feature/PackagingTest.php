@@ -138,6 +138,32 @@ class PackagingTest extends TestCase
         $this->assertSame('edited', $order->fresh()->packMark());
     }
 
+    public function test_a_cod_change_after_booking_blocks_handover_until_someone_confirms_it_was_updated_by_hand(): void
+    {
+        $order = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 2]]);
+        $this->actingAs($this->packer);
+        $this->packIt($order);
+        $reason = DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'customer_request')->value('id');
+
+        // More items: the cash to collect goes up after the courier was booked.
+        app(OrderEditor::class)->request($order->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 3]]], $reason, $this->desk, $order->fresh()->lock_version);
+        $this->assertNotNull(app(\App\Services\Orders\OrderService::class)->pendingCodUpdate($order->fresh()));
+        $this->assertDatabaseHas('app_notifications', ['title' => 'Update the COD of '.$order->order_no.' at the courier']);
+        $this->packIt($order->fresh(), $this->label($order->fresh())); // repacked with the new label
+
+        $this->post('/handover', ['rider_name' => 'Rafiq']);
+        $session = DB::table('handover_sessions')->value('id');
+        $this->postJson("/handover/{$session}/scan", ['code' => $this->label($order->fresh())])
+            ->assertJson(['ok' => false, 'result' => 'blocked'])->assertJsonFragment(['message' => 'COD changed to ৳1,800 but not updated at the courier yet. Keep the parcel; ask the moderator or admin to update it, then scan again.']);
+
+        // Someone changed it in the courier panel and says so: the parcel can go.
+        $this->actingAs($this->desk)->get("/orders/{$order->id}")->assertSee('Update the COD at');
+        $this->post("/orders/{$order->id}/cod-updated")->assertSessionHas('success');
+        $this->assertNull(app(\App\Services\Orders\OrderService::class)->pendingCodUpdate($order->fresh()));
+        $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'courier', 'user_id' => $this->desk->id]);
+        $this->actingAs($this->packer)->postJson("/handover/{$session}/scan", ['code' => $this->label($order->fresh())])->assertJson(['ok' => true]);
+    }
+
     public function test_handover_catches_duplicates_lists_missing_and_writes_the_manifest(): void
     {
         $a = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);

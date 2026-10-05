@@ -152,6 +152,41 @@ class OrderService
         });
     }
 
+    /**
+     * The COD changed after booking and the courier still has the old amount.
+     *
+     * @return array{courier: string, cn: ?string, booked: float, now: float}|null
+     */
+    public function pendingCodUpdate(Order $order): ?array
+    {
+        if (! DB::table('order_amendments')->where('order_id', $order->id)->where('courier_action', 'update_cod')->whereNull('courier_action_done_at')->exists()) {
+            return null;
+        }
+        $shipment = DB::table('shipments')->where('id', $order->active_shipment_id)->first(['courier', 'consignment_id', 'cod_amount']);
+
+        return [
+            'courier' => ucfirst((string) ($shipment->courier ?? 'courier')),
+            'cn' => $shipment->consignment_id ?? null,
+            'booked' => (float) ($shipment->cod_amount ?? 0),
+            'now' => (float) $order->cod_amount,
+        ];
+    }
+
+    /** Someone changed the COD in the courier's panel by hand: unblock the handover and keep a record. */
+    public function markCodUpdated(Order $order, User $by): void
+    {
+        $pending = $this->pendingCodUpdate($order);
+        if (! $pending) {
+            return;
+        }
+        DB::table('order_amendments')->where('order_id', $order->id)->where('courier_action', 'update_cod')->whereNull('courier_action_done_at')
+            ->update(['courier_action_done_at' => now(), 'updated_at' => now()]);
+        DB::table('shipments')->where('id', $order->active_shipment_id)->update(['cod_amount' => $order->cod_amount, 'updated_at' => now()]);
+        $this->note($order, 'courier', __('COD updated at :c by hand: ৳:a → ৳:b (confirmed by :n).', [
+            'c' => $pending['courier'], 'a' => number_format($pending['booked']), 'b' => number_format($pending['now']), 'n' => $by->name,
+        ]), $by);
+    }
+
     public function note(Order $order, string $type, string $body, ?User $by, array $meta = []): void
     {
         DB::table('order_notes')->insert([

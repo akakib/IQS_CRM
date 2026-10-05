@@ -143,7 +143,8 @@ class OrderEditor
 
         $courierAction = 'none';
         if ($order->active_shipment_id) {
-            $courierAction = $a->edit_class === 'content' || abs($oldCod - (float) $order->cod_amount) > 0.001 ? 'update_cod' : 'reprint_label';
+            // Only a real change of the cash to collect has to be updated at the courier (by hand); the label is re-issued either way.
+            $courierAction = abs($oldCod - (float) $order->cod_amount) > 0.001 ? 'update_cod' : ($a->edit_class === 'label' ? 'reprint_label' : 'none');
         }
         DB::table('order_amendments')->where('id', $amendmentId)->update([
             'to_version' => $version, 'applied_at' => now(), 'courier_action' => $courierAction, 'updated_at' => now(),
@@ -166,6 +167,13 @@ class OrderEditor
 
         if ((float) $order->refund_due > 0) {
             $this->orders->note($order, 'payment', __('Advance is more than the new total: refund ৳:r due.', ['r' => $order->refund_due]), null);
+        }
+        if ($courierAction === 'update_cod') {
+            $this->notifications->send('cod_update_needed', __('Update the COD of :no at the courier', ['no' => $order->order_no]),
+                __('৳:a → ৳:b. Change it in the courier panel, then press "COD updated" on the order.', ['a' => number_format($oldCod), 'b' => number_format((float) $order->cod_amount)]), [
+                    'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+                    'user_ids' => array_values(array_unique(array_filter([$order->moderator_id, $by->id, ...app(\App\Services\Orders\DeskService::class)->managerIds()]))),
+                ]);
         }
         if ($wasPacked && $a->edit_class === 'content') {
             $this->notifications->send('order_needs_repack', __(':no edited after packaging: repack', ['no' => $order->order_no]), $this->describe(json_decode($a->changes, true)), [

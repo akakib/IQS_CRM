@@ -216,6 +216,7 @@
                     @include('desk._reassign', ['order' => $order, 'reassign' => $reassign])
                 @endif
                 <x-order-presence :order="$order" mode="view" />
+                <x-cod-update :order="$order" />
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">

@@ -164,7 +164,7 @@ class ScanService
         }
         $pendingCod = DB::table('order_amendments')->where('order_id', $order->id)->where('courier_action', 'update_cod')->whereNull('courier_action_done_at')->exists();
         if ($pendingCod) {
-            return $this->log('handover', $sessionId, $code, $order, $label, $this->fail('blocked', __('COD not yet updated at Steadfast. Do not hand over.')), $by);
+            return $this->log('handover', $sessionId, $code, $order, $label, $this->fail('blocked', __('COD changed to ৳:b but not updated at the courier yet. Keep the parcel; ask the moderator or admin to update it, then scan again.', ['b' => number_format((float) $order->cod_amount)])), $by);
         }
 
         if ($key === 'packed') {

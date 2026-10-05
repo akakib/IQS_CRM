@@ -186,6 +186,15 @@ class OrderController extends Controller
         return back()->with('success', __('Order :no is now :s.', ['no' => $order->order_no, 's' => OrderStatus::map()[$order->status_id]['name']]));
     }
 
+    /** The COD was changed by hand in the courier's panel. */
+    public function codUpdated(Order $order, Request $request): RedirectResponse
+    {
+        $this->authorizeWork($order, $request->user());
+        $this->orders->markCodUpdated($order, $request->user());
+
+        return back()->with('success', __('COD confirmed at the courier. :no can be handed over.', ['no' => $order->order_no]));
+    }
+
     /** Screens with this order open check in here every few seconds (who else is on it, who is editing). */
     public function presence(Order $order, Request $request, \App\Services\Orders\OrderPresence $presence): JsonResponse
     {

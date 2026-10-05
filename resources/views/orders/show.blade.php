@@ -23,6 +23,8 @@
         </div>
     </div>
 
+    <x-cod-update :order="$order" />
+
     <div class="grid gap-6 xl:grid-cols-3">
         <div class="space-y-6 xl:col-span-2">
             @foreach ($amendments as $a)

@@ -25,6 +25,7 @@ class UserRequest extends FormRequest
             'employment_type' => ['nullable', Rule::enum(EmploymentType::class)],
             'work_location_id' => ['nullable', Rule::exists('locations', 'id')->whereNull('deleted_at')],
             'telegram_user_id' => ['nullable', 'string', 'max:50'],
+            'voice_name' => ['nullable', 'string', 'max:60'],
             // Required when creating; optional on edit (filled = Owner resets it).
             'password' => [$user ? 'nullable' : 'required', 'confirmed', Password::min(8)],
         ];
@@ -43,6 +44,7 @@ class UserRequest extends FormRequest
             'work_location_id' => $this->input('work_location_id') ?: null,
             'phone' => $this->input('phone') ?: null,
             'telegram_user_id' => $this->input('telegram_user_id') ?: null,
+            'voice_name' => trim((string) $this->input('voice_name')) ?: null,
         ]);
     }
 }

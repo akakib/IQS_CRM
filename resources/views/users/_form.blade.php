@@ -7,6 +7,19 @@
         <x-form.input name="phone" :label="__('Phone')" :value="$user->phone" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX" />
         <x-form.input name="telegram_user_id" :label="__('Telegram user ID')" :value="$user->telegram_user_id" maxlength="50" />
 
+        {{-- Voice alerts say this instead of the first name: spell it the way it should sound. --}}
+        <div class="mb-4 md:col-span-2" x-data="{ v: @js(old('voice_name', $user->voice_name ?? '')) }">
+            <label for="voice_name" class="mb-2 block text-sm font-medium text-gray-700">{{ __('Name for voice alerts') }}</label>
+            <div class="flex gap-2">
+                <input id="voice_name" name="voice_name" x-model="v" maxlength="60" placeholder="{{ __('e.g. Pron-toe') }}"
+                    class="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                <button type="button" class="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    @click="window.speechSynthesis && (speechSynthesis.cancel(), speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance((v.trim() || document.getElementById('name').value.trim().split(' ')[0]) + ', you have a new order.'), { lang: 'en-IN', rate: 0.92 })))">{{ __('Hear it') }}</button>
+            </div>
+            <p class="mt-1 text-xs text-gray-500">{{ __('Leave empty to use the first name. If it sounds wrong, spell it the way it sounds and press Hear it.') }}</p>
+            @error('voice_name')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
+
         <div class="mb-4">
             <label class="mb-2 block text-sm font-medium text-gray-700">{{ __('Employment type') }}</label>
             <x-simple-select name="employment_type" :options="['' => __('Not set')] + $employmentOptions" :value="old('employment_type', $user->employment_type?->value ?? '')" full-width class="w-full" />

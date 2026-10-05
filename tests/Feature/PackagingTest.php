@@ -277,7 +277,7 @@ class PackagingTest extends TestCase
 
         $this->actingAs($this->desk)->post('/products/availability', ['ids' => [$this->dates->id], 'status' => 'in_stock']);
 
-        $this->assertSame('confirmed', $this->key($order));
+        $this->assertSame('ready_for_packaging', $this->key($order)); // confirmed again, so the courier is booked right away
         $this->assertDatabaseHas('restock_releases', ['variant_id' => $this->dates->id]);
     }
 

@@ -75,7 +75,7 @@ class DeskController extends Controller
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab')
             : ($toTimed ? ($timed->status_id === $s('new') ? 'verify' : 'call') : (collect(self::TABS)->first(fn ($t) => $counts[$t] > 0) ?? 'call'));
 
-        $this->desk->bookDue(); // anything past its Undo time is booked after this page is sent
+        $this->desk->bookDue(); // a booking whose own request died, or a retry that is due, is sent after this page
         $page = max(1, (int) $request->query('page', 1));
         $rows = DB::table('orders')->leftJoin('users as pk', 'pk.id', '=', 'orders.packer_id')
             ->where('moderator_id', $user->id)->whereRaw($where[$tab][0], $where[$tab][1])
@@ -159,6 +159,7 @@ class DeskController extends Controller
     public function pulse(Request $request): JsonResponse
     {
         $user = $request->user();
+        $this->desk->bookDue(); // every few seconds while anyone works: no booking waits for cron
         if (! $user->current_break_id) {
             if (Cache::add('desk:auto-assign', 1, 60)) {
                 $this->desk->autoAssign();
@@ -263,7 +264,6 @@ class DeskController extends Controller
                 $this->machine->transition($order, 'confirmed', $user);
                 $next = ['tab' => 'call'];
                 $message = __(':no confirmed. Booking the courier.', ['no' => $order->order_no]);
-                session()->flash('undo', ['id' => $order->id, 'no' => $order->order_no, 'until' => now()->addSeconds(DeskService::UNDO_SECONDS)->getTimestamp()]);
                 break;
             case 'no_response':
                 $message = $this->desk->noResponse($order, $user, $note) === 'cancelled'
@@ -290,7 +290,6 @@ class DeskController extends Controller
                 $this->machine->transition($order, 'confirmed', $user, 'user', null, $note);
                 $next = ['tab' => 'hold'];
                 $message = __(':no confirmed. Booking the courier.', ['no' => $order->order_no]);
-                session()->flash('undo', ['id' => $order->id, 'no' => $order->order_no, 'until' => now()->addSeconds(DeskService::UNDO_SECONDS)->getTimestamp()]);
                 break;
             case 'back_to_packaging':
                 $this->machine->transition($order, 'ready_for_packaging', $user, 'user', null, $note);
@@ -302,26 +301,6 @@ class DeskController extends Controller
         }
 
         return redirect()->route('desk.index', $embedded ?? array_filter($next))->with('success', $message);
-    }
-
-    /** Undo a confirm in its first seconds: back to the Call tab, nothing booked. */
-    public function undo(Order $order, Request $request): RedirectResponse
-    {
-        abort_unless($order->moderator_id === $request->user()->id || $request->user()->permissionScope('orders.view') === 'all', 403);
-        if (! $this->desk->undoConfirm($order, $request->user())) {
-            return back()->with('error', __('Too late: :no is already being booked.', ['no' => $order->order_no]));
-        }
-
-        return redirect()->route('desk.index', array_filter(['tab' => 'call', 'order' => $order->id, 'embed' => $request->boolean('embed') ? 1 : null]))
-            ->with('success', __('Confirm undone. :no is back in Call.', ['no' => $order->order_no]));
-    }
-
-    /** The Undo bar ran out: book what is due now. */
-    public function bookDue(): \Illuminate\Http\JsonResponse
-    {
-        $this->desk->bookDue();
-
-        return response()->json(['ok' => true]);
     }
 
     /** "+5 min" on the running timer. */

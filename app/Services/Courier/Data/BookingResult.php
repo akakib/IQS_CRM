@@ -12,5 +12,7 @@ final class BookingResult
         public readonly ?string $status = null,
         public readonly ?string $error = null,
         public readonly array $raw = [],
+        /** On failure: auth (keys refused), rejected (the courier refused this parcel's data), temporary (network, server) */
+        public readonly string $kind = 'temporary',
     ) {}
 }

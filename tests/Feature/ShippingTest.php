@@ -43,6 +43,8 @@ class ShippingTest extends TestCase
         $sm = app(OrderStateMachine::class);
         $sm->transition($order, 'record_verified', null, 'rule');
         $sm->transition($order, 'confirmed', auth()->user());
+        // Confirm books by itself; this page is for the ones whose booking failed.
+        DB::table('orders')->where('id', $order->id)->update(['booking_state' => 'failed']);
 
         return $order->fresh();
     }

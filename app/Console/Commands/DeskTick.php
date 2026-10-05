@@ -27,6 +27,7 @@ class DeskTick extends Command
         $released = $desk->sweepExpired();
         $desk->armUntouchedAll();
         $assigned = $desk->autoAssign();
+        $desk->recoverStale(); // a booking that stopped half way: ask the courier before trying again
         $desk->runBookings();
         $closed = $breaks->autoClose();
         $this->digest($telegram);

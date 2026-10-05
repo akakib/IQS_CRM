@@ -25,6 +25,12 @@ interface CourierDriver
      */
     public function bookBulk(array $requests): array;
 
+    /**
+     * Is a parcel with this invoice (our order number) already at the courier?
+     * true / false, or null when the courier cannot tell (then a person checks).
+     */
+    public function invoiceBooked(string $invoice): ?bool;
+
     /** Current courier status for one of our invoices, or null if unknown. */
     public function statusByInvoice(string $invoice): ?CourierUpdate;
 

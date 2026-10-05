@@ -11,6 +11,7 @@ use App\Services\Points\PointHooks;
 use App\Services\Work\WorkCalendar;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -395,37 +396,54 @@ class DeskService
         return 'no_answer';
     }
 
-    /** Seconds to Undo a confirm before the courier is booked. */
-    public const UNDO_SECONDS = 10;
+    /** Minutes to the next try after a temporary failure (1st, 2nd); the 3rd failure stops. */
+    private const RETRY_MINUTES = [1, 5];
+
+    /** A booking that has not finished after this long probably died half way. */
+    private const STALE_MINUTES = 5;
 
     /**
-     * Undo a confirm while the courier is not booked yet: back to the Call tab.
-     * Only one of Undo and booking can win: the row must still be waiting.
-     */
-    public function undoConfirm(Order $order, User $user): bool
-    {
-        $undone = DB::table('orders')->where('id', $order->id)->where('status_id', OrderStatus::idFor('confirmed'))
-            ->where('booking_state', 'queued')->where('booking_attempts', 0)->where('book_after', '>', now())
-            ->update(['booking_state' => 'none', 'book_after' => null, 'updated_at' => now()]);
-        if (! $undone) {
-            return false;
-        }
-        app(OrderStateMachine::class)->transition($order->fresh(), 'record_verified', $user, 'system', null, __('Confirm undone'));
-
-        return true;
-    }
-
-    /**
-     * Book every confirmed order whose Undo time is over, after the response.
-     * Called by the Undo bar when its time runs out and by the desk and
-     * packaging pages, so booking never waits for cron. Retries stay with cron.
+     * Book what is waiting, after the response: new confirms whose own request
+     * died, retries whose time came, and half-finished bookings to check.
+     * Called by the desk pulse, the desk and packaging pages and cron, so
+     * booking never depends on one browser staying open.
      */
     public function bookDue(): void
     {
-        $due = DB::table('orders')->where('booking_state', 'queued')->where('booking_attempts', 0)
-            ->where('status_id', OrderStatus::idFor('confirmed'))->where('book_after', '<=', now())->exists();
+        $confirmed = OrderStatus::idFor('confirmed');
+        $due = DB::table('orders')->where('booking_state', 'queued')->where('status_id', $confirmed)
+            ->where(fn ($q) => $q->where(fn ($q) => $q->whereNull('booking_claim')->where(fn ($q) => $q->whereNull('book_after')->orWhere('book_after', '<=', now())))
+                ->orWhere('booking_claimed_at', '<', now()->subMinutes(self::STALE_MINUTES)))
+            ->exists();
         if ($due) {
-            app()->terminating(fn () => Cache::lock('desk:book-due', 60)->get(fn () => $this->runBookings(null, null, true)));
+            app()->terminating(fn () => Cache::lock('desk:book-due', 120)->get(function () {
+                $this->recoverStale();
+                $this->runBookings();
+            }));
+        }
+    }
+
+    /**
+     * A booking that started but never finished (the request was killed after
+     * sending): it may or may not be at the courier. Ask the courier by our
+     * order number. Not there: try again. There, or the courier cannot tell:
+     * stop and let a person check, never book a second parcel blindly.
+     */
+    public function recoverStale(): void
+    {
+        $rows = DB::table('orders')->where('booking_state', 'queued')->where('status_id', OrderStatus::idFor('confirmed'))
+            ->where('booking_claimed_at', '<', now()->subMinutes(self::STALE_MINUTES))->limit(10)->get(['id', 'order_no', 'moderator_id', 'booking_claim']);
+        foreach ($rows as $row) {
+            $booked = app(\App\Services\Courier\CourierManager::class)->driver()->invoiceBooked($row->order_no);
+            $release = DB::table('orders')->where('id', $row->id)->where('booking_claim', $row->booking_claim);
+            if ($booked === false) {
+                $release->update(['booking_claim' => null, 'booking_claimed_at' => null, 'book_after' => null, 'updated_at' => now()]);
+
+                continue;
+            }
+            $error = __('The booking stopped half way and :no may already be at the courier. Check it in the courier panel before booking again.', ['no' => $row->order_no]);
+            $release->update(['booking_claim' => null, 'booking_claimed_at' => null, 'booking_state' => 'failed', 'booking_error' => mb_substr($error, 0, 255), 'updated_at' => now()]);
+            $this->failedNotice($row, $error);
         }
     }
 
@@ -437,7 +455,7 @@ class DeskService
         }
         // Only one click wins: the state must still be "not sent" (or "failed" for a retry) at the moment of the update.
         $queued = DB::table('orders')->where('id', $order->id)->whereIn('booking_state', ['none', 'failed'])->update([
-            'booking_state' => 'queued', 'booking_attempts' => 0, 'booking_error' => null, 'book_after' => null,
+            'booking_state' => 'queued', 'booking_attempts' => 0, 'booking_error' => null, 'book_after' => null, 'booking_claim' => null, 'booking_claimed_at' => null,
             'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now(),
         ]);
         if (! $queued) {
@@ -452,42 +470,85 @@ class DeskService
     }
 
     /**
-     * Book queued orders. Three failures: stop and tell the moderator and managers.
+     * Book queued orders. Each order is claimed first (one UPDATE that only
+     * succeeds while nobody else holds it), so two requests running at the same
+     * moment can never send the same order twice.
      *
-     * @param  list<int>|null  $orderIds  null = every queued order (cron retry)
+     * Failures: keys refused = wait, one alert, no order is blamed; the courier
+     * refused the parcel's data = Booking failed at once (retrying cannot help);
+     * anything else = try again after 1 and 5 minutes, then Booking failed.
+     *
+     * @param  list<int>|null  $orderIds  null = every order that is due
      */
-    public function runBookings(?array $orderIds = null, ?int $byUserId = null, bool $firstTryOnly = false): void
+    public function runBookings(?array $orderIds = null, ?int $byUserId = null): void
     {
-        $rows = DB::table('orders')->where('booking_state', 'queued')->where('status_id', OrderStatus::idFor('confirmed'))
-            ->where(fn ($q) => $q->whereNull('book_after')->orWhere('book_after', '<=', now())) // still inside the Undo time: wait
-            ->when($firstTryOnly, fn ($q) => $q->where('booking_attempts', 0))
+        $ids = DB::table('orders')->where('booking_state', 'queued')->where('status_id', OrderStatus::idFor('confirmed'))
+            ->whereNull('booking_claim')
+            ->where(fn ($q) => $q->whereNull('book_after')->orWhere('book_after', '<=', now()))
             ->when($orderIds !== null, fn ($q) => $q->whereIn('id', $orderIds))
-            ->orderBy('id')->limit(50)->get(['id', 'order_no', 'moderator_id', 'booking_attempts']);
-        if ($rows->isEmpty()) {
+            ->orderBy('id')->limit(50)->pluck('id')->all();
+        if (! $ids) {
             return;
+        }
+        $token = (string) Str::uuid();
+        DB::table('orders')->whereIn('id', $ids)->where('booking_state', 'queued')->whereNull('booking_claim')
+            ->update(['booking_claim' => $token, 'booking_claimed_at' => now()]);
+        $rows = DB::table('orders')->where('booking_claim', $token)->get(['id', 'order_no', 'moderator_id', 'booking_attempts']);
+        if ($rows->isEmpty()) {
+            return; // another request took them first
         }
 
         $by = $byUserId ? User::find($byUserId) : null;
-        $result = app(BookingService::class)->book($rows->pluck('id')->all(), $by);
+        try {
+            $result = app(BookingService::class)->book($rows->pluck('id')->all(), $by);
+        } finally {
+            // Booked or not, this request is done with them (booked ones are no longer queued).
+            DB::table('orders')->where('booking_claim', $token)->update(['booking_claim' => null, 'booking_claimed_at' => null]);
+        }
 
         foreach ($rows as $row) {
             if (! isset($result['failed'][$row->order_no])) {
                 continue; // booked: BookingService cleared the state
             }
+            $error = (string) $result['failed'][$row->order_no];
+            $kind = $result['kind'][$row->order_no] ?? 'temporary';
+            $order = DB::table('orders')->where('id', $row->id)->where('booking_state', 'queued');
+
+            if ($kind === 'auth') {
+                $order->update(['book_after' => now()->addMinutes(5), 'booking_error' => mb_substr($error, 0, 255), 'updated_at' => now()]);
+                if (Cache::add('courier:auth-alert', 1, now()->addMinutes(30))) {
+                    $this->notifications->send('booking_failed', __('The courier refused the API keys'),
+                        __('No order can be booked until the keys are fixed in Settings > Courier accounts. Waiting orders are booked by themselves after that.'), [
+                            'link' => route('settings.couriers'), 'user_ids' => $this->managerIds(),
+                        ]);
+                }
+
+                continue;
+            }
+
             $attempts = $row->booking_attempts + 1;
-            $failed = $attempts >= 3;
-            DB::table('orders')->where('id', $row->id)->update([
+            $failed = $kind === 'rejected' || $attempts > count(self::RETRY_MINUTES);
+            $order->update([
                 'booking_attempts' => $attempts, 'booking_state' => $failed ? 'failed' : 'queued',
-                'booking_error' => mb_substr((string) $result['failed'][$row->order_no], 0, 255), 'updated_at' => now(),
+                'book_after' => $failed ? null : now()->addMinutes(self::RETRY_MINUTES[$attempts - 1]),
+                'booking_error' => mb_substr($error, 0, 255), 'updated_at' => now(),
             ]);
             if ($failed) {
-                $this->systemNote($row->id, __('Courier booking failed 3 times: :e', ['e' => $result['failed'][$row->order_no]]), null);
-                $this->notifications->send('booking_failed', __('Booking failed: :no', ['no' => $row->order_no]), (string) $result['failed'][$row->order_no], [
-                    'link' => route('desk.index', ['tab' => 'send', 'order' => $row->id]), 'subject' => ['order', $row->id],
-                    'user_ids' => array_filter(array_merge([$row->moderator_id], $this->managerIds())),
-                ]);
+                $this->failedNotice($row, $kind === 'rejected'
+                    ? __('The courier refused this parcel: :e', ['e' => $error])
+                    : __('Courier booking failed :n times: :e', ['n' => $attempts, 'e' => $error]));
             }
         }
+    }
+
+    /** Booking failed: a note on the order and a notice to its moderator and the managers. */
+    private function failedNotice(object $row, string $message): void
+    {
+        $this->systemNote($row->id, $message, null);
+        $this->notifications->send('booking_failed', __('Booking failed: :no', ['no' => $row->order_no]), $message, [
+            'link' => route('desk.index', ['tab' => 'send', 'order' => $row->id]), 'subject' => ['order', $row->id],
+            'user_ids' => array_filter(array_merge([$row->moderator_id], $this->managerIds())),
+        ]);
     }
 
     // ── Reactions to status changes (registered in AppServiceProvider) ──
@@ -507,10 +568,14 @@ class DeskService
         if ($to['key'] === 'packed') {
             $set['packed_at'] = now();
         }
-        // Confirmed = book the courier. A person gets a few seconds to Undo first; a rule books at once.
+        // Confirmed = book the courier right away, after the response (nobody waits for the courier).
         if ($to['key'] === 'confirmed') {
-            $set += ['booking_state' => 'queued', 'booking_attempts' => 0, 'booking_error' => null,
-                'book_after' => $actor ? now()->addSeconds(self::UNDO_SECONDS) : now()];
+            $set += ['booking_state' => 'queued', 'booking_attempts' => 0, 'booking_error' => null, 'book_after' => null];
+            $orderId = $order->id;
+            $actorId = $actor?->id;
+            app()->terminating(fn () => $this->runBookings([$orderId], $actorId));
+        } elseif ($from['key'] === 'confirmed' && $to['key'] !== 'ready_for_packaging' && $order->booking_state !== 'none') {
+            $set += ['booking_state' => 'none', 'book_after' => null]; // held or cancelled before the courier was booked
         }
         if ($set) {
             DB::table('orders')->where('id', $order->id)->update($set);

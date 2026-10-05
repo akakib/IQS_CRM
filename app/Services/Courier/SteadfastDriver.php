@@ -42,13 +42,32 @@ class SteadfastDriver implements CourierDriver
                 $c = $response->json('consignment') ?? [];
                 $results[$req->invoice] = $response->successful() && ! empty($c['consignment_id'])
                     ? new BookingResult($req->invoice, true, (string) $c['consignment_id'], $c['tracking_code'] ?? null, $c['status'] ?? null, raw: $response->json())
-                    : new BookingResult($req->invoice, false, error: 'Steadfast: HTTP '.$response->status().' '.mb_substr($response->body(), 0, 300), raw: $response->json() ?? []);
+                    : new BookingResult($req->invoice, false, error: 'Steadfast: HTTP '.$response->status().' '.mb_substr($response->body(), 0, 300), raw: $response->json() ?? [],
+                        kind: match (true) {
+                            in_array($response->status(), [401, 403], true) => 'auth',
+                            $response->status() >= 400 && $response->status() < 500 && $response->status() !== 429 => 'rejected', // wrong phone, address, COD, duplicate invoice
+                            default => 'temporary',
+                        });
             } catch (\Throwable $e) {
-                $results[$req->invoice] = new BookingResult($req->invoice, false, error: $e->getMessage());
+                $results[$req->invoice] = new BookingResult($req->invoice, false, error: $e->getMessage(), kind: str_contains($e->getMessage(), 'keys are missing') ? 'auth' : 'temporary');
             }
         }
 
         return $results;
+    }
+
+    public function invoiceBooked(string $invoice): ?bool
+    {
+        try {
+            $response = $this->client()->get('status_by_invoice/'.rawurlencode($invoice));
+        } catch (\Throwable) {
+            return null;
+        }
+        if ($response->status() === 404) {
+            return false;
+        }
+
+        return $response->successful() && $response->json('delivery_status') ? true : null;
     }
 
     public function statusByInvoice(string $invoice): ?CourierUpdate

@@ -39,6 +39,8 @@ class Order extends Model
             'next_call_at' => 'datetime',
             'timer_extended_at' => 'datetime',
             'packaging_sent_at' => 'datetime',
+            'book_after' => 'datetime',
+            'booking_claimed_at' => 'datetime',
             'packaging_started_at' => 'datetime',
             'packed_at' => 'datetime',
         ];

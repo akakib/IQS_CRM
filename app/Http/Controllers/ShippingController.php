@@ -38,7 +38,16 @@ class ShippingController extends Controller
     public function book(Request $request, BookingService $booking): RedirectResponse
     {
         $data = $request->validate(['ids' => ['required', 'array', 'max:300'], 'ids.*' => ['integer']]);
-        $result = $booking->book($data['ids'], $request->user());
+        // Same path as every other booking (claimed first), so this button and an automatic
+        // booking running at the same moment can never send one order twice.
+        DB::table('orders')->whereIn('id', $data['ids'])->where('status_id', \App\Models\OrderStatus::idFor('confirmed'))->whereNull('booking_claim')
+            ->update(['booking_state' => 'queued', 'booking_attempts' => 0, 'book_after' => null, 'booking_error' => null]);
+        app(\App\Services\Orders\DeskService::class)->runBookings($data['ids'], $request->user()->id);
+        $rows = DB::table('orders')->whereIn('id', $data['ids'])->get(['order_no', 'status_id', 'booking_error']);
+        $result = [
+            'booked' => $rows->where('status_id', '!=', \App\Models\OrderStatus::idFor('confirmed'))->pluck('order_no')->all(),
+            'failed' => $rows->where('status_id', \App\Models\OrderStatus::idFor('confirmed'))->mapWithKeys(fn ($r) => [$r->order_no => $r->booking_error ?: __('Not booked')])->all(),
+        ];
 
         $message = trans_choice(':count order booked.|:count orders booked.', count($result['booked']), ['count' => count($result['booked'])]);
         $redirect = $result['booked']

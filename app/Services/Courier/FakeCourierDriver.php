@@ -29,6 +29,12 @@ class FakeCourierDriver implements CourierDriver
         $results = [];
 
         foreach ($requests as $request) {
+            // Tests and staging can make the next booking fail: Cache 'fake-courier:fail' = auth | rejected | temporary.
+            if ($kind = Cache::pull('fake-courier:fail')) {
+                $results[$request->invoice] = new BookingResult($request->invoice, false, error: 'Fake courier: '.$kind.' failure', kind: $kind);
+
+                continue;
+            }
             $key = $this->key($request->invoice);
             $booking = Cache::get($key);
 
@@ -54,6 +60,11 @@ class FakeCourierDriver implements CourierDriver
         }
 
         return $results;
+    }
+
+    public function invoiceBooked(string $invoice): ?bool
+    {
+        return Cache::has($this->key($invoice));
     }
 
     public function statusByInvoice(string $invoice): ?CourierUpdate

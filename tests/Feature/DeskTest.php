@@ -105,9 +105,8 @@ class DeskTest extends TestCase
         $this->assertNotContains('record_verified', collect($machine->allowedTargets($confirmed->fresh(), $this->mahim))->pluck('key'));
         $this->act($confirmed, 'resume')->assertSessionHasErrors('status');
         $this->assertSame('hold', $this->key($confirmed));
-        $this->act($confirmed, 'back_to_send')->assertSessionHas('undo');
-        $this->assertSame('confirmed', $this->key($confirmed));
-        $this->assertSame('queued', $confirmed->fresh()->booking_state);
+        $this->act($confirmed, 'back_to_send')->assertSessionHas('success');
+        $this->assertSame('ready_for_packaging', $this->key($confirmed)); // booked right away
     }
 
     public function test_take_next_gives_the_oldest_order_and_stops_at_the_limit(): void
@@ -220,7 +219,7 @@ class DeskTest extends TestCase
         $this->travel(5)->minutes();
         $this->act($a, 'confirm', ['note' => 'will take it'])->assertSessionHas('success');
 
-        $this->assertSame('confirmed', $this->key($a));
+        $this->assertSame('ready_for_packaging', $this->key($a)); // confirm books the courier right away
         $this->assertNull($a->fresh()->action_due_at);
         $this->assertDatabaseHas('order_notes', ['order_id' => $a->id, 'note_type' => 'call']);
         $this->travel(30)->minutes();
@@ -309,7 +308,15 @@ class DeskTest extends TestCase
         $a = $this->web();
         app(OrderStateMachine::class)->transition($a, 'record_verified', null, 'rule');
         $this->actingAs($this->mahim)->post('/desk/next');
-        $this->act($a, 'confirm');
+        // Confirm books the courier right away. Here the courier is down for the first try.
+        \Illuminate\Support\Facades\Cache::put('fake-courier:fail', 'temporary');
+        $this->act($a, 'confirm')->assertSessionHas('success');
+        $a->refresh();
+        $this->assertSame('confirmed', $this->key($a));
+        $this->assertSame('queued', $a->booking_state);
+        $this->assertSame(1, $a->booking_attempts);
+        $this->assertNull($a->booking_claim);
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($a->book_after)->between(now()->addSeconds(50), now()->addSeconds(70))); // next try in 1 minute
 
         // Not in the packaging queue before a consignment exists.
         try {
@@ -317,23 +324,13 @@ class DeskTest extends TestCase
             $this->fail('No consignment yet');
         } catch (ValidationException) {
         }
+        $this->get('/desk')->assertDontSee('Booking failed'); // still trying: the tab shows only for a real failure
 
-        $this->get('/desk')->assertDontSee('Booking failed'); // the tab shows only when an order is in it
-        // Confirm books by itself, after a few seconds to Undo. Undo: back to Call, nothing booked.
-        $this->assertSame('queued', $a->fresh()->booking_state);
-        $this->post("/desk/{$a->id}/undo")->assertSessionHas('success');
-        $this->assertSame('record_verified', $this->key($a));
-        $this->assertSame('none', $a->fresh()->booking_state);
-        $this->post('/desk/book-due');
+        // Not yet due: the pulse does not book. Due: the next pulse books it (no cron needed).
+        $this->getJson('/desk/pulse')->assertOk();
         $this->assertSame(0, DB::table('shipments')->where('order_id', $a->id)->count());
-
-        // Confirm again; inside the Undo time nothing is booked, after it the bar (or any desk page) books it.
-        $this->act($a, 'confirm')->assertSessionHas('undo');
-        $this->post('/desk/book-due');
-        $this->assertSame(0, DB::table('shipments')->where('order_id', $a->id)->count());
-        $this->travel(11)->seconds();
-        $this->post("/desk/{$a->id}/undo")->assertSessionHas('error'); // too late
-        $this->post('/desk/book-due')->assertOk(); // booking runs after the response (fake courier)
+        $this->travel(61)->seconds();
+        $this->getJson('/desk/pulse')->assertOk();
         $this->assertSame(1, DB::table('shipments')->where('order_id', $a->id)->count());
 
         $a->refresh();
@@ -342,6 +339,86 @@ class DeskTest extends TestCase
         $this->assertNotNull($a->packaging_sent_at);
         $this->assertSame('none', $a->booking_state);
         $this->get('/desk?tab=packaging')->assertSee($a->order_no)->assertSee('Waiting for a packer')->assertSee('No packer yet');
+    }
+
+    public function test_one_order_is_never_sent_twice_and_each_kind_of_failure_is_handled(): void
+    {
+        $desk = $this->desk();
+        $machine = app(OrderStateMachine::class);
+        $confirmed = function () use ($machine) {
+            $o = $this->web();
+            $machine->transition($o, 'record_verified', null, 'rule');
+            $machine->transition($o->fresh(), 'confirmed', null, 'rule'); // its own booking runs only when the app terminates: the test drives it instead
+
+            return $o->fresh();
+        };
+
+        // 1. Another request holds it: this one skips it, nothing is sent twice.
+        $a = $confirmed();
+        DB::table('orders')->where('id', $a->id)->update(['booking_claim' => 'other-request', 'booking_claimed_at' => now()]);
+        $desk->runBookings([$a->id]);
+        $this->assertSame(0, DB::table('shipments')->where('order_id', $a->id)->count());
+
+        // 2. Its edit waits while the courier is being booked.
+        $this->actingAs($this->mahim);
+        try {
+            app(\App\Services\Orders\OrderEditor::class)->request($a->fresh(), ['items' => [['variant_id' => $this->variant->id, 'qty' => 2]]],
+                (int) DB::table('status_reasons')->where('reason_type', 'amendment')->value('id'), $this->mahim, $a->fresh()->lock_version);
+            $this->fail('Edit during booking');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('being booked right now', collect($e->errors())->flatten()->first());
+        }
+
+        // 3. That request died half way. The courier does not have it: released and booked normally.
+        $this->travel(6)->minutes();
+        $desk->recoverStale();
+        $this->assertNull($a->fresh()->booking_claim);
+        $desk->runBookings([$a->id]);
+        $this->assertSame(1, DB::table('shipments')->where('order_id', $a->id)->count());
+
+        // 4. Died half way and the courier already has it: never booked again, a person checks.
+        $b = $confirmed();
+        app(\App\Services\Courier\FakeCourierDriver::class)->bookBulk([new \App\Services\Courier\Data\BookingRequest(invoice: $b->order_no, recipientName: 'x', recipientPhone: '01700000000', recipientAddress: 'x', codAmount: 1, note: null)]);
+        DB::table('orders')->where('id', $b->id)->update(['booking_claim' => 'dead-request', 'booking_claimed_at' => now()->subMinutes(10)]);
+        $desk->recoverStale();
+        $this->assertSame('failed', $b->fresh()->booking_state);
+        $this->assertStringContainsString('may already be at the courier', $b->fresh()->booking_error);
+        $this->assertSame(0, DB::table('shipments')->where('order_id', $b->id)->count());
+
+        // 5. The courier refused the parcel's data: Booking failed at once, no pointless retries.
+        $c = $confirmed();
+        \Illuminate\Support\Facades\Cache::put('fake-courier:fail', 'rejected');
+        $desk->runBookings([$c->id]);
+        $this->assertSame('failed', $c->fresh()->booking_state);
+        $this->assertSame(1, $c->fresh()->booking_attempts);
+
+        // 6. Keys refused: the order waits (not blamed), one alert however many orders.
+        $boss = User::factory()->create();
+        $boss->roles()->attach(\App\Models\Role::firstWhere('system_key', 'owner')?->id ?? $this->role([], [], 'Owner')->id);
+        DB::table('roles')->where('id', DB::table('user_roles')->where('user_id', $boss->id)->value('role_id'))->update(['system_key' => 'owner']);
+        $d = $confirmed();
+        $e = $confirmed();
+        foreach ([$d, $e] as $o) {
+            \Illuminate\Support\Facades\Cache::put('fake-courier:fail', 'auth');
+            $desk->runBookings([$o->id]);
+            $this->assertSame('queued', $o->fresh()->booking_state);
+            $this->assertSame(0, $o->fresh()->booking_attempts);
+        }
+        $this->assertSame(1, DB::table('app_notifications')->where('title', 'The courier refused the API keys')->count());
+
+        // 7. Temporary failures: 1 minute, 5 minutes, then Booking failed.
+        $f = $confirmed();
+        foreach ([1 => 'queued', 2 => 'queued', 3 => 'failed'] as $try => $state) {
+            \Illuminate\Support\Facades\Cache::put('fake-courier:fail', 'temporary');
+            DB::table('orders')->where('id', $f->id)->update(['book_after' => null]);
+            $desk->runBookings([$f->id]);
+            $this->assertSame($state, $f->fresh()->booking_state, "try $try");
+        }
+
+        // 8. Held before the courier was booked: no longer waiting to be booked.
+        $g = $confirmed();
+        $machine->transition($g->fresh(), 'hold', $this->mahim, 'user', (int) DB::table('status_reasons')->where('reason_type', 'hold')->value('id'));
+        $this->assertSame('none', $g->fresh()->booking_state);
     }
 
     public function test_confirm_warns_when_the_same_customer_has_another_open_order(): void

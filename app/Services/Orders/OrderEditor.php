@@ -38,6 +38,9 @@ class OrderEditor
             if ($order->lock_version !== $expectedLock) {
                 throw ValidationException::withMessages(['order' => __('This order was changed by someone else. Reload and try again.')]);
             }
+            if ($order->booking_claim && $order->booking_claimed_at && \Illuminate\Support\Carbon::parse($order->booking_claimed_at)->gt(now()->subMinutes(5))) {
+                throw ValidationException::withMessages(['order' => __('The courier is being booked right now. Try again in a few seconds.')]);
+            }
             $status = OrderStatus::map()[$order->status_id];
             if ($status['edit_policy'] === 'locked') {
                 throw ValidationException::withMessages(['order' => __('A :s order cannot be edited. Use partial delivery or a new order.', ['s' => $status['name']])]);

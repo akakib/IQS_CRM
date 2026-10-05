@@ -29,7 +29,7 @@ class BookingService
         $confirmed = OrderStatus::idFor('confirmed');
         $orders = Order::whereIn('id', $orderIds)->where('status_id', $confirmed)->get()->keyBy('order_no');
         $hotline = (string) settings('store.hotline');
-        $result = ['booked' => [], 'failed' => []];
+        $result = ['booked' => [], 'failed' => [], 'kind' => []];
 
         $requests = $orders->map(fn (Order $o) => new BookingRequest(
             invoice: $o->order_no,
@@ -50,6 +50,7 @@ class BookingService
         } catch (\Throwable $e) {
             foreach ($orders->keys() as $no) {
                 $result['failed'][$no] = $e->getMessage();
+                $result['kind'][$no] = str_contains($e->getMessage(), 'keys are missing') ? 'auth' : 'temporary';
             }
 
             return $result;
@@ -62,6 +63,7 @@ class BookingService
             }
             if (! $r->ok || ! $r->consignmentId) {
                 $result['failed'][$invoice] = $r->error ?: __('Courier did not return a consignment ID.');
+                $result['kind'][$invoice] = $r->ok ? 'temporary' : $r->kind;
 
                 continue;
             }
@@ -84,6 +86,7 @@ class BookingService
                 $result['booked'][] = $invoice;
             } catch (\Throwable $e) {
                 $result['failed'][$invoice] = $e->getMessage();
+                $result['kind'][$invoice] = 'temporary';
             }
         }
 

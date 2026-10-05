@@ -77,7 +77,7 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
         },
 
         test() {
-            window.speechSynthesis?.cancel();
+            // No cancel() here: on iPhone a cancel right before speaking drops the new line.
             this.say(`${name}, two minutes left on current order.`, true);
         },
 
@@ -167,6 +167,9 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
                     this.waiting = true;
                 }
             };
+            // iPhone: keep a reference (an unreferenced utterance can be dropped before it plays) and wake a stuck queue.
+            window.__iqsUtterance = u;
+            window.speechSynthesis.resume?.();
             window.speechSynthesis.speak(u);
         },
 
@@ -176,7 +179,8 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
             this.queue = [];
             this.waiting = false;
             // After this click the browser allows sound.
-            setTimeout(() => lines.forEach((l) => this.say(l)), 0);
+            // Spoken right inside the tap: iPhone only allows speech that starts in the tap itself.
+            lines.forEach((l) => this.say(l));
         },
     };
 }

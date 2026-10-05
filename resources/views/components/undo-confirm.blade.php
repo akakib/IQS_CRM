@@ -18,13 +18,13 @@
             },
         }"
         x-show="open"
-        @keydown.window="if ($event.key === 'u' && !['INPUT', 'TEXTAREA', 'SELECT'].includes($event.target.tagName)) $refs.undo.requestSubmit()"
+        @keydown.window="if ($event.shiftKey && $event.code === 'KeyU' && !['INPUT', 'TEXTAREA', 'SELECT'].includes($event.target.tagName)) $refs.undo.requestSubmit()"
         class="fixed inset-x-3 bottom-4 z-[96] mx-auto flex max-w-md items-center gap-3 rounded-xl bg-primary-dark px-4 py-3 text-sm text-white shadow-xl">
         <p class="min-w-0 flex-1">{{ __(':no confirmed.', ['no' => $undo['no']]) }} <span class="text-white/70">{{ __('Booking the courier in') }} <span class="tabular-nums" x-text="left + 's'"></span></span></p>
         <form x-ref="undo" method="POST" action="{{ route('desk.undo', $undo['id']) }}">
             @csrf
             @if (request()->boolean('embed'))<input type="hidden" name="embed" value="1">@endif
-            <button class="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-primary-dark hover:bg-gray-100">{{ __('Undo') }} <kbd class="ml-1 hidden rounded bg-black/10 px-1 text-[11px] sm:inline">U</kbd></button>
+            <button class="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-primary-dark hover:bg-gray-100">{{ __('Undo') }} <kbd class="ml-1 hidden rounded bg-black/10 px-1 text-[11px] sm:inline">⇧U</kbd></button>
         </form>
     </div>
 @endif

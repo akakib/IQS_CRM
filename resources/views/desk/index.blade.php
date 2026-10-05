@@ -36,9 +36,13 @@
         openReason(mode) { this.reasonMode = mode; this.reason = null },
         keys(e) {
             if (e.ctrlKey || e.metaKey || e.altKey || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
-            const k = e.key.toLowerCase();
+            if (this.reasonMode && e.key === 'Escape') { this.reasonMode = null; return }
+            // Every shortcut needs Shift, so a stray key press never acts on an order.
+            // e.code, not e.key: Shift turns 1 into ! and the code stays Digit1.
+            if (!e.shiftKey) return;
+            const k = e.code.startsWith('Key') ? e.code.slice(3).toLowerCase() : (e.code.startsWith('Digit') ? e.code.slice(5) : null);
+            if (!k) return;
             if (this.reasonMode) {
-                if (k === 'escape') { this.reasonMode = null; return }
                 const pick = this.$root.querySelector(`[data-reason='${this.reasonMode}-${k}']`);
                 if (pick) { pick.click(); e.preventDefault() }
                 return;
@@ -73,7 +77,7 @@
             <form method="POST" action="{{ route('desk.next') }}">
                 @csrf
                 <x-button class="w-full sm:w-auto" data-key="t" :disabled="! $waiting || $atLimit">
-                    {{ $atLimit ? ($limit === 1 ? __('Finish this order first') : __('Finish one first')) : __('Take next') }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">T</kbd>
+                    {{ $atLimit ? ($limit === 1 ? __('Finish this order first') : __('Finish one first')) : __('Take next') }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">⇧T</kbd>
                 </x-button>
             </form>
         @endif
@@ -197,7 +201,7 @@
                 @endforelse
             </div>
             @if ($list->hasPages())<div class="mt-3">{{ $list->links() }}</div>@endif
-            <p class="mt-3 hidden text-[11px] text-gray-400 lg:block">{{ __('Keys: J / K next and previous order · the letter on a button presses it · T take next') }}</p>
+            <p class="mt-3 hidden text-[11px] text-gray-400 lg:block">{{ __('Keys (hold Shift): J / K next and previous order · the letter on a button presses it · T take next') }}</p>
         </aside>
         @endunless
 
@@ -421,16 +425,16 @@
                                         {{-- The courier is booked right away: a second open order of the same customer is merged first, not shipped twice. --}}
                                         <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="$dispatch('open-confirm', { id: 'confirm-duplicate', form: 'desk-act' })"
                                             class="whitespace-nowrap w-full py-3 text-base xl:w-auto xl:flex-1">
-                                            {{ $label }} <kbd class="hidden rounded bg-white/20 px-1.5 text-[11px] uppercase sm:inline">{{ $k }}</kbd>
+                                            {{ $label }} <kbd class="hidden rounded bg-white/20 px-1.5 text-[11px] uppercase sm:inline">⇧{{ $k }}</kbd>
                                         </x-button>
                                     @elseif (in_array($action, ['hold', 'cancel'], true))
                                         <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="openReason('{{ $action }}')" class="flex-1 whitespace-nowrap py-2.5 sm:py-3 xl:flex-none">
-                                            {{ $label }} <kbd class="hidden rounded bg-black/5 px-1.5 text-[11px] uppercase sm:inline">{{ $k }}</kbd>
+                                            {{ $label }} <kbd class="hidden rounded bg-black/5 px-1.5 text-[11px] uppercase sm:inline">⇧{{ $k }}</kbd>
                                         </x-button>
                                     @else
                                         <x-button form="desk-act" name="action" value="{{ $action }}" :variant="$variant" data-key="{{ $k }}"
                                             class="whitespace-nowrap {{ $variant === 'primary' ? 'w-full py-3 text-base xl:w-auto xl:flex-1' : 'flex-1 py-2.5 sm:py-3 xl:flex-none' }}">
-                                            {{ $label }} <kbd class="hidden rounded {{ $variant === 'primary' ? 'bg-white/20' : 'bg-black/5' }} px-1.5 text-[11px] uppercase sm:inline">{{ $k }}</kbd>
+                                            {{ $label }} <kbd class="hidden rounded {{ $variant === 'primary' ? 'bg-white/20' : 'bg-black/5' }} px-1.5 text-[11px] uppercase sm:inline">⇧{{ $k }}</kbd>
                                         </x-button>
                                     @endif
                                 @endforeach
@@ -461,7 +465,7 @@
                                     <button type="button" @click="reason = {{ $id }}" data-reason="{{ $mode }}-{{ $loop->iteration }}"
                                         class="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm"
                                         :class="reason === {{ $id }} ? 'border-primary bg-primary-soft font-medium text-primary' : 'border-gray-200 text-gray-700 hover:bg-gray-50'">
-                                        {{ __($label) }} @if ($loop->iteration < 10)<kbd class="rounded bg-gray-100 px-1.5 text-[11px] text-gray-500">{{ $loop->iteration }}</kbd>@endif
+                                        {{ __($label) }} @if ($loop->iteration < 10)<kbd class="rounded bg-gray-100 px-1.5 text-[11px] text-gray-500">⇧{{ $loop->iteration }}</kbd>@endif
                                     </button>
                                 @endforeach
                             </div>

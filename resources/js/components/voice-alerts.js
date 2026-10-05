@@ -188,6 +188,9 @@ function voiceLabel(v) {
     return `${short} (${where})`;
 }
 
+// Known male Indian voices: Edge (Prabhat, Madhur, Aarav, Kunal, Rehaan), Windows (Ravi, Hemant), iPhone (Rishi).
+const MALE = /(Prabhat|Madhur|Aarav|Kunal|Rehaan|Ravi|Hemant|Rishi)/i;
+
 // The voice picked in this browser; otherwise an Indian accent: an English (India)
 // voice, else a Hindi one (it reads English sentences with an Indian accent; Chrome on
 // Windows has "Google Hindi" but no English India voice), then any English voice.
@@ -196,7 +199,9 @@ function chosenVoice(pick) {
 
     return (
         (pick && voices.find((v) => v.name === pick)) ||
+        voices.find((v) => v.lang === 'en-IN' && MALE.test(v.name)) ||
         voices.find((v) => v.lang === 'en-IN') ||
+        voices.find((v) => v.lang?.startsWith('hi') && MALE.test(v.name)) ||
         voices.find((v) => v.lang?.startsWith('hi')) ||
         voices.find((v) => v.lang === 'en-GB') ||
         voices.find((v) => v.lang?.startsWith('en')) ||

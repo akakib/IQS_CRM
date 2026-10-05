@@ -7,7 +7,7 @@
 @php
     // Dot colour and mark per kind of entry.
     $kinds = [
-        'status' => ['bg-green-900 text-white', '✓'],
+        'status' => ['bg-primary text-white', '✓'],
         'call' => ['bg-blue-600 text-white', '☎'],
         'chat' => ['bg-blue-600 text-white', '✉'],
         'assignment' => ['bg-gray-500 text-white', '●'],

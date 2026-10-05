@@ -1,5 +1,5 @@
 @php
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $recipients = ['order_moderator' => __('Assigned moderator'), 'actor' => __('Person who did it'), 'packer' => __('Packer'), 'previous_moderator' => __('Previously assigned moderator')];
     $settle = ['order_final' => __('When the order ends'), 'immediate' => __('Right away')];
     $fmt = fn ($v) => is_bool($v) ? ($v ? 'true' : 'false') : (string) ($v ?? '-');
@@ -36,7 +36,7 @@
                                                 class="w-20 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm tabular-nums {{ $r->points < 0 ? 'text-red-700' : 'text-green-800' }}" aria-label="{{ __('Points') }}">
                                             <label class="flex items-center gap-1 text-xs text-gray-600">
                                                 <input type="hidden" name="is_active" value="0">
-                                                <input type="checkbox" name="is_active" value="1" @checked($r->is_active) class="rounded border-gray-300 text-green-900"> {{ __('On') }}
+                                                <input type="checkbox" name="is_active" value="1" @checked($r->is_active) class="rounded border-gray-300 text-primary"> {{ __('On') }}
                                             </label>
                                             <x-button size="sm">{{ __('Save') }}</x-button>
                                         </form>
@@ -107,27 +107,27 @@
                     </div>
                     <label class="flex items-center gap-2 text-sm text-gray-600">
                         <input type="hidden" name="requires_delivery" value="0">
-                        <input type="checkbox" name="requires_delivery" value="1" class="rounded border-gray-300 text-green-900"> {{ __('Only if the order is delivered') }}
+                        <input type="checkbox" name="requires_delivery" value="1" class="rounded border-gray-300 text-primary"> {{ __('Only if the order is delivered') }}
                     </label>
                     <template x-for="(c, i) in conds" :key="i">
                         <div class="rounded-lg border border-gray-200 p-2">
                             <div class="mb-1 flex flex-wrap gap-1">
                                 @foreach ($fields as $key => $label)
-                                    <button type="button" @click="c.field = @js($key)" class="rounded border px-1.5 py-0.5 text-[11px]" :class="c.field === @js($key) ? 'border-green-900 bg-green-900 text-white' : 'border-gray-200 text-gray-600'">{{ $key }}</button>
+                                    <button type="button" @click="c.field = @js($key)" class="rounded border px-1.5 py-0.5 text-[11px]" :class="c.field === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-600'">{{ $key }}</button>
                                 @endforeach
                             </div>
                             <input type="hidden" :name="`conditions[${i}][field]`" :value="c.field">
                             <div class="flex gap-1">
                                 <input type="hidden" :name="`conditions[${i}][operator]`" :value="c.operator">
                                 @foreach (['>=', '<=', '=', '!=', '>', '<'] as $op)
-                                    <button type="button" @click="c.operator = @js($op)" class="w-8 rounded border text-xs" :class="c.operator === @js($op) ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300'">{{ $op }}</button>
+                                    <button type="button" @click="c.operator = @js($op)" class="w-8 rounded border text-xs" :class="c.operator === @js($op) ? 'border-primary bg-primary text-white' : 'border-gray-300'">{{ $op }}</button>
                                 @endforeach
                                 <input :name="`conditions[${i}][value]`" x-model="c.value" required placeholder="30 / true / sales" class="min-w-0 flex-1 rounded border border-gray-300 px-2 text-xs">
                                 <button type="button" @click="conds.splice(i, 1)" class="px-1 text-gray-400 hover:text-red-600">&times;</button>
                             </div>
                         </div>
                     </template>
-                    <button type="button" @click="conds.push({ field: 'blame', operator: '=', value: '' })" class="text-sm font-medium text-green-900 hover:underline">+ {{ __('Add condition') }}</button>
+                    <button type="button" @click="conds.push({ field: 'blame', operator: '=', value: '' })" class="text-sm font-medium text-primary hover:underline">+ {{ __('Add condition') }}</button>
                     <x-button class="w-full">{{ __('Save rule') }}</x-button>
                 </form>
             </x-card>

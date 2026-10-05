@@ -31,6 +31,7 @@ class SettingsController extends Controller
             $rules[str_replace('.', '_', $key)] = $keyRules;
         }
         $rules['orders_pickup_cutoffs.*'] = ['required', 'date_format:H:i'];
+        $rules['appearance_font'][] = \Illuminate\Validation\Rule::in(array_keys(config('appearance.fonts')));
 
         $request->merge(['verification_rerun_on_edit' => $request->boolean('verification_rerun_on_edit')]);
         $data = $request->validate($rules, [

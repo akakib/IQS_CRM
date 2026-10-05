@@ -13,7 +13,7 @@
                 <p class="text-sm text-gray-500">{{ $user->email }}</p>
             </div>
 
-            <button type="submit" class="rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">{{ __('Save') }}</button>
+            <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Save') }}</button>
         </form>
 
         <form method="POST" action="{{ route('profile.password') }}" class="rounded-xl border border-gray-200 bg-white p-6">
@@ -26,14 +26,14 @@
                     <label for="{{ $field }}" class="mb-2 block text-sm font-medium text-gray-700">{{ $label }}</label>
                     <input id="{{ $field }}" name="{{ $field }}" type="password" required
                         autocomplete="{{ $field === 'current_password' ? 'current-password' : 'new-password' }}"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-green-800 focus:outline-none">
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none">
                     @error($field, 'password')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
             @endforeach
 
-            <button type="submit" class="rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">{{ __('Change password') }}</button>
+            <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Change password') }}</button>
         </form>
     </div>
 </x-layouts.app>

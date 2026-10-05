@@ -9,8 +9,8 @@
             'secondary' => 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50',
             'danger' => 'bg-red-600 text-white hover:bg-red-700',
             'danger-outline' => 'border border-red-200 bg-white text-red-600 hover:bg-red-50',
-            'ghost' => 'text-green-900 hover:bg-green-50',
-            default => 'bg-green-900 text-white hover:bg-green-800',
+            'ghost' => 'text-primary hover:bg-primary-soft',
+            default => 'bg-primary text-white hover:bg-primary-dark',
         };
 @endphp
 

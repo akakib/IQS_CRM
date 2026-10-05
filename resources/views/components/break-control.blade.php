@@ -15,7 +15,7 @@
         $over = $limit > 0 && $used > $limit;
         $seconds = $break ? (int) \Illuminate\Support\Carbon::parse($break->started_at)->diffInSeconds(now(), true) : 0;
     @endphp
-    <div class="fixed inset-0 z-[200] flex items-center justify-center p-6 {{ $over ? 'bg-red-700' : 'bg-green-950' }}" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 z-[200] flex items-center justify-center p-6 {{ $over ? 'bg-red-700' : 'bg-primary-dark' }}" role="dialog" aria-modal="true">
         <div class="w-full max-w-sm text-center text-white">
             <p class="text-xs font-semibold uppercase tracking-widest text-white/60">{{ $over ? __('Break limit passed') : __('On a break') }}</p>
             <p class="mt-4 text-2xl font-semibold">{{ $user->name }}</p>
@@ -27,7 +27,7 @@
             @endif
             <form method="POST" action="{{ route('breaks.end') }}" class="mt-8">
                 @csrf
-                <button type="submit" autofocus class="w-full rounded-xl bg-white px-6 py-4 text-base font-semibold {{ $over ? 'text-red-700' : 'text-green-950' }} hover:bg-gray-100">{{ __('Start work') }}</button>
+                <button type="submit" autofocus class="w-full rounded-xl px-6 py-4 text-base font-semibold hover:opacity-90" style="background: #fff; color: {{ $over ? '#b91c1c' : 'var(--brand)' }}">{{ __('Start work') }}</button>
             </form>
         </div>
     </div>
@@ -52,12 +52,12 @@
                     <template x-if="!reasons"><p class="col-span-2 text-sm text-gray-400">{{ __('Loading…') }}</p></template>
                     <template x-for="r in reasons ?? []" :key="r.id">
                         <button type="button" @click="reason = r.id" x-text="r.label" class="rounded-lg border px-3 py-2.5 text-sm font-medium"
-                            :class="reason === r.id ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'"></button>
+                            :class="reason === r.id ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'"></button>
                     </template>
                 </div>
                 <div class="mt-5 flex gap-2">
                     <button type="button" @click="open = false" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">{{ __('Cancel') }}</button>
-                    <button type="submit" :disabled="!reason" class="flex-1 rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50">{{ __('Start break') }}</button>
+                    <button type="submit" :disabled="!reason" class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50">{{ __('Start break') }}</button>
                 </div>
             </form>
         </div>

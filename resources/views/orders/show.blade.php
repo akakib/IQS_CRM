@@ -4,13 +4,13 @@
     $s = $statuses[$order->status_id];
     $canAct = $order->moderator_id === $user->id || $user->permissionScope('orders.view') === 'all';
     $noteIcon = ['status' => '●', 'call' => '☎', 'chat' => '✉', 'payment' => '৳', 'assignment' => '👤', 'amendment' => '✎', 'courier' => '🚚', 'verification' => '✓', 'rider' => '🛵'];
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
 @endphp
 
 <x-layouts.app :heading="$order->order_no">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-2">
-            <a href="{{ route('orders.index') }}" class="text-sm text-green-900 hover:underline">{{ __('Orders') }}</a>
+            <a href="{{ route('orders.index') }}" class="text-sm text-primary hover:underline">{{ __('Orders') }}</a>
             <span class="text-gray-300">/</span>
             <x-order-status :order="$order" :statuses="$statuses" />
             <span class="text-xs text-gray-500">{{ $order->channel }} · {{ $order->created_at->format('d M Y, g:i A') }}</span>
@@ -96,7 +96,7 @@
                     <div class="flex justify-between"><dt class="text-gray-500">{{ __('Delivery') }} ({{ $order->zone?->name ?? '-' }}, {{ number_format($order->total_weight_g / 1000, 2) }} kg)</dt><dd class="tabular-nums">৳{{ number_format((float) $order->delivery_charge, 2) }}</dd></div>
                     <div class="flex justify-between font-semibold"><dt>{{ __('Total') }}</dt><dd class="tabular-nums">৳{{ number_format((float) $order->grand_total, 2) }}</dd></div>
                     @if ((float) $order->advance_verified)<div class="flex justify-between"><dt class="text-gray-500">{{ __('Advance (verified)') }}</dt><dd class="tabular-nums">-৳{{ number_format((float) $order->advance_verified, 2) }}</dd></div>@endif
-                    <div class="flex justify-between text-base font-semibold text-green-900"><dt>{{ __('COD to collect') }}</dt><dd class="tabular-nums">৳{{ number_format((float) $order->cod_amount, 2) }}</dd></div>
+                    <div class="flex justify-between text-base font-semibold text-primary"><dt>{{ __('COD to collect') }}</dt><dd class="tabular-nums">৳{{ number_format((float) $order->cod_amount, 2) }}</dd></div>
                 </dl>
             </x-card>
 
@@ -129,7 +129,7 @@
                     <input type="hidden" name="type" :value="type">
                     <div class="flex shrink-0 gap-1">
                         @foreach (['call' => __('Call'), 'chat' => __('Chat'), 'manual' => __('Note')] as $key => $label)
-                            <button type="button" @click="type = @js($key)" class="rounded-lg border px-2.5 py-2 text-xs" :class="type === @js($key) ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
+                            <button type="button" @click="type = @js($key)" class="rounded-lg border px-2.5 py-2 text-xs" :class="type === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
                         @endforeach
                     </div>
                     <input name="body" required maxlength="2000" placeholder="{{ __('What happened? e.g. called, customer will confirm tonight') }}" class="{{ $input }}">

@@ -1,5 +1,5 @@
 @php
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $tk = fn ($v) => $v === null ? '-' : '৳'.number_format((float) $v);
     $usd = fn ($v) => '$'.number_format((float) $v, 2);
     $x = fn ($v) => $v === null ? '-' : number_format($v, 2).'x';
@@ -72,7 +72,7 @@
                 <div class="rounded-xl border border-gray-200 bg-white p-4">
                     <div class="flex items-center justify-between">
                         <p class="font-medium text-gray-800">{{ \Illuminate\Support\Carbon::parse($d['day'])->format('D d M') }}</p>
-                        <p class="text-sm font-semibold tabular-nums text-green-900">{{ $x($d['delivered_roas']) }}</p>
+                        <p class="text-sm font-semibold tabular-nums text-primary">{{ $x($d['delivered_roas']) }}</p>
                     </div>
                     <p class="mt-1 text-xs text-gray-500">{{ $usd($d['usd']) }} = {{ $tk($d['bdt']) }} · {{ __(':n orders', ['n' => (int) $d['orders']]) }} · {{ __(':m messages', ['m' => (int) $d['messages']]) }}</p>
                     <p class="text-xs text-gray-500">{{ __('Meta :a · Confirmed :b · MER :c', ['a' => $x($d['meta_roas']), 'b' => $x($d['confirmed_roas']), 'c' => $x($d['mer'])]) }}</p>
@@ -88,7 +88,7 @@
                     <div @class(['flex items-center justify-between gap-2 text-sm', 'opacity-50' => ! $a->is_active])>
                         <span>{{ $a->name }} <span class="text-xs text-gray-400">{{ ucfirst($a->platform) }} · {{ $a->external_id ?: __('no id') }} · {{ $a->timezone }}</span></span>
                         @can('marketing.create')
-                            <form method="POST" action="{{ route('marketing.accounts.toggle', $a->id) }}">@csrf<button class="text-xs text-green-900 hover:underline">{{ $a->is_active ? __('Off') : __('On') }}</button></form>
+                            <form method="POST" action="{{ route('marketing.accounts.toggle', $a->id) }}">@csrf<button class="text-xs text-primary hover:underline">{{ $a->is_active ? __('Off') : __('On') }}</button></form>
                         @endcan
                     </div>
                 @empty

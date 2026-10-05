@@ -1,6 +1,6 @@
 <x-layouts.app :heading="__('Batch :b', ['b' => $batch->batch_no])">
     <div class="mb-4 flex flex-wrap items-center gap-2">
-        <a href="{{ route('packing.index') }}" class="text-sm text-green-900 hover:underline">{{ __('Packing') }}</a>
+        <a href="{{ route('packing.index') }}" class="text-sm text-primary hover:underline">{{ __('Packing') }}</a>
         <x-badge :color="['released' => 'blue', 'picked' => 'amber', 'done' => 'green'][$batch->status]">{{ ucfirst($batch->status) }}</x-badge>
         <span class="ml-auto flex gap-2">
             <x-button size="sm" variant="secondary" type="button" onclick="window.print()">{{ __('Print pick list') }}</x-button>

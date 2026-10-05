@@ -37,7 +37,7 @@
                         <div class="min-w-0">
                             <p class="text-sm font-medium text-gray-800">{{ $rule['name'] ?? $e->trigger_key }}</p>
                             <p class="mt-0.5 text-xs text-gray-500">
-                                @if ($e->order_no)<a href="{{ route('orders.show', $e->order_id) }}" class="font-mono text-green-900 hover:underline">{{ $e->order_no }}</a> · @endif
+                                @if ($e->order_no)<a href="{{ route('orders.show', $e->order_id) }}" class="font-mono text-primary hover:underline">{{ $e->order_no }}</a> · @endif
                                 {{ \Illuminate\Support\Carbon::parse($e->created_at)->format('d M, g:i A') }}
                                 @if ($e->revoke_reason) · {{ $e->revoke_reason }} @endif
                                 @if ($e->dispute_status) · {{ __('Dispute: :s', ['s' => $e->dispute_status]) }} @endif
@@ -49,7 +49,7 @@
                         </div>
                     </div>
                     @if (\App\Http\Controllers\PointsController::canDispute($e, $disputeDays))
-                        <button type="button" @click="open = !open" class="mt-2 text-xs font-medium text-green-900 hover:underline">{{ __('Dispute this') }}</button>
+                        <button type="button" @click="open = !open" class="mt-2 text-xs font-medium text-primary hover:underline">{{ __('Dispute this') }}</button>
                         <form x-show="open" x-cloak method="POST" action="{{ route('points.dispute', $e->id) }}" class="mt-2 flex gap-2">
                             @csrf
                             <input name="note" required maxlength="500" placeholder="{{ __('Why is this wrong?') }}" class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm">

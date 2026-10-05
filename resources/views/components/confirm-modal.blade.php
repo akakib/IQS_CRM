@@ -35,7 +35,7 @@
             <button type="button" @click="open = false"
                 class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">{{ __('Cancel') }}</button>
             <button type="button" @click="open = false; document.getElementById(form)?.submit()"
-                class="rounded-lg px-4 py-2 text-sm text-white" :class="danger ? 'bg-red-600 hover:bg-red-700' : 'bg-green-900 hover:bg-green-800'"
+                class="rounded-lg px-4 py-2 text-sm text-white" :class="danger ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary-dark'"
                 x-text="verb"></button>
         </div>
     </div>

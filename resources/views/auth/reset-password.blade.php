@@ -8,7 +8,7 @@
         <x-form.input name="password_confirmation" type="password" :label="__('Confirm new password')" required autocomplete="new-password" />
 
         <button type="submit" :disabled="busy"
-            class="w-full rounded-lg bg-green-900 px-6 py-2.5 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-60">
+            class="w-full rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60">
             {{ __('Save new password') }}
         </button>
     </form>

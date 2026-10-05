@@ -92,7 +92,7 @@
                     <x-record-card :title="$name" subtitle="Warehouse">
                         <x-slot:badge><x-list.check :id="$id" /></x-slot:badge>
                         <x-slot:footer>Updated today</x-slot:footer>
-                        <x-slot:actions><a href="#" class="text-sm text-green-900">Edit</a></x-slot:actions>
+                        <x-slot:actions><a href="#" class="text-sm text-primary">Edit</a></x-slot:actions>
                     </x-record-card>
                 @endforeach
             </x-list.cards>

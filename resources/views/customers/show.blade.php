@@ -6,7 +6,7 @@
 
 <x-layouts.app :heading="$customer->name">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <a href="{{ route('customers.index') }}" class="text-sm text-green-900 hover:underline">{{ __('Back to customers') }}</a>
+        <a href="{{ route('customers.index') }}" class="text-sm text-primary hover:underline">{{ __('Back to customers') }}</a>
         <div class="flex items-center gap-2">
             @can('customers.edit')
                 @if ($canSeeContact)<x-button variant="secondary" :href="route('customers.edit', $customer)">{{ __('Edit') }}</x-button>@endif
@@ -76,7 +76,7 @@
             <form method="POST" action="{{ route('customers.merge', $customer) }}" id="merge-form">
                 @csrf
                 <p class="mb-3 text-sm text-gray-600">{{ __('Enter any phone number of the duplicate customer. Their numbers, addresses, history and orders move here; the duplicate is removed.') }}</p>
-                <input name="duplicate_phone" required inputmode="tel" placeholder="01XXXXXXXXX" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none">
+                <input name="duplicate_phone" required inputmode="tel" placeholder="01XXXXXXXXX" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
             </form>
             <x-slot:footer>
                 <x-button type="button" variant="secondary" @click="$dispatch('close-modal', 'merge')">{{ __('Cancel') }}</x-button>

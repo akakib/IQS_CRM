@@ -1,5 +1,5 @@
 @php
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $tk = fn ($v) => '৳'.number_format((float) $v);
     $usd = fn ($v) => '$'.number_format((float) $v, 2);
     $vendorOptions = $vendors->where('is_active', true)->pluck('name', 'id')->all();
@@ -52,7 +52,7 @@
                             <td class="text-right tabular-nums">{{ $usd($l->usd) }}</td>
                             <td class="text-right tabular-nums">{{ number_format((float) $l->rate, 2) }}</td>
                             <td class="text-right tabular-nums">{{ $tk($l->bdt_total) }}</td>
-                            <td @class(['text-right tabular-nums', 'text-gray-400' => (float) $l->usd_remaining <= 0, 'font-medium text-green-900' => (float) $l->usd_remaining > 0])>{{ $usd($l->usd_remaining) }}</td>
+                            <td @class(['text-right tabular-nums', 'text-gray-400' => (float) $l->usd_remaining <= 0, 'font-medium text-primary' => (float) $l->usd_remaining > 0])>{{ $usd($l->usd_remaining) }}</td>
                         </tr>
                     @endforeach
                 </x-list.table>
@@ -61,7 +61,7 @@
                         <div class="rounded-xl border border-gray-200 bg-white p-4">
                             <div class="flex items-center justify-between">
                                 <p class="font-medium text-gray-800">{{ $usd($l->usd) }} <span class="text-xs font-normal text-gray-500">@ {{ number_format((float) $l->rate, 2) }}</span></p>
-                                <p class="text-sm tabular-nums text-green-900">{{ __(':u left', ['u' => $usd($l->usd_remaining)]) }}</p>
+                                <p class="text-sm tabular-nums text-primary">{{ __(':u left', ['u' => $usd($l->usd_remaining)]) }}</p>
                             </div>
                             <p class="mt-1 text-xs text-gray-500">{{ $l->vendor }} · {{ date('d M Y', strtotime($l->purchased_on)) }} · {{ $tk($l->bdt_total) }}</p>
                         </div>

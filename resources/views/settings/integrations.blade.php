@@ -12,7 +12,7 @@
             @if ($secret)
                 <div x-data="{ show: false }" class="flex items-center gap-2">
                     <p class="flex-1 break-all rounded-lg bg-gray-50 px-3 py-2 font-mono text-sm" x-text="show ? @js($secret) : '••••••••••••••••'"></p>
-                    <button type="button" @click="show = !show" class="text-sm text-green-900 hover:underline" x-text="show ? @js(__('Hide')) : @js(__('Show'))"></button>
+                    <button type="button" @click="show = !show" class="text-sm text-primary hover:underline" x-text="show ? @js(__('Hide')) : @js(__('Show'))"></button>
                 </div>
             @else
                 <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('Not set. Ask for WOO_WEBHOOK_SECRET to be added to the server settings.') }}</p>
@@ -27,7 +27,7 @@
             @if ($steadfastToken)
                 <div x-data="{ show: false }" class="flex items-center gap-2">
                     <p class="flex-1 break-all rounded-lg bg-gray-50 px-3 py-2 font-mono text-sm" x-text="show ? @js($steadfastToken) : '••••••••••••••••'"></p>
-                    <button type="button" @click="show = !show" class="text-sm text-green-900 hover:underline" x-text="show ? @js(__('Hide')) : @js(__('Show'))"></button>
+                    <button type="button" @click="show = !show" class="text-sm text-primary hover:underline" x-text="show ? @js(__('Hide')) : @js(__('Show'))"></button>
                 </div>
             @else
                 <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('Not set (STEADFAST_WEBHOOK_TOKEN).') }}</p>
@@ -54,7 +54,7 @@
                     @if ($row->error)<span class="block text-xs text-red-600">{{ $row->error }}</span>@endif
                 </span>
                 <span class="flex items-center gap-2">
-                    @if ($row->order_id)<a href="{{ route('orders.show', $row->order_id) }}" class="text-xs text-green-900 hover:underline">{{ __('Open order') }}</a>@endif
+                    @if ($row->order_id)<a href="{{ route('orders.show', $row->order_id) }}" class="text-xs text-primary hover:underline">{{ __('Open order') }}</a>@endif
                     <x-badge :color="['processed' => 'green', 'failed' => 'red', 'received' => 'blue', 'ignored' => 'gray'][$row->status]">{{ ucfirst($row->status) }}</x-badge>
                     @if ($row->status === 'failed')
                         <form method="POST" action="{{ route('settings.integrations.retry', $row->id) }}">@csrf<x-button size="sm" variant="secondary">{{ __('Retry') }}</x-button></form>

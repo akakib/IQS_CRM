@@ -65,7 +65,7 @@
                             <td class="font-mono text-gray-600">{{ $consignments[$o->active_shipment_id] ?? '-' }}</td>
                             <td class="text-right tabular-nums">৳{{ number_format((float) $o->cod_amount) }}</td>
                             <td class="text-right">
-                                <form method="POST" action="{{ route('shipping.reprint', $o) }}">@csrf<button class="text-xs text-green-900 hover:underline">{{ __('New label') }}</button></form>
+                                <form method="POST" action="{{ route('shipping.reprint', $o) }}">@csrf<button class="text-xs text-primary hover:underline">{{ __('New label') }}</button></form>
                             </td>
                         </tr>
                     @endforeach

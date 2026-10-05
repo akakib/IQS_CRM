@@ -55,8 +55,8 @@
         <span class="text-gray-600">{{ __('On duty today') }}:
             <b class="text-gray-800">{{ $onDuty->isEmpty() ? __('not set (everyone with packing access)') : $onDuty->join(', ') }}</b></span>
         <span class="flex items-center gap-3">
-            @if ($newLabels)<a href="{{ route('packing.labels') }}" target="_blank" class="font-medium text-green-900 hover:underline">{{ __('Print new labels (:n)', ['n' => $newLabels]) }}</a>@endif
-            <a href="{{ route('handover.index') }}" class="font-medium text-green-900 hover:underline">{{ __('Handover') }}</a>
+            @if ($newLabels)<a href="{{ route('packing.labels') }}" target="_blank" class="font-medium text-primary hover:underline">{{ __('Print new labels (:n)', ['n' => $newLabels]) }}</a>@endif
+            <a href="{{ route('handover.index') }}" class="font-medium text-primary hover:underline">{{ __('Handover') }}</a>
             @if ($openIssues)<a href="{{ route('packing.issues') }}" class="font-medium text-red-600 hover:underline">{{ __('Missing items (:n)', ['n' => $openIssues]) }}</a>@endif
         </span>
     </div>
@@ -69,7 +69,7 @@
                 <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     @foreach ($staff as $id => $name)
                         <label class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                            <input type="checkbox" name="user_ids[]" value="{{ $id }}" @checked($onDuty->has($id)) class="rounded border-gray-300 text-green-900"> {{ $name }}
+                            <input type="checkbox" name="user_ids[]" value="{{ $id }}" @checked($onDuty->has($id)) class="rounded border-gray-300 text-primary"> {{ $name }}
                         </label>
                     @endforeach
                 </div>
@@ -94,7 +94,7 @@
 
         {{-- The order in my hands: tick every item, then Packed. --}}
         <template x-if="list">
-            <div class="mt-3 rounded-xl border-2 bg-white" :class="list.repack ? 'border-red-600' : 'border-green-800'">
+            <div class="mt-3 rounded-xl border-2 bg-white" :class="list.repack ? 'border-red-600' : 'border-primary'">
                 <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
                     <div>
                         <p class="font-mono text-lg font-bold text-gray-900" x-text="list.order_no"></p>
@@ -102,13 +102,13 @@
                     </div>
                     <span class="text-sm font-semibold tabular-nums text-gray-600" x-text="ticked.length + ' / ' + list.items.length"></span>
                 </div>
-                <p x-show="!list.repack" class="bg-green-50 px-4 py-2 text-sm font-medium text-green-900" x-text="last?.message"></p>
+                <p x-show="!list.repack" class="bg-primary-soft px-4 py-2 text-sm font-medium text-primary" x-text="last?.message"></p>
                 <p x-show="list.repack" class="bg-red-50 px-4 py-2 text-sm font-medium text-red-700">{{ __('Edited after packing. Change the box:') }} <span x-text="list.diff"></span></p>
                 <div class="divide-y divide-gray-100">
                     <template x-for="i in list.items" :key="i.id">
                         <button type="button" @click="tick(i.id)" class="flex w-full items-center gap-4 px-4 py-4 text-left" :class="ticked.includes(i.id) ? 'bg-green-50' : ''">
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-2 text-xl font-bold"
-                                :class="ticked.includes(i.id) ? 'border-green-800 bg-green-800 text-white' : 'border-gray-300 text-transparent'">✓</span>
+                                :class="ticked.includes(i.id) ? 'border-primary bg-primary-dark text-white' : 'border-gray-300 text-transparent'">✓</span>
                             <span class="min-w-0 flex-1">
                                 <span class="block text-base font-medium text-gray-900" x-text="i.name"></span>
                                 <span class="text-xs text-gray-500" x-show="i.shelf">{{ __('Shelf') }} <b x-text="i.shelf"></b></span>
@@ -120,7 +120,7 @@
                 <div class="grid grid-cols-3 gap-2 border-t border-gray-100 p-4">
                     <button type="button" @click="holding = !holding" class="rounded-xl border border-amber-300 px-3 py-4 text-sm font-semibold text-amber-800 hover:bg-amber-50">{{ __('Hold') }}</button>
                     <button type="button" @click="packed()" :disabled="!allTicked || busy"
-                        class="col-span-2 rounded-xl bg-green-900 px-3 py-4 text-base font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+                        class="col-span-2 rounded-xl bg-primary px-3 py-4 text-base font-semibold text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40"
                         x-text="allTicked ? @js(__('Packed')) : @js(__('Tick every item'))"></button>
                 </div>
                 <form x-show="holding" x-cloak method="POST" :action="@js(url('/packing/orders')) + '/' + list.id + '/hold'" class="space-y-2 border-t border-gray-100 p-4">
@@ -145,7 +145,7 @@
         @foreach ($filters as $f => $label)
             <a href="{{ route('packing.index', $f === 'all' ? [] : ['show' => $f]) }}"
                 @class(['flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium',
-                    'border-green-900 bg-green-900 text-white' => $filter === $f, 'border-gray-300 bg-white text-gray-600' => $filter !== $f])>
+                    'border-primary bg-primary text-white' => $filter === $f, 'border-gray-300 bg-white text-gray-600' => $filter !== $f])>
                 {{ $label }} <span class="tabular-nums opacity-70">{{ $counts[$f] }}</span>
             </a>
         @endforeach

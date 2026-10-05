@@ -2,7 +2,7 @@
     $pct = fn ($v) => $v === null ? '-' : rtrim(rtrim(number_format($v, 1), '0'), '.').'%';
     $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 1), '0'), '.');
     $query = fn (array $extra) => route('kpi.index', array_filter(['from' => $from, 'to' => $to] + $extra));
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     // Client-side sort for the (short) team table: click a heading.
     $cols = ['delivered' => __('Delivered'), 'delivery_rate' => __('Delivery %'), 'cancel_rate' => __('Cancel %'), 'return_rate' => __('Return %'), 'saved' => __('Saved'), 'pending' => __('No response now'), 'released' => __('Timed out')];
 @endphp
@@ -40,7 +40,7 @@
                 <x-slot:head>
                     <th>{{ __('Moderator') }}</th>
                     @foreach ($cols as $k => $label)
-                        <th class="text-right"><button type="button" @click="sort('{{ $k }}')" class="uppercase hover:text-green-900">{{ $label }} <span x-show="key === '{{ $k }}'" x-text="dir < 0 ? '↓' : '↑'"></span></button></th>
+                        <th class="text-right"><button type="button" @click="sort('{{ $k }}')" class="uppercase hover:text-primary">{{ $label }} <span x-show="key === '{{ $k }}'" x-text="dir < 0 ? '↓' : '↑'"></span></button></th>
                     @endforeach
                     @if ($mode === 'cohort')<th class="text-right">{{ __('Open') }}</th>@endif
                     @if ($showAmount)<th class="text-right">{{ __('Delivered ৳') }}</th>@endif
@@ -85,7 +85,7 @@
                 <div class="rounded-xl border border-gray-200 bg-white p-4">
                     <div class="flex items-center justify-between">
                         <p class="font-medium text-gray-800">{{ $r['name'] }}</p>
-                        <p class="text-lg font-semibold tabular-nums text-green-900">{{ $r['delivered'] }} <span class="text-xs font-normal text-gray-500">{{ __('delivered') }}</span></p>
+                        <p class="text-lg font-semibold tabular-nums text-primary">{{ $r['delivered'] }} <span class="text-xs font-normal text-gray-500">{{ __('delivered') }}</span></p>
                     </div>
                     <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-gray-600">
                         <span>{{ __('Delivery') }}: <b>{{ $pct($r['delivery_rate']) }}</b></span>

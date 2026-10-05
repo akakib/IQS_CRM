@@ -24,7 +24,7 @@
                 <span class="tabular-nums text-gray-500"><span x-text="s.rows_done"></span> / <span x-text="s.rows_total"></span></span>
             </div>
             <div class="h-2.5 overflow-hidden rounded-full bg-gray-100">
-                <div class="h-full rounded-full bg-green-800 transition-all" :style="`width: ${pct}%`"></div>
+                <div class="h-full rounded-full bg-primary-dark transition-all" :style="`width: ${pct}%`"></div>
             </div>
             <div class="mt-4 grid grid-cols-3 gap-3 text-center">
                 <div><p class="text-xl font-semibold tabular-nums text-gray-800" x-text="s.created"></p><p class="text-xs text-gray-500">{{ __('new') }}</p></div>
@@ -32,8 +32,8 @@
                 <div><p class="text-xl font-semibold tabular-nums" :class="s.skipped ? 'text-amber-700' : 'text-gray-800'" x-text="s.skipped"></p><p class="text-xs text-gray-500">{{ __('skipped') }}</p></div>
             </div>
             <p x-show="s.status === 'running' || s.status === 'pending'" class="mt-4 text-xs text-gray-500">{{ __('Keep this page open until it finishes.') }}</p>
-            <button type="button" x-show="s.status === 'paused'" @click="s.status = 'running'; run()" class="mt-4 text-sm font-medium text-green-900 hover:underline">{{ __('Resume') }}</button>
-            <a x-show="s.status === 'done'" href="{{ route('products.index') }}" class="mt-4 inline-block text-sm font-medium text-green-900 hover:underline">{{ __('Go to products') }}</a>
+            <button type="button" x-show="s.status === 'paused'" @click="s.status = 'running'; run()" class="mt-4 text-sm font-medium text-primary hover:underline">{{ __('Resume') }}</button>
+            <a x-show="s.status === 'done'" href="{{ route('products.index') }}" class="mt-4 inline-block text-sm font-medium text-primary hover:underline">{{ __('Go to products') }}</a>
         </x-card>
 
         <div x-show="s.errors.length" class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">

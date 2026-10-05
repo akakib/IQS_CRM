@@ -1,6 +1,6 @@
 <x-layouts.app :heading="__('Edit product')">
     <div class="mb-4 flex items-center justify-between">
-        <a href="{{ route('products.index') }}" class="text-sm text-green-900 hover:underline">{{ __('Back to products') }}</a>
+        <a href="{{ route('products.index') }}" class="text-sm text-primary hover:underline">{{ __('Back to products') }}</a>
         @can('products.delete')
             <form id="delete-product" method="POST" action="{{ route('products.destroy', $product) }}">
                 @csrf

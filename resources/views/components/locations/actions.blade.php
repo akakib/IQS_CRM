@@ -5,7 +5,7 @@
 
 <div class="inline-flex items-center gap-3">
     @can('locations.edit')
-        <a href="{{ route('locations.edit', $location) }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Edit') }}</a>
+        <a href="{{ route('locations.edit', $location) }}" class="text-sm font-medium text-primary hover:underline">{{ __('Edit') }}</a>
     @endcan
     @can('locations.delete')
     <form id="{{ $formId }}" method="POST" action="{{ route('locations.destroy', $location) }}">

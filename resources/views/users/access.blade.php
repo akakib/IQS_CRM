@@ -11,12 +11,12 @@
         return implode(' ', $parts);
     };
     $expired = fn ($row) => $row->expires_at && \Illuminate\Support\Carbon::parse($row->expires_at)->isPast();
-    $inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
 @endphp
 
 <x-layouts.app :heading="__('Access: :name', ['name' => $user->name])">
     <div class="mb-4">
-        <a href="{{ route('users.index') }}" class="text-sm text-green-900 hover:underline">{{ __('Back to staff') }}</a>
+        <a href="{{ route('users.index') }}" class="text-sm text-primary hover:underline">{{ __('Back to staff') }}</a>
     </div>
 
     <div class="grid gap-6 xl:grid-cols-2">
@@ -63,7 +63,7 @@
                 @error('expires_at') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
                 <input type="text" name="reason" value="{{ old('reason') }}" maxlength="255" placeholder="{{ __('Reason (required for temporary)') }}" class="{{ $inputClass }}">
                 @error('reason') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
-                <button type="submit" class="rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">{{ __('Give role') }}</button>
+                <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Give role') }}</button>
             </form>
         </section>
 
@@ -116,7 +116,7 @@
                 @error('expires_at') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
                 <input type="text" name="reason" value="{{ old('reason') }}" maxlength="255" required placeholder="{{ __('Reason') }}" class="{{ $inputClass }}">
                 @error('reason') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
-                <button type="submit" class="rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">{{ __('Save custom access') }}</button>
+                <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Save custom access') }}</button>
             </form>
         </section>
     </div>
@@ -125,7 +125,7 @@
     <section class="mt-6 rounded-xl border border-gray-200 bg-white p-5">
         <h2 class="text-sm font-semibold text-gray-800">{{ __('What :name can do right now', ['name' => $user->name]) }}</h2>
         @if ($map->isOwner)
-            <p class="mt-2 text-sm text-green-900">{{ __('Owner: everything, every field.') }}</p>
+            <p class="mt-2 text-sm text-primary">{{ __('Owner: everything, every field.') }}</p>
         @else
             <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($modules as $module => $m)

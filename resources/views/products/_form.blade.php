@@ -4,8 +4,8 @@
         'id' => null, 'name' => 'Default', 'sku' => '', 'barcode' => '', 'shelf_code' => '', 'unit' => 'pcs', 'pack_qty' => 1,
         'weight_g' => '', 'cost_price' => '', 'is_active' => true, 'prices' => $blankPrices,
     ]]);
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
-    $small = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
+    $small = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none';
     $canSeeCost = auth()->user()->canSeeField('cost_price');
 @endphp
 
@@ -64,7 +64,7 @@
                             <div class="flex items-center gap-3">
                                 <label class="flex items-center gap-1.5 text-xs text-gray-600">
                                     <input type="hidden" :name="`variants[${i}][is_active]`" :value="row.is_active ? 1 : 0">
-                                    <input type="checkbox" x-model="row.is_active" class="rounded border-gray-300 text-green-900"> {{ __('Active') }}
+                                    <input type="checkbox" x-model="row.is_active" class="rounded border-gray-300 text-primary"> {{ __('Active') }}
                                 </label>
                                 <button type="button" x-show="rows.length > 1" @click="rows.splice(i, 1)" class="text-xs text-red-600 hover:underline">{{ __('Remove') }}</button>
                             </div>
@@ -80,7 +80,7 @@
                                 <div class="mt-1 grid grid-cols-3 overflow-hidden rounded-md border border-gray-300 text-center">
                                     @foreach (['pcs' => __('Pcs'), 'g' => __('Gram'), 'box' => __('Box')] as $unit => $unitLabel)
                                         <button type="button" @click="row.unit = @js($unit)" class="py-1.5 text-xs"
-                                            :class="row.unit === @js($unit) ? 'bg-green-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'">{{ $unitLabel }}</button>
+                                            :class="row.unit === @js($unit) ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50'">{{ $unitLabel }}</button>
                                     @endforeach
                                 </div>
                             </div>
@@ -109,7 +109,7 @@
                     </div>
                 </template>
             </div>
-            <button type="button" @click="add()" class="mt-3 text-sm font-medium text-green-900 hover:underline">+ {{ __('Add variant') }}</button>
+            <button type="button" @click="add()" class="mt-3 text-sm font-medium text-primary hover:underline">+ {{ __('Add variant') }}</button>
         </x-card>
     </div>
 

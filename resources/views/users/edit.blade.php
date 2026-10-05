@@ -16,7 +16,7 @@
                 @php $row = $own[$n] ?? null; @endphp
                 <div class="flex items-center gap-3" x-data="{ on: {{ $row ? 'true' : 'false' }} }">
                     <label class="flex w-36 items-center gap-2 text-sm text-gray-700">
-                        <input type="checkbox" name="days[{{ $n }}][on]" value="1" x-model="on" class="rounded border-gray-300 text-green-900"> {{ $name }}
+                        <input type="checkbox" name="days[{{ $n }}][on]" value="1" x-model="on" class="rounded border-gray-300 text-primary"> {{ $name }}
                     </label>
                     <input type="time" name="days[{{ $n }}][start]" value="{{ $row ? substr($row->start_time, 0, 5) : settings('work.start') }}" :disabled="!on" class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-400">
                     <span class="text-gray-400">&rarr;</span>

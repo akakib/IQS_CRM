@@ -5,10 +5,10 @@
 
 <div class="inline-flex items-center gap-3">
     @can('staff.edit')
-        <a href="{{ route('users.edit', $user) }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Edit') }}</a>
+        <a href="{{ route('users.edit', $user) }}" class="text-sm font-medium text-primary hover:underline">{{ __('Edit') }}</a>
     @endcan
     @can('access.manage')
-        <a href="{{ route('users.access', $user) }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Access') }}</a>
+        <a href="{{ route('users.access', $user) }}" class="text-sm font-medium text-primary hover:underline">{{ __('Access') }}</a>
     @endcan
     @if (! $user->is(auth()->user()) && auth()->user()->can('staff.delete'))
         <form id="{{ $formId }}" method="POST" action="{{ route('users.status', $user) }}">
@@ -18,7 +18,7 @@
                 <button type="button" class="text-sm font-medium text-red-600 hover:underline"
                     @click="$dispatch('open-confirm', { id: 'user-status', form: @js($formId), label: @js($user->name), verb: @js(__('Deactivate')), message: @js(__('They will be logged out and cannot log in until activated again.')), danger: true })">{{ __('Deactivate') }}</button>
             @else
-                <button type="button" class="text-sm font-medium text-green-900 hover:underline"
+                <button type="button" class="text-sm font-medium text-primary hover:underline"
                     @click="$dispatch('open-confirm', { id: 'user-status', form: @js($formId), label: @js($user->name), verb: @js(__('Activate')), message: @js(__('They will be able to log in again.')), danger: false })">{{ __('Activate') }}</button>
             @endif
         </form>

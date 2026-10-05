@@ -1,5 +1,5 @@
 @php
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $types = ['no_answer' => __('Customer not answering'), 'partial' => __('Partial delivery'), 'cancel' => __('Wants to cancel'), 'exchange' => __('Exchange'), 'address' => __('Address problem'), 'hold' => __('Deliver later'), 'other' => __('Other')];
 @endphp
 
@@ -16,7 +16,7 @@
     @if ($results->count() > 1)
         <div class="mb-4 space-y-2">
             @foreach ($results as $r)
-                <a href="{{ route('hotline.index', ['q' => $q, 'order' => $r->id]) }}" class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 text-sm hover:border-green-800">
+                <a href="{{ route('hotline.index', ['q' => $q, 'order' => $r->id]) }}" class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 text-sm hover:border-primary">
                     <span><b class="font-mono">{{ $r->order_no }}</b> · {{ $r->ship_name }}</span>
                     <x-order-status :order="$r" :statuses="$statuses" />
                 </a>
@@ -40,7 +40,7 @@
                             <p class="text-2xl font-bold tabular-nums">৳{{ number_format((float) $o->cod_amount) }}</p>
                         </div>
                     </div>
-                    <p class="mt-3 text-sm"><b>{{ $o->ship_name }}</b> · <a href="tel:{{ $o->ship_phone }}" class="font-mono text-green-900">{{ $o->ship_phone }}</a>{{ $o->ship_alt_phone ? ' / '.$o->ship_alt_phone : '' }}</p>
+                    <p class="mt-3 text-sm"><b>{{ $o->ship_name }}</b> · <a href="tel:{{ $o->ship_phone }}" class="font-mono text-primary">{{ $o->ship_phone }}</a>{{ $o->ship_alt_phone ? ' / '.$o->ship_alt_phone : '' }}</p>
                     <p class="text-sm text-gray-600">{{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}</p>
                     <p class="mt-2 text-sm text-gray-700">{{ $o->items->map(fn ($i) => $i->name_snapshot.' ×'.rtrim(rtrim($i->qty, '0'), '.'))->join(', ') }}</p>
                     <p class="mt-2 text-sm">{{ __('Assigned to') }}: <b>{{ $o->moderator?->name ?? __('nobody') }}</b></p>

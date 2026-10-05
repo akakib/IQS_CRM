@@ -1,7 +1,7 @@
 @php
     $hasFilters = $filters['actor'] || $filters['type'] || $filters['q'] !== '' || $filters['from'] || $filters['to'];
     $show = fn ($v) => is_array($v) ? json_encode($v, JSON_UNESCAPED_UNICODE) : (is_bool($v) ? ($v ? 'yes' : 'no') : (string) ($v ?? '-'));
-    $inputClass = 'rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $inputClass = 'rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
 @endphp
 
 <x-layouts.app :heading="__('Activity log')">

@@ -7,7 +7,7 @@
     </div>
 
     @if ($role->isOwner())
-        <div class="max-w-2xl rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900">
+        <div class="max-w-2xl rounded-xl border border-green-200 bg-primary-soft p-4 text-sm text-primary">
             {{ __('Owner always has every permission, including modules added later, and sees every field.') }}
         </div>
     @else
@@ -39,7 +39,7 @@
                                             @php($key = $module.'.'.$action)
                                             <label class="inline-flex flex-col items-center gap-0.5" title="{{ $m['label'] }}: {{ $m['actions'][$action] }}">
                                                 <input type="checkbox" name="grants[]" value="{{ $key }}" @checked(in_array($key, old('grants', array_keys($grants)), true))
-                                                    class="h-4 w-4 rounded border-gray-300 text-green-900">
+                                                    class="h-4 w-4 rounded border-gray-300 text-primary">
                                                 @if ($m['actions'][$action] !== __(\Illuminate\Support\Str::headline($action)))
                                                     <span class="text-[10px] text-gray-400">{{ $m['actions'][$action] }}</span>
                                                 @endif
@@ -68,7 +68,7 @@
                 @foreach ($maskFields as $field => $label)
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <input type="checkbox" name="masks[]" value="{{ $field }}" @checked(in_array($field, old('masks', array_keys($masks)), true))
-                            class="h-4 w-4 rounded border-gray-300 text-green-900">
+                            class="h-4 w-4 rounded border-gray-300 text-primary">
                         {{ __('Hide :field', ['field' => mb_strtolower($label)]) }}
                     </label>
                 @endforeach
@@ -77,7 +77,7 @@
     @endif
 
     <div class="flex items-center gap-2">
-        <button type="submit" class="rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">{{ __('Save') }}</button>
+        <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Save') }}</button>
         <a href="{{ route('roles.index') }}" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">{{ __('Cancel') }}</a>
     </div>
 </div>

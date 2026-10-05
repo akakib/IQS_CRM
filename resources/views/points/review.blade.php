@@ -18,7 +18,7 @@
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-gray-800">{{ $f->name }} · {{ $flagLabels[$f->flag_type] ?? $f->flag_type }}</p>
                         <p class="text-xs text-gray-500">
-                            @if ($f->order_no)<a href="{{ route('orders.show', $f->order_id) }}" class="font-mono text-green-900 hover:underline">{{ $f->order_no }}</a> · @endif
+                            @if ($f->order_no)<a href="{{ route('orders.show', $f->order_id) }}" class="font-mono text-primary hover:underline">{{ $f->order_no }}</a> · @endif
                             {{ $f->details }} · {{ \Illuminate\Support\Carbon::parse($f->created_at)->format('d M, g:i A') }}
                         </p>
                     </div>
@@ -42,7 +42,7 @@
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-gray-800">{{ $d->name }} · {{ $rule['name'] ?? $d->trigger_key }} <span class="text-red-700">{{ (float) $d->points }}</span></p>
                         <p class="text-xs text-gray-500">
-                            @if ($d->order_no)<a href="{{ route('orders.show', $d->order_id) }}" class="font-mono text-green-900 hover:underline">{{ $d->order_no }}</a> · @endif
+                            @if ($d->order_no)<a href="{{ route('orders.show', $d->order_id) }}" class="font-mono text-primary hover:underline">{{ $d->order_no }}</a> · @endif
                             "{{ $d->dispute_note }}"
                         </p>
                     </div>
@@ -65,7 +65,7 @@
                 <div class="mb-2 rounded-xl border border-gray-200 bg-white p-3">
                     <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                         <div class="min-w-0 text-sm">
-                            <a href="{{ route('orders.show', $o->id) }}" class="font-mono text-green-900 hover:underline">{{ $o->order_no }}</a>
+                            <a href="{{ route('orders.show', $o->id) }}" class="font-mono text-primary hover:underline">{{ $o->order_no }}</a>
                             · {{ $o->ship_name }}
                             · <span class="font-mono">{{ $canSeeContact ? $o->ship_phone : substr($o->ship_phone, 0, 3).'*****'.substr($o->ship_phone, -3) }}</span>
                             · ৳{{ number_format((float) $o->grand_total) }}

@@ -5,7 +5,7 @@
 @endphp
 
 <x-layouts.app :heading="__('Ad tracking')">
-    <div class="mb-4 rounded-xl border p-4 text-sm {{ $metaReady && $production ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900' }}">
+    <div class="mb-4 rounded-xl border p-4 text-sm {{ $metaReady && $production ? 'border-green-200 bg-primary-soft text-primary' : 'border-amber-200 bg-amber-50 text-amber-900' }}">
         @if ($metaReady && $production)
             {{ __('Meta Conversions API is live: events are sent to Meta.') }}
         @else
@@ -26,7 +26,7 @@
                         <p class="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">{{ __('Send when the order is') }}</p>
                         <div class="flex flex-wrap gap-2">
                             @foreach ($stages as $key => $label)
-                                <button type="button" @click="fire = @js($key)" class="rounded-full border px-3 py-1 text-sm" :class="fire === @js($key) ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
+                                <button type="button" @click="fire = @js($key)" class="rounded-full border px-3 py-1 text-sm" :class="fire === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
                             @endforeach
                         </div>
                         <p x-show="fire === 'delivered'" class="mt-2 text-xs text-amber-700">{{ __('Turn off the browser Purchase on the thank-you page (or rename it), otherwise Meta cannot match them days later. Meta only accepts events up to 7 days old.') }}</p>
@@ -36,7 +36,7 @@
                         <p class="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">{{ __('Value') }}</p>
                         <div class="flex flex-wrap gap-2">
                             @foreach ($bases as $key => $label)
-                                <button type="button" @click="basis = @js($key)" class="rounded-full border px-3 py-1 text-sm" :class="basis === @js($key) ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
+                                <button type="button" @click="basis = @js($key)" class="rounded-full border px-3 py-1 text-sm" :class="basis === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
                             @endforeach
                         </div>
                     </div>
@@ -44,11 +44,11 @@
                         <p class="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">{{ __('For orders from') }}</p>
                         <div class="flex flex-wrap gap-3">
                             @foreach ($channels as $key => $label)
-                                <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="channels[]" value="{{ $key }}" @checked(in_array($key, $chosen, true)) class="rounded border-gray-300 text-green-900"> {{ $label }}</label>
+                                <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="channels[]" value="{{ $key }}" @checked(in_array($key, $chosen, true)) class="rounded border-gray-300 text-primary"> {{ $label }}</label>
                             @endforeach
                         </div>
                     </div>
-                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" value="1" @checked($e->is_active) class="rounded border-gray-300 text-green-900"> {{ __('On') }}</label>
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" value="1" @checked($e->is_active) class="rounded border-gray-300 text-primary"> {{ __('On') }}</label>
                     @can('settings.edit')<x-button>{{ __('Save') }}</x-button>@endcan
                 </form>
             </x-card>

@@ -16,7 +16,7 @@
                         <a href="{{ route('orders.show', $i->order_id) }}" class="font-mono font-semibold hover:underline">{{ $i->order_no }}</a>
                         <span class="text-sm text-gray-600">· {{ $i->ship_name }} · ৳{{ number_format((float) $i->cod_amount) }}</span>
                         <p class="text-sm text-gray-800">{{ ucfirst(str_replace('_', ' ', $i->issue_type)) }}{{ $i->note ? ': '.$i->note : '' }}</p>
-                        @if ($i->rider_phone)<a href="tel:{{ $i->rider_phone }}" class="text-xs text-green-900">☎ {{ __('Rider') }} {{ $i->rider_phone }}</a>@endif
+                        @if ($i->rider_phone)<a href="tel:{{ $i->rider_phone }}" class="text-xs text-primary">☎ {{ __('Rider') }} {{ $i->rider_phone }}</a>@endif
                         @if ($all)<p class="text-xs text-gray-500">{{ __('Assigned to') }}: {{ $i->moderator ?? '-' }}</p>@endif
                     </div>
                     <x-badge :color="$due->isPast() ? 'red' : 'amber'">{{ $due->isPast() ? __('Overdue :t', ['t' => $due->diffForHumans(null, true)]) : __('Due in :t', ['t' => $due->diffForHumans(null, true)]) }}</x-badge>
@@ -26,7 +26,7 @@
                     <input type="hidden" name="resolution" :value="r">
                     <div class="flex flex-wrap gap-1.5">
                         @foreach ($resolutions as $key => $label)
-                            <button type="button" @click="r = @js($key)" class="rounded-full border px-2.5 py-1 text-xs" :class="r === @js($key) ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
+                            <button type="button" @click="r = @js($key)" class="rounded-full border px-2.5 py-1 text-xs" :class="r === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
                         @endforeach
                     </div>
                     <input name="note" maxlength="500" placeholder="{{ __('What was agreed') }}" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">

@@ -75,7 +75,7 @@
                     <td class="text-gray-500">{{ $product->updated_at->format('d M Y') }}</td>
                     <td class="text-right">
                         @can('products.edit')
-                            <a href="{{ route('products.edit', $product) }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Edit') }}</a>
+                            <a href="{{ route('products.edit', $product) }}" class="text-sm font-medium text-primary hover:underline">{{ __('Edit') }}</a>
                         @endcan
                     </td>
                 </tr>
@@ -94,7 +94,7 @@
                     </x-slot:badge>
                     <x-slot:footer>{{ trans_choice(':count variant|:count variants', $product->variants->count(), ['count' => $product->variants->count()]) }}</x-slot:footer>
                     <x-slot:actions>
-                        @can('products.edit')<a href="{{ route('products.edit', $product) }}" class="text-sm font-medium text-green-900">{{ __('Edit') }}</a>@endcan
+                        @can('products.edit')<a href="{{ route('products.edit', $product) }}" class="text-sm font-medium text-primary">{{ __('Edit') }}</a>@endcan
                     </x-slot:actions>
                 </x-record-card>
             @endforeach

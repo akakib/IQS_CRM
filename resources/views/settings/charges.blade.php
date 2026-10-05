@@ -1,4 +1,4 @@
-@php($input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none')
+@php($input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none')
 
 <x-layouts.app :heading="__('Delivery charges')">
     <p class="mb-4 text-sm text-gray-500">{{ __('Agents never type the delivery charge: it comes from these rules by zone, parcel weight and order total. Lowest priority number wins; a free-shipping rule (higher minimum total) beats the normal charge.') }}</p>
@@ -19,7 +19,7 @@
                                 <td class="py-2 pr-3 text-right font-medium tabular-nums">{{ (float) $r->charge ? '৳'.number_format((float) $r->charge) : __('Free') }}</td>
                                 <td class="py-2 pr-3">{{ $r->priority }}</td>
                                 <td class="py-2 text-right">
-                                    <form method="POST" action="{{ route('settings.charges.rules.toggle', $r->id) }}">@csrf<button class="text-xs text-green-900 hover:underline">{{ $r->is_active ? __('Switch off') : __('Switch on') }}</button></form>
+                                    <form method="POST" action="{{ route('settings.charges.rules.toggle', $r->id) }}">@csrf<button class="text-xs text-primary hover:underline">{{ $r->is_active ? __('Switch off') : __('Switch on') }}</button></form>
                                 </td>
                             </tr>
                         @endforeach

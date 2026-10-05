@@ -1,5 +1,5 @@
 @php
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $items = $order->items->map(fn ($i) => [
         'variant_id' => $i->variant_id, 'label' => $i->name_snapshot, 'sub' => $i->sku_snapshot, 'price' => (float) $i->unit_price,
         'unit' => $i->unit, 'weight_g' => (int) ($i->variant?->weight_g ?? 0), 'qty' => (float) $i->qty, 'line_discount' => (float) $i->line_discount,
@@ -8,7 +8,7 @@
 
 <x-layouts.app :heading="__('Edit :no', ['no' => $order->order_no])">
     <div class="mb-4 flex flex-wrap items-center gap-2 text-sm">
-        <a href="{{ route('orders.show', $order) }}" class="text-green-900 hover:underline">{{ __('Back to the order') }}</a>
+        <a href="{{ route('orders.show', $order) }}" class="text-primary hover:underline">{{ __('Back to the order') }}</a>
         @if ($policy === 'approval' && ! auth()->user()->can('orders.approve'))
             <x-badge color="amber">{{ __('In this stage a manager must approve the change') }}</x-badge>
         @endif
@@ -90,7 +90,7 @@
                         <input type="hidden" name="zone_id" :value="zone">
                         <div class="flex flex-wrap gap-2">
                             @foreach ($zones as $id => $zone)
-                                <button type="button" @click="zone = '{{ $id }}'" class="rounded-full border px-2.5 py-1 text-xs" :class="zone == '{{ $id }}' ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $zone }}</button>
+                                <button type="button" @click="zone = '{{ $id }}'" class="rounded-full border px-2.5 py-1 text-xs" :class="zone == '{{ $id }}' ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $zone }}</button>
                             @endforeach
                         </div>
                     </div>

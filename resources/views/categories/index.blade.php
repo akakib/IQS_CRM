@@ -1,4 +1,4 @@
-@php($input = 'rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none')
+@php($input = 'rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none')
 
 <x-layouts.app :heading="__('Categories')">
     <x-products.subnav active="categories" />
@@ -34,7 +34,7 @@
                         <x-button size="sm">{{ __('Save') }}</x-button>
                     </form>
                     <div class="flex items-center gap-3">
-                        <button type="button" @click="editing = !editing" class="text-sm text-green-900 hover:underline" x-text="editing ? @js(__('Cancel')) : @js(__('Edit'))"></button>
+                        <button type="button" @click="editing = !editing" class="text-sm text-primary hover:underline" x-text="editing ? @js(__('Cancel')) : @js(__('Edit'))"></button>
                         <form id="{{ $formId }}" method="POST" action="{{ route('categories.destroy', $category) }}">
                             @csrf
                             @method('DELETE')

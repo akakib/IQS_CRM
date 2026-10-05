@@ -1,5 +1,5 @@
 @php
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
 @endphp
 
 <x-layouts.app :heading="__('Quick order')">
@@ -74,7 +74,7 @@
                     <div class="mb-4 flex flex-wrap gap-2">
                         @foreach (['messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone call'), 'b2b' => 'B2B'] as $key => $label)
                             <button type="button" @click="channel = @js($key)" class="rounded-full border px-3 py-1.5 text-sm"
-                                :class="channel === @js($key) ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
+                                :class="channel === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
                         @endforeach
                     </div>
                     <div class="grid gap-3 md:grid-cols-2">
@@ -98,13 +98,13 @@
                     <template x-if="customer && customer.addresses.length">
                         <div class="mb-3 space-y-2">
                             <template x-for="a in customer.addresses" :key="a.id">
-                                <label class="flex cursor-pointer items-start gap-2 rounded-lg border p-2 text-sm" :class="addressId == a.id ? 'border-green-800 bg-green-50' : 'border-gray-200'">
-                                    <input type="radio" :value="a.id" x-model="addressId" @change="zoneId = a.zone_id; recharge()" class="mt-0.5 text-green-900">
+                                <label class="flex cursor-pointer items-start gap-2 rounded-lg border p-2 text-sm" :class="addressId == a.id ? 'border-primary bg-primary-soft' : 'border-gray-200'">
+                                    <input type="radio" :value="a.id" x-model="addressId" @change="zoneId = a.zone_id; recharge()" class="mt-0.5 text-primary">
                                     <span x-text="a.line"></span>
                                 </label>
                             </template>
                             <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 p-2 text-sm">
-                                <input type="radio" value="" x-model="addressId" class="text-green-900"> {{ __('New address') }}
+                                <input type="radio" value="" x-model="addressId" class="text-primary"> {{ __('New address') }}
                             </label>
                         </div>
                     </template>
@@ -120,7 +120,7 @@
                         <div class="flex flex-wrap gap-2">
                             @foreach ($zones as $id => $zone)
                                 <button type="button" @click="zoneId = {{ $id }}; recharge()" class="rounded-full border px-2.5 py-1 text-xs"
-                                    :class="zoneId == {{ $id }} ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $zone }}</button>
+                                    :class="zoneId == {{ $id }} ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $zone }}</button>
                             @endforeach
                         </div>
                     </div>
@@ -182,7 +182,7 @@
                     <div class="mb-3 flex flex-wrap gap-2">
                         @foreach ($methods as $m)
                             <button type="button" @click="payMethod = payMethod == {{ $m->id }} ? null : {{ $m->id }}" class="rounded-full border px-2.5 py-1 text-xs"
-                                :class="payMethod == {{ $m->id }} ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $m->name }}</button>
+                                :class="payMethod == {{ $m->id }} ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $m->name }}</button>
                         @endforeach
                     </div>
                     <div x-show="payMethod" class="space-y-2">

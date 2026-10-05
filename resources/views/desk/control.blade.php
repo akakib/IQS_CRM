@@ -21,7 +21,7 @@
                 @php $st = $byKey[$key] ?? null; @endphp
                 @continue(! $st)
                 @php $row = $stages[$st['id']] ?? null; @endphp
-                <a href="{{ route('orders.index', ['tab' => 'all', 'status' => $st['id']]) }}" class="rounded-lg border border-gray-200 p-3 hover:border-green-800">
+                <a href="{{ route('orders.index', ['tab' => 'all', 'status' => $st['id']]) }}" class="rounded-lg border border-gray-200 p-3 hover:border-primary">
                     <p class="text-xs font-medium" style="color: {{ $st['color'] }}">{{ __($st['name']) }}</p>
                     <p class="text-xl font-semibold tabular-nums text-gray-900">{{ (int) ($row->n ?? 0) }}</p>
                     <p class="text-[11px] text-gray-500">{{ $row ? __('oldest untouched :t', ['t' => $ago($row->oldest)]) : '' }}</p>
@@ -92,6 +92,6 @@
     @endif
 
     @can('attendance.view')
-        <p class="mt-4 text-sm"><a href="{{ route('attendance.index') }}" class="font-medium text-green-900 hover:underline">{{ __('Attendance and breaks') }} &rarr;</a></p>
+        <p class="mt-4 text-sm"><a href="{{ route('attendance.index') }}" class="font-medium text-primary hover:underline">{{ __('Attendance and breaks') }} &rarr;</a></p>
     @endcan
 </x-layouts.app>

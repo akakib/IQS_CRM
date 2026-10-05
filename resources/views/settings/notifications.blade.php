@@ -33,7 +33,7 @@
                         <x-simple-select name="default_priority" size="sm" :options="$priorityOptions" :value="$type->default_priority" />
                         <label class="flex items-center gap-1.5 text-xs text-gray-600">
                             <input type="hidden" name="is_active" value="0">
-                            <input type="checkbox" name="is_active" value="1" @checked($type->is_active) @change="$refs.typeForm.requestSubmit()" class="rounded border-gray-300 text-green-900">
+                            <input type="checkbox" name="is_active" value="1" @checked($type->is_active) @change="$refs.typeForm.requestSubmit()" class="rounded border-gray-300 text-primary">
                             {{ __('On') }}
                         </label>
                     </div>
@@ -57,7 +57,7 @@
                     @endforelse
                 </div>
 
-                <button type="button" x-show="!adding" @click="adding = true" class="mt-2 text-xs font-medium text-green-900 hover:underline">+ {{ __('Add who receives it') }}</button>
+                <button type="button" x-show="!adding" @click="adding = true" class="mt-2 text-xs font-medium text-primary hover:underline">+ {{ __('Add who receives it') }}</button>
                 <form x-show="adding" x-cloak method="POST" action="{{ route('settings.notifications.rules.store') }}"
                     class="mt-3 flex flex-col gap-2 border-t border-gray-100 pt-3 md:flex-row md:flex-wrap md:items-center"
                     @select-change="if (Object.keys(@js($targetLabels)).includes($event.detail)) target = $event.detail">
@@ -68,10 +68,10 @@
                     <div x-show="target === 'user'" x-cloak><x-simple-select name="user_id" size="sm" :options="['' => __('Choose person')] + $userOptions" value="" /></div>
                     @foreach (['channel_in_app' => __('In-app'), 'channel_telegram' => 'Telegram', 'channel_sms' => 'SMS'] as $field => $label)
                         <label class="flex items-center gap-1.5 text-xs text-gray-600">
-                            <input type="checkbox" name="{{ $field }}" value="1" @checked($field === 'channel_in_app') class="rounded border-gray-300 text-green-900"> {{ $label }}
+                            <input type="checkbox" name="{{ $field }}" value="1" @checked($field === 'channel_in_app') class="rounded border-gray-300 text-primary"> {{ $label }}
                         </label>
                     @endforeach
-                    <button type="submit" class="rounded-lg bg-green-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-800">{{ __('Add') }}</button>
+                    <button type="submit" class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-dark">{{ __('Add') }}</button>
                     <button type="button" @click="adding = false" class="text-xs text-gray-500 hover:underline">{{ __('Cancel') }}</button>
                 </form>
             </div>

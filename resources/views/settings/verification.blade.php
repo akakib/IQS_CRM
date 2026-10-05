@@ -1,5 +1,5 @@
 @php
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $outcomes = [
         'record_verified' => __('Record verified (still needs the call)'),
         'record_verified_and_confirmed' => __('Verified and confirmed (skip the call)'),
@@ -32,7 +32,7 @@
                         <div class="flex items-center gap-2">
                             <x-badge :color="$outcomeColor[$r->outcome]">{{ $outcomes[$r->outcome] }}</x-badge>
                             @can('settings.edit')
-                                <form method="POST" action="{{ route('settings.verification.toggle', $r->id) }}">@csrf<button class="text-xs text-green-900 hover:underline">{{ $r->is_active ? __('Off') : __('On') }}</button></form>
+                                <form method="POST" action="{{ route('settings.verification.toggle', $r->id) }}">@csrf<button class="text-xs text-primary hover:underline">{{ $r->is_active ? __('Off') : __('On') }}</button></form>
                                 <form method="POST" action="{{ route('settings.verification.destroy', $r->id) }}">@csrf @method('DELETE')<button class="text-xs text-red-600 hover:underline">{{ __('Delete') }}</button></form>
                             @endcan
                         </div>
@@ -82,27 +82,27 @@
                             <div class="rounded-lg border border-gray-200 p-2">
                                 <div class="mb-1 flex flex-wrap gap-1">
                                     @foreach ($fields as $key => $label)
-                                        <button type="button" @click="c.field = @js($key)" class="rounded border px-1.5 py-0.5 text-[11px]" :class="c.field === @js($key) ? 'border-green-900 bg-green-900 text-white' : 'border-gray-200 text-gray-600'">{{ __($label) }}</button>
+                                        <button type="button" @click="c.field = @js($key)" class="rounded border px-1.5 py-0.5 text-[11px]" :class="c.field === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-600'">{{ __($label) }}</button>
                                     @endforeach
                                 </div>
                                 <input type="hidden" :name="`conditions[${i}][field]`" :value="c.field">
                                 <div x-show="provFields.includes(c.field)" class="mb-1 flex flex-wrap gap-1">
                                     <input type="hidden" :name="`conditions[${i}][provider_id]`" :value="c.provider_id ?? ''">
                                     @foreach ($providers as $id => $name)
-                                        <button type="button" @click="c.provider_id = {{ $id }}" class="rounded-full border px-2 py-0.5 text-[11px]" :class="c.provider_id == {{ $id }} ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $name }}</button>
+                                        <button type="button" @click="c.provider_id = {{ $id }}" class="rounded-full border px-2 py-0.5 text-[11px]" :class="c.provider_id == {{ $id }} ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $name }}</button>
                                     @endforeach
                                 </div>
                                 <div class="flex gap-1">
                                     <input type="hidden" :name="`conditions[${i}][operator]`" :value="c.operator">
                                     @foreach (['>=', '<=', '=', '!=', '>', '<'] as $op)
-                                        <button type="button" @click="c.operator = @js($op)" class="w-8 rounded border text-xs" :class="c.operator === @js($op) ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300'">{{ $op }}</button>
+                                        <button type="button" @click="c.operator = @js($op)" class="w-8 rounded border text-xs" :class="c.operator === @js($op) ? 'border-primary bg-primary text-white' : 'border-gray-300'">{{ $op }}</button>
                                     @endforeach
                                     <input :name="`conditions[${i}][value]`" x-model="c.value" required placeholder="80 / true" class="min-w-0 flex-1 rounded border border-gray-300 px-2 text-xs">
                                     <button type="button" @click="conds.splice(i, 1)" class="px-1 text-gray-400 hover:text-red-600">&times;</button>
                                 </div>
                             </div>
                         </template>
-                        <button type="button" @click="conds.push({ field: 'cod_amount', operator: '<=', value: '', provider_id: null })" class="text-sm font-medium text-green-900 hover:underline">+ {{ __('Add condition') }}</button>
+                        <button type="button" @click="conds.push({ field: 'cod_amount', operator: '<=', value: '', provider_id: null })" class="text-sm font-medium text-primary hover:underline">+ {{ __('Add condition') }}</button>
                         <x-button class="w-full">{{ __('Save rule') }}</x-button>
                     </form>
                 </x-card>

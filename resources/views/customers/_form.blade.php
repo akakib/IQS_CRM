@@ -1,5 +1,5 @@
 @php
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $extraPhones = old('extra_phones', $customer->exists ? $customer->phones->where('is_primary', false)->pluck('phone')->values()->all() : []);
     $addresses = old('addresses', $customer->exists ? $customer->addresses->map->only(['id', 'address_line', 'district', 'thana', 'zone_id', 'is_default'])->values()->all() : []);
     if ($addresses === []) {
@@ -23,7 +23,7 @@
                     <button type="button" @click="phones.splice(i, 1)" class="px-2 text-gray-400 hover:text-red-600" aria-label="{{ __('Remove') }}">&times;</button>
                 </div>
             </template>
-            <button type="button" x-show="phones.length < 5" @click="phones.push('')" class="text-sm font-medium text-green-900 hover:underline">+ {{ __('Add number') }}</button>
+            <button type="button" x-show="phones.length < 5" @click="phones.push('')" class="text-sm font-medium text-primary hover:underline">+ {{ __('Add number') }}</button>
             @error('extra_phones.*')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
         </div>
 
@@ -44,7 +44,7 @@
             <textarea id="note" name="note" rows="2" maxlength="500" class="{{ $input }}">{{ old('note', $customer->note) }}</textarea>
         </div>
         <label class="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" name="marketing_consent" value="1" @checked(old('marketing_consent', $customer->marketing_consent)) class="rounded border-gray-300 text-green-900">
+            <input type="checkbox" name="marketing_consent" value="1" @checked(old('marketing_consent', $customer->marketing_consent)) class="rounded border-gray-300 text-primary">
             {{ __('Agreed to receive offers (marketing consent)') }}
         </label>
     </x-card>
@@ -62,17 +62,17 @@
                     <input type="hidden" :name="`addresses[${i}][zone_id]`" :value="a.zone_id ?? ''">
                     @foreach ($zones as $id => $zone)
                         <button type="button" @click="a.zone_id = {{ $id }}" class="rounded-full border px-2.5 py-1 text-xs"
-                            :class="a.zone_id == {{ $id }} ? 'border-green-900 bg-green-900 text-white' : 'border-gray-300 text-gray-600'">{{ $zone }}</button>
+                            :class="a.zone_id == {{ $id }} ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $zone }}</button>
                     @endforeach
                     <label class="ml-auto flex items-center gap-1 text-xs text-gray-600">
-                        <input type="radio" :checked="def === i" @change="def = i" class="text-green-900"> {{ __('Default') }}
+                        <input type="radio" :checked="def === i" @change="def = i" class="text-primary"> {{ __('Default') }}
                     </label>
                     <input type="hidden" :name="`addresses[${i}][is_default]`" :value="def === i ? 1 : 0">
                     <button type="button" x-show="rows.length > 1" @click="rows.splice(i, 1); if (def >= rows.length) def = 0" class="text-xs text-red-600 hover:underline">{{ __('Remove') }}</button>
                 </div>
             </div>
         </template>
-        <button type="button" x-show="rows.length < 10" @click="rows.push({ id: null, address_line: '', district: '', thana: '', zone_id: '' })" class="text-sm font-medium text-green-900 hover:underline">+ {{ __('Add address') }}</button>
+        <button type="button" x-show="rows.length < 10" @click="rows.push({ id: null, address_line: '', district: '', thana: '', zone_id: '' })" class="text-sm font-medium text-primary hover:underline">+ {{ __('Add address') }}</button>
     </x-card>
 </div>
 

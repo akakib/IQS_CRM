@@ -42,7 +42,7 @@
                         @if ($w && $w->is_extra)
                             <x-badge :color="$w->extra_approved_at ? 'green' : 'amber'">{{ $w->extra_approved_at ? __('Extra day, approved') : __('Extra day, not approved') }}</x-badge>
                             @if ($canEdit)
-                                <form method="POST" action="{{ route('attendance.extra', $w->id) }}">@csrf<button class="text-xs font-medium text-green-900 hover:underline">{{ $w->extra_approved_at ? __('Remove approval') : __('Approve') }}</button></form>
+                                <form method="POST" action="{{ route('attendance.extra', $w->id) }}">@csrf<button class="text-xs font-medium text-primary hover:underline">{{ $w->extra_approved_at ? __('Remove approval') : __('Approve') }}</button></form>
                             @endif
                         @endif
                         <x-badge :color="$over ? 'red' : 'gray'">{{ __('Breaks :u of :l min', ['u' => $rest, 'l' => $limit]) }}</x-badge>
@@ -62,7 +62,7 @@
                                     @if ($b->correction_note)<span class="text-xs text-gray-400">· {{ __('corrected: :n', ['n' => $b->correction_note]) }}</span>@endif
                                 </span>
                                 @if ($canEdit && $b->ended_at)
-                                    <button type="button" @click="edit = !edit" class="text-xs font-medium text-green-900 hover:underline">{{ __('Correct') }}</button>
+                                    <button type="button" @click="edit = !edit" class="text-xs font-medium text-primary hover:underline">{{ __('Correct') }}</button>
                                     <form x-show="edit" x-cloak method="POST" action="{{ route('attendance.breaks.correct', $b->id) }}" class="flex w-full flex-wrap items-center gap-2">
                                         @csrf
                                         <label class="text-xs text-gray-500">{{ __('Really ended at') }}

@@ -19,7 +19,7 @@
         'hold' => __('On hold. Resume it when the reason is solved.'),
         'confirmed' => __('Confirmed. Send it to packing: the courier is booked for you.'),
     ];
-    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
+    $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $showDetailOnPhone = request()->filled('order') && $order && ! $lost;
     // The one order whose timer is running: the open one, or another of mine.
     $armed = $order && $order->action_due_at && $isMine ? $order : $timed;
@@ -56,7 +56,7 @@
     {{-- New orders: nobody picks; "Take next" always gives the oldest one. --}}
     <div @class(['mb-4 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         <div class="flex items-center gap-4">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold tabular-nums {{ $waiting ? 'bg-green-900 text-white' : 'bg-gray-100 text-gray-400' }}">{{ $waiting }}</div>
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold tabular-nums {{ $waiting ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400' }}">{{ $waiting }}</div>
             <div>
                 <p class="text-sm font-semibold text-gray-800">{{ trans_choice('{0} No new orders|{1} New order waiting|[2,*] New orders waiting', $waiting) }}</p>
                 <p class="text-xs text-gray-500">
@@ -139,7 +139,7 @@
                     @php $current = $order && $order->id === $row->id; @endphp
                     <a href="{{ $url(['tab' => $tab, 'page' => $list->currentPage() > 1 ? $list->currentPage() : null, 'order' => $row->id]) }}" data-row data-current="{{ $current ? 1 : 0 }}"
                         @class(['flex items-center justify-between gap-2 border-b border-l-4 border-b-gray-100 px-4 py-3 last:border-b-0 hover:bg-gray-50',
-                            'border-l-green-900 bg-green-50/60' => $current, 'border-l-transparent' => ! $current])>
+                            'border-l-primary bg-primary-soft/60' => $current, 'border-l-transparent' => ! $current])>
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $row->ship_name }}</span>
                             <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }}@if ($row->channel !== 'web') · {{ $row->channel }}@endif</span>
@@ -173,14 +173,14 @@
                     <p class="mt-1 text-sm text-gray-500">{{ $waiting && $canTake ? __('Press Take next to get the oldest new order.') : __('New orders will show at the top when they arrive.') }}</p>
                 </div>
             @else
-                <a href="{{ $url(['tab' => $tab]) }}" class="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-green-900 lg:hidden">&larr; {{ __('My orders') }} · {{ $tabLabels[$tab] }} ({{ $counts[$tab] }})</a>
+                <a href="{{ $url(['tab' => $tab]) }}" class="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-primary lg:hidden">&larr; {{ __('My orders') }} · {{ $tabLabels[$tab] }} ({{ $counts[$tab] }})</a>
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                                    <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-green-900 hover:underline">{{ $order->order_no }}</a>
+                                    <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-primary hover:underline">{{ $order->order_no }}</a>
                                     <span>{{ ucfirst($order->channel) }}</span>
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
@@ -229,7 +229,7 @@
                             <div class="rounded-lg border border-gray-200 p-4">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Duplicate check') }}</p>
                                 @forelse ($detail['duplicates'] as $d)
-                                    <a href="{{ route('orders.show', $d->id) }}" class="block text-sm text-gray-800 hover:text-green-900">
+                                    <a href="{{ route('orders.show', $d->id) }}" class="block text-sm text-gray-800 hover:text-primary">
                                         <span class="font-mono">{{ $d->order_no }}</span> · {{ $money($d->grand_total) }} · <span style="color: {{ $statuses[$d->status_id]['color'] }}">{{ __($statuses[$d->status_id]['name']) }}</span>
                                     </a>
                                 @empty
@@ -341,7 +341,7 @@
                                 @foreach ($reasons[$mode] as $id => $label)
                                     <button type="button" @click="reason = {{ $id }}" data-reason="{{ $mode }}-{{ $loop->iteration }}"
                                         class="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm"
-                                        :class="reason === {{ $id }} ? 'border-green-900 bg-green-50 font-medium text-green-900' : 'border-gray-200 text-gray-700 hover:bg-gray-50'">
+                                        :class="reason === {{ $id }} ? 'border-primary bg-primary-soft font-medium text-primary' : 'border-gray-200 text-gray-700 hover:bg-gray-50'">
                                         {{ __($label) }} @if ($loop->iteration < 10)<kbd class="rounded bg-gray-100 px-1.5 text-[11px] text-gray-500">{{ $loop->iteration }}</kbd>@endif
                                     </button>
                                 @endforeach
@@ -352,7 +352,7 @@
                             <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="{{ $input }} mt-3">
                             <div class="mt-4 flex gap-2">
                                 <button type="button" @click="reasonMode = null" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">{{ __('Back') }}</button>
-                                <button type="submit" :disabled="!reason" class="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 {{ $mode === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-900 hover:bg-green-800' }}">{{ $mode === 'cancel' ? __('Cancel the order') : __('Put on hold') }}</button>
+                                <button type="submit" :disabled="!reason" class="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 {{ $mode === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary-dark' }}">{{ $mode === 'cancel' ? __('Cancel the order') : __('Put on hold') }}</button>
                             </div>
                         </form>
                     </div>

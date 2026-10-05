@@ -54,7 +54,7 @@
         <template x-for="option in options" :key="option.value">
             <button type="button" @click="choose(option.value)"
                 @class(['w-full text-left px-3 py-1.5 hover:bg-gray-50', 'text-xs' => $size === 'sm', 'text-sm' => $size === 'md'])
-                :class="option.value === value ? 'font-medium text-green-900' : 'text-gray-700'"
+                :class="option.value === value ? 'font-medium text-primary' : 'text-gray-700'"
                 x-text="option.label"></button>
         </template>
     </div>

@@ -44,14 +44,14 @@
                 @keydown.arrow-down.prevent="active = Math.min(active + 1, items.length - 1)"
                 @keydown.arrow-up.prevent="active = Math.max(active - 1, 0)"
                 @keydown.enter.prevent="choose(items[active])"
-                class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-green-800 focus:outline-none">
+                class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none">
         </div>
         <div class="max-h-64 overflow-y-auto py-1">
             <p x-show="loading" class="px-3 py-2 text-xs text-gray-400">{{ __('Searching…') }}</p>
             <p x-show="!loading && !items.length" class="px-3 py-2 text-xs text-gray-400">{{ __('No match.') }}</p>
             <template x-for="(item, i) in items" :key="item.value">
                 <button type="button" @click="choose(item)" @mouseenter="active = i"
-                    class="block w-full px-3 py-1.5 text-left text-sm" :class="i === active ? 'bg-green-50 text-green-900' : 'text-gray-700'">
+                    class="block w-full px-3 py-1.5 text-left text-sm" :class="i === active ? 'bg-primary-soft text-primary' : 'text-gray-700'">
                     <span x-text="item.label"></span>
                     <span x-show="item.sub" class="block text-xs text-gray-400" x-text="item.sub"></span>
                 </button>

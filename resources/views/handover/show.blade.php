@@ -20,7 +20,7 @@
             </div>
             <div class="mt-4 grid grid-cols-3 gap-3 text-center">
                 <div class="rounded-xl border border-gray-200 bg-white p-4"><p class="text-xs uppercase text-gray-500">{{ __('To hand over') }}</p><p class="text-2xl font-semibold tabular-nums" x-text="total"></p></div>
-                <div class="rounded-xl border border-green-200 bg-green-50 p-4"><p class="text-xs uppercase text-green-800">{{ __('Scanned') }}</p><p class="text-2xl font-semibold tabular-nums text-green-900" x-text="count"></p></div>
+                <div class="rounded-xl border border-green-200 bg-primary-soft p-4"><p class="text-xs uppercase text-green-800">{{ __('Scanned') }}</p><p class="text-2xl font-semibold tabular-nums text-primary" x-text="count"></p></div>
                 <div class="rounded-xl border p-4" :class="total - count > 0 ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'"><p class="text-xs uppercase text-gray-500">{{ __('Left') }}</p><p class="text-2xl font-semibold tabular-nums" x-text="Math.max(0, total - count)"></p></div>
             </div>
             <form method="POST" action="{{ route('handover.close', $session->id) }}" class="mt-4">@csrf<x-button class="w-full">{{ __('Finish handover') }}</x-button></form>

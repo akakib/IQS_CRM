@@ -17,12 +17,12 @@
     <input type="hidden" name="dir" value="{{ $list->dir }}">
 
     <input type="search" name="q" value="{{ $list->search }}" @input="go()" placeholder="{{ $placeholder }}"
-        class="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none md:max-w-xs">
+        class="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none md:max-w-xs">
 
     <button type="button" @click="sheet = true" class="relative shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 md:hidden">
         {{ __('Filters') }}
         @if ($activeFilters)
-            <span class="ml-1 rounded-full bg-green-900 px-1.5 text-xs text-white">{{ $activeFilters }}</span>
+            <span class="ml-1 rounded-full bg-primary px-1.5 text-xs text-white">{{ $activeFilters }}</span>
         @endif
     </button>
 
@@ -37,7 +37,7 @@
             @if ($list->hasFilters())
                 <a href="{{ $action }}" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">{{ __('Clear') }}</a>
             @endif
-            <button type="button" @click="sheet = false" class="ml-auto rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white md:hidden">{{ __('Done') }}</button>
+            <button type="button" @click="sheet = false" class="ml-auto rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white md:hidden">{{ __('Done') }}</button>
         </div>
     </div>
 </form>

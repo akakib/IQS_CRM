@@ -14,7 +14,7 @@
     @endif
     <button type="button" @click="toggle()"
         @class([
-            'flex items-center gap-2 whitespace-nowrap rounded-lg border border-gray-300 bg-white text-left focus:border-green-800 focus:outline-none',
+            'flex items-center gap-2 whitespace-nowrap rounded-lg border border-gray-300 bg-white text-left focus:border-primary focus:outline-none',
             'w-full' => $fullWidth,
             'px-2.5 py-1.5 text-xs' => $size === 'sm',
             'px-3 py-2 text-sm' => $size === 'md',
@@ -41,11 +41,11 @@
             <template x-for="day in daysInMonth()" :key="day">
                 <button type="button" @click="pick(day)" :disabled="isDisabled(day)" x-text="day"
                     class="mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs"
-                    :class="isDisabled(day) ? 'cursor-not-allowed text-gray-300' : (isSelected(day) ? 'bg-green-900 text-white' : (isToday(day) ? 'font-semibold text-green-800 hover:bg-green-50' : 'text-gray-700 hover:bg-gray-100'))"></button>
+                    :class="isDisabled(day) ? 'cursor-not-allowed text-gray-300' : (isSelected(day) ? 'bg-primary text-white' : (isToday(day) ? 'font-semibold text-primary hover:bg-primary-soft' : 'text-gray-700 hover:bg-gray-100'))"></button>
             </template>
         </div>
         <div class="mt-2 flex items-center justify-between border-t border-gray-100 pt-2">
-            <button type="button" @click="pickToday()" class="text-xs font-medium text-green-900 hover:underline">{{ __('Today') }}</button>
+            <button type="button" @click="pickToday()" class="text-xs font-medium text-primary hover:underline">{{ __('Today') }}</button>
             @if ($clearable)
                 <button type="button" @click="clear()" class="text-xs text-gray-400 hover:text-gray-600">{{ __('Clear') }}</button>
             @endif

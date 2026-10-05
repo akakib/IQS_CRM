@@ -8,7 +8,7 @@
 
 <div x-data="{ selected: [], all: @js(collect($ids)->map(fn ($id) => (string) $id)->values()) }" {{ $attributes }}>
     <label class="mb-2 hidden items-center gap-2 text-xs text-gray-500 md:inline-flex">
-        <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-green-900"
+        <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary"
             :checked="all.length && selected.length === all.length"
             @change="selected = $event.target.checked ? [...all] : []">
         {{ __('Select all on this page') }}

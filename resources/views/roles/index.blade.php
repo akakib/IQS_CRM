@@ -3,7 +3,7 @@
         <p class="text-sm text-gray-500">{{ __('A role is a set of rules shared by everyone who has it.') }}</p>
         @can('access.manage')
             <a href="{{ route('roles.create') }}"
-                class="shrink-0 rounded-lg bg-green-900 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">+ {{ __('New role') }}</a>
+                class="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">+ {{ __('New role') }}</a>
         @endcan
     </div>
 
@@ -27,7 +27,7 @@
                     </span>
                     @can('access.manage')
                         <span class="inline-flex items-center gap-3">
-                            <a href="{{ route('roles.edit', $role) }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Edit') }}</a>
+                            <a href="{{ route('roles.edit', $role) }}" class="text-sm font-medium text-primary hover:underline">{{ __('Edit') }}</a>
                             @unless ($role->isOwner())
                                 <form id="{{ $formId }}" method="POST" action="{{ route('roles.destroy', $role) }}">
                                     @csrf

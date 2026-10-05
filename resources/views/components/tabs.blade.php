@@ -7,7 +7,7 @@
         @php([$label, $url, $count] = array_pad($tab, 3, null))
         <a href="{{ $url }}" @class([
             '-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-0.5 pb-2 text-sm',
-            'border-green-900 font-medium text-green-900' => $key === $active,
+            'border-primary font-medium text-primary' => $key === $active,
             'border-transparent text-gray-500 hover:text-gray-700' => $key !== $active,
         ])>
             {{ $label }}

@@ -19,7 +19,6 @@ use Illuminate\View\View;
  */
 class PaymentController extends Controller
 {
-    private const PER_PAGE = 50;
 
     public function __construct(private OrderService $orders) {}
 
@@ -47,7 +46,7 @@ class PaymentController extends Controller
             ->orderBy($list->sort === 'amount' ? 'p.amount' : 'p.received_at', $list->dir)->orderBy('p.id', $list->dir)
             ->select(['p.id', 'p.amount', 'p.transaction_id', 'p.sender_number', 'p.status', 'p.counts_now', 'p.received_at', 'p.verified_at',
                 'o.id as order_id', 'o.order_no', 'o.ship_name', 'o.ship_phone', 'm.name as method', 'u.name as added_by', 'v.name as checked_by'])
-            ->paginate(self::PER_PAGE)->withQueryString();
+            ->paginate($list->perPage)->withQueryString();
 
         return view('payments.index', [
             'list' => $list, 'status' => $status, 'payments' => $payments, 'summary' => $summary,

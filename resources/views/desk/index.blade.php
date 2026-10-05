@@ -118,6 +118,14 @@
             @else
                 <a href="{{ $url(['tab' => $tab]) }}" class="mb-3 inline-block text-sm text-green-900 hover:underline lg:hidden">&larr; {{ $tabLabels[$tab] }}</a>
 
+                @if ($timed)
+                    <a href="{{ $url(['tab' => $statuses[$timed->status_id]['key'] === 'new' ? 'verify' : 'call', 'order' => $timed->id]) }}"
+                        class="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100">
+                        <span>{{ __('Your timer is running on :no. Finish that one first.', ['no' => $timed->order_no]) }}</span>
+                        <x-countdown :seconds="$secondsLeft($timed->action_due_at)" />
+                    </a>
+                @endif
+
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">
                         <div class="flex flex-wrap items-start justify-between gap-3">

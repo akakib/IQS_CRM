@@ -56,11 +56,17 @@ class DeskController extends Controller
             $bindings = array_merge($bindings, $b);
         }
         $select[] = "SUM(CASE WHEN channel = 'web' AND status_id IN (?, ?) THEN 1 ELSE 0 END) as n_active";
+        $select[] = 'SUM(CASE WHEN action_due_at IS NOT NULL THEN 1 ELSE 0 END) as n_timed';
         $bindings = array_merge($bindings, [$s('new'), $s('record_verified')]);
         $counts = (array) DB::table('orders')->where('moderator_id', $user->id)
             ->whereIn('status_id', [$s('new'), $s('record_verified'), $s('no_answer'), $s('hold'), $s('confirmed'), ...$packing])
             ->selectRaw(implode(', ', $select), $bindings)->first();
         $counts = collect($counts)->mapWithKeys(fn ($n, $k) => [substr($k, 2) => (int) $n])->all();
+
+        // Work waiting but no timer running (first visit of the day, or after a break): start it now.
+        if (! $counts['timed'] && $counts['verify'] + $counts['call'] > 0) {
+            $this->desk->armTimer($user->id);
+        }
 
         // Default tab: the first one with work in it.
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab')
@@ -91,6 +97,10 @@ class DeskController extends Controller
             'list' => $list,
             'order' => $order,
             'detail' => $order ? $this->detail($order) : null,
+            // The timer runs on one order at a time. If the open order is not that one, point to it.
+            'timed' => $order && ! $order->action_due_at
+                ? DB::table('orders')->where('moderator_id', $user->id)->whereNotNull('action_due_at')->orderBy('action_due_at')->first(['id', 'order_no', 'action_due_at', 'status_id'])
+                : null,
             'statuses' => OrderStatus::map(),
             'waiting' => (int) $waiting->n,
             'oldestWaiting' => $waiting->oldest,

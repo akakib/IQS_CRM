@@ -18,11 +18,19 @@ use Illuminate\View\View;
  */
 class HandoverController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $filters = $request->validate(['from' => ['nullable', 'date'], 'to' => ['nullable', 'date']]) + ['from' => null, 'to' => null];
+
         return view('handover.index', [
+            'filters' => $filters,
+            // Newest first; the date filter uses the indexed pickup_date.
             'sessions' => DB::table('handover_sessions as s')->leftJoin('users as u', 'u.id', '=', 's.started_by')
-                ->orderByDesc('s.id')->limit(15)->get(['s.*', 'u.name as by']),
+                ->when($filters['from'], fn ($q, $d) => $q->where('s.pickup_date', '>=', $d))
+                ->when($filters['to'], fn ($q, $d) => $q->where('s.pickup_date', '<=', $d))
+                ->orderByDesc('s.id')
+                ->selectRaw("s.*, u.name as `by`, (SELECT COUNT(*) FROM scan_logs l WHERE l.handover_session_id = s.id AND l.result = 'ok') as parcels")
+                ->paginate(15)->withQueryString(),
             'waiting' => Order::whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->count(),
             // Riders seen before, newest phone first. A new name typed here is simply remembered next time.
             'riders' => DB::table('handover_sessions')->whereNotNull('rider_name')->where('rider_name', '!=', '')

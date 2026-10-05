@@ -34,14 +34,26 @@
             </form>
         </x-card>
         <x-card :title="__('Recent handovers')">
+            {{-- Pick a day or a range; newest first. --}}
+            <form method="GET" x-ref="filters" x-data class="mb-3 flex flex-wrap items-center gap-2">
+                <x-date-input name="from" :value="$filters['from']" :placeholder="__('From')" @date-change="$nextTick(() => $refs.filters.requestSubmit())" />
+                <x-date-input name="to" :value="$filters['to']" :placeholder="__('To')" @date-change="$nextTick(() => $refs.filters.requestSubmit())" />
+                @if ($filters['from'] || $filters['to'])
+                    <a href="{{ route('handover.index') }}" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">{{ __('Clear') }}</a>
+                @endif
+            </form>
             @forelse ($sessions as $s)
                 <a href="{{ $s->closed_at ? route('handover.manifest', $s->id) : route('handover.show', $s->id) }}" class="flex items-center justify-between gap-3 border-b border-gray-100 px-2 py-3 text-sm last:border-0 hover:bg-gray-50">
-                    <span>{{ \Illuminate\Support\Carbon::parse($s->started_at)->format('d M, g:i A') }} · {{ $s->rider_name ?? __('Rider') }}</span>
+                    <span class="min-w-0">
+                        <span class="block font-medium text-gray-900">{{ \Illuminate\Support\Carbon::parse($s->started_at)->format('d M Y, g:i A') }} · {{ $s->rider_name ?? __('Rider') }}</span>
+                        <span class="block text-xs text-gray-500">{{ trans_choice(':count parcel|:count parcels', $s->parcels) }}{{ $s->rider_phone ? ' · '.$s->rider_phone : '' }}{{ $s->by ? ' · '.__('by :n', ['n' => $s->by]) : '' }}</span>
+                    </span>
                     <x-badge :color="$s->closed_at ? 'green' : 'blue'">{{ $s->closed_at ? __('Manifest') : __('Open') }}</x-badge>
                 </a>
             @empty
-                <p class="text-sm text-gray-400">{{ __('None yet.') }}</p>
+                <p class="py-6 text-center text-sm text-gray-400">{{ ($filters['from'] || $filters['to']) ? __('No handover in these dates.') : __('None yet.') }}</p>
             @endforelse
+            @if ($sessions->hasPages())<div class="mt-3">{{ $sessions->links() }}</div>@endif
         </x-card>
     </div>
 </x-layouts.app>

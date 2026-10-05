@@ -11,7 +11,7 @@ use App\Services\Courier\BookingService;
 use App\Services\Orders\OrderEditor;
 use App\Services\Orders\OrderService;
 use App\Services\Orders\OrderStateMachine;
-use App\Services\Packing\BatchService;
+use App\Services\Packaging\BatchService;
 use App\Services\Telegram\TelegramService;
 use Database\Seeders\CatalogSeeder;
 use Database\Seeders\CustomerSeeder;
@@ -22,7 +22,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
-class PackingTest extends TestCase
+class PackagingTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -83,8 +83,8 @@ class PackingTest extends TestCase
     /** Scan the label (claims the order), tick every item, press Packed. */
     private function packIt(Order $o, ?string $code = null): void
     {
-        $this->postJson('/packing/scan', ['code' => $code ?? $this->label($o)])->assertJson(['ok' => true]);
-        $this->postJson("/packing/orders/{$o->id}/pack", ['items' => DB::table('order_items')->where('order_id', $o->id)->pluck('id')->all()])->assertJson(['ok' => true]);
+        $this->postJson('/packaging/scan', ['code' => $code ?? $this->label($o)])->assertJson(['ok' => true]);
+        $this->postJson("/packaging/orders/{$o->id}/pack", ['items' => DB::table('order_items')->where('order_id', $o->id)->pluck('id')->all()])->assertJson(['ok' => true]);
     }
 
     public function test_release_posts_one_pick_list_sorted_by_shelf_without_customer_details(): void
@@ -92,7 +92,7 @@ class PackingTest extends TestCase
         $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
         $this->booked('01812345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
 
-        $this->actingAs($this->desk)->post('/packing/release')->assertRedirect();
+        $this->actingAs($this->desk)->post('/packaging/release')->assertRedirect();
 
         $batch = DB::table('batches')->first();
         $lines = app(BatchService::class)->pickList($batch->id);
@@ -112,16 +112,16 @@ class PackingTest extends TestCase
         $this->actingAs($this->packer);
 
         // Scan = mine, with a checklist. Not packed until every item is ticked.
-        $this->postJson('/packing/scan', ['code' => $this->label($order)])->assertJson(['ok' => true, 'level' => 'ok'])->assertJsonPath('checklist.order_no', $order->order_no);
+        $this->postJson('/packaging/scan', ['code' => $this->label($order)])->assertJson(['ok' => true, 'level' => 'ok'])->assertJsonPath('checklist.order_no', $order->order_no);
         $this->assertSame('ready_for_packaging', $this->key($order));
         $this->assertSame($this->packer->id, $order->fresh()->packer_id);
-        $this->postJson("/packing/orders/{$order->id}/pack", ['items' => []])->assertStatus(422);
+        $this->postJson("/packaging/orders/{$order->id}/pack", ['items' => []])->assertStatus(422);
         $this->packIt($order);
         $this->assertSame('packed', $this->key($order));
         $this->assertNotNull($order->fresh()->packed_at);
-        $this->postJson('/packing/scan', ['code' => $this->label($order)])->assertJson(['ok' => false, 'result' => 'duplicate']);
+        $this->postJson('/packaging/scan', ['code' => $this->label($order)])->assertJson(['ok' => false, 'result' => 'duplicate']);
 
-        // Content edit after packing (manager approves since status needs approval).
+        // Content edit after packaging (manager approves since status needs approval).
         app(OrderEditor::class)->request($order->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 3]]],
             DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'customer_request')->value('id'), $this->desk, $order->fresh()->lock_version);
         $this->assertSame('repack', $order->fresh()->packMark());
@@ -129,10 +129,10 @@ class PackingTest extends TestCase
         $old = $order->order_no.'-1';
         // The edit itself issued the new label (unprinted), so the packer can print it without asking anyone.
         $this->assertDatabaseHas('shipment_labels', ['barcode' => $order->order_no.'-2', 'voided_at' => null, 'printed_at' => null]);
-        $this->postJson('/packing/scan', ['code' => $old])->assertJson(['ok' => false])->assertJsonFragment(['result' => 'blocked']); // voided now
-        $this->post("/packing/{$order->id}/label")->assertOk()->assertSee($order->order_no.'-2');
+        $this->postJson('/packaging/scan', ['code' => $old])->assertJson(['ok' => false])->assertJsonFragment(['result' => 'blocked']); // voided now
+        $this->post("/packaging/{$order->id}/label")->assertOk()->assertSee($order->order_no.'-2');
         $this->assertNotNull(DB::table('shipment_labels')->where('barcode', $order->order_no.'-2')->value('printed_at'));
-        $this->postJson('/packing/scan', ['code' => $order->order_no.'-2'])->assertJson(['ok' => true, 'level' => 'edited'])->assertJsonPath('checklist.repack', true);
+        $this->postJson('/packaging/scan', ['code' => $order->order_no.'-2'])->assertJson(['ok' => true, 'level' => 'edited'])->assertJsonPath('checklist.repack', true);
         $this->assertSame('repack', $order->fresh()->packMark()); // still red until the items are ticked again
         $this->packIt($order, $order->order_no.'-2');
         $this->assertSame('edited', $order->fresh()->packMark());
@@ -166,7 +166,7 @@ class PackingTest extends TestCase
         $this->actingAs($this->packer);
         $this->packIt($good);
         $this->packIt($edited);
-        // Edited after packing: must be repacked, so it cannot leave, by scan or by hand.
+        // Edited after packaging: must be repacked, so it cannot leave, by scan or by hand.
         app(OrderEditor::class)->request($edited->fresh(), ['items' => [['variant_id' => $this->nuts->id, 'qty' => 2]]],
             DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'customer_request')->value('id'), $this->desk, $edited->fresh()->lock_version);
 
@@ -183,13 +183,13 @@ class PackingTest extends TestCase
         $this->get("/handover/{$session}/manifest")->assertOk()->assertSee('ticked by hand');
     }
 
-    public function test_cancelled_or_held_order_is_refused_at_packing(): void
+    public function test_cancelled_or_held_order_is_refused_at_packaging(): void
     {
         $order = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
         app(OrderStateMachine::class)->transition($order, 'cancelled', $this->desk, 'user',
             DB::table('status_reasons')->where('reason_type', 'cancel')->where('system_key', 'customer_cancelled')->value('id'));
 
-        $this->actingAs($this->packer)->postJson('/packing/scan', ['code' => $this->label($order)])
+        $this->actingAs($this->packer)->postJson('/packaging/scan', ['code' => $this->label($order)])
             ->assertJson(['ok' => false, 'level' => 'red']);
         $this->assertSame('cancelled', $this->key($order));
     }
@@ -197,17 +197,17 @@ class PackingTest extends TestCase
     public function test_packer_reports_missing_item_admin_marks_out_of_stock_and_orders_hold(): void
     {
         $order = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
-        $this->actingAs($this->desk)->post('/packing/release');
+        $this->actingAs($this->desk)->post('/packaging/release');
         $batch = DB::table('batches')->value('id');
 
-        $this->actingAs($this->packer)->post('/packing/report', ['variant_id' => $this->dates->id, 'batch_id' => $batch])->assertSessionHas('success');
+        $this->actingAs($this->packer)->post('/packaging/report', ['variant_id' => $this->dates->id, 'batch_id' => $batch])->assertSessionHas('success');
         $this->assertTrue((bool) $order->fresh()->stock_issue_flag);
-        $this->postJson('/packing/scan', ['code' => $this->label($order)])->assertJson(['ok' => false]);
+        $this->postJson('/packaging/scan', ['code' => $this->label($order)])->assertJson(['ok' => false]);
         $this->assertSame('ready_for_packaging', $this->key($order)); // packer cannot change availability
 
         $report = DB::table('stock_issue_reports')->value('id');
-        $this->actingAs($this->packer)->post("/packing/issues/{$report}", ['decision' => 'out_of_stock'])->assertForbidden();
-        $this->actingAs($this->desk)->post("/packing/issues/{$report}", ['decision' => 'out_of_stock'])->assertSessionHas('success');
+        $this->actingAs($this->packer)->post("/packaging/issues/{$report}", ['decision' => 'out_of_stock'])->assertForbidden();
+        $this->actingAs($this->desk)->post("/packaging/issues/{$report}", ['decision' => 'out_of_stock'])->assertSessionHas('success');
 
         $this->assertSame('out_of_stock', $this->dates->fresh()->availability_status);
         $this->assertSame('hold', $this->key($order));
@@ -234,7 +234,7 @@ class PackingTest extends TestCase
     {
         config(['services.telegram.webhook_secret' => 'tg-secret']);
         $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
-        $this->actingAs($this->desk)->post('/packing/release');
+        $this->actingAs($this->desk)->post('/packaging/release');
         $batch = DB::table('batches')->value('id');
 
         $this->postJson('/webhooks/telegram', ['callback_query' => ['id' => 'cb1', 'from' => ['id' => 555], 'data' => "picked:{$batch}"]],
@@ -255,7 +255,7 @@ class PackingTest extends TestCase
         $initData = http_build_query($fields + ['hash' => $hash]);
 
         $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
-        $this->actingAs($this->desk)->post('/packing/release');
+        $this->actingAs($this->desk)->post('/packaging/release');
         auth()->logout();
         $batch = DB::table('batches')->value('id');
 

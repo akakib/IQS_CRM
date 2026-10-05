@@ -262,14 +262,14 @@ class DeskTest extends TestCase
         $this->assertDatabaseHas('app_notifications', ['user_id' => $this->rima->id, 'subject_id' => $b->id]);
     }
 
-    public function test_send_to_packing_books_the_courier_and_only_then_reaches_the_packers(): void
+    public function test_send_to_packaging_books_the_courier_and_only_then_reaches_the_packers(): void
     {
         $a = $this->web();
         app(OrderStateMachine::class)->transition($a, 'record_verified', null, 'rule');
         $this->actingAs($this->mahim)->post('/desk/next');
         $this->act($a, 'confirm');
 
-        // Not in the packing queue before a consignment exists.
+        // Not in the packaging queue before a consignment exists.
         try {
             app(OrderStateMachine::class)->transition($a->fresh(), 'ready_for_packaging', null, 'system');
             $this->fail('No consignment yet');
@@ -282,9 +282,9 @@ class DeskTest extends TestCase
         $a->refresh();
         $this->assertSame('ready_for_packaging', $this->key($a));
         $this->assertNotNull($a->active_shipment_id);
-        $this->assertNotNull($a->packing_sent_at);
+        $this->assertNotNull($a->packaging_sent_at);
         $this->assertSame('none', $a->booking_state);
-        $this->get('/desk?tab=packing')->assertSee($a->order_no)->assertSee('Waiting for a packer');
+        $this->get('/desk?tab=packaging')->assertSee($a->order_no)->assertSee('Waiting for a packer');
     }
 
     public function test_chat_orders_belong_to_their_creator_without_timer_or_limit(): void
@@ -402,8 +402,8 @@ class DeskTest extends TestCase
         $this->get('/kpi?view=cohort')->assertOk()->assertSee('Mahim');
         $this->post('/kpi/targets', ['user_id' => $this->mahim->id, 'delivered_count' => 300, 'delivery_rate' => 85])->assertSessionHas('success');
         $this->get('/kpi?view=cohort')->assertSee('target 300 / month');
-        $this->get('/packing')->assertOk()->assertSee('On duty today');
-        $this->post('/packing/shift', ['user_ids' => [$this->rima->id]])->assertSessionHas('success');
+        $this->get('/packaging')->assertOk()->assertSee('On duty today');
+        $this->post('/packaging/shift', ['user_ids' => [$this->rima->id]])->assertSessionHas('success');
         $this->assertDatabaseHas('packer_shifts', ['user_id' => $this->rima->id]);
     }
 }

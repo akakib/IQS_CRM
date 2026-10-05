@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Packing;
+namespace App\Services\Packaging;
 
 use App\Models\Order;
 use App\Models\User;
@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Packer says "item not found on the shelf": a report to Admin only. The
- * order is flagged and skipped in packing; Admin decides Out of stock /
+ * order is flagged and skipped in packaging; Admin decides Out of stock /
  * Pre-order (orders then move to Hold automatically) or dismisses it.
  */
 class StockIssueService
@@ -30,7 +30,7 @@ class StockIssueService
             : []);
         DB::table('orders')->whereIn('id', $orderIds)->update(['stock_issue_flag' => true]);
         foreach (Order::whereIn('id', $orderIds)->get() as $order) {
-            $this->orders->note($order, 'system', __('Packer could not find an item. Skipped in packing until Admin decides.'), $by);
+            $this->orders->note($order, 'system', __('Packer could not find an item. Skipped in packaging until Admin decides.'), $by);
         }
 
         $row = DB::table('product_variants as v')->join('products as p', 'p.id', '=', 'v.product_id')->where('v.id', $variantId)
@@ -38,7 +38,7 @@ class StockIssueService
         $name = $row ? $row->product.($row->variant !== 'Default' ? ' · '.$row->variant : '') : null;
         $this->notifications->send('stock_issue_reported', __('Item not found: :i', ['i' => $name ?? '#'.$variantId]),
             trim(($by ? __('Reported by :n', ['n' => $by->name]) : '').' '.($note ?? '')), [
-                'link' => route('packing.issues'), 'subject' => ['stock_issue', $id], 'priority' => 'urgent',
+                'link' => route('packaging.issues'), 'subject' => ['stock_issue', $id], 'priority' => 'urgent',
             ]);
 
         return $id;

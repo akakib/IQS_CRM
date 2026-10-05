@@ -10,7 +10,7 @@
 return [
     'types' => [
         'new_order' => ['New order to take', 'normal'],
-        'order_needs_repack' => ['Order edited after packing (repack)', 'urgent'],
+        'order_needs_repack' => ['Order edited after packaging (repack)', 'urgent'],
         'delivery_issue' => ['Delivery issue from rider or courier', 'urgent'],
         'stock_issue_reported' => ['Packer could not find an item', 'urgent'],
         'hold_expected_date_passed' => ['Hold expected date passed', 'normal'],

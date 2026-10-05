@@ -2,7 +2,7 @@
     use Illuminate\Support\Carbon;
     use Illuminate\Support\Js;
 
-    $tabLabels = ['verify' => __('Verify'), 'call' => __('Call'), 'again' => __('Call again'), 'hold' => __('On hold'), 'send' => __('To send'), 'packing' => __('Packing')];
+    $tabLabels = ['verify' => __('Verify'), 'call' => __('Call'), 'again' => __('Call again'), 'hold' => __('On hold'), 'send' => __('To send'), 'packaging' => __('Packaging')];
     $url = fn (array $q) => route('desk.index', $q);
     $key = $order ? $statuses[$order->status_id]['key'] : null;
     $isMine = $order && $order->moderator_id === auth()->id();
@@ -17,7 +17,7 @@
         'record_verified' => __('Call the customer and confirm the order.'),
         'no_answer' => __('No response before. Call again.'),
         'hold' => __('On hold. Resume it when the reason is solved.'),
-        'confirmed' => __('Confirmed. Send it to packing: the courier is booked for you.'),
+        'confirmed' => __('Confirmed. Send it to packaging: the courier is booked for you.'),
     ];
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $showDetailOnPhone = request()->filled('order') && $order && ! $lost;
@@ -149,12 +149,12 @@
                                 <x-countdown :seconds="$secondsLeft($row->action_due_at)" />
                             @elseif ($tab === 'again')
                                 <span class="text-xs text-amber-700">{{ Carbon::parse($row->next_call_at)->isToday() ? Carbon::parse($row->next_call_at)->format('g:i A') : Carbon::parse($row->next_call_at)->format('d M, g A') }}</span>
-                            @elseif ($tab === 'packing')
+                            @elseif ($tab === 'packaging')
                                 <x-badge :color="$statuses[$row->status_id]['color']">{{ $row->booking_state === 'failed' ? __('Booking failed') : ($row->booking_state === 'queued' ? __('Booking…') : __($statuses[$row->status_id]['name'])) }}</x-badge>
                             @else
                                 <span class="text-xs text-gray-400">{{ $age($row->assigned_at ?? $row->created_at) }}</span>
                             @endif
-                            @if ($row->no_response_count && $tab !== 'packing')<span class="mt-0.5 block text-[11px] text-amber-700">{{ __('Try :n', ['n' => $row->no_response_count + 1]) }}</span>@endif
+                            @if ($row->no_response_count && $tab !== 'packaging')<span class="mt-0.5 block text-[11px] text-amber-700">{{ __('Try :n', ['n' => $row->no_response_count + 1]) }}</span>@endif
                         </span>
                     </a>
                 @empty
@@ -251,18 +251,18 @@
                             @endforeach
                         </div>
 
-                        @if ($tab === 'packing' || in_array($key, ['ready_for_packaging', 'packed', 'ready_for_pickup'], true))
+                        @if ($tab === 'packaging' || in_array($key, ['ready_for_packaging', 'packed', 'ready_for_pickup'], true))
                             <div class="mt-3 rounded-lg border border-gray-200 px-4 py-3 text-sm">
                                 @if ($order->booking_state === 'queued')
                                     <p class="text-gray-700">{{ __('Booking the courier… this takes a few seconds. Reload to see the CN.') }}</p>
                                 @elseif ($order->booking_state === 'failed')
                                     <p class="font-medium text-red-700">{{ __('Courier booking failed: :e', ['e' => $order->booking_error]) }}</p>
                                 @else
-                                    <p class="text-gray-700">{{ __('CN :cn', ['cn' => $detail['consignment'] ?? '-']) }} · {{ __('in the packing queue since :t', ['t' => $order->packing_sent_at?->format('g:i A') ?? '-']) }}</p>
+                                    <p class="text-gray-700">{{ __('CN :cn', ['cn' => $detail['consignment'] ?? '-']) }} · {{ __('in the packaging queue since :t', ['t' => $order->packaging_sent_at?->format('g:i A') ?? '-']) }}</p>
                                     <p class="mt-1 font-medium text-gray-900">
                                         @if ($order->packed_at) {{ __('Packed by :n at :t', ['n' => $order->packer->name ?? '-', 't' => $order->packed_at->format('g:i A')]) }}
                                         @elseif (in_array($key, ['packed', 'ready_for_pickup'], true)) {{ __('Packed') }}
-                                        @elseif ($order->packer_id) {{ __('Packing: :n, since :t', ['n' => $order->packer->name ?? '-', 't' => $order->packing_started_at?->format('g:i A')]) }}
+                                        @elseif ($order->packer_id) {{ __('Packaging: :n, since :t', ['n' => $order->packer->name ?? '-', 't' => $order->packaging_started_at?->format('g:i A')]) }}
                                         @else {{ __('Waiting for a packer') }} @endif
                                     </p>
                                 @endif
@@ -289,8 +289,8 @@
                             $actions = match (true) {
                                 $key === 'new' => [['verify', __('Record OK, call next'), 'v', 'primary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 in_array($key, ['record_verified', 'no_answer'], true) => [['confirm', $order->channel === 'web' ? __('Call verified') : __('Confirm'), 'v', 'primary'], ['no_response', __('No response'), 'n', 'secondary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
-                                $key === 'hold' => [$detail['consignment'] ? ['back_to_packing', __('Back to packing'), 'p', 'primary'] : ['resume', __('Resume, call next'), 'r', 'primary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
-                                $key === 'confirmed' && $order->booking_state === 'none' => [['send', __('Send to packing'), 'p', 'primary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
+                                $key === 'hold' => [$detail['consignment'] ? ['back_to_packaging', __('Back to packaging'), 'p', 'primary'] : ['resume', __('Resume, call next'), 'r', 'primary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
+                                $key === 'confirmed' && $order->booking_state === 'none' => [['send', __('Send to packaging'), 'p', 'primary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 $key === 'confirmed' && $order->booking_state === 'failed' => [['send', __('Try booking again'), 'p', 'primary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 default => [],
                             };

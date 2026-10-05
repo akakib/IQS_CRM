@@ -37,7 +37,7 @@ return [
     'work.end' => ['string', '22:00', 'Office closes (HH:MM)', 'Working hours', ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/']],
     'work.days' => ['string', '0,1,2,3,4,6', 'Office days (0 = Sunday ... 6 = Saturday). Each person can have their own days on their staff page', 'Working hours', ['required', 'regex:/^[0-6](,[0-6]){0,6}$/']],
     'work.break_limit_minutes' => ['int', 60, 'Break minutes allowed per day (more shows in red)', 'Working hours', ['required', 'integer', 'min:0', 'max:600']],
-    'telegram.digest_minutes' => ['int', 30, 'Packing digest to the shop Telegram group every (minutes)', 'Reports', ['required', 'integer', 'min:5', 'max:720']],
+    'telegram.digest_minutes' => ['int', 30, 'Packaging digest to the shop Telegram group every (minutes)', 'Reports', ['required', 'integer', 'min:5', 'max:720']],
     'kpi.show_delivered_amount' => ['bool', false, 'Show delivered money amounts on the KPI page', 'KPI', ['boolean']],
     'analysis.cod_fee_percent' => ['decimal', 1, 'Courier COD fee on cash collected (%)', 'Reports', ['required', 'numeric', 'min:0', 'max:10']],
     'marketing.fallback_rate' => ['decimal', 125, 'BDT per USD for ad spend not covered by any dollar lot', 'Reports', ['required', 'numeric', 'min:1', 'max:1000']],

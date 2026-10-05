@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderStatus;
-use App\Services\Packing\ScanService;
+use App\Services\Packaging\ScanService;
 use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;

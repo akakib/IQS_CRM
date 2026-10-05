@@ -1,5 +1,5 @@
 {{-- Status chip in the status's own colour (from the database), plus the
-     repack / edited mark after packing. --}}
+     repack / edited mark after packaging. --}}
 @props(['order', 'statuses' => null])
 
 @php

@@ -11,7 +11,7 @@
                 <p class="font-medium text-gray-800">{{ $r->product }}{{ $r->variant !== 'Default' ? ' · '.$r->variant : '' }} <span class="font-mono text-xs text-gray-400">{{ $r->sku }} {{ $r->shelf_code ? '· '.$r->shelf_code : '' }}</span></p>
                 <p class="text-xs text-gray-500">{{ __('Reported by :n', ['n' => $r->reporter ?? '-']) }} · {{ \Illuminate\Support\Carbon::parse($r->created_at)->diffForHumans() }}{{ $r->order_no ? ' · '.$r->order_no : '' }}{{ $r->note ? ' · '.$r->note : '' }}</p>
                 @can('products.availability')
-                    <form method="POST" action="{{ route('packing.issues.resolve', $r->id) }}" class="mt-3 flex flex-wrap items-center gap-2">
+                    <form method="POST" action="{{ route('packaging.issues.resolve', $r->id) }}" class="mt-3 flex flex-wrap items-center gap-2">
                         @csrf
                         <input type="hidden" name="decision" :value="d">
                         @foreach (['out_of_stock' => __('Out of stock'), 'backorder' => __('Pre-order'), 'dismiss' => __('It is there (dismiss)')] as $key => $label)

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Packing;
+namespace App\Services\Packaging;
 
 use App\Models\Order;
 use App\Models\OrderStatus;
@@ -70,7 +70,7 @@ class BatchService
             ->update(['status' => 'picked', 'picked_by' => $by?->id, 'picked_at' => now(), 'updated_at' => now()]);
     }
 
-    /** Packing finished: packed orders wait on the pickup shelf. */
+    /** Packaging finished: packed orders wait on the pickup shelf. */
     public function done(int $batchId, User $by): int
     {
         $packed = Order::where('batch_id', $batchId)->where('status_id', OrderStatus::idFor('packed'))->get();

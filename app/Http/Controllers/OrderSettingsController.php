@@ -75,7 +75,7 @@ class OrderSettingsController extends Controller
         $data = $request->validate([
             'reason_type' => ['required', Rule::in(['cancel', 'hold', 'amendment', 'return', 'reassign', 'break', 'status'])],
             'label_en' => ['required', 'string', 'max:150'],
-            'blame_stage' => ['required', Rule::in(['none', 'sales', 'verification', 'packing', 'dispatch', 'courier', 'customer'])],
+            'blame_stage' => ['required', Rule::in(['none', 'sales', 'verification', 'packaging', 'dispatch', 'courier', 'customer'])],
             'counts_as_break' => ['boolean'],
         ]);
         $data['counts_as_break'] = $data['reason_type'] !== 'break' || ! empty($data['counts_as_break']);

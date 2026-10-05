@@ -45,7 +45,7 @@ class OrderConfigSeeder extends Seeder
         ['hold', 'record_verified', 'orders.edit', false, false],
         ['hold', 'confirmed', 'orders.edit', false, false],
         ['hold', 'cancelled', 'orders.edit', true, false],
-        ['hold', 'ready_for_packaging', 'orders.edit', false, false],        // packer hold solved: back to the packing queue (CN gate still applies)
+        ['hold', 'ready_for_packaging', 'orders.edit', false, false],        // packer hold solved: back to the packaging queue (CN gate still applies)
         ['confirmed', 'hold', 'orders.edit', true, false],
         ['confirmed', 'cancelled', 'orders.edit', true, false],
         ['confirmed', 'ready_for_packaging', null, false, true],             // bulk booking (needs CN ID)
@@ -77,7 +77,7 @@ class OrderConfigSeeder extends Seeder
         ['hold', 'Deliver on a date', 'customer', 'scheduled', 'on_date'],
         ['hold', 'Customer asked to wait', 'customer', 'customer_wait', 'manual'],
         ['hold', 'Waiting for advance payment', 'none', 'advance_wait', 'manual'],
-        ['hold', 'Item not found while packing', 'none', 'item_not_found', 'manual'],
+        ['hold', 'Item not found while packaging', 'none', 'item_not_found', 'manual'],
         ['hold', 'Damaged or wrong item on the shelf', 'none', 'item_damaged', 'manual'],
         ['cancel', 'Customer cancelled', 'customer', 'customer_cancelled', 'manual'],
         ['cancel', 'Fake or prank order', 'customer', 'fake_order', 'manual'],
@@ -92,7 +92,7 @@ class OrderConfigSeeder extends Seeder
         ['amendment', 'Price error', 'sales', 'price_error', 'manual'],
         ['amendment', 'Advance payment verified', 'none', 'advance_verified', 'manual'],
         ['return', 'Customer refused at door', 'customer', 'refused', 'manual'],
-        ['return', 'Wrong or missing item', 'packing', 'wrong_item', 'manual'],
+        ['return', 'Wrong or missing item', 'packaging', 'wrong_item', 'manual'],
         ['return', 'Wrong address or phone', 'sales', 'wrong_address', 'manual'],
         ['return', 'Courier failed', 'courier', 'courier_failed', 'manual'],
         ['return', 'Returned, reason not set yet', 'none', 'unclassified', 'manual'],

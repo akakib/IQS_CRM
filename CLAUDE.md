@@ -51,7 +51,7 @@ from Step 5 onward and gains ad cost in Step 6.
     use simple/cursor pagination instead of COUNT(*) on every load.
   - Loading = skeletons; empty = empty-state component with a next action.
 - Interactions feel smart but light: inline status change, optimistic UI
-  with rollback on error, keyboard shortcuts on scan/packing screens,
+  with rollback on error, keyboard shortcuts on scan/packaging screens,
   toasts for results. No page reload for small actions (use fetch + Alpine).
 - Bangla labels from lang files; numbers and money formatted consistently
   (৳ with thousand separators).
@@ -88,7 +88,7 @@ size. Choose the cheapest correct approach, then code it.
    accounting all read from the order.
 2. Humans decide, the system executes (totals, CN ID, stock, COD, P&L are automatic).
 3. Batch first. Every repeated action has a bulk version.
-4. Scan, don't read. Packing, handover, transfers are driven by barcode/QR scans.
+4. Scan, don't read. Packaging, handover, transfers are driven by barcode/QR scans.
 5. Every state change is an event: who, when, from, to, reason.
    KPIs are computed ONLY from these events, never from self-reported data.
 6. Nothing is deleted. Ledgers (stock, money, USD, orders) are append-only;
@@ -101,7 +101,7 @@ Main path:
 New → Record Verified (automatic checks: phone format, address/thana,
 duplicate, fraud score) → Confirmed (call, or system auto-confirm rule)
 → Ready for Packaging (bulk Steadfast booking + label print happen HERE)
-→ Packed (label scanned at packing) → Ready for Pickup
+→ Packed (label scanned at packaging) → Ready for Pickup
 → Handed Over (scanned at rider handover)
 → courier statuses from Steadfast webhook (In Transit, Delivered,
   Partial Delivered, Cancelled/Returned, Hold)
@@ -114,7 +114,7 @@ Pre-order stays sellable on the website (shown as in stock); confirmed orders
 with a Pre-order item go to Hold · Stock আসেছ automatically.
 Only Admin/Owner changes product availability; packers can only report
 "মাল পাওয়া যায়িন", which alerts Admin.
-Repack is NOT a status: an order edited after packing stays in its stage,
+Repack is NOT a status: an order edited after packaging stays in its stage,
 marked RED until repacked, then shown in an "Edited" colour (DB_DESIGN 3.4).
 Rules:
 - Transitions happen ONLY through one `OrderStateMachine` service.
@@ -314,7 +314,7 @@ holiday/courier-closure calendar, second courier (Pathao/RedX).
 | 1 | Products (CRUD, variants, units, 3 price lists, cost price, price history, CSV import from Woo, one-way sync) + Customers (phone key, duplicates, fraud score) | 1 |
 | 2 | Order intake: Woo webhook, Quick Order + product search, ownership, state machine, amendments, delivery-charge rules | 1 |
 | 3 | Confirmation & courier: call queue, auto-confirm, CAPI Purchase, bulk Steadfast booking, labels, webhooks, delivery issues, hotline screen | 1 |
-| 4 | Packing & dispatch: batches, pick lists, scan-to-pack, handover scan + manifest, Telegram bot & Mini App | 1 |
+| 4 | Packaging & dispatch: batches, pick lists, scan-to-pack, handover scan + manifest, Telegram bot & Mini App | 1 |
 | 5 | Dashboards, KPI scoring, Analysis tab (order P&L without ad cost), nightly summary | 1 |
 | 6 | Meta/Google cost: USD lots FIFO, vendor dues, daily spend, ROAS; ad cost added to Analysis P&L | 2 |
 | 7 | Stock management (full scope above) | 3 |
@@ -328,7 +328,7 @@ Agreed with the owner on 2026-10-05:
 - UI is English only. Still wrap every string in __() so Bangla can be added later.
 - No 2FA for now (no google2fa package until the owner asks).
 - Locations: types warehouse / shop / virtual. Riajuddin Bazar is the only shop
-  and ALL packing happens there. "Online" is a department and a sales channel,
+  and ALL packaging happens there. "Online" is a department and a sales channel,
   never a stock location.
 - Products keep description, regular/sale/discount price, SEO title and
   description and every other needed field IN THIS SYSTEM; the one-way sync to
@@ -346,11 +346,11 @@ Agreed with the owner on 2026-10-05:
   - No response returns to the same moderator after 30 min, 5 h, 24 h (moved
     to the next shift start if outside hours); after the last one the order
     is cancelled as unreachable (0 points, counts in the KPI cancel rate).
-  - "Send to packing" books the courier after the response; the order reaches
-    the packing queue only with a CN. Cron (`desk:tick`) retries and sweeps.
+  - "Send to packaging" books the courier after the response; the order reaches
+    the packaging queue only with a CN. Cron (`desk:tick`) retries and sweeps.
   - Timers are columns checked at click time; cron only catches what nobody
     touched. Keep it that way (shared hosting).
-- Packing: one shared queue for today's on-duty packers; scanning the label
+- Packaging: one shared queue for today's on-duty packers; scanning the label
   claims the order; Packed only when every item is ticked (server-checked).
   A packer who cannot finish puts the order on Hold with a reason. Packers
   never see phone, full address or prices. Telegram: digest + exceptions only.

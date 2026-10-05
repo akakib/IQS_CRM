@@ -16,7 +16,7 @@ created_at).
 Statuses, transitions, reasons, verification rules, fraud providers,
 event-firing timing, delivery charges — all live in tables with admin screens.
 2. Code depends only on system_keys, never on names or IDs.
-Custom statuses/rules can be added freely; core gates (e.g. "no packing
+Custom statuses/rules can be added freely; core gates (e.g. "no packaging
 without CN ID") are attached to system keys and cannot be bypassed.
 3. Orders are versioned. Every edit creates a new version snapshot.
 Nothing about an old version is ever overwritten.
@@ -65,7 +65,7 @@ status_reasons
   status_id          FK order_statuses NULL   -- NULL = usable for amendments/returns
   reason_type        enum('status','amendment','return','cancel','hold','refund')
   label_bn           varchar(150)
-  blame_stage        enum('none','sales','verification','packing','dispatch','courier','customer') NULL
+  blame_stage        enum('none','sales','verification','packaging','dispatch','courier','customer') NULL
   system_key         varchar(50) NULL   -- e.g. 'awaiting_stock','stock_out','scheduled'
   release_mode       enum('manual','on_restock','on_date') default 'manual'
                      -- how an order leaves Hold with this reason
@@ -248,7 +248,7 @@ orders
   created_by         FK users NULL           -- NULL for website orders
   current_version    int default 1
   packed_version     int NULL                -- the version that is physically in the box
-  edited_after_pack  bool default false      -- true once any edit happened after packing
+  edited_after_pack  bool default false      -- true once any edit happened after packaging
                                              -- (drives the "edited" colour, see 3.4)
   -- delivery snapshot (copied from address at creation; editable via amendment)
   ship_name, ship_phone, ship_alt_phone, ship_address, ship_district, ship_thana,
@@ -344,11 +344,11 @@ rider notes — all with person, date and time, and stage.
 order_assignments                 -- ownership history
   id, order_id FK, user_id FK, role enum('owner','temporary'),
   assigned_by FK users NULL, reason varchar(150), started_at, ended_at NULL
-3.4 Edit after packing — red mark, repack, edited colour
+3.4 Edit after packaging — red mark, repack, edited colour
 Edit window: allowed in every status BEFORE handed_over.
 From handed_over onward edit_policy = locked (Steadfast has the parcel).
 Edit classes (stored on order_amendments.edit_class):
-Class Examples After packing Mark
+Class Examples After packaging Mark
 contentitem added / removed / quantity or
 weight changed
 open box, fix, new
@@ -403,7 +403,7 @@ packed, never
 edited normal
 packed_version < current_version
 edited after
-packing, box is
+packaging, box is
 wrong
 RED — needs repack
 packed_version = current_version
@@ -417,7 +417,7 @@ Flow:
 2. Someone edits it (still Packed or Ready for Pickup) → current_version = 4,
 edited_after_pack = true → card turns RED in the packaging/pickup column.
 Telegram alert to the shop with the difference (what to add / remove).
-3. Scan at packing or handover while RED → scan FAILS with a red signal
+3. Scan at packaging or handover while RED → scan FAILS with a red signal
 and shows the difference between version 3 and version 4:
 "এই অডডBengআrephaার edit হেয়েছ — KitKat ×২ → ×৩ কডBengআrইuন, নতডBengআsignইuঅ_uiন label লাগান".
 4. Packer fixes the box, prints the new label, scans the NEW label →
@@ -427,7 +427,7 @@ packed_version = 4 → card leaves RED and shows the EDITED colour.
 difference is always shown against packed_version, not the original.
 Every step writes an automatic order_notes row (who, date & time, stage).
 3.5 Labels (old labels must stop working)
-Scan validation (packing and handover):
+Scan validation (packaging and handover):
 Barcode not found → "Unknown label".
 Label voided_at set → RED "পডBengআsignইuঅ_uiরেনা label — বদলান" (stops the old label on
 an edited parcel from being handed over by mistake).
@@ -534,7 +534,7 @@ Packers and other staff cannot change availability. Reminder to the
 marker at oos_review_at.
 Packer finds an item missing on the shelf → presses "মাল পাওয়া যায়িন"
 (report only). This creates a stock_issue_reports row and alerts Admin;
-the order gets an "issue reported" flag and is skipped in packing. Admin
+the order gets an "issue reported" flag and is skipped in packaging. Admin
 decides: mark Out of stock / Pre-order (order moves to Hold with the
 matching reason) or dismiss ("মাল আেছ, অমডBengআsignইuঅ_uiক তােক").
 stock_issue_reports

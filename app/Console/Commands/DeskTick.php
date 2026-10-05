@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * The once-a-minute sweep for things nobody clicked: expired action timers,
  * returned No response orders, auto-assign, booking retries, breaks left
- * open, and the packing digest. Each part is a few indexed queries.
+ * open, and the packaging digest. Each part is a few indexed queries.
  */
 class DeskTick extends Command
 {
@@ -36,7 +36,7 @@ class DeskTick extends Command
         return self::SUCCESS;
     }
 
-    /** One message per interval: how many orders reached packing, plus exceptions. No customer details. */
+    /** One message per interval: how many orders reached packaging, plus exceptions. No customer details. */
     private function digest(TelegramService $telegram): void
     {
         $last = Cache::get('desk:digest_at');
@@ -46,10 +46,10 @@ class DeskTick extends Command
         }
         Cache::forever('desk:digest_at', now()->toIso8601String());
 
-        $reached = DB::table('orders')->where('packing_sent_at', '>', $since)->count();
+        $reached = DB::table('orders')->where('packaging_sent_at', '>', $since)->count();
         $lines = [];
         $event = fn (string $key) => DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')
-            ->where('e.created_at', '>', $since)->where('e.to_status_id', OrderStatus::idFor($key))->whereNotNull('o.packing_sent_at');
+            ->where('e.created_at', '>', $since)->where('e.to_status_id', OrderStatus::idFor($key))->whereNotNull('o.packaging_sent_at');
 
         foreach ($event('cancelled')->pluck('o.order_no') as $no) {
             $lines[] = '❌ '.__(':no cancelled: do not pack', ['no' => $no]);
@@ -60,7 +60,7 @@ class DeskTick extends Command
         $repack = DB::table('orders')->whereNotNull('packed_version')->whereColumn('packed_version', '<', 'current_version')
             ->where('updated_at', '>', $since)->whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->pluck('order_no');
         foreach ($repack as $no) {
-            $lines[] = '🔴 '.__(':no edited after packing: repack', ['no' => $no]);
+            $lines[] = '🔴 '.__(':no edited after packaging: repack', ['no' => $no]);
         }
 
         if ($reached === 0 && $lines === []) {
@@ -68,6 +68,6 @@ class DeskTick extends Command
         }
         $waiting = DB::table('orders')->where('status_id', OrderStatus::idFor('ready_for_packaging'))->count();
         $telegram->send(config('services.telegram.shop_chat_id'),
-            '📦 '.__(':n new for packing · :w waiting in total', ['n' => $reached, 'w' => $waiting]).($lines ? "\n".implode("\n", $lines) : ''));
+            '📦 '.__(':n new for packaging · :w waiting in total', ['n' => $reached, 'w' => $waiting]).($lines ? "\n".implode("\n", $lines) : ''));
     }
 }

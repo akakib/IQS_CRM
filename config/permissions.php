@@ -15,7 +15,7 @@ return [
         'orders' => ['view', 'create', 'edit', 'approve', 'export', 'reassign', 'take'],
         'shipping' => ['view', 'create'],
         'hotline' => ['view', 'create'],
-        'packing' => ['view', 'create', 'manage'],
+        'packaging' => ['view', 'create', 'manage'],
         'attendance' => ['view', 'edit'],
         // Creating/editing roles and giving access is Owner-only (no permission
         // can grant it, so nobody can raise their own access).
@@ -34,7 +34,7 @@ return [
         'staff.delete' => 'Deactivate',
         'products.availability' => 'Stock status',
         'points.manage' => 'Manage rules and reviews',
-        'packing.manage' => 'Set on-duty packers',
+        'packaging.manage' => 'Set on-duty packers',
         'attendance.view' => 'See breaks and working days',
         'attendance.edit' => 'Correct breaks, approve extra days',
         'orders.reassign' => 'Reassign and control room',

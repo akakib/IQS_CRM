@@ -26,7 +26,7 @@ use Illuminate\View\View;
  */
 class DeskController extends Controller
 {
-    public const TABS = ['verify', 'call', 'again', 'hold', 'send', 'packing'];
+    public const TABS = ['verify', 'call', 'again', 'hold', 'send', 'packaging'];
 
     private const PER_PAGE = 25;
 
@@ -40,7 +40,7 @@ class DeskController extends Controller
         // Time that ran out is enforced here, on every visit, not only by the cron.
         $lost = $this->desk->sweepFor($user->id);
         $now = now()->toDateTimeString();
-        $packing = [$s('ready_for_packaging'), $s('packed'), $s('ready_for_pickup')];
+        $packaging = [$s('ready_for_packaging'), $s('packed'), $s('ready_for_pickup')];
 
         // tab => [SQL condition, bindings]. Written once, used for the counts and for the list.
         $where = [
@@ -49,7 +49,7 @@ class DeskController extends Controller
             'again' => ['(status_id = ? AND next_call_at > ?)', [$s('no_answer'), $now]],
             'hold' => ['status_id = ?', [$s('hold')]],
             'send' => ["(status_id = ? AND booking_state = 'none')", [$s('confirmed')]],
-            'packing' => ["((status_id = ? AND booking_state <> 'none') OR status_id IN (?, ?, ?))", [$s('confirmed'), ...$packing]],
+            'packaging' => ["((status_id = ? AND booking_state <> 'none') OR status_id IN (?, ?, ?))", [$s('confirmed'), ...$packaging]],
         ];
 
         $select = [];
@@ -62,7 +62,7 @@ class DeskController extends Controller
         $select[] = 'SUM(CASE WHEN action_due_at IS NOT NULL THEN 1 ELSE 0 END) as n_timed';
         $bindings = array_merge($bindings, [$s('new'), $s('record_verified')]);
         $counts = (array) DB::table('orders')->where('moderator_id', $user->id)
-            ->whereIn('status_id', [$s('new'), $s('record_verified'), $s('no_answer'), $s('hold'), $s('confirmed'), ...$packing])
+            ->whereIn('status_id', [$s('new'), $s('record_verified'), $s('no_answer'), $s('hold'), $s('confirmed'), ...$packaging])
             ->selectRaw(implode(', ', $select), $bindings)->first();
         $counts = collect($counts)->mapWithKeys(fn ($n, $k) => [substr($k, 2) => (int) $n])->all();
 
@@ -139,7 +139,7 @@ class DeskController extends Controller
         abort_if($order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
 
         $data = $request->validate([
-            'action' => ['required', Rule::in(['verify', 'confirm', 'no_response', 'hold', 'cancel', 'resume', 'send', 'back_to_packing'])],
+            'action' => ['required', Rule::in(['verify', 'confirm', 'no_response', 'hold', 'cancel', 'resume', 'send', 'back_to_packaging'])],
             'reason_id' => ['nullable', 'integer'],
             'note' => ['nullable', 'string', 'max:500'],
             'hold_expected_date' => ['nullable', 'date', 'after_or_equal:today'],
@@ -172,7 +172,7 @@ class DeskController extends Controller
                 }
                 $this->machine->transition($order, 'confirmed', $user);
                 $next = ['tab' => 'send', 'order' => $order->id];
-                $message = __('Confirmed. Send it to packing.');
+                $message = __('Confirmed. Send it to packaging.');
                 break;
             case 'no_response':
                 $message = $this->desk->noResponse($order, $user, $note) === 'cancelled'
@@ -195,13 +195,13 @@ class DeskController extends Controller
                 $next = ['tab' => 'call', 'order' => $order->id];
                 $message = __('Back in your Call tab.');
                 break;
-            case 'back_to_packing':
+            case 'back_to_packaging':
                 $this->machine->transition($order, 'ready_for_packaging', $user, 'user', null, $note);
-                $message = __(':no is back in the packing queue.', ['no' => $order->order_no]);
+                $message = __(':no is back in the packaging queue.', ['no' => $order->order_no]);
                 break;
             default: // send
-                $this->desk->sendToPacking($order, $user);
-                $message = __(':no sent to packing. Booking the courier…', ['no' => $order->order_no]);
+                $this->desk->sendToPackaging($order, $user);
+                $message = __(':no sent to packaging. Booking the courier…', ['no' => $order->order_no]);
         }
 
         return redirect()->route('desk.index', array_filter($next))->with('success', $message);

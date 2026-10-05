@@ -19,8 +19,8 @@ use Illuminate\Validation\ValidationException;
  * - Action timer: runs on ONE order per moderator at a time (their oldest);
  *   when it passes, the order goes back to New and the next timer starts.
  * - No response: the order leaves the Call tab and returns after a delay.
- * - Send to packing: courier booking runs in the background; the order
- *   reaches the packing queue only once a consignment exists.
+ * - Send to packaging: courier booking runs in the background; the order
+ *   reaches the packaging queue only once a consignment exists.
  *
  * Due times are plain columns, so "is it due?" is answered by a WHERE at
  * click time. The cron sweep (desk:tick) only catches what nobody touched.
@@ -331,10 +331,10 @@ class DeskService
     }
 
     /** One button: book the courier in the background, then the order shows up for the packers. */
-    public function sendToPacking(Order $order, User $user): void
+    public function sendToPackaging(Order $order, User $user): void
     {
         if (OrderStatus::map()[$order->status_id]['key'] !== 'confirmed') {
-            throw ValidationException::withMessages(['order' => __('Only a confirmed order can go to packing.')]);
+            throw ValidationException::withMessages(['order' => __('Only a confirmed order can go to packaging.')]);
         }
         // Only one click wins: the state must still be "not sent" (or "failed" for a retry) at the moment of the update.
         $queued = DB::table('orders')->where('id', $order->id)->whereIn('booking_state', ['none', 'failed'])->update([
@@ -344,7 +344,7 @@ class DeskService
         if (! $queued) {
             return; // already on its way
         }
-        $this->orders->note($order, 'courier', __('Sent to packing by :n. Booking the courier…', ['n' => $user->name]), $user);
+        $this->orders->note($order, 'courier', __('Sent to packaging by :n. Booking the courier…', ['n' => $user->name]), $user);
 
         $orderId = $order->id;
         $userId = $user->id;
@@ -382,7 +382,7 @@ class DeskService
             if ($failed) {
                 $this->systemNote($row->id, __('Courier booking failed 3 times: :e', ['e' => $result['failed'][$row->order_no]]), null);
                 $this->notifications->send('booking_failed', __('Booking failed: :no', ['no' => $row->order_no]), (string) $result['failed'][$row->order_no], [
-                    'link' => route('desk.index', ['tab' => 'packing', 'order' => $row->id]), 'subject' => ['order', $row->id],
+                    'link' => route('desk.index', ['tab' => 'packaging', 'order' => $row->id]), 'subject' => ['order', $row->id],
                     'user_ids' => array_filter(array_merge([$row->moderator_id], $this->managerIds())),
                 ]);
             }
@@ -406,7 +406,7 @@ class DeskService
         if ($to['key'] === 'packed') {
             $set['packed_at'] = now();
         }
-        // Confirmed by a rule with no moderator: nobody is there to press Send to packing.
+        // Confirmed by a rule with no moderator: nobody is there to press Send to packaging.
         if ($to['key'] === 'confirmed' && ! $order->moderator_id && $order->channel === 'web') {
             $set['booking_state'] = 'queued';
         }

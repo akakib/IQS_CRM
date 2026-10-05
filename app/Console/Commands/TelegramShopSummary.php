@@ -12,7 +12,7 @@ class TelegramShopSummary extends Command
 {
     protected $signature = 'telegram:shop-summary';
 
-    protected $description = 'Post the end-of-day packing summary to the shop Telegram group';
+    protected $description = 'Post the end-of-day packaging summary to the shop Telegram group';
 
     public function handle(TelegramService $telegram): int
     {

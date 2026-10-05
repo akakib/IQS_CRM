@@ -1,7 +1,7 @@
 @php
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $typeLabels = ['cancel' => __('Cancel reasons'), 'hold' => __('Hold reasons'), 'amendment' => __('Order change reasons'), 'return' => __('Return reasons'), 'reassign' => __('Reassign reasons'), 'break' => __('Break reasons'), 'status' => __('Other')];
-    $blame = ['none' => __('Nobody'), 'sales' => __('Sales / agent'), 'verification' => __('Verification'), 'packing' => __('Packing'), 'dispatch' => __('Dispatch'), 'courier' => __('Courier'), 'customer' => __('Customer')];
+    $blame = ['none' => __('Nobody'), 'sales' => __('Sales / agent'), 'verification' => __('Verification'), 'packaging' => __('Packaging'), 'dispatch' => __('Dispatch'), 'courier' => __('Courier'), 'customer' => __('Customer')];
 @endphp
 
 <x-layouts.app :heading="__('Order statuses and reasons')">

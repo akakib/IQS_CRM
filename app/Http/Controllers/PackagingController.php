@@ -7,10 +7,10 @@ use App\Models\OrderStatus;
 use App\Models\StatusReason;
 use App\Models\User;
 use App\Services\ActivityLogger;
-use App\Services\Packing\BatchService;
+use App\Services\Packaging\BatchService;
 use App\Services\Courier\BookingService;
-use App\Services\Packing\ScanService;
-use App\Services\Packing\StockIssueService;
+use App\Services\Packaging\ScanService;
+use App\Services\Packaging\StockIssueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +25,7 @@ use Illuminate\View\View;
  *
  * Page load: shift (1), counts (1), queue (1), my day (2), new labels (1), hold reasons (1).
  */
-class PackingController extends Controller
+class PackagingController extends Controller
 {
     private const PER_PAGE = 25;
 
@@ -34,8 +34,8 @@ class PackingController extends Controller
         $user = $request->user();
         $today = today()->toDateString();
         $onDuty = DB::table('packer_shifts as s')->join('users as u', 'u.id', '=', 's.user_id')->where('s.work_date', $today)->orderBy('u.name')->pluck('u.name', 'u.id');
-        $canManage = $user->can('packing.manage');
-        // No list set today = everyone with packing access works (so a forgotten list never stops the shop).
+        $canManage = $user->can('packaging.manage');
+        // No list set today = everyone with packaging access works (so a forgotten list never stops the shop).
         $working = $onDuty->isEmpty() || $onDuty->has($user->id) || $canManage;
 
         $rfp = OrderStatus::idFor('ready_for_packaging');
@@ -57,16 +57,16 @@ class PackingController extends Controller
             ->when($filter === 'red', fn ($q) => $q->whereRaw($red))
             ->when($filter === 'waiting', fn ($q) => $q->where('o.status_id', $rfp)->whereNull('o.packer_id'))
             ->when($filter === 'mine', fn ($q) => $q->where('o.packer_id', $user->id))
-            ->orderByRaw("{$red} DESC, {$orange} DESC")->orderBy('o.packing_sent_at')->orderBy('o.id')
-            ->selectRaw("o.id, o.order_no, o.status_id, o.packing_sent_at, o.packing_started_at, o.packer_id, o.ship_district, o.ship_thana, o.edited_after_pack,
+            ->orderByRaw("{$red} DESC, {$orange} DESC")->orderBy('o.packaging_sent_at')->orderBy('o.id')
+            ->selectRaw("o.id, o.order_no, o.status_id, o.packaging_sent_at, o.packaging_started_at, o.packer_id, o.ship_district, o.ship_thana, o.edited_after_pack,
                 m.name as moderator, p.name as packer, {$red} as is_red, {$orange} as is_orange,
                 (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) as items")
             ->paginate(self::PER_PAGE)->withQueryString();
 
         $since = now()->startOfDay();
-        $mine = DB::table('orders')->where('packer_id', $user->id)->where('packed_at', '>=', $since)->get(['packing_started_at', 'packed_at']);
+        $mine = DB::table('orders')->where('packer_id', $user->id)->where('packed_at', '>=', $since)->get(['packaging_started_at', 'packed_at']);
 
-        return view('packing.index', [
+        return view('packaging.index', [
             'working' => $working,
             'onDuty' => $onDuty,
             'canManage' => $canManage,
@@ -76,7 +76,7 @@ class PackingController extends Controller
             'queue' => $queue,
             'myDay' => [
                 'packed' => $mine->count(),
-                'avg' => $mine->count() ? (int) round($mine->avg(fn ($o) => $o->packing_started_at ? max(0, strtotime($o->packed_at) - strtotime($o->packing_started_at)) : 0) / 60) : null,
+                'avg' => $mine->count() ? (int) round($mine->avg(fn ($o) => $o->packaging_started_at ? max(0, strtotime($o->packed_at) - strtotime($o->packaging_started_at)) : 0) / 60) : null,
                 'errors' => DB::table('scan_logs')->where('user_id', $user->id)->where('created_at', '>=', $since)->whereIn('result', ['blocked', 'unknown'])->count(),
             ],
             'newLabels' => DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')
@@ -132,7 +132,7 @@ class PackingController extends Controller
     public function label(Order $order, Request $request, BookingService $booking): View
     {
         abort_unless($order->active_shipment_id, 422, __('This order is not booked.'));
-        abort_unless(in_array($order->status_id, OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']), true), 422, __('This order is not in the packing queue.'));
+        abort_unless(in_array($order->status_id, OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']), true), 422, __('This order is not in the packaging queue.'));
         if ((int) $order->label_version !== (int) $order->current_version) {
             $booking->issueLabel($order, $order->active_shipment_id, null, __('Order edited (version :v)', ['v' => $order->current_version]));
         }
@@ -164,7 +164,7 @@ class PackingController extends Controller
         ]);
         $scans->hold($order, (int) $data['reason_id'], $data['note'] ?? null, $request->user());
 
-        return redirect()->route('packing.index')->with('success', __(':no is on hold. The moderator and admin were told.', ['no' => $order->order_no]));
+        return redirect()->route('packaging.index')->with('success', __(':no is on hold. The moderator and admin were told.', ['no' => $order->order_no]));
     }
 
     /** Print every label in the queue that has not been printed yet. */
@@ -174,9 +174,9 @@ class PackingController extends Controller
         $ids = DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')
             ->whereNull('l.voided_at')->whereNull('l.printed_at')
             ->whereIn('o.status_id', [$rfp, ...OrderStatus::idsFor(['packed', 'ready_for_pickup'])])
-            ->orderBy('o.packing_sent_at')->limit(100)->pluck('o.id');
+            ->orderBy('o.packaging_sent_at')->limit(100)->pluck('o.id');
         if ($ids->isEmpty()) {
-            return redirect()->route('packing.index')->with('error', __('No new label to print.'));
+            return redirect()->route('packaging.index')->with('error', __('No new label to print.'));
         }
 
         $orders = Order::whereIn('id', $ids)->with('items:id,order_id,name_snapshot,qty,unit')->get();
@@ -195,7 +195,7 @@ class PackingController extends Controller
     {
         $id = $batches->release(null, $request->user());
 
-        return $id ? redirect()->route('packing.batch', $id)->with('success', __('Batch released and sent to the shop.')) : back()->with('error', __('No booked order is waiting.'));
+        return $id ? redirect()->route('packaging.batch', $id)->with('success', __('Batch released and sent to the shop.')) : back()->with('error', __('No booked order is waiting.'));
     }
 
     public function batch(int $batch, BatchService $batches): View
@@ -203,7 +203,7 @@ class PackingController extends Controller
         $row = DB::table('batches')->find($batch);
         abort_unless($row, 404);
 
-        return view('packing.batch', [
+        return view('packaging.batch', [
             'batch' => $row,
             'lines' => $batches->pickList($batch),
             'orders' => Order::where('batch_id', $batch)->with('items:id,order_id,name_snapshot,qty,unit')
@@ -241,7 +241,7 @@ class PackingController extends Controller
 
     public function issues(): View
     {
-        return view('packing.issues', [
+        return view('packaging.issues', [
             'reports' => DB::table('stock_issue_reports as r')->join('product_variants as v', 'v.id', '=', 'r.variant_id')
                 ->join('products as p', 'p.id', '=', 'v.product_id')->leftJoin('users as u', 'u.id', '=', 'r.reported_by')
                 ->leftJoin('orders as o', 'o.id', '=', 'r.order_id')

@@ -76,7 +76,7 @@ class BookingService
                         'created_at' => now(), 'updated_at' => now(),
                     ]);
                     $order->forceFill(['active_shipment_id' => $shipmentId, 'pickup_date' => $order->pickup_date ?? now()->toDateString(),
-                        'booking_state' => 'none', 'booking_error' => null, 'packing_sent_at' => now()])->save();
+                        'booking_state' => 'none', 'booking_error' => null, 'packaging_sent_at' => now()])->save();
                     $this->issueLabel($order, $shipmentId, $by, null);
                     $this->orders->note($order, 'courier', __('Booked with :c · CN :cn · COD ৳:cod', ['c' => ucfirst($driver->name()), 'cn' => $r->consignmentId, 'cod' => $order->cod_amount]), $by);
                     $this->machine->transition($order, 'ready_for_packaging', $by, 'system', null, 'CN '.$r->consignmentId);

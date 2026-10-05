@@ -2,10 +2,10 @@
     use Illuminate\Support\Carbon;
     $filters = ['all' => __('All'), 'red' => __('Repack'), 'waiting' => __('Waiting'), 'mine' => __('Mine')];
     $wait = fn ($t) => $t ? Carbon::parse($t)->diffForHumans(now(), ['short' => true, 'syntax' => Carbon::DIFF_ABSOLUTE, 'parts' => 1]) : '-';
-    $canPack = auth()->user()->can('packing.create') && $working;
+    $canPack = auth()->user()->can('packaging.create') && $working;
 @endphp
 
-<x-layouts.app :heading="__('Packing')">
+<x-layouts.app :heading="__('Packaging')">
 <div class="mx-auto max-w-3xl"
     x-data="{
         last: null, list: null, ticked: [], busy: false, holding: false, holdReason: null,
@@ -14,7 +14,7 @@
             if (this.open === id) { this.open = null; return }
             this.open = id;
             if (!this.previews[id]) {
-                try { this.previews[id] = await (await fetch(@js(url('/packing/orders')) + '/' + id, { headers: { Accept: 'application/json' } })).json() }
+                try { this.previews[id] = await (await fetch(@js(url('/packaging/orders')) + '/' + id, { headers: { Accept: 'application/json' } })).json() }
                 catch (e) { this.previews[id] = { error: true } }
             }
         },
@@ -26,7 +26,7 @@
             return json;
         },
         async scan(code) {
-            try { this.last = await this.post(@js(route('packing.scan.post')), { code }) }
+            try { this.last = await this.post(@js(route('packaging.scan.post')), { code }) }
             catch (e) { this.last = { ok: false, level: 'red', message: e.message } }
             this.list = this.last.checklist ?? null; this.ticked = []; this.holding = false;
             $dispatch('scan-result', { ok: this.last.ok, message: this.last.message });
@@ -37,7 +37,7 @@
             if (!this.allTicked || this.busy) return;
             this.busy = true;
             try {
-                const r = await this.post(@js(url('/packing/orders')) + '/' + this.list.id + '/pack', { items: this.ticked });
+                const r = await this.post(@js(url('/packaging/orders')) + '/' + this.list.id + '/pack', { items: this.ticked });
                 window.toast(r.message); this.list = null; this.last = null;
                 setTimeout(() => window.location.reload(), 700);
             } catch (e) { window.toast(e.message, 'error') }
@@ -53,18 +53,18 @@
 
     <div class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
         <span class="text-gray-600">{{ __('On duty today') }}:
-            <b class="text-gray-800">{{ $onDuty->isEmpty() ? __('not set (everyone with packing access)') : $onDuty->join(', ') }}</b></span>
+            <b class="text-gray-800">{{ $onDuty->isEmpty() ? __('not set (everyone with packaging access)') : $onDuty->join(', ') }}</b></span>
         <span class="flex items-center gap-3">
-            @if ($newLabels)<a href="{{ route('packing.labels') }}" target="_blank" class="font-medium text-primary hover:underline">{{ __('Print new labels (:n)', ['n' => $newLabels]) }}</a>@endif
+            @if ($newLabels)<a href="{{ route('packaging.labels') }}" target="_blank" class="font-medium text-primary hover:underline">{{ __('Print new labels (:n)', ['n' => $newLabels]) }}</a>@endif
             <a href="{{ route('handover.index') }}" class="font-medium text-primary hover:underline">{{ __('Handover') }}</a>
-            @if ($openIssues)<a href="{{ route('packing.issues') }}" class="font-medium text-red-600 hover:underline">{{ __('Missing items (:n)', ['n' => $openIssues]) }}</a>@endif
+            @if ($openIssues)<a href="{{ route('packaging.issues') }}" class="font-medium text-red-600 hover:underline">{{ __('Missing items (:n)', ['n' => $openIssues]) }}</a>@endif
         </span>
     </div>
 
     @if ($canManage)
         <details class="mb-4 rounded-xl border border-gray-200 bg-white">
             <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700">{{ __('Set today\'s packers') }}</summary>
-            <form method="POST" action="{{ route('packing.shift') }}" class="border-t border-gray-100 p-4">
+            <form method="POST" action="{{ route('packaging.shift') }}" class="border-t border-gray-100 p-4">
                 @csrf
                 <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     @foreach ($staff as $id => $name)
@@ -79,7 +79,7 @@
     @endif
 
     @unless ($working)
-        <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{{ __('You are not on duty for packing today. Ask the admin to add you.') }}</div>
+        <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{{ __('You are not on duty for packaging today. Ask the admin to add you.') }}</div>
     @endunless
 
     @if ($canPack)
@@ -103,7 +103,7 @@
                     <span class="text-sm font-semibold tabular-nums text-gray-600" x-text="ticked.length + ' / ' + list.items.length"></span>
                 </div>
                 <p x-show="!list.repack" class="bg-primary-soft px-4 py-2 text-sm font-medium text-primary" x-text="last?.message"></p>
-                <p x-show="list.repack" class="bg-red-50 px-4 py-2 text-sm font-medium text-red-700">{{ __('Edited after packing. Change the box:') }} <span x-text="list.diff"></span></p>
+                <p x-show="list.repack" class="bg-red-50 px-4 py-2 text-sm font-medium text-red-700">{{ __('Edited after packaging. Change the box:') }} <span x-text="list.diff"></span></p>
                 <div class="divide-y divide-gray-100">
                     <template x-for="i in list.items" :key="i.id">
                         <button type="button" @click="tick(i.id)" class="flex w-full items-center gap-4 px-4 py-4 text-left" :class="ticked.includes(i.id) ? 'bg-green-50' : ''">
@@ -123,7 +123,7 @@
                         class="col-span-2 rounded-xl bg-primary px-3 py-4 text-base font-semibold text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40"
                         x-text="allTicked ? @js(__('Packed')) : @js(__('Tick every item'))"></button>
                 </div>
-                <form x-show="holding" x-cloak method="POST" :action="@js(url('/packing/orders')) + '/' + list.id + '/hold'" class="space-y-2 border-t border-gray-100 p-4">
+                <form x-show="holding" x-cloak method="POST" :action="@js(url('/packaging/orders')) + '/' + list.id + '/hold'" class="space-y-2 border-t border-gray-100 p-4">
                     @csrf
                     <input type="hidden" name="reason_id" :value="holdReason">
                     <p class="text-sm font-medium text-gray-700">{{ __('Why can it not be packed?') }}</p>
@@ -143,7 +143,7 @@
     {{-- Shared queue --}}
     <div class="mt-6 flex gap-2 overflow-x-auto">
         @foreach ($filters as $f => $label)
-            <a href="{{ route('packing.index', $f === 'all' ? [] : ['show' => $f]) }}"
+            <a href="{{ route('packaging.index', $f === 'all' ? [] : ['show' => $f]) }}"
                 @class(['flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium',
                     'border-primary bg-primary text-white' => $filter === $f, 'border-gray-300 bg-white text-gray-600' => $filter !== $f])>
                 {{ $label }} <span class="tabular-nums opacity-70">{{ $counts[$f] }}</span>
@@ -155,7 +155,7 @@
         @forelse ($queue as $o)
             <div @class(['overflow-hidden rounded-xl border bg-white',
                 'border-red-300' => $o->is_red, 'border-orange-300' => ! $o->is_red && $o->is_orange, 'border-gray-200' => ! $o->is_red && ! $o->is_orange])>
-                {{-- Tap to see what is inside. Looking does not start packing; scanning the label does. --}}
+                {{-- Tap to see what is inside. Looking does not start packaging; scanning the label does. --}}
                 <button type="button" @click="peek({{ $o->id }})" @class(['flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-gray-50', 'bg-red-50/40' => $o->is_red])>
                     <span class="min-w-0">
                         <span class="flex flex-wrap items-center gap-2">
@@ -171,8 +171,8 @@
                     </span>
                     <span class="flex shrink-0 items-center gap-3">
                         <span class="text-right">
-                            <span class="block text-sm font-semibold tabular-nums {{ $o->packing_sent_at && Carbon::parse($o->packing_sent_at)->lt(now()->subMinutes(30)) ? 'text-red-600' : 'text-gray-700' }}">{{ $wait($o->packing_sent_at) }}</span>
-                            <span class="block text-xs text-gray-500">{{ $o->packer ? __('Packing: :n', ['n' => $o->packer]) : __('Waiting') }}</span>
+                            <span class="block text-sm font-semibold tabular-nums {{ $o->packaging_sent_at && Carbon::parse($o->packaging_sent_at)->lt(now()->subMinutes(30)) ? 'text-red-600' : 'text-gray-700' }}">{{ $wait($o->packaging_sent_at) }}</span>
+                            <span class="block text-xs text-gray-500">{{ $o->packer ? __('Packaging: :n', ['n' => $o->packer]) : __('Waiting') }}</span>
                         </span>
                         <svg class="h-4 w-4 text-gray-400 transition-transform" :class="open === {{ $o->id }} && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                     </span>
@@ -183,7 +183,7 @@
                     <template x-if="previews[{{ $o->id }}]?.error"><p class="text-sm text-red-600">{{ __('Could not load. Tap again.') }}</p></template>
                     <template x-if="previews[{{ $o->id }}]?.items">
                         <div>
-                            <p x-show="previews[{{ $o->id }}].repack" class="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{{ __('Edited after packing. Change the box:') }} <span x-text="previews[{{ $o->id }}].diff"></span></p>
+                            <p x-show="previews[{{ $o->id }}].repack" class="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{{ __('Edited after packaging. Change the box:') }} <span x-text="previews[{{ $o->id }}].diff"></span></p>
                             <div class="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
                                 <template x-for="i in previews[{{ $o->id }}].items" :key="i.id">
                                     <div class="flex items-center justify-between gap-3 px-3 py-2.5">
@@ -197,13 +197,13 @@
                             </div>
                             <p class="mt-2 text-xs text-gray-500">
                                 <template x-if="previews[{{ $o->id }}].label && previews[{{ $o->id }}].label_current">
-                                    <span>{{ __('To start packing, scan its label:') }} <b class="font-mono text-gray-800" x-text="previews[{{ $o->id }}].label"></b><span x-show="!previews[{{ $o->id }}].label_printed"> · {{ __('not printed yet') }}</span></span>
+                                    <span>{{ __('To start packaging, scan its label:') }} <b class="font-mono text-gray-800" x-text="previews[{{ $o->id }}].label"></b><span x-show="!previews[{{ $o->id }}].label_printed"> · {{ __('not printed yet') }}</span></span>
                                 </template>
                                 <template x-if="previews[{{ $o->id }}].label && !previews[{{ $o->id }}].label_current">
                                     <span class="font-medium text-orange-700">{{ __('The order changed: print the new label, then scan it.') }}</span>
                                 </template>
                             </p>
-                            <form x-show="previews[{{ $o->id }}].label && (!previews[{{ $o->id }}].label_current || !previews[{{ $o->id }}].label_printed)" method="POST" action="{{ route('packing.label', $o->id) }}" target="_blank" class="mt-2" @submit="setTimeout(() => location.reload(), 1500)">
+                            <form x-show="previews[{{ $o->id }}].label && (!previews[{{ $o->id }}].label_current || !previews[{{ $o->id }}].label_printed)" method="POST" action="{{ route('packaging.label', $o->id) }}" target="_blank" class="mt-2" @submit="setTimeout(() => location.reload(), 1500)">
                                 @csrf
                                 <button class="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-primary hover:text-white" x-text="previews[{{ $o->id }}].label_current ? @js(__('Print label')) : @js(__('Print new label'))"></button>
                             </form>

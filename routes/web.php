@@ -9,7 +9,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderSettingsController;
-use App\Http\Controllers\PackingController;
+use App\Http\Controllers\PackagingController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -135,30 +135,32 @@ Route::middleware('auth')->group(function () {
     Route::post('/shipping/resync', [ShippingController::class, 'resync'])->middleware('can:shipping.create')->name('shipping.resync');
     Route::post('/shipping/{order}/reprint', [ShippingController::class, 'reprint'])->middleware('can:shipping.create')->name('shipping.reprint');
 
-    // Packing and handover
-    Route::middleware('can:packing.view')->group(function () {
-        Route::get('/packing', [PackingController::class, 'index'])->name('packing.index');
+    // Packaging and handover
+    // The module used to live at /packing: old bookmarks and notification links still land.
+    Route::get('/packing/{rest?}', fn (?string $rest = null) => redirect('/packaging'.($rest ? '/'.$rest : '')))->where('rest', '.*');
+    Route::middleware('can:packaging.view')->group(function () {
+        Route::get('/packaging', [PackagingController::class, 'index'])->name('packaging.index');
         // GET only: Route::redirect answers every verb and, once routes are cached, swallowed the scan POST below.
-        Route::get('/packing/scan', fn () => redirect('/packing'))->name('packing.scan');
-        Route::get('/packing/labels', [PackingController::class, 'labels'])->name('packing.labels');
-        Route::post('/packing/{order}/label', [PackingController::class, 'label'])->name('packing.label');
-        Route::get('/packing/orders/{order}', [PackingController::class, 'preview'])->name('packing.preview');
-        Route::get('/packing/batches/{batch}', [PackingController::class, 'batch'])->whereNumber('batch')->name('packing.batch');
-        Route::post('/packing/report', [PackingController::class, 'report'])->name('packing.report');
-        Route::get('/packing/issues', [PackingController::class, 'issues'])->name('packing.issues');
-        Route::post('/packing/issues/{report}', [PackingController::class, 'resolve'])->whereNumber('report')->name('packing.issues.resolve');
+        Route::get('/packaging/scan', fn () => redirect('/packaging'))->name('packaging.scan');
+        Route::get('/packaging/labels', [PackagingController::class, 'labels'])->name('packaging.labels');
+        Route::post('/packaging/{order}/label', [PackagingController::class, 'label'])->name('packaging.label');
+        Route::get('/packaging/orders/{order}', [PackagingController::class, 'preview'])->name('packaging.preview');
+        Route::get('/packaging/batches/{batch}', [PackagingController::class, 'batch'])->whereNumber('batch')->name('packaging.batch');
+        Route::post('/packaging/report', [PackagingController::class, 'report'])->name('packaging.report');
+        Route::get('/packaging/issues', [PackagingController::class, 'issues'])->name('packaging.issues');
+        Route::post('/packaging/issues/{report}', [PackagingController::class, 'resolve'])->whereNumber('report')->name('packaging.issues.resolve');
         Route::get('/handover', [HandoverController::class, 'index'])->name('handover.index');
         Route::get('/handover/{session}', [HandoverController::class, 'show'])->whereNumber('session')->name('handover.show');
         Route::get('/handover/{session}/manifest', [HandoverController::class, 'manifest'])->whereNumber('session')->name('handover.manifest');
     });
-    Route::post('/packing/shift', [PackingController::class, 'shift'])->middleware('can:packing.manage')->name('packing.shift');
-    Route::middleware('can:packing.create')->group(function () {
-        Route::post('/packing/scan', [PackingController::class, 'scan'])->name('packing.scan.post');
-        Route::post('/packing/orders/{order}/pack', [PackingController::class, 'pack'])->name('packing.pack');
-        Route::post('/packing/orders/{order}/hold', [PackingController::class, 'hold'])->name('packing.hold');
-        Route::post('/packing/release', [PackingController::class, 'release'])->name('packing.release');
-        Route::post('/packing/batches/{batch}/picked', [PackingController::class, 'picked'])->whereNumber('batch')->name('packing.picked');
-        Route::post('/packing/batches/{batch}/done', [PackingController::class, 'done'])->whereNumber('batch')->name('packing.done');
+    Route::post('/packaging/shift', [PackagingController::class, 'shift'])->middleware('can:packaging.manage')->name('packaging.shift');
+    Route::middleware('can:packaging.create')->group(function () {
+        Route::post('/packaging/scan', [PackagingController::class, 'scan'])->name('packaging.scan.post');
+        Route::post('/packaging/orders/{order}/pack', [PackagingController::class, 'pack'])->name('packaging.pack');
+        Route::post('/packaging/orders/{order}/hold', [PackagingController::class, 'hold'])->name('packaging.hold');
+        Route::post('/packaging/release', [PackagingController::class, 'release'])->name('packaging.release');
+        Route::post('/packaging/batches/{batch}/picked', [PackagingController::class, 'picked'])->whereNumber('batch')->name('packaging.picked');
+        Route::post('/packaging/batches/{batch}/done', [PackagingController::class, 'done'])->whereNumber('batch')->name('packaging.done');
         Route::post('/handover', [HandoverController::class, 'start'])->name('handover.start');
         Route::post('/handover/{session}/scan', [HandoverController::class, 'scan'])->whereNumber('session')->name('handover.scan');
         Route::post('/handover/{session}/manual', [HandoverController::class, 'manual'])->whereNumber('session')->name('handover.manual');

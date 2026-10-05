@@ -1,14 +1,14 @@
 <x-layouts.app :heading="__('Batch :b', ['b' => $batch->batch_no])">
     <div class="mb-4 flex flex-wrap items-center gap-2">
-        <a href="{{ route('packing.index') }}" class="text-sm text-primary hover:underline">{{ __('Packing') }}</a>
+        <a href="{{ route('packaging.index') }}" class="text-sm text-primary hover:underline">{{ __('Packaging') }}</a>
         <x-badge :color="['released' => 'blue', 'picked' => 'amber', 'done' => 'green'][$batch->status]">{{ ucfirst($batch->status) }}</x-badge>
         <span class="ml-auto flex gap-2">
             <x-button size="sm" variant="secondary" type="button" onclick="window.print()">{{ __('Print pick list') }}</x-button>
             @if ($batch->status === 'released')
-                <form method="POST" action="{{ route('packing.picked', $batch->id) }}">@csrf<x-button size="sm" variant="secondary">{{ __('Picked') }}</x-button></form>
+                <form method="POST" action="{{ route('packaging.picked', $batch->id) }}">@csrf<x-button size="sm" variant="secondary">{{ __('Picked') }}</x-button></form>
             @endif
             @if ($batch->status !== 'done')
-                <form method="POST" action="{{ route('packing.done', $batch->id) }}">@csrf<x-button size="sm">{{ __('Packing finished') }}</x-button></form>
+                <form method="POST" action="{{ route('packaging.done', $batch->id) }}">@csrf<x-button size="sm">{{ __('Packaging finished') }}</x-button></form>
             @endif
         </span>
     </div>
@@ -25,7 +25,7 @@
                             <td class="py-2 pr-2 text-right font-semibold tabular-nums">{{ rtrim(rtrim(number_format((float) $l->qty, 3, '.', ''), '0'), '.') }}{{ $l->unit === 'g' ? ' g' : '' }}</td>
                             <td class="py-2 text-right tabular-nums text-gray-500">{{ $l->orders }}</td>
                             <td class="py-2 pl-2 text-right">
-                                <form method="POST" action="{{ route('packing.report') }}">
+                                <form method="POST" action="{{ route('packaging.report') }}">
                                     @csrf
                                     <input type="hidden" name="variant_id" value="{{ $l->variant_id }}">
                                     <input type="hidden" name="batch_id" value="{{ $batch->id }}">

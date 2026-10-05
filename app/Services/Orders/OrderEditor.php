@@ -16,7 +16,7 @@ use Illuminate\Validation\ValidationException;
  * person), a new append-only version, recomputed totals/COD and a readable
  * note. The status's edit_policy decides: free = apply now, approval = wait
  * for a manager, locked = refused (partial delivery or a new order instead).
- * Editing after packing marks the order RED (repack) or relabel.
+ * Editing after packaging marks the order RED (repack) or relabel.
  */
 class OrderEditor
 {
@@ -120,7 +120,7 @@ class OrderEditor
         $order->current_version = $version;
         $order->lock_version++;
 
-        // After packing: content change = box is wrong (RED), address/phone only = new label (ORANGE).
+        // After packaging: content change = box is wrong (RED), address/phone only = new label (ORANGE).
         $wasPacked = $order->packed_version !== null;
         if ($wasPacked) {
             $order->edited_after_pack = true;
@@ -158,7 +158,7 @@ class OrderEditor
             $this->orders->note($order, 'payment', __('Advance is more than the new total: refund ৳:r due.', ['r' => $order->refund_due]), null);
         }
         if ($wasPacked && $a->edit_class === 'content') {
-            $this->notifications->send('order_needs_repack', __(':no edited after packing: repack', ['no' => $order->order_no]), $this->describe(json_decode($a->changes, true)), [
+            $this->notifications->send('order_needs_repack', __(':no edited after packaging: repack', ['no' => $order->order_no]), $this->describe(json_decode($a->changes, true)), [
                 'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
             ]);
         }

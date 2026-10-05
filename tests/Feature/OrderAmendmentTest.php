@@ -103,7 +103,7 @@ class OrderAmendmentTest extends TestCase
         $this->assertSame('1.000', $order->fresh()->items->first()->qty);
     }
 
-    public function test_content_edit_after_packing_marks_repack_and_alerts(): void
+    public function test_content_edit_after_packaging_marks_repack_and_alerts(): void
     {
         $order = $this->order();
         $this->setStatus($order, 'packed', ['packed_version' => 1]);
@@ -117,7 +117,7 @@ class OrderAmendmentTest extends TestCase
         $this->assertDatabaseHas('order_amendments', ['order_id' => $order->id, 'edit_class' => 'content']);
     }
 
-    public function test_address_only_edit_after_packing_is_a_label_change(): void
+    public function test_address_only_edit_after_packaging_is_a_label_change(): void
     {
         $order = $this->order();
         $this->setStatus($order, 'packed', ['packed_version' => 1]);

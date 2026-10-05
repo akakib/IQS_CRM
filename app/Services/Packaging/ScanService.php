@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Packing;
+namespace App\Services\Packaging;
 
 use App\Models\Order;
 use App\Models\OrderStatus;
@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Packing and handover scans (DB_DESIGN 3.5). Every scan is logged, good or
+ * Packaging and handover scans (DB_DESIGN 3.5). Every scan is logged, good or
  * bad. Packers see items only, never customer contact details.
  *
  * @phpstan-type Result array{ok: bool, level: string, result: string, message: string, order?: array}
@@ -24,7 +24,7 @@ class ScanService
     public function __construct(private OrderStateMachine $machine, private OrderService $orders) {}
 
     /**
-     * Packing scan, step 1: scanning the label opens the order and makes the
+     * Packaging scan, step 1: scanning the label opens the order and makes the
      * scanner its packer. Nothing is packed yet; step 2 is finish().
      *
      * @return array{ok: bool, level: string, result: string, message: string, order?: array, checklist?: array}
@@ -33,7 +33,7 @@ class ScanService
     {
         [$label, $order, $early] = $this->lookup($code);
         if ($early) {
-            return $this->log('packing', null, $code, $order, $label, $early, $by);
+            return $this->log('packaging', null, $code, $order, $label, $early, $by);
         }
 
         $key = OrderStatus::map()[$order->status_id]['key'];
@@ -41,33 +41,33 @@ class ScanService
         $isCurrent = (int) $label->order_version === (int) $order->current_version;
 
         if ($order->stock_issue_flag) {
-            return $this->log('packing', null, $code, $order, $label, $this->fail('blocked', __('Skip: an item was reported missing. Admin is deciding.')), $by);
+            return $this->log('packaging', null, $code, $order, $label, $this->fail('blocked', __('Skip: an item was reported missing. Admin is deciding.')), $by);
         }
 
         $repack = false;
         if (in_array($key, ['packed', 'ready_for_pickup'], true)) {
             if ($mark !== 'repack') {
-                return $this->log('packing', null, $code, $order, $label, $this->fail('duplicate', __('Already packed.'), 'warn'), $by);
+                return $this->log('packaging', null, $code, $order, $label, $this->fail('duplicate', __('Already packed.'), 'warn'), $by);
             }
             if (! $isCurrent) {
-                return $this->log('packing', null, $code, $order, $label, $this->fail('blocked', __('Edited after packing: repack. :d Print and scan the NEW label.', ['d' => $this->diff($order)])), $by);
+                return $this->log('packaging', null, $code, $order, $label, $this->fail('blocked', __('Edited after packaging: repack. :d Print and scan the NEW label.', ['d' => $this->diff($order)])), $by);
             }
             $repack = true; // new label on an edited order: fix the box, tick the items again
         } elseif ($key !== 'ready_for_packaging') {
-            return $this->log('packing', null, $code, $order, $label, $this->fail('blocked', __('Do not pack: order is :s.', ['s' => OrderStatus::map()[$order->status_id]['name']])), $by);
+            return $this->log('packaging', null, $code, $order, $label, $this->fail('blocked', __('Do not pack: order is :s.', ['s' => OrderStatus::map()[$order->status_id]['name']])), $by);
         } elseif (! $isCurrent) {
-            return $this->log('packing', null, $code, $order, $label, $this->fail('blocked', __('Old label: the order changed. Print the new label first.')), $by);
+            return $this->log('packaging', null, $code, $order, $label, $this->fail('blocked', __('Old label: the order changed. Print the new label first.')), $by);
         }
 
         if ((int) $order->packer_id !== $by->id) {
             $previous = $order->packer_id ? DB::table('users')->where('id', $order->packer_id)->value('name') : null;
-            $order->forceFill(['packer_id' => $by->id, 'packing_started_at' => now()])->save();
+            $order->forceFill(['packer_id' => $by->id, 'packaging_started_at' => now()])->save();
             $this->orders->note($order, 'system', $previous
-                ? __('Packing taken over by :n (was :p).', ['n' => $by->name, 'p' => $previous])
-                : __('Packing started by :n.', ['n' => $by->name]), $by);
+                ? __('Packaging taken over by :n (was :p).', ['n' => $by->name, 'p' => $previous])
+                : __('Packaging started by :n.', ['n' => $by->name]), $by);
         }
 
-        $r = $this->log('packing', null, $code, $order, $label, [
+        $r = $this->log('packaging', null, $code, $order, $label, [
             'ok' => true, 'level' => $repack ? 'edited' : 'ok', 'result' => 'ok',
             'message' => $repack ? __('Repack: fix the box, then tick every item.') : __('Yours. Tick every item, then press Packed.'),
         ], $by);
@@ -93,7 +93,7 @@ class ScanService
     }
 
     /**
-     * Packing, step 2: every item was ticked. The server checks the list
+     * Packaging, step 2: every item was ticked. The server checks the list
      * itself, so a half-ticked order can never become Packed.
      *
      * @param  list<int>  $tickedItemIds
@@ -130,7 +130,7 @@ class ScanService
     public function hold(Order $order, int $reasonId, ?string $note, User $by): void
     {
         $this->machine->transition($order, 'hold', $by, 'scan', $reasonId, $note);
-        $order->forceFill(['packer_id' => null, 'packing_started_at' => null])->save();
+        $order->forceFill(['packer_id' => null, 'packaging_started_at' => null])->save();
 
         $reason = DB::table('status_reasons')->where('id', $reasonId)->value('label_en');
         app(\App\Services\NotificationService::class)->send('order_held_by_packer', __(':no held by packer :n', ['no' => $order->order_no, 'n' => $by->name]), trim($reason.($note ? ' · '.$note : '')), [
@@ -157,7 +157,7 @@ class ScanService
             return $this->log('handover', $sessionId, $code, $order, $label, $this->fail('blocked', __('Do not hand over: order is :s.', ['s' => OrderStatus::map()[$order->status_id]['name']])), $by);
         }
         if ($order->packMark() === 'repack') {
-            return $this->log('handover', $sessionId, $code, $order, $label, $this->fail('blocked', __('Edited after packing: repack first. :d', ['d' => $this->diff($order)])), $by);
+            return $this->log('handover', $sessionId, $code, $order, $label, $this->fail('blocked', __('Edited after packaging: repack first. :d', ['d' => $this->diff($order)])), $by);
         }
         if ((int) $label->order_version < (int) $order->label_version || (int) $order->label_version < (int) $order->current_version) {
             return $this->log('handover', $sessionId, $code, $order, $label, $this->fail('blocked', __('New label needed (address or COD changed).'), 'orange'), $by);

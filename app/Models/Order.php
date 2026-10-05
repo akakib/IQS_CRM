@@ -38,8 +38,8 @@ class Order extends Model
             'action_due_at' => 'datetime',
             'next_call_at' => 'datetime',
             'timer_extended_at' => 'datetime',
-            'packing_sent_at' => 'datetime',
-            'packing_started_at' => 'datetime',
+            'packaging_sent_at' => 'datetime',
+            'packaging_started_at' => 'datetime',
             'packed_at' => 'datetime',
         ];
     }
@@ -103,7 +103,7 @@ class Order extends Model
         };
     }
 
-    /** RED: edited after packing, box is wrong. EDITED: edited and repacked. */
+    /** RED: edited after packaging, box is wrong. EDITED: edited and repacked. */
     public function packMark(): ?string
     {
         if ($this->packed_version === null) {

@@ -183,10 +183,10 @@ class PointHooks
         return DB::table('order_events')->where('order_id', $order->id)->where('to_status_id', OrderStatus::idFor('packed'))->orderByDesc('id')->value('user_id');
     }
 
-    /** Minutes from reaching the packing queue to now. */
+    /** Minutes from reaching the packaging queue to now. */
     private function minutesSinceRelease(Order $order): ?float
     {
-        return $order->packing_sent_at ? round(now()->diffInSeconds($order->packing_sent_at, true) / 60, 1) : null;
+        return $order->packaging_sent_at ? round(now()->diffInSeconds($order->packaging_sent_at, true) / 60, 1) : null;
     }
 
     private function lastReasonBlame(Order $order): string

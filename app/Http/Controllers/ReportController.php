@@ -27,8 +27,8 @@ class ReportController extends Controller
             $tiles[] = [__('Confirmed today'), $todayCount('confirmed'), null, null];
             $tiles[] = [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null];
         }
-        if ($user->can('packing.view')) {
-            $tiles[] = [__('Packed today'), $todayCount('packed'), route('packing.index'), null];
+        if ($user->can('packaging.view')) {
+            $tiles[] = [__('Packed today'), $todayCount('packed'), route('packaging.index'), null];
         }
         if ($user->can('orders.view')) {
             $tiles[] = [__('Delivered today'), $todayCount('delivered'), null, null];

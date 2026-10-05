@@ -9,7 +9,7 @@
         @endcan
     </div>
 
-    <x-tabs :tabs="['book' => [__('Ready to book'), '#book', $orders->count()], 'booked' => [__('Booked, waiting for packing'), '#booked', $booked->count()]]" active="book" />
+    <x-tabs :tabs="['book' => [__('Ready to book'), '#book', $orders->count()], 'booked' => [__('Booked, waiting for packaging'), '#booked', $booked->count()]]" active="book" />
 
     <section id="book" class="mb-8">
         @if ($orders->isEmpty())
@@ -49,7 +49,7 @@
     </section>
 
     <section id="booked">
-        <h2 class="mb-2 text-sm font-semibold text-gray-800">{{ __('Booked, waiting for packing') }}</h2>
+        <h2 class="mb-2 text-sm font-semibold text-gray-800">{{ __('Booked, waiting for packaging') }}</h2>
         @if ($booked->isEmpty())
             <p class="text-sm text-gray-400">{{ __('Nothing booked yet.') }}</p>
         @else

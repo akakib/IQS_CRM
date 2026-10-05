@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\Packing\BatchService;
-use App\Services\Packing\StockIssueService;
+use App\Services\Packaging\BatchService;
+use App\Services\Packaging\StockIssueService;
 use App\Services\Telegram\TelegramService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

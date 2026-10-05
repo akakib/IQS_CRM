@@ -17,6 +17,7 @@ use App\Support\Lists\ListState;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -222,7 +223,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function amend(Order $order, Request $request, OrderEditor $editor): RedirectResponse
+    public function amend(Order $order, Request $request, OrderEditor $editor): RedirectResponse|Response
     {
         $this->authorizeWork($order, $request->user());
         $data = $request->validate([
@@ -243,10 +244,15 @@ class OrderController extends Controller
 
         $result = $editor->request($order, $data, (int) $data['reason_id'], $request->user(), (int) $data['lock_version']);
 
-        // Opened from Order management: go back to the same order there.
-        $to = $request->input('back') === 'desk' ? route('desk.index', array_filter(['tab' => in_array($request->input('tab'), DeskController::TABS, true) ? $request->input('tab') : null, 'order' => $order->id])) : route('orders.show', $order);
+        $message = $result['applied'] ? __('Order updated.') : __('Change sent to a manager for approval.');
+        // Saved from the edit popup: the page behind it reloads and shows the message.
+        if ($request->boolean('embed')) {
+            session()->flash('success', $message);
 
-        return redirect($to)->with('success', $result['applied'] ? __('Order updated.') : __('Change sent to a manager for approval.'));
+            return response()->view('orders.edit-done');
+        }
+
+        return redirect()->route('orders.show', $order)->with('success', $message);
     }
 
     public function decideAmendment(Order $order, int $amendment, Request $request, OrderEditor $editor): RedirectResponse

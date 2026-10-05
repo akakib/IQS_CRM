@@ -6,9 +6,10 @@
     ])->values();
 @endphp
 
-<x-layouts.app :heading="__('Edit :no', ['no' => $order->order_no])">
+{{-- embed=1: the form sits in the edit popup on Order management, so no sidebar or header. --}}
+<x-dynamic-component :component="request('embed') ? 'layouts.embed' : 'layouts.app'" :heading="__('Edit :no', ['no' => $order->order_no])">
     <div class="mb-4 flex flex-wrap items-center gap-2 text-sm">
-        <a href="{{ route('orders.show', $order) }}" class="text-primary hover:underline">{{ __('Back to the order') }}</a>
+        @unless (request('embed'))<a href="{{ route('orders.show', $order) }}" class="text-primary hover:underline">{{ __('Back to the order') }}</a>@endunless
         @if ($policy === 'approval' && ! auth()->user()->can('orders.approve'))
             <x-badge color="amber">{{ __('In this stage a manager must approve the change') }}</x-badge>
         @endif
@@ -42,7 +43,7 @@
             money(n) { return '৳' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); },
         }">
         @csrf
-        @if (request('back') === 'desk')<input type="hidden" name="back" value="desk"><input type="hidden" name="tab" value="{{ request('tab') }}">@endif
+        @if (request('embed'))<input type="hidden" name="embed" value="1">@endif
         <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">
 
         <div class="grid gap-6 xl:grid-cols-3">
@@ -107,4 +108,4 @@
             </div>
         </div>
     </form>
-</x-layouts.app>
+</x-dynamic-component>

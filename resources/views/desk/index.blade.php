@@ -186,12 +186,12 @@
                                     <x-order-status :order="$order" :statuses="$statuses" />
                                     @if ($order->action_due_at)<x-countdown :seconds="$secondsLeft($order->action_due_at)" />@endif
                                     @if ($order->no_response_count)<x-badge color="amber">{{ __('No response ×:n', ['n' => $order->no_response_count]) }}</x-badge>@endif
-                                    {{-- Wrong item, address or phone: fix it in the full form and come straight back here. --}}
+                                    {{-- Wrong item, address or phone: fix it in the popup without leaving this page. --}}
                                     @if (($statuses[$order->status_id]['edit_policy'] ?? 'locked') !== 'locked')
-                                        <a href="{{ route('orders.edit', ['order' => $order, 'back' => 'desk', 'tab' => $tab]) }}" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">
+                                        <button type="button" @click="$dispatch('open-order-edit')" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.86 4.49l2.65 2.65M4 20l1-4L16.5 4.5a1.87 1.87 0 012.65 2.65L7.65 18.65 4 20z"/></svg>
                                             {{ __('Edit order') }}
-                                        </a>
+                                        </button>
                                     @endif
                                 </div>
                                 <h2 class="mt-1 text-2xl font-semibold text-gray-900">{{ $order->ship_name }}</h2>
@@ -368,4 +368,24 @@
         </section>
     </div>
 </div>
+
+{{-- Edit popup: the full edit form in a large window over this page. It closes
+     only with its Close button (a stray click outside must not lose typing).
+     After a save the form tells this page, which reloads on the same order. --}}
+@if ($order ?? null)
+    <template x-teleport="body">
+        <div x-data="{ open: false, src: '' }" x-show="open" x-cloak
+            @open-order-edit.window="src = @js(route('orders.edit', ['order' => $order->id, 'embed' => 1])); open = true"
+            @message.window="if ($event.origin === location.origin && $event.data?.iqsOrderEdited) location.href = @js(route('desk.index', ['tab' => $tab, 'order' => $order->id]))"
+            class="fixed inset-0 z-[120] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">
+            <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-[92vh] sm:rounded-2xl">
+                <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-6">
+                    <h3 class="text-base font-semibold text-gray-900">{{ __('Edit :no', ['no' => $order->order_no]) }}</h3>
+                    <button type="button" @click="open = false; src = ''" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Close') }}</button>
+                </div>
+                <iframe :src="src" title="{{ __('Edit order') }}" class="min-h-0 w-full flex-1 border-0 bg-gray-50"></iframe>
+            </div>
+        </div>
+    </template>
+@endif
 </x-layouts.app>

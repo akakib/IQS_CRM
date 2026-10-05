@@ -115,7 +115,11 @@
                         <div class="flex items-center justify-between gap-2" @select-change.stop="zone = $event.detail; recharge()">
                             <dt class="flex min-w-0 items-center gap-2 text-gray-500">
                                 <span class="shrink-0">{{ __('Delivery') }}</span>
-                                <x-simple-select name="zone_id" :options="$zones" :value="(string) old('zone_id', $order->zone_id ?? '')" :placeholder="__('Choose area')" size="sm" />
+                                @if (\App\Services\Orders\DeliveryCharges::flat())
+                                    <input type="hidden" name="zone_id" value="{{ $order->zone_id }}"><span class="text-xs text-gray-400">{{ __('same everywhere') }}</span>
+                                @else
+                                    <x-simple-select name="zone_id" :options="$zones" :value="(string) old('zone_id', $order->zone_id ?? '')" :placeholder="__('Choose area')" size="sm" />
+                                @endif
                             </dt>
                             <dd class="shrink-0 text-right tabular-nums"><span x-text="money(delivery)"></span>
                                 <span class="block text-[11px] text-gray-400" x-text="@js($order->channel === 'web') && !zoneChanged ? @js(__('as sold')) : @js(__('from the delivery rules'))"></span></dd>

@@ -60,10 +60,12 @@
                 </div>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     <input type="hidden" :name="`addresses[${i}][zone_id]`" :value="a.zone_id ?? ''">
+                    @unless (\App\Services\Orders\DeliveryCharges::flat())
                     @foreach ($zones as $id => $zone)
                         <button type="button" @click="a.zone_id = {{ $id }}" class="rounded-full border px-2.5 py-1 text-xs"
                             :class="a.zone_id == {{ $id }} ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $zone }}</button>
                     @endforeach
+                    @endunless
                     <label class="ml-auto flex items-center gap-1 text-xs text-gray-600">
                         <input type="radio" :checked="def === i" @change="def = i" class="text-primary"> {{ __('Default') }}
                     </label>

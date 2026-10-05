@@ -25,6 +25,20 @@ class OrderSettingsController extends Controller
         ]);
     }
 
+    /** By delivery area (the rules below) or one charge for the whole country. */
+    public function chargeMode(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['mode' => ['required', 'in:area,flat'], 'flat_charge' => ['required_if:mode,flat', 'nullable', 'numeric', 'min:0', 'max:100000']]);
+        app(\App\Services\SettingsService::class)->set(array_filter([
+            'delivery.mode' => $data['mode'],
+            'delivery.flat_charge' => $data['mode'] === 'flat' ? (float) $data['flat_charge'] : null,
+        ], fn ($v) => $v !== null), $request->user()->id);
+
+        return back()->with('success', $data['mode'] === 'flat'
+            ? __('One delivery charge for the whole country: ৳:c.', ['c' => number_format((float) $data['flat_charge'])])
+            : __('Delivery is charged by area again.'));
+    }
+
     public function storeZone(Request $request): RedirectResponse
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:100', Rule::unique('delivery_zones', 'name')]]);

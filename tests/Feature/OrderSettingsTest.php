@@ -35,6 +35,22 @@ class OrderSettingsTest extends TestCase
         $this->assertDatabaseHas('activity_log', ['action' => 'delivery_rule.created']);
     }
 
+    public function test_one_charge_for_the_whole_country_replaces_the_area_rules_until_switched_back(): void
+    {
+        $charges = app(\App\Services\Orders\DeliveryCharges::class);
+        $outside = \Illuminate\Support\Facades\DB::table('delivery_zones')->where('system_key', 'outside_dhaka')->value('id');
+        $byArea = $charges->for($outside, 500, 1000);
+
+        $this->post('/settings/charges/mode', ['mode' => 'flat', 'flat_charge' => 80])->assertSessionHas('success');
+        $this->assertSame(80.0, $charges->for($outside, 500, 1000));
+        $this->assertSame(80.0, $charges->for(null, 5000, 99999));
+        $this->get('/settings/charges')->assertOk()->assertSee('Not in use while one charge applies');
+
+        $this->post('/settings/charges/mode', ['mode' => 'flat'])->assertSessionHasErrors('flat_charge');
+        $this->post('/settings/charges/mode', ['mode' => 'area'])->assertSessionHas('success');
+        $this->assertSame($byArea, $charges->for($outside, 500, 1000));
+    }
+
     public function test_reasons_and_status_names_are_editable(): void
     {
         $this->get('/settings/reasons')->assertOk()->assertSee('Cancel reasons');

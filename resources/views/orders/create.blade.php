@@ -117,7 +117,7 @@
                         </div>
                         <datalist id="bd-districts">@foreach ($districts as $d)<option value="{{ $d }}">@endforeach</datalist>
                         <input type="hidden" name="zone_id" :value="zoneId || ''">
-                        <div class="flex flex-wrap gap-2">
+                        <div @class(['flex flex-wrap gap-2', 'hidden' => \App\Services\Orders\DeliveryCharges::flat()])>
                             @foreach ($zones as $id => $zone)
                                 <button type="button" @click="zoneId = {{ $id }}; recharge()" class="rounded-full border px-2.5 py-1 text-xs"
                                     :class="zoneId == {{ $id }} ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $zone }}</button>

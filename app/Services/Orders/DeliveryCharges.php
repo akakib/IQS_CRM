@@ -6,15 +6,26 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Delivery charge comes from delivery_charge_rules, never typed by agents.
+ * Delivery charge is never typed by agents. Either one charge for the whole
+ * country (settings delivery.mode = flat), or delivery_charge_rules by area:
  * Matching rule with the lowest priority number wins; among equals a
  * free-shipping threshold (higher min_order_total) beats the normal charge,
  * then a zone rule beats an any-zone rule.
  */
 class DeliveryCharges
 {
+    /** One charge for the whole country (Settings > Delivery charges): delivery areas are not asked for. */
+    public static function flat(): bool
+    {
+        return settings('delivery.mode') === 'flat';
+    }
+
     public function for(?int $zoneId, int $weightG, float $orderTotal): float
     {
+        if (self::flat()) {
+            return round((float) settings('delivery.flat_charge'), 2);
+        }
+
         $rules = Cache::rememberForever('delivery_charge_rules', fn () => DB::table('delivery_charge_rules')->where('is_active', true)->get()->all());
 
         $match = collect($rules)

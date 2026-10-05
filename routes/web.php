@@ -220,6 +220,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/charges', [OrderSettingsController::class, 'charges'])->middleware('can:settings.view')->name('settings.charges');
     Route::get('/settings/reasons', [OrderSettingsController::class, 'reasons'])->middleware('can:settings.view')->name('settings.reasons');
     Route::middleware('can:settings.edit')->group(function () {
+        Route::post('/settings/charges/mode', [OrderSettingsController::class, 'chargeMode'])->name('settings.charges.mode');
         Route::post('/settings/charges/zones', [OrderSettingsController::class, 'storeZone'])->name('settings.charges.zones.store');
         Route::post('/settings/charges/rules', [OrderSettingsController::class, 'storeRule'])->name('settings.charges.rules.store');
         Route::post('/settings/charges/rules/{rule}/toggle', [OrderSettingsController::class, 'toggleRule'])->whereNumber('rule')->name('settings.charges.rules.toggle');

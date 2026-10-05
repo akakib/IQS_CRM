@@ -1,10 +1,37 @@
 @php($input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none')
 
 <x-layouts.app :heading="__('Delivery charges')">
-    <p class="mb-4 text-sm text-gray-500">{{ __('Agents never type the delivery charge: it comes from these rules by zone, parcel weight and order total. Lowest priority number wins; a free-shipping rule (higher minimum total) beats the normal charge.') }}</p>
+    <p class="mb-4 text-sm text-gray-500">{{ __('Staff never type the delivery charge. By area: an order takes the rule whose area (or Any zone), parcel weight and "order total from" all fit it. If more than one fits, the lower priority number wins; at the same priority a free-delivery rule (a higher order total) wins over the normal charge.') }}</p>
 
-    <div class="grid gap-6 xl:grid-cols-3">
-        <x-card :title="__('Rules')" class="xl:col-span-2">
+    @php($flat = \App\Services\Orders\DeliveryCharges::flat())
+    <x-card :title="__('How delivery is charged')" class="mb-6">
+        <form method="POST" action="{{ route('settings.charges.mode') }}" x-data="{ mode: @js($flat ? 'flat' : 'area') }" class="space-y-3">
+            @csrf
+            <input type="hidden" name="mode" :value="mode">
+            <div class="grid gap-2 sm:grid-cols-2">
+                <button type="button" @click="mode = 'area'" class="rounded-xl border-2 p-4 text-left" :class="mode === 'area' ? 'border-primary bg-primary-soft' : 'border-gray-200 hover:bg-gray-50'">
+                    <p class="text-sm font-semibold text-gray-900">{{ __('By delivery area') }}</p>
+                    <p class="mt-0.5 text-xs text-gray-500">{{ __('Inside Dhaka, outside Dhaka and so on, with the rules below (weight, free above an order total).') }}</p>
+                </button>
+                <button type="button" @click="mode = 'flat'" class="rounded-xl border-2 p-4 text-left" :class="mode === 'flat' ? 'border-primary bg-primary-soft' : 'border-gray-200 hover:bg-gray-50'">
+                    <p class="text-sm font-semibold text-gray-900">{{ __('One charge for the whole country') }}</p>
+                    <p class="mt-0.5 text-xs text-gray-500">{{ __('Same charge everywhere. Order forms stop asking for the delivery area.') }}</p>
+                </button>
+            </div>
+            <div x-show="mode === 'flat'" x-cloak class="flex flex-wrap items-center gap-2">
+                <label for="flat_charge" class="text-sm text-gray-700">{{ __('Charge') }} ৳</label>
+                <input id="flat_charge" name="flat_charge" type="number" min="0" step="1" value="{{ old('flat_charge', (float) settings('delivery.flat_charge')) }}" class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm tabular-nums focus:border-primary focus:outline-none">
+            </div>
+            @error('flat_charge')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
+            <x-button>{{ __('Save') }}</x-button>
+        </form>
+    </x-card>
+
+    @if ($flat)
+        <p class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('Not in use while one charge applies to the whole country. Kept for when you switch back.') }}</p>
+    @endif
+    <div @class(['grid gap-6 xl:grid-cols-3', 'opacity-50' => $flat])>
+        <x-card :title="__('Rules')" class="min-w-0 xl:col-span-2">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="text-left text-xs uppercase tracking-wide text-gray-500"><tr>

@@ -32,17 +32,24 @@ class HandoverController extends Controller
                 ->selectRaw("s.*, u.name as `by`, (SELECT COUNT(*) FROM scan_logs l WHERE l.handover_session_id = s.id AND l.result = 'ok') as parcels")
                 ->paginate(15)->withQueryString(),
             'waiting' => Order::whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->count(),
-            // Riders seen before, newest phone first. A new name typed here is simply remembered next time.
-            'riders' => DB::table('handover_sessions')->whereNotNull('rider_name')->where('rider_name', '!=', '')
-                ->orderByDesc('id')->limit(300)->get(['rider_name as name', 'rider_phone as phone'])
-                ->unique(fn ($r) => mb_strtolower(trim($r->name)))->take(50)
-                ->map(fn ($r) => ['name' => trim($r->name), 'phone' => (string) $r->phone])->values(),
+            // Known riders, most recently used first. A new name typed here is saved by start().
+            'riders' => DB::table('riders')->orderByDesc('last_used_at')->orderBy('name')->limit(100)->get(['name', 'phone'])
+                ->map(fn ($r) => ['name' => $r->name, 'phone' => (string) $r->phone])->values(),
         ]);
     }
 
     public function start(Request $request): RedirectResponse
     {
         $data = $request->validate(['rider_name' => ['nullable', 'string', 'max:100'], 'rider_phone' => ['nullable', 'string', 'max:20']]);
+        // Remember the rider (new name = new rider; a changed phone replaces the old one).
+        $name = trim((string) ($data['rider_name'] ?? ''));
+        $phone = Phone::normalize($data['rider_phone'] ?? null);
+        if ($name !== '') {
+            $rider = DB::table('riders')->where('name', $name)->first();
+            $rider
+                ? DB::table('riders')->where('id', $rider->id)->update(['phone' => $phone ?: $rider->phone, 'last_used_at' => now(), 'updated_at' => now()])
+                : DB::table('riders')->insert(['name' => $name, 'phone' => $phone, 'last_used_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        }
         $id = DB::table('handover_sessions')->insertGetId([
             'courier' => 'steadfast', 'pickup_date' => today(), 'rider_name' => $data['rider_name'] ?? null,
             'rider_phone' => Phone::normalize($data['rider_phone'] ?? null), 'started_by' => $request->user()->id, 'started_at' => now(),

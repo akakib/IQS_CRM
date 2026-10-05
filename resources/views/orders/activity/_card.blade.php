@@ -14,7 +14,7 @@
 
 <button type="button" @click="$dispatch('open-order', {{ $o->id }})"
     @class([
-        'block w-full rounded-xl border bg-white p-3 text-left shadow-sm transition hover:border-primary hover:shadow',
+        'block w-full cursor-pointer rounded-xl border bg-white p-3 text-left shadow-sm transition hover:border-primary hover:shadow',
         'border-red-300 ring-1 ring-red-200' => $late || $repack,
         'border-gray-200' => ! $late && ! $repack,
     ])>

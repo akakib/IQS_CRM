@@ -12,6 +12,30 @@
                 window.matchMedia('(min-width: 768px)').addEventListener('change', e => this.wide = e.matches);
                 setInterval(() => { if (!this.open && !document.hidden) this.refresh() }, 30000);
                 this.$el.addEventListener('click', e => { const b = e.target.closest('[data-more]'); if (b) this.more(b) });
+                this.dragScroll();
+            },
+            {{-- Mouse drag pulls the board sideways. A drag is not a click: a card under the mouse does not open. --}}
+            dragScroll() {
+                let box = null, startX = 0, startLeft = 0, moved = false;
+                this.$refs.board.addEventListener('pointerdown', e => {
+                    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+                    box = e.target.closest('[data-drag-scroll]');
+                    if (!box) return;
+                    startX = e.clientX; startLeft = box.scrollLeft; moved = false;
+                });
+                window.addEventListener('pointermove', e => {
+                    if (!box) return;
+                    const dx = e.clientX - startX;
+                    if (!moved && Math.abs(dx) > 5) { moved = true; box.classList.add('cursor-grabbing', 'select-none') }
+                    if (moved) box.scrollLeft = startLeft - dx;
+                });
+                window.addEventListener('pointerup', () => {
+                    if (!box) return;
+                    box.classList.remove('cursor-grabbing', 'select-none');
+                    box = null;
+                    if (moved) setTimeout(() => moved = false, 0);
+                });
+                this.$refs.board.addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault() } }, true);
             },
             async refresh() {
                 if (this.loading) return;

@@ -258,3 +258,55 @@ Tests: 186 passing.
 8. Points review → Disputes → Remove the point → it shows Removed in their My points.
 9. Analysis → KPI: the person who confirmed and delivered is listed with a score.
 10. Analysis → Order P&L → switch between By day, By product and By person; log in with a role that has the profit mask → no profit column.
+
+---
+
+## Step 6: Ad cost, USD lots and ROAS (done 2026-10-05)
+
+### Built
+- **USD lots** (Marketing → USD lots):
+  - Each lot records date, vendor, USD, rate and the taka total.
+  - It can be paid now (method + transaction ID), part-paid, or have a due date.
+  - Each vendor card shows what was bought, what was paid and what is still due.
+  - **Pay a vendor** records a payment. Payments are never edited.
+  - A reminder goes to the bell when a balance is due by tomorrow (10:00 daily).
+- **Daily ad spend** per ad account (Meta or Google, days in the account's timezone):
+  - **Meta**: pulled every 3 hours, always re-pulling the last 3 days. Without a token the numbers are **fake** (steady made-up figures).
+  - **Google**: **CSV import** of the daily report (Day/Cost columns). It works for a Meta export too.
+  - **Add a day by hand** is available for anything else.
+- **FIFO**: spend uses the **oldest dollars first**, so each day gets its real taka cost. When a day changes (re-pull, import or a new lot), everything is re-costed from the start, so it never drifts.
+  - Spend with no dollars left is shown in **red as "no lot"**, costed at the fallback rate (125 in settings) until you add the lot.
+- **ROAS dashboard** (Marketing → Ad spend & ROAS), per day:
+  - Spend in USD and real taka cost.
+  - Messages.
+  - Orders by channel (web / chat / other).
+  - Delivered revenue.
+  - Meta ROAS (what Meta reports) vs confirmed ROAS vs **delivered ROAS** (the real one).
+  - MER (all placed revenue ÷ cost).
+  - Cost per order and cost per message.
+  - **Dollar balance**: bought − spent = left.
+- **Order P&L now includes ad cost**:
+  - A day's ad cost is shared equally over the orders placed that day (B2B excluded).
+  - New tiles: Ad cost, Profit before ads, **Profit after ads** with margin %.
+- The nightly owner summary now shows the day's ad cost and profit after ads.
+
+Tests: 191 passing.
+
+### Skipped / needs you
+- **Meta ads token**: a System User token with `ads_read` → put it in the server `.env` as `META_ADS_TOKEN`. Then add the ad account with its `act_` ID. Until then spend is fake.
+- **Google Ads API** needs an approved developer token. Until then, import the daily CSV.
+- Give the marketing person **marketing.view** (and **marketing.create** to add lots and spend) in Roles.
+- The **hPanel cron** (`schedule:run` every minute) is still not added. Spend pulls, reminders and summaries only run with it.
+- Staging has no ad account yet. Add one on the Ad spend page and press **Pull spend now** to see fake numbers.
+
+### 10-line manual test checklist
+1. Marketing → USD lots → Add a vendor.
+2. Add a lot: $100 at 122, paid ৳5,000 now by bKash with a transaction ID, rest due tomorrow → the vendor card shows ৳7,200 due.
+3. Pay a vendor ৳7,200 → card says Paid up.
+4. Marketing → Ad spend → Add account (Meta, any name) → Pull spend now → 3 days of fake spend appear.
+5. Taka cost per day = USD × 122 while the lot lasts; when it runs out, "no lot" shows in red.
+6. Add a second lot dated earlier → the days re-cost oldest dollars first.
+7. Import CSV: a file with `Day,Cost` rows → those days appear (source import).
+8. Create a few orders today → the day row shows the order count and the cost per order.
+9. Deliver one → delivered revenue and delivered ROAS go up.
+10. Analysis → Order P&L → Ad cost and Profit after ads tiles; a role with the profit mask does not see profit.

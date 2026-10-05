@@ -80,7 +80,7 @@
     </div>
 
     <div @class(['hidden lg:block' => $showDetailOnPhone])>
-        <x-tabs :tabs="collect($tabLabels)->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
+        <x-tabs :tabs="collect($tabLabels)->reject(fn ($label, $t) => $t === 'send' && ! $counts['send'] && $tab !== 'send')->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
     </div>
     @endunless
 

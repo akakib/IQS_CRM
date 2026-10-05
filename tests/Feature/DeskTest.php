@@ -318,6 +318,7 @@ class DeskTest extends TestCase
         } catch (ValidationException) {
         }
 
+        $this->get('/desk')->assertDontSee('Booking failed'); // the tab shows only when an order is in it
         // Confirm books by itself, after a few seconds to Undo. Undo: back to Call, nothing booked.
         $this->assertSame('queued', $a->fresh()->booking_state);
         $this->post("/desk/{$a->id}/undo")->assertSessionHas('success');

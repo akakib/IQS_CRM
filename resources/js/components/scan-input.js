@@ -40,18 +40,34 @@ export default function scanInput({ once = false } = {}) {
             setTimeout(() => (this.state = null), 2500);
         },
 
+        // Two sounds nobody can mix up: OK = a short bright "ding-ding" going up;
+        // problem = a low buzz, twice. Phones also vibrate differently.
         beep(ok) {
             try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const o = ctx.createOscillator();
-                o.frequency.value = ok ? 880 : 220;
-                o.connect(ctx.destination);
-                o.start();
-                setTimeout(() => {
-                    o.stop();
-                    ctx.close();
-                }, ok ? 120 : 400);
+                const ctx = (window.__iqsAudio ??= new (window.AudioContext || window.webkitAudioContext)());
+                if (ctx.state === 'suspended') ctx.resume();
+                const tone = (freq, start, length, type, volume) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = type;
+                    o.frequency.value = freq;
+                    const t = ctx.currentTime + start;
+                    g.gain.setValueAtTime(0.0001, t);
+                    g.gain.exponentialRampToValueAtTime(volume, t + 0.01);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t + length);
+                    o.connect(g).connect(ctx.destination);
+                    o.start(t);
+                    o.stop(t + length + 0.02);
+                };
+                if (ok) {
+                    tone(1046, 0, 0.12, 'sine', 0.35);
+                    tone(1568, 0.13, 0.18, 'sine', 0.35);
+                } else {
+                    tone(150, 0, 0.22, 'square', 0.25);
+                    tone(150, 0.3, 0.32, 'square', 0.25);
+                }
             } catch (e) {}
+            navigator.vibrate?.(ok ? 60 : [120, 80, 220]);
         },
 
         async startCamera() {
@@ -130,7 +146,6 @@ export default function scanInput({ once = false } = {}) {
             if (!code || (code === this.lastCode && now - this.lastAt < 3000)) return;
             this.lastCode = code;
             this.lastAt = now;
-            navigator.vibrate?.(60);
             this.$dispatch('scan', code);
             if (once) this.stopCamera();
         },

@@ -190,3 +190,71 @@ Tests: 176 passing.
 8. Finish → manifest shows the COD total and anything not handed over.
 9. Batch page → "Not found" on an item → Packing → Missing-item reports → Out of stock → that order goes on Hold.
 10. Products → Stock status → mark it In stock again → the held pre-order orders return to Confirmed.
+
+---
+
+## Step 5: Points, KPI, dashboard and order P&L (done 2026-10-05)
+
+### Built
+- **Points engine** (speed + fewer mistakes). The event types are fixed in code. **Every value is set by the admin** in Settings → Points rules: plus or minus, who gets it, when it settles, and conditions. The rules page also has "Test on an order".
+- **15 starting rules**, as agreed:
+  - Took an order +1.
+  - Confirmed +1, kept **only if delivered**.
+  - Delivered +3; a risky order delivered gives +5 more.
+  - Partial delivery +1.
+  - Cancelled because of a sales mistake −2.
+  - Returned because of a sales mistake or a packing mistake −3.
+  - A risky order the customer refused −5.
+  - Packed within 30 minutes of release +1.
+  - Entry error fixed −1, or −2 after packing.
+  - Order taken away for the person's own mistake −1.
+  - Delivery issue not handled in time −1.
+  - **Fake status −10**.
+- **How points are given:**
+  - Points stay **pending** until the order ends.
+  - Each order, rule and person is counted once.
+  - Each award keeps a copy of the rule as it was, so editing a rule never changes past points.
+  - If the courier later turns a delivery into a return, the delivery points are taken back.
+  - There is a **monthly minus cap** (default 50).
+- **Fake-status protection:**
+  - The system flags a web order confirmed less than a minute after it was taken.
+  - A weekly **call-back check** picks 5 random orders per person to phone the customer.
+  - Points review → Flags: the big minus is added **only when a manager confirms** the flag. Nobody can review their own flag.
+- **My points** (everyone, under Overview): settled, waiting and removed points by month. A minus point can be **disputed** within 3 days; a manager keeps or removes it.
+- **Trial month is ON**: points are recorded and shown but not used for bonus. Turn it off in Settings → General → Points.
+- **KPI scorecard** (Analysis), separate from points:
+  - Volume 40 / speed 20 / quality 40. The weights are in Settings.
+  - Volume = how many orders the person confirmed.
+  - Speed = the median time from taking an order to confirming it.
+  - Quality = delivered ÷ (delivered + returned + cancelled).
+- **Order P&L** (Analysis): orders that ended in the chosen period, grouped by day, channel, person, product or category.
+  - Profit = revenue − product cost (the cost recorded at confirmation) − courier charge − COD fee (1%, in settings) − packaging.
+  - **Ad cost is not included yet** (Step 6).
+  - Profit and cost are hidden from roles with the profit or cost mask.
+- **Dashboard tiles**:
+  - Orders today, waiting to be taken, confirmed, packed and delivered today.
+  - Open delivery issues.
+  - Points to review (managers only).
+  - My points.
+  - The orders you are working on now.
+- **Nightly owner summary** on Telegram at 22:00 (time is in settings).
+- New permissions are **off for every role** until you tick them: points (manage), kpi, analysis, marketing.
+
+Tests: 186 passing.
+
+### Skipped / needs you
+- Give managers **points.manage**, **kpi.view** and **analysis.view** in Roles.
+- Bonus money from points is not built. During the trial month we only watch the numbers.
+- The P&L product cost depends on each variant's cost price being filled in. Without it the cost counts as 0.
+
+### 10-line manual test checklist
+1. Settings → Points rules: change "Order delivered" to 4 → Save.
+2. Take an order (Assign to me) → Confirm it → My points shows +1 Waiting.
+3. Move it to Delivered (or let the fake courier deliver it) → the points become Settled.
+4. Cancel another confirmed order with the reason "Entry mistake" → −2, and its confirm point shows Removed.
+5. Points rules → Test on an order → enter that order number → shows which rules match and what was given.
+6. Points review → Call-back check → mark one order "Not called" → it appears under Flags.
+7. Flags → Confirm fake → that person gets −10. Log in as them → My points → Dispute.
+8. Points review → Disputes → Remove the point → it shows Removed in their My points.
+9. Analysis → KPI: the person who confirmed and delivered is listed with a score.
+10. Analysis → Order P&L → switch between By day, By product and By person; log in with a role that has the profit mask → no profit column.

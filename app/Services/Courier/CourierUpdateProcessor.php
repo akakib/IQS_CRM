@@ -45,7 +45,7 @@ class CourierUpdateProcessor
             ->first();
         if (! $shipment && $u->invoice) {
             $shipment = DB::table('shipments as s')->join('orders as o', 'o.id', '=', 's.order_id')
-                ->where('o.order_no', $u->invoice)->where('s.is_active', true)->select('s.*')->first();
+                ->where('o.order_no', preg_replace('/-\d+$/', '', $u->invoice))->where('s.is_active', true)->select('s.*')->first();
         }
         if (! $shipment) {
             $this->mark($eventId, 'No shipment for this consignment / invoice.');
@@ -86,7 +86,7 @@ class CourierUpdateProcessor
         }
 
         $current = OrderStatus::map()[$order->status_id];
-        if ($current['key'] === 'cancelled' && $status === 'cancelled') {
+        if (($current['key'] === 'cancelled' || $order->taken_back_at) && $status === 'cancelled') {
             $this->orders->markCourierCancelled($order, null, 'courier');
             $this->mark($eventId, null);
 

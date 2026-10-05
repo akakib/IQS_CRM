@@ -194,13 +194,14 @@ class OrderService
      */
     public function pendingCourierCancel(Order $order): ?array
     {
-        if (! $order->active_shipment_id || OrderStatus::map()[$order->status_id]['key'] !== 'cancelled') {
+        if (! $order->active_shipment_id || (OrderStatus::map()[$order->status_id]['key'] !== 'cancelled' && ! $order->taken_back_at)) {
             return null;
         }
         $shipment = DB::table('shipments')->where('id', $order->active_shipment_id)->whereNull('cancelled_at')->whereNull('final_at')
             ->first(['courier', 'consignment_id']);
 
-        return $shipment ? ['courier' => ucfirst((string) $shipment->courier), 'cn' => $shipment->consignment_id, 'packed' => $order->packed_at !== null] : null;
+        return $shipment ? ['courier' => ucfirst((string) $shipment->courier), 'cn' => $shipment->consignment_id,
+            'packed' => $order->packed_at !== null || $order->unpack_needed_at !== null, 'taken_back' => (bool) $order->taken_back_at] : null;
     }
 
     /** The booking was deleted at the courier (by hand, or the courier said so). */
@@ -211,6 +212,11 @@ class OrderService
             return;
         }
         DB::table('shipments')->where('id', $order->active_shipment_id)->update(['cancelled_at' => now(), 'updated_at' => now()]);
+        if ($order->taken_back_at) {
+            // Booked by mistake and now deleted: the order has no parcel any more and may be confirmed again.
+            DB::table('shipments')->where('id', $order->active_shipment_id)->update(['is_active' => false]);
+            $order->forceFill(['active_shipment_id' => null, 'taken_back_at' => null])->save();
+        }
         $this->note($order, 'courier', $how === 'courier'
             ? __(':c confirmed the parcel is cancelled (CN :cn).', ['c' => $pending['courier'], 'cn' => $pending['cn'] ?? '-'])
             : __('Parcel deleted at :c by hand (CN :cn), confirmed by :n.', ['c' => $pending['courier'], 'cn' => $pending['cn'] ?? '-', 'n' => $by?->name ?? '-']), $by);

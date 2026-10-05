@@ -434,7 +434,7 @@ class DeskService
         $rows = DB::table('orders')->where('booking_state', 'queued')->where('status_id', OrderStatus::idFor('confirmed'))
             ->where('booking_claimed_at', '<', now()->subMinutes(self::STALE_MINUTES))->limit(10)->get(['id', 'order_no', 'moderator_id', 'booking_claim']);
         foreach ($rows as $row) {
-            $booked = app(\App\Services\Courier\CourierManager::class)->driver()->invoiceBooked($row->order_no);
+            $booked = app(\App\Services\Courier\CourierManager::class)->driver()->invoiceBooked(BookingService::invoiceFor(Order::find($row->id)));
             $release = DB::table('orders')->where('id', $row->id)->where('booking_claim', $row->booking_claim);
             if ($booked === false) {
                 $release->update(['booking_claim' => null, 'booking_claimed_at' => null, 'book_after' => null, 'updated_at' => now()]);
@@ -541,6 +541,78 @@ class DeskService
         }
     }
 
+    /**
+     * May this person take this booked order back? Waiting for a packer: its own
+     * moderator (or a manager). Once a packer started or packed it: managers
+     * only, because someone else's work is stopped. With the courier: never.
+     */
+    public function canTakeBack(Order $order, User $user): bool
+    {
+        if (! in_array(OrderStatus::map()[$order->status_id]['key'], ['ready_for_packaging', 'packed', 'ready_for_pickup'], true) || $order->taken_back_at) {
+            return false;
+        }
+        if ($user->can('orders.approve')) {
+            return true;
+        }
+
+        return ! $order->packer_id && ! $order->packed_at && $order->moderator_id === $user->id && $user->can('orders.edit');
+    }
+
+    /**
+     * Booked by mistake: back to the Call tab. The label is voided so it never
+     * scans, the parcel is deleted at the courier by hand (same "Deleted" step
+     * as a cancel), and a started or packed box is opened and put back. Until
+     * Deleted is pressed the order cannot be confirmed again (one order, one parcel).
+     */
+    public function takeBack(Order $order, User $by, string $why): void
+    {
+        DB::transaction(function () use ($order, $by, $why) {
+            $fresh = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+            $key = OrderStatus::map()[$fresh->status_id]['key'];
+            if (in_array(OrderStatus::map()[$fresh->status_id]['group'], ['courier', 'final'], true)) {
+                throw ValidationException::withMessages(['order' => __('The courier already has this parcel: use Cancel and ask the courier to return it.')]);
+            }
+            if (! $this->canTakeBack($fresh, $by)) {
+                throw ValidationException::withMessages(['order' => $key === 'ready_for_packaging' || in_array($key, ['packed', 'ready_for_pickup'], true)
+                    ? __('A packer already started this order: ask a manager to take it back.')
+                    : __('Only a booked order that is not with the courier yet can be taken back.')]);
+            }
+            $touched = $fresh->packer_id || $fresh->packed_at;
+            $packerId = $fresh->packer_id;
+            $cn = $fresh->active_shipment_id ? DB::table('shipments')->where('id', $fresh->active_shipment_id)->value('consignment_id') : null;
+
+            DB::table('shipment_labels')->where('order_id', $fresh->id)->whereNull('voided_at')
+                ->update(['voided_at' => now(), 'void_reason' => __('Taken back (booked by mistake)'), 'updated_at' => now()]);
+            $fresh->forceFill([
+                'taken_back_at' => now(), 'booking_state' => 'none', 'packaging_sent_at' => null,
+                'packer_id' => null, 'packaging_started_at' => null, 'packed_at' => null,
+                'unpack_needed_at' => $touched ? now() : null, 'unpack_packer_id' => $touched ? $packerId : null,
+            ])->save();
+            app(OrderStateMachine::class)->transition($fresh, 'record_verified', $by, 'system', null, __('Booked by mistake: :w', ['w' => $why]));
+
+            $this->notifications->send('courier_cancel_needed', __('Delete :no at the courier', ['no' => $fresh->order_no]),
+                __('Taken back by :n (booked by mistake, CN :cn). Delete it in the courier panel, then press "Deleted" on the order.', ['n' => $by->name, 'cn' => $cn ?? '-']), [
+                    'link' => route('orders.show', $fresh), 'subject' => ['order', $fresh->id], 'priority' => 'urgent',
+                    'user_ids' => array_values(array_unique(array_filter([$fresh->moderator_id, $by->id, ...$this->managerIds()]))),
+                ]);
+            if ($touched && $packerId) {
+                $this->notifications->send('courier_cancel_needed', __('Stop: :no was taken back', ['no' => $fresh->order_no]),
+                    __('Do not pack or send it. Open the box, put the items back on the shelf, then press Unpacked on the Packaging page.'), [
+                        'link' => route('packaging.index'), 'subject' => ['order', $fresh->id], 'priority' => 'urgent', 'user_ids' => [$packerId],
+                    ]);
+            }
+        });
+    }
+
+    /** The packer opened the box and put the items back. */
+    public function markUnpacked(Order $order, User $by): void
+    {
+        $done = DB::table('orders')->where('id', $order->id)->whereNotNull('unpack_needed_at')->update(['unpack_needed_at' => null, 'unpack_packer_id' => null]);
+        if ($done) {
+            $this->systemNote($order->id, __('Box opened and items put back on the shelf by :n.', ['n' => $by->name]), $by->id);
+        }
+    }
+
     /** Booking failed: a note on the order and a notice to its moderator and the managers. */
     private function failedNotice(object $row, string $message): void
     {
@@ -592,6 +664,9 @@ class DeskService
                     'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
                     'user_ids' => array_values(array_unique(array_filter([$order->moderator_id, $actor?->id, $order->packer_id, ...$this->managerIds()]))),
                 ]);
+        }
+        if ($to['key'] === 'cancelled' && ($order->packer_id || $order->packed_at)) {
+            DB::table('orders')->where('id', $order->id)->update(['unpack_needed_at' => now(), 'unpack_packer_id' => $order->packer_id, 'packer_id' => null, 'packaging_started_at' => null]);
         }
         if ($to['final']) {
             DB::table('order_assignments')->where('order_id', $order->id)->whereNull('ended_at')->update(['ended_at' => now(), 'ended_reason' => 'finished']);

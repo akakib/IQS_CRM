@@ -50,7 +50,10 @@ class OrderConfigSeeder extends Seeder
         ['confirmed', 'cancelled', 'orders.edit', true, false],
         ['confirmed', 'record_verified', null, false, true],                 // Undo within seconds of Call verified (before the courier is booked)
         ['confirmed', 'ready_for_packaging', null, false, true],             // bulk booking (needs CN ID)
-        ['ready_for_packaging', 'packed', null, false, true],                // label scan
+        ['ready_for_packaging', 'packed', null, false, true],
+        ['ready_for_packaging', 'record_verified', null, false, true],      // booked by mistake (DeskService::takeBack)
+        ['packed', 'record_verified', null, false, true],
+        ['ready_for_pickup', 'record_verified', null, false, true],                // label scan
         ['ready_for_packaging', 'cancelled', 'orders.approve', true, false],
         ['ready_for_packaging', 'hold', 'orders.approve', true, false],        // item went out of stock after booking
         ['packed', 'ready_for_pickup', null, false, true],

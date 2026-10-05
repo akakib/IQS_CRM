@@ -40,6 +40,8 @@ class Order extends Model
             'timer_extended_at' => 'datetime',
             'packaging_sent_at' => 'datetime',
             'book_after' => 'datetime',
+            'taken_back_at' => 'datetime',
+            'unpack_needed_at' => 'datetime',
             'booking_claimed_at' => 'datetime',
             'packaging_started_at' => 'datetime',
             'packed_at' => 'datetime',

@@ -31,8 +31,11 @@ class BookingService
         $hotline = (string) settings('store.hotline');
         $result = ['booked' => [], 'failed' => [], 'kind' => []];
 
+        // The courier takes each invoice once: after a deleted parcel the order is booked as IQ10007-2.
+        $invoices = $orders->mapWithKeys(fn (Order $o) => [$o->order_no => self::invoiceFor($o)]);
+        $byInvoice = $invoices->flip();
         $requests = $orders->map(fn (Order $o) => new BookingRequest(
-            invoice: $o->order_no,
+            invoice: $invoices[$o->order_no],
             recipientName: $o->ship_name,
             recipientPhone: $o->ship_phone,
             recipientAddress: collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', '),
@@ -56,8 +59,9 @@ class BookingService
             return $result;
         }
 
-        foreach ($responses as $invoice => $r) {
-            $order = $orders[$invoice] ?? null;
+        foreach ($responses as $sent => $r) {
+            $invoice = $byInvoice[$sent] ?? null; // results below are keyed by our order number
+            $order = $invoice ? ($orders[$invoice] ?? null) : null;
             if (! $order) {
                 continue;
             }
@@ -91,6 +95,14 @@ class BookingService
         }
 
         return $result;
+    }
+
+    /** The invoice sent to the courier: the order number, plus -2, -3 after a parcel was deleted at the courier. */
+    public static function invoiceFor(Order $order): string
+    {
+        $deleted = DB::table('shipments')->where('order_id', $order->id)->whereNotNull('cancelled_at')->count();
+
+        return $deleted ? $order->order_no.'-'.($deleted + 1) : $order->order_no;
     }
 
     /**

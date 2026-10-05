@@ -16,7 +16,7 @@
         @endcan
     </div>
 
-    <x-list.filter-bar :list="$list" :action="route('orders.index')" :placeholder="__('Order no, phone or name')">
+    <x-list.filter-bar :list="$list" :action="route('orders.index')" :placeholder="__('Order no, phone, name or CN')">
         <input type="hidden" name="tab" value="{{ $tab }}">
         <x-simple-select name="status" :options="$statusOptions" :value="$list->filter('status') ?? ''" />
         <x-simple-select name="channel" :options="['' => __('Any channel'), 'web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone')]" :value="$list->filter('channel') ?? ''" />

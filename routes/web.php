@@ -128,6 +128,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/presence', [OrderController::class, 'presence'])->middleware('can:orders.view')->name('orders.presence');
     Route::post('/orders/{order}/cod-updated', [OrderController::class, 'codUpdated'])->middleware('can:orders.edit')->name('orders.cod-updated');
     Route::post('/orders/{order}/courier-cancelled', [OrderController::class, 'courierCancelled'])->middleware('can:orders.edit')->name('orders.courier-cancelled');
+    Route::post('/orders/{order}/take-back', [OrderController::class, 'takeBack'])->middleware('can:orders.edit')->name('orders.take-back');
     Route::get('/orders/{order}/edit', [OrderController::class, 'edit'])->middleware('can:orders.edit')->name('orders.edit');
     Route::post('/orders/{order}/amend', [OrderController::class, 'amend'])->middleware('can:orders.edit')->name('orders.amend');
     Route::post('/orders/{order}/amendments/{amendment}', [OrderController::class, 'decideAmendment'])->whereNumber('amendment')->middleware('can:orders.approve')->name('orders.amendments.decide');
@@ -164,6 +165,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/packaging/scan', [PackagingController::class, 'scan'])->name('packaging.scan.post');
         Route::post('/packaging/orders/{order}/pack', [PackagingController::class, 'pack'])->name('packaging.pack');
         Route::post('/packaging/orders/{order}/hold', [PackagingController::class, 'hold'])->name('packaging.hold');
+        Route::post('/packaging/orders/{order}/unpacked', [PackagingController::class, 'unpacked'])->name('packaging.unpacked');
         Route::post('/packaging/release', [PackagingController::class, 'release'])->name('packaging.release');
         Route::post('/packaging/batches/{batch}/picked', [PackagingController::class, 'picked'])->whereNumber('batch')->name('packaging.picked');
         Route::post('/packaging/batches/{batch}/done', [PackagingController::class, 'done'])->whereNumber('batch')->name('packaging.done');

@@ -11,7 +11,9 @@
 @if ($pending)
     <div {{ $attributes->merge(['class' => 'mb-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900']) }}>
         <p class="font-semibold">{{ __('Delete this parcel at :c by hand', ['c' => $pending['courier']]) }}</p>
-        <p class="mt-0.5">{{ __('The order was cancelled after booking. Open the :c panel, find CN :cn and delete or cancel it, so no rider picks it up. Then press the button.', ['c' => $pending['courier'], 'cn' => $pending['cn'] ?? '-']) }}</p>
+        <p class="mt-0.5">{{ $pending['taken_back']
+            ? __('Taken back (booked by mistake). Open the :c panel, find CN :cn and delete or cancel it, so no rider picks it up. Then press the button. Until then the order cannot be confirmed again.', ['c' => $pending['courier'], 'cn' => $pending['cn'] ?? '-'])
+            : __('The order was cancelled after booking. Open the :c panel, find CN :cn and delete or cancel it, so no rider picks it up. Then press the button.', ['c' => $pending['courier'], 'cn' => $pending['cn'] ?? '-']) }}</p>
         @if ($pending['packed'])
             <p class="mt-1 font-medium">{{ __('It was already packed: open the box and put the items back on the shelf.') }}</p>
         @endif

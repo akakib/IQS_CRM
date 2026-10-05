@@ -421,6 +421,84 @@ class DeskTest extends TestCase
         $this->assertSame('none', $g->fresh()->booking_state);
     }
 
+    public function test_booked_by_mistake_goes_back_to_call_and_never_gets_a_second_parcel(): void
+    {
+        $machine = app(OrderStateMachine::class);
+        $booked = function () use ($machine) {
+            $o = $this->web();
+            $machine->transition($o, 'record_verified', null, 'rule');
+            $this->desk()->assign($o->id, $this->mahim->id, 'claimed');
+            $this->actingAs($this->mahim);
+            $this->act($o, 'confirm');
+            $this->assertSame('ready_for_packaging', $this->key($o));
+
+            return $o->fresh();
+        };
+
+        // 1. Waiting for a packer: its own moderator takes it back.
+        $a = $booked();
+        $label = DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('barcode');
+        $this->get("/orders/{$a->id}")->assertSee('Booked by mistake');
+        $cn = DB::table('shipments')->where('order_id', $a->id)->value('consignment_id');
+        $this->post("/orders/{$a->id}/take-back", ['why' => 'Customer had not confirmed'])->assertSessionHas('success');
+        $a->refresh();
+        $this->assertSame('record_verified', $this->key($a));
+        $this->assertNotNull($a->taken_back_at);
+        $this->assertNull($a->unpack_needed_at);
+        $this->assertSame(0, DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->count());
+        $this->assertDatabaseHas('app_notifications', ['title' => "Delete {$a->order_no} at the courier"]);
+        $this->get("/orders/{$a->id}")->assertSee('Taken back (booked by mistake)');
+
+        // The old label never scans.
+        $packer = User::factory()->create();
+        $scan = app(\App\Services\Packaging\ScanService::class)->open($label, $packer);
+        $this->assertStringContainsString('Do not pack', json_encode($scan));
+
+        // No second parcel until the first is deleted at the courier.
+        $this->act($a, 'confirm')->assertSessionHasErrors('status');
+        $this->assertSame(1, DB::table('shipments')->where('order_id', $a->id)->count());
+        $this->post("/orders/{$a->id}/courier-cancelled")->assertSessionHas('success');
+        $this->assertNull($a->fresh()->taken_back_at);
+        $this->act($a, 'confirm')->assertSessionHas('success');
+        $this->assertSame('ready_for_packaging', $this->key($a));
+        $this->assertSame(1, DB::table('shipments')->where('order_id', $a->id)->where('is_active', true)->count()); // the new one; the deleted one is inactive
+
+        // 2. A packer started it: the moderator cannot, a manager can, and the packer must unpack.
+        $b = $booked();
+        $bLabel = DB::table('shipment_labels')->where('order_id', $b->id)->whereNull('voided_at')->value('barcode');
+        app(\App\Services\Packaging\ScanService::class)->open($bLabel, $packer);
+        $this->assertSame($packer->id, (int) $b->fresh()->packer_id);
+        $this->post("/orders/{$b->id}/take-back", ['why' => 'Customer had not confirmed'])->assertSessionHasErrors('order');
+        $manager = User::factory()->create();
+        $manager->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'orders.approve'], [], 'Manager')->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->actingAs($manager)->post("/orders/{$b->id}/take-back", ['why' => 'Wrong customer confirmed'])->assertSessionHas('success');
+        $b->refresh();
+        $this->assertSame('record_verified', $this->key($b));
+        $this->assertNotNull($b->unpack_needed_at);
+        $this->assertSame($packer->id, (int) $b->unpack_packer_id);
+        $this->assertNull($b->packer_id);
+        $this->assertDatabaseHas('app_notifications', ['title' => "Stop: {$b->order_no} was taken back"]);
+        app(DeskService::class)->markUnpacked($b, $packer);
+        $this->assertNull($b->fresh()->unpack_needed_at);
+
+        // 3. With the courier already: no taking back, only Cancel.
+        $c = $booked();
+        $machine->transition($c->fresh(), 'packed', null, 'system');
+        $machine->transition($c->fresh(), 'ready_for_pickup', null, 'system');
+        $machine->transition($c->fresh(), 'handed_over', null, 'system');
+        try {
+            app(DeskService::class)->takeBack($c->fresh(), $manager, 'Too late test');
+            $this->fail('Handed over');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('courier already has this parcel', collect($e->errors())->flatten()->first());
+        }
+
+        // All orders finds an order by its CN (even a deleted older parcel), and only that order.
+        $this->actingAs($manager)->get('/orders')->assertSee($b->order_no);
+        $this->get('/orders?q='.$cn)->assertSee($a->order_no)->assertDontSee($b->order_no);
+    }
+
     public function test_confirm_warns_when_the_same_customer_has_another_open_order(): void
     {
         $first = $this->web();

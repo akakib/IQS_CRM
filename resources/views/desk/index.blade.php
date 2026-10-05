@@ -222,6 +222,7 @@
                 <x-order-presence :order="$order" mode="view" />
                 <x-cod-update :order="$order" />
                 <x-courier-cancel :order="$order" />
+                <x-take-back :order="$order" class="mb-3" />
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">
@@ -384,7 +385,7 @@
                                 $key === 'no_answer' && $order->next_call_at && $order->next_call_at->isFuture() => [['confirm', $order->channel === 'web' ? __('Call verified') : __('Confirm'), 'v', 'primary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 in_array($key, ['record_verified', 'no_answer'], true) => [['confirm', $order->channel === 'web' ? __('Call verified') : __('Confirm'), 'v', 'primary'], ['no_response', __('No response'), 'n', 'secondary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 $key === 'hold' => [match (true) {
-                                    (bool) $detail['consignment'] => ['back_to_packaging', __('Back to packaging'), 'p', 'primary'],
+                                    $detail['consignment'] && ! $order->taken_back_at => ['back_to_packaging', __('Back to packaging'), 'p', 'primary'],
                                     $detail['heldFrom'] === 'confirmed' => ['back_to_send', __('Send to packaging'), 'p', 'primary'],
                                     default => ['resume', __('Resume, call next'), 'r', 'primary'],
                                 }, ['cancel', __('Cancel'), 'x', 'danger-outline']],

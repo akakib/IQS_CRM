@@ -83,8 +83,20 @@ class PackagingController extends Controller
             'newLabels' => DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')
                 ->whereNull('l.voided_at')->whereNull('l.printed_at')->whereRaw($inQueue)->count(),
             'holdReasons' => StatusReason::options('hold'),
+            // Boxes to open: taken back or cancelled after a packer started them.
+            'toUnpack' => DB::table('orders as o')->leftJoin('users as p', 'p.id', '=', 'o.unpack_packer_id')->whereNotNull('o.unpack_needed_at')
+                ->orderBy('o.unpack_needed_at')->limit(50)->get(['o.id', 'o.order_no', 'o.unpack_needed_at', 'o.unpack_packer_id', 'p.name as packer']),
             'openIssues' => DB::table('stock_issue_reports')->where('status', 'open')->count(),
         ]);
+    }
+
+    /** The packer opened a taken-back or cancelled box and put the items back. */
+    public function unpacked(Order $order, Request $request): RedirectResponse
+    {
+        abort_unless((int) $order->unpack_packer_id === $request->user()->id || $request->user()->can('packaging.manage') || ! $order->unpack_packer_id, 403);
+        app(\App\Services\Orders\DeskService::class)->markUnpacked($order, $request->user());
+
+        return back()->with('success', __(':no: items are back on the shelf.', ['no' => $order->order_no]));
     }
 
     /** Today's on-duty packers (replaces the list). */

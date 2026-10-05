@@ -140,6 +140,27 @@
         </template>
     @endif
 
+    {{-- Boxes to open: taken back (booked by mistake) or cancelled after a packer started them. --}}
+    @if ($toUnpack->isNotEmpty())
+        <div class="mt-6 rounded-xl border border-red-300 bg-red-50 p-4">
+            <p class="text-sm font-semibold text-red-900">{{ __('Open these boxes and put the items back') }}</p>
+            <p class="mt-0.5 text-xs text-red-800">{{ __('These orders were taken back or cancelled after packaging started. Do not send them.') }}</p>
+            <div class="mt-3 space-y-2">
+                @foreach ($toUnpack as $u)
+                    <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm">
+                        <span><span class="font-semibold text-gray-900">{{ $u->order_no }}</span>
+                            <span class="text-gray-500">· {{ $u->packer ? __('was with :n', ['n' => $u->packer]) : __('no packer') }} · {{ \Illuminate\Support\Carbon::parse($u->unpack_needed_at)->diffForHumans() }}</span></span>
+                        @if (! $u->unpack_packer_id || (int) $u->unpack_packer_id === auth()->id() || $canManage)
+                            <form method="POST" action="{{ route('packaging.unpacked', $u->id) }}">@csrf
+                                <x-button size="sm">{{ __('Unpacked') }}</x-button>
+                            </form>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- Shared queue --}}
     <div class="mt-6 flex gap-2 overflow-x-auto">
         @foreach ($filters as $f => $label)

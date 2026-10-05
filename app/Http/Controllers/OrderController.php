@@ -60,7 +60,9 @@ class OrderController extends Controller
             ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s
                 ->where('order_no', strtoupper($q))
                 ->when(strlen($digits) >= 4, fn ($s) => $s->orWhere('ship_phone', 'like', (str_starts_with($digits, '0') ? $digits : '0'.$digits).'%')->orWhere('order_no', 'IQ'.$digits))
-                ->orWhere('ship_name', 'like', $q.'%')))
+                ->orWhere('ship_name', 'like', $q.'%')
+                // CN (or the courier's tracking code), also of a deleted older parcel
+                ->orWhereIn('id', \Illuminate\Support\Facades\DB::table('shipments')->select('order_id')->where('consignment_id', $q)->orWhere('tracking_code', strtoupper($q)))))
             ->tap(fn ($w) => $list->applySort($w))
             ->simplePaginate($list->perPage)
             ->withQueryString();
@@ -184,6 +186,15 @@ class OrderController extends Controller
         }
 
         return back()->with('success', __('Order :no is now :s.', ['no' => $order->order_no, 's' => OrderStatus::map()[$order->status_id]['name']]));
+    }
+
+    /** Booked by mistake: back to Call; the parcel is deleted at the courier by hand. */
+    public function takeBack(Order $order, Request $request, \App\Services\Orders\DeskService $desk): RedirectResponse
+    {
+        $data = $request->validate(['why' => ['required', 'string', 'min:5', 'max:300']]);
+        $desk->takeBack($order, $request->user(), $data['why']);
+
+        return back()->with('success', __(':no is back in Call. Delete its parcel at the courier, then press Deleted.', ['no' => $order->order_no]));
     }
 
     /** The COD was changed by hand in the courier's panel. */

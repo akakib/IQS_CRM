@@ -207,6 +207,9 @@ class ScanService
             return [null, null, $this->fail('unknown', __('Unknown label.'))];
         }
         $order = Order::with('items:id,order_id,name_snapshot,qty,unit')->find($label->order_id);
+        if ($label->voided_at && $order && ($order->unpack_needed_at || $order->taken_back_at || OrderStatus::map()[$order->status_id]['key'] === 'cancelled')) {
+            return [$label, $order, $this->fail('blocked', __('Do not pack: :r. Put the items back on the shelf.', ['r' => (string) $label->void_reason]))];
+        }
         if ($label->voided_at) {
             return [$label, $order, $this->fail('blocked', __('Old label: replace it. :r', ['r' => (string) $label->void_reason]))];
         }

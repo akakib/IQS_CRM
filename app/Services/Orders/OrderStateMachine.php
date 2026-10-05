@@ -60,6 +60,9 @@ class OrderStateMachine
             if ($source === 'user' && $rule->permission_key && ! $user?->can($rule->permission_key)) {
                 throw ValidationException::withMessages(['status' => __('You are not allowed to move orders to :to.', ['to' => $to['name']])]);
             }
+            if ($to['key'] === 'confirmed' && $fresh->taken_back_at) {
+                throw ValidationException::withMessages(['status' => __('The old parcel still stands at the courier: delete it there and press "Deleted" first, so this order never has two parcels.')]);
+            }
             if ($source === 'user' && $from['key'] === 'hold' && ! in_array($to['key'], $this->holdExits($fresh), true)) {
                 throw ValidationException::withMessages(['status' => __('This order was held after :to. It goes back to where it was, not an earlier step.', ['to' => $to['name']])]);
             }
@@ -149,7 +152,7 @@ class OrderStateMachine
      */
     public function holdExits(Order $order, ?string $heldFrom = null): array
     {
-        if ($this->hasConsignment($order)) {
+        if ($this->hasConsignment($order) && ! $order->taken_back_at) {
             return ['ready_for_packaging', 'cancelled'];
         }
         $heldFrom ??= $this->heldFrom($order);

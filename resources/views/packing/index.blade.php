@@ -29,7 +29,7 @@
             try { this.last = await this.post(@js(route('packing.scan.post')), { code }) }
             catch (e) { this.last = { ok: false, level: 'red', message: e.message } }
             this.list = this.last.checklist ?? null; this.ticked = []; this.holding = false;
-            $dispatch('scan-result', { ok: this.last.ok, message: '' }); // the result is shown in the box below, once
+            $dispatch('scan-result', { ok: this.last.ok, message: this.last.message });
         },
         tick(id) { this.ticked = this.ticked.includes(id) ? this.ticked.filter(i => i !== id) : [...this.ticked, id] },
         get allTicked() { return this.list && this.ticked.length === this.list.items.length },
@@ -83,7 +83,7 @@
     @endunless
 
     @if ($canPack)
-        <x-scan-input :placeholder="__('Scan a label')" />
+        <x-scan-input once quiet :placeholder="__('Scan a label')" />
 
         {{-- Scan result that is not a checklist (blocked, already packed…) --}}
         <div x-show="last && !list" x-cloak class="mt-3 rounded-xl border-2 p-4"

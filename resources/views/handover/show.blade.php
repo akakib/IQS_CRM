@@ -25,7 +25,7 @@
                 },
             }" @scan="handle($event.detail)">
             <div>
-                <x-scan-input :placeholder="__('Scan each parcel as the rider takes it')" />
+                <x-scan-input quiet :placeholder="__('Scan each parcel')" />
                 <div x-show="last" x-cloak class="mt-4 rounded-xl border-2 p-4"
                     :class="{ 'border-green-600 bg-green-50': last?.level === 'ok', 'border-purple-600 bg-purple-50': last?.level === 'edited', 'border-orange-500 bg-orange-50': ['orange', 'warn'].includes(last?.level), 'border-red-600 bg-red-50': last?.level === 'red' }">
                     <p class="text-lg font-bold" x-text="last?.message"></p>

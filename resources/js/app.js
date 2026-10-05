@@ -2,10 +2,12 @@ import './bootstrap';
 import Alpine from 'alpinejs';
 import dateInput from './components/date-input';
 import phoneDial from './components/phone-dial';
+import scanInput from './components/scan-input';
 
 window.Alpine = Alpine;
 Alpine.data('dateInput', dateInput);
 Alpine.data('phoneDial', phoneDial);
+Alpine.data('scanInput', scanInput);
 Alpine.start();
 
 // One click, one action. Once a form is on its way to the server, a second

@@ -156,6 +156,10 @@ class PackagingTest extends TestCase
         $this->postJson("/handover/{$session}/scan", ['code' => $this->label($order->fresh())])
             ->assertJson(['ok' => false, 'result' => 'blocked'])->assertJsonFragment(['message' => 'COD changed to ৳1,800 but not updated at the courier yet. Keep the parcel; ask the moderator or admin to update it, then scan again.']);
 
+        // The packer cannot confirm it (no button, and the server refuses).
+        $this->actingAs($this->packer)->post("/orders/{$order->id}/cod-updated")->assertForbidden();
+        $this->assertNotNull(app(\App\Services\Orders\OrderService::class)->pendingCodUpdate($order->fresh()));
+
         // Someone changed it in the courier panel and says so: the parcel can go.
         $this->actingAs($this->desk)->get("/orders/{$order->id}")->assertSee('Update the COD at');
         $this->post("/orders/{$order->id}/cod-updated")->assertSessionHas('success');

@@ -140,6 +140,11 @@ class OrderEditor
         ]);
         $this->orders->snapshot($order, $version, $by->id);
 
+        // The old label no longer scans: have the new one ready so the packer can print it without asking anyone.
+        if ($order->active_shipment_id && in_array($order->status_id, OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']), true)) {
+            app(\App\Services\Courier\BookingService::class)->issueLabel($order, $order->active_shipment_id, null, __('Order edited (version :v)', ['v' => $version]));
+        }
+
         $reason = DB::table('status_reasons')->where('id', $a->reason_id)->value('label_en');
         $diff = (float) $a->amount_diff;
         $this->orders->note($order, 'amendment', trim($this->describe(json_decode($a->changes, true))

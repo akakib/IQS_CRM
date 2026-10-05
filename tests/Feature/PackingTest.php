@@ -127,11 +127,11 @@ class PackingTest extends TestCase
         $this->assertSame('repack', $order->fresh()->packMark());
 
         $old = $order->order_no.'-1';
-        $this->postJson('/packing/scan', ['code' => $old])->assertJson(['ok' => false, 'level' => 'red'])
-            ->assertJsonFragment(['message' => 'Edited after packing: repack. Dates ×2 → ×3 Print and scan the NEW label.']);
-
-        app(BookingService::class)->issueLabel($order->fresh(), $order->fresh()->active_shipment_id, $this->desk, 'repack');
+        // The edit itself issued the new label (unprinted), so the packer can print it without asking anyone.
+        $this->assertDatabaseHas('shipment_labels', ['barcode' => $order->order_no.'-2', 'voided_at' => null, 'printed_at' => null]);
         $this->postJson('/packing/scan', ['code' => $old])->assertJson(['ok' => false])->assertJsonFragment(['result' => 'blocked']); // voided now
+        $this->post("/packing/{$order->id}/label")->assertOk()->assertSee($order->order_no.'-2');
+        $this->assertNotNull(DB::table('shipment_labels')->where('barcode', $order->order_no.'-2')->value('printed_at'));
         $this->postJson('/packing/scan', ['code' => $order->order_no.'-2'])->assertJson(['ok' => true, 'level' => 'edited'])->assertJsonPath('checklist.repack', true);
         $this->assertSame('repack', $order->fresh()->packMark()); // still red until the items are ticked again
         $this->packIt($order, $order->order_no.'-2');

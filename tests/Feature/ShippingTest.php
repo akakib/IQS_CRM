@@ -101,8 +101,7 @@ class ShippingTest extends TestCase
         $this->assertSame(2, $order->current_version);
         $this->assertSame('reprint_label', DB::table('order_amendments')->where('order_id', $order->id)->value('courier_action'));
 
-        $this->post("/shipping/{$order->id}/reprint")->assertRedirect();
-
+        // The new label is issued with the edit; no separate reprint step is needed.
         $this->assertNotNull(DB::table('shipment_labels')->where('barcode', $order->order_no.'-1')->value('voided_at'));
         $this->assertDatabaseHas('shipment_labels', ['barcode' => $order->order_no.'-2', 'voided_at' => null]);
         $this->assertSame(2, $order->fresh()->label_version);

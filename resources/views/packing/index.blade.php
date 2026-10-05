@@ -113,7 +113,7 @@
                                 <span class="block text-base font-medium text-gray-900" x-text="i.name"></span>
                                 <span class="text-xs text-gray-500" x-show="i.shelf">{{ __('Shelf') }} <b x-text="i.shelf"></b></span>
                             </span>
-                            <span class="shrink-0 text-xl font-bold tabular-nums text-gray-900" x-text="'×' + i.qty"></span>
+                            <span class="shrink-0 text-xl font-bold tabular-nums text-gray-900" x-text="i.qty"></span>
                         </button>
                     </template>
                 </div>
@@ -191,7 +191,7 @@
                                             <span class="block text-sm font-medium text-gray-900" x-text="i.name"></span>
                                             <span class="text-xs text-gray-500" x-show="i.shelf">{{ __('Shelf') }} <b x-text="i.shelf"></b></span>
                                         </span>
-                                        <span class="shrink-0 text-base font-bold tabular-nums text-gray-900" x-text="'×' + i.qty"></span>
+                                        <span class="shrink-0 text-base font-bold tabular-nums text-gray-900" x-text="i.qty"></span>
                                     </div>
                                 </template>
                             </div>
@@ -200,9 +200,13 @@
                                     <span>{{ __('To start packing, scan its label:') }} <b class="font-mono text-gray-800" x-text="previews[{{ $o->id }}].label"></b><span x-show="!previews[{{ $o->id }}].label_printed"> · {{ __('not printed yet') }}</span></span>
                                 </template>
                                 <template x-if="previews[{{ $o->id }}].label && !previews[{{ $o->id }}].label_current">
-                                    <span class="font-medium text-orange-700">{{ __('The order changed: a new label must be printed before it can be scanned.') }}</span>
+                                    <span class="font-medium text-orange-700">{{ __('The order changed: print the new label, then scan it.') }}</span>
                                 </template>
                             </p>
+                            <form x-show="previews[{{ $o->id }}].label && (!previews[{{ $o->id }}].label_current || !previews[{{ $o->id }}].label_printed)" method="POST" action="{{ route('packing.label', $o->id) }}" target="_blank" class="mt-2" @submit="setTimeout(() => location.reload(), 1500)">
+                                @csrf
+                                <button class="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-primary hover:text-white" x-text="previews[{{ $o->id }}].label_current ? @js(__('Print label')) : @js(__('Print new label'))"></button>
+                            </form>
                         </div>
                     </template>
                 </div>

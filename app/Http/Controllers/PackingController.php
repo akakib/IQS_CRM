@@ -8,6 +8,7 @@ use App\Models\StatusReason;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\Packing\BatchService;
+use App\Services\Courier\BookingService;
 use App\Services\Packing\ScanService;
 use App\Services\Packing\StockIssueService;
 use Illuminate\Http\JsonResponse;
@@ -124,6 +125,25 @@ class PackingController extends Controller
             'label' => $label->barcode ?? null,
             'label_printed' => (bool) ($label->printed_at ?? false),
             'label_current' => $label && (int) $label->order_version === (int) $order->current_version,
+        ]);
+    }
+
+    /** Print one order's label from its card. An order edited before labels were re-issued automatically gets its new label here. */
+    public function label(Order $order, Request $request, BookingService $booking): View
+    {
+        abort_unless($order->active_shipment_id, 422, __('This order is not booked.'));
+        abort_unless(in_array($order->status_id, OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']), true), 422, __('This order is not in the packing queue.'));
+        if ((int) $order->label_version !== (int) $order->current_version) {
+            $booking->issueLabel($order, $order->active_shipment_id, null, __('Order edited (version :v)', ['v' => $order->current_version]));
+        }
+        DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')
+            ->update(['printed_at' => now(), 'printed_by' => $request->user()->id]);
+
+        return view('shipping.labels', [
+            'orders' => Order::whereKey($order->id)->with('items:id,order_id,name_snapshot,qty,unit')->get(),
+            'labels' => DB::table('shipment_labels as l')->join('shipments as s', 's.id', '=', 'l.shipment_id')
+                ->where('l.order_id', $order->id)->whereNull('l.voided_at')
+                ->get(['l.order_id', 'l.barcode', 'l.cod_on_label', 's.consignment_id', 's.courier'])->keyBy('order_id'),
         ]);
     }
 

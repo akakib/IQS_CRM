@@ -98,10 +98,11 @@ class OrderActivityController extends Controller
         $now = now()->toDateTimeString();
 
         return [
-            'waiting' => ['label' => __('New, nobody took'), 'sql' => 'o.status_id = ? AND o.moderator_id IS NULL', 'bind' => [$s('new')], 'tone' => 'gray'],
+            // Anything waiting with nobody on it (also an order taken back after a missed timer) is "nobody took", like the Control room counts it.
+            'waiting' => ['label' => __('New, nobody took'), 'sql' => 'o.status_id IN (?, ?, ?) AND o.moderator_id IS NULL', 'bind' => [$s('new'), $s('record_verified'), $s('no_answer')], 'tone' => 'gray'],
             'verify' => ['label' => __('Verify'), 'sql' => 'o.status_id = ? AND o.moderator_id IS NOT NULL', 'bind' => [$s('new')], 'tone' => 'blue'],
-            'call' => ['label' => __('Call'), 'sql' => '(o.status_id = ? OR (o.status_id = ? AND (o.next_call_at IS NULL OR o.next_call_at <= ?)))', 'bind' => [$s('record_verified'), $s('no_answer'), $now], 'tone' => 'amber'],
-            'again' => ['label' => __('Call again'), 'sql' => 'o.status_id = ? AND o.next_call_at > ?', 'bind' => [$s('no_answer'), $now], 'tone' => 'orange'],
+            'call' => ['label' => __('Call'), 'sql' => 'o.moderator_id IS NOT NULL AND (o.status_id = ? OR (o.status_id = ? AND (o.next_call_at IS NULL OR o.next_call_at <= ?)))', 'bind' => [$s('record_verified'), $s('no_answer'), $now], 'tone' => 'amber'],
+            'again' => ['label' => __('Call again'), 'sql' => 'o.moderator_id IS NOT NULL AND o.status_id = ? AND o.next_call_at > ?', 'bind' => [$s('no_answer'), $now], 'tone' => 'orange'],
             'hold' => ['label' => __('On hold'), 'sql' => 'o.status_id = ?', 'bind' => [$s('hold')], 'tone' => 'red'],
             'send' => ['label' => __('To send'), 'sql' => "o.status_id = ? AND o.booking_state IN ('none', 'failed')", 'bind' => [$s('confirmed')], 'tone' => 'green'],
             'packaging' => ['label' => __('Packaging'), 'sql' => "((o.status_id = ? AND o.booking_state = 'queued') OR o.status_id = ?)", 'bind' => [$s('confirmed'), $s('ready_for_packaging')], 'tone' => 'purple'],

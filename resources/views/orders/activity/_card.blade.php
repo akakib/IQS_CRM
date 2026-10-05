@@ -6,7 +6,7 @@
     $since = Carbon::parse($o->queue_since ?? $o->assigned_at ?? $o->created_at);
     $age = $since->diffForHumans(now(), ['short' => true, 'syntax' => Carbon::DIFF_ABSOLUTE, 'parts' => 1]);
     $left = $o->action_due_at ? max(0, now()->diffInSeconds(Carbon::parse($o->action_due_at), false)) : null;
-    $late = ($key === 'new' && ! $o->moderator_id && $since->lt(now()->subMinutes((int) settings('desk.auto_assign_minutes'))))
+    $late = (in_array($key, ['new', 'record_verified', 'no_answer'], true) && ! $o->moderator_id && $since->lt(now()->subMinutes((int) settings('desk.auto_assign_minutes'))))
         || ($left !== null && $left <= 120)
         || $o->booking_state === 'failed';
     $repack = $o->packed_version && $o->packed_version < $o->current_version && in_array($key, ['packed', 'ready_for_pickup'], true);
@@ -31,7 +31,7 @@
     <div class="mt-2 text-xs">
         @if ($repack)
             <span class="font-medium text-red-700">{{ __('Edited after packing: repack') }}</span>
-        @elseif ($key === 'new' && ! $o->moderator_id)
+        @elseif (in_array($key, ['new', 'record_verified', 'no_answer'], true) && ! $o->moderator_id)
             <span class="text-gray-600">{{ __('Waiting for someone to take it') }}</span>
         @elseif (in_array($key, ['new', 'record_verified', 'no_answer'], true) && $left !== null)
             <span class="inline-flex items-center gap-1.5 text-gray-700">{{ $key === 'new' ? __('Checking the record') : __('Calling') }} <x-countdown :seconds="$left" /></span>

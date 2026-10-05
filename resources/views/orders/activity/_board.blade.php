@@ -1,11 +1,17 @@
 {{-- The columns. Swapped as a whole by Refresh and the 30-second refresh. --}}
 @php
+    // Only stages that have orders right now (with these filters).
+    $columns = array_filter($columns, fn ($key) => $counts[$key] > 0, ARRAY_FILTER_USE_KEY);
+    $firstKey = array_key_first($columns);
     $tones = [
         'gray' => 'bg-gray-400', 'blue' => 'bg-blue-500', 'amber' => 'bg-amber-500', 'orange' => 'bg-orange-500', 'red' => 'bg-red-500',
         'green' => 'bg-green-600', 'purple' => 'bg-purple-500', 'teal' => 'bg-teal-600',
     ];
 @endphp
-<div data-refreshed="{{ $refreshedAt->format('g:i:s A') }}">
+<div data-refreshed="{{ $refreshedAt->format('g:i:s A') }}" x-init="if (!@js(array_keys($columns)).includes(col)) col = @js($firstKey)">
+    @if (! $columns)
+        <div class="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">{{ __('No orders moving in these dates.') }}</div>
+    @endif
     {{-- Phone: one stage at a time, picked from this row. --}}
     <div class="mb-3 flex gap-2 overflow-x-auto pb-1 md:hidden">
         @foreach ($columns as $key => $col)
@@ -20,7 +26,7 @@
     {{-- Grab the board with the mouse and pull it sideways (hand cursor); touch scrolls as usual. --}}
     <div data-drag-scroll class="flex cursor-grab gap-4 overflow-x-auto pb-4">
         @foreach ($columns as $key => $col)
-            <section class="w-full shrink-0 md:w-72" x-show="wide || col === @js($key)" @if ($loop->index > 0) x-cloak @endif>
+            <section class="w-full shrink-0 md:w-72" x-show="wide || col === @js($key)" @if ($key !== $firstKey) x-cloak @endif>
                 <header class="mb-2 flex items-center justify-between px-1">
                     <span class="flex items-center gap-2 text-sm font-semibold text-gray-800">
                         <span class="h-2 w-2 rounded-full {{ $tones[$col['tone']] }}"></span>{{ $col['label'] }}

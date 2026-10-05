@@ -88,7 +88,7 @@ class ScanService
             'items' => DB::table('order_items as i')->join('product_variants as v', 'v.id', '=', 'i.variant_id')
                 ->where('i.order_id', $order->id)->orderBy('v.shelf_code')->orderBy('i.id')
                 ->get(['i.id', 'i.name_snapshot as name', 'i.qty', 'i.unit', 'v.shelf_code as shelf'])
-                ->map(fn ($i) => ['id' => $i->id, 'name' => $i->name, 'qty' => ($i->unit === 'g' ? '' : '×').rtrim(rtrim((string) $i->qty, '0'), '.').($i->unit === 'g' ? ' g' : ''), 'shelf' => $i->shelf])->all(),
+                ->map(fn ($i) => ['id' => $i->id, 'name' => $i->name, 'qty' => \App\Support\Units::qty($i->qty, $i->unit), 'shelf' => $i->shelf])->all(),
         ];
     }
 
@@ -252,7 +252,7 @@ class ScanService
         if ($order) {
             $r['order'] = [
                 'order_no' => $order->order_no,
-                'items' => $order->items->map(fn ($i) => $i->name_snapshot.' ×'.rtrim(rtrim((string) $i->qty, '0'), '.').($i->unit === 'g' ? ' g' : ''))->all(),
+                'items' => $order->items->map(fn ($i) => $i->name_snapshot.' '.\App\Support\Units::qty($i->qty, $i->unit))->all(),
             ];
         }
 

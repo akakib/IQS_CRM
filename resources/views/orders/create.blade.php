@@ -47,11 +47,11 @@
                 if (!p || !p.sellable) return;
                 const existing = this.items.find(i => i.variant_id === p.value);
                 if (existing) existing.qty = Number(existing.qty) + 1;
-                else this.items.push({ variant_id: p.value, label: p.label, sub: p.sub, price: p.price || 0, unit: p.unit, weight_g: p.weight_g, qty: p.unit === 'g' ? 500 : 1, line_discount: 0, preorder: p.availability === 'backorder' });
+                else this.items.push({ variant_id: p.value, label: p.label, sub: p.sub, price: p.price || 0, unit: p.unit, weight_g: p.weight_g, qty: ({ g: 500, ml: 250 })[p.unit] || 1, line_discount: 0, preorder: p.availability === 'backorder' });
                 this.q = ''; this.results = []; this.$refs.search.focus(); this.recharge();
             },
             lineTotal(i) { return Math.max(0, i.qty * i.price - (Number(i.line_discount) || 0)); },
-            weight() { return this.items.reduce((s, i) => s + (i.unit === 'g' ? Number(i.qty) : i.weight_g * i.qty), 0); },
+            weight() { const per = { g: 1, kg: 1000, ml: 1, l: 1000 }; return this.items.reduce((s, i) => s + (per[i.unit] ? Number(i.qty) * per[i.unit] : i.weight_g * i.qty), 0); },
             subtotal() { return this.items.reduce((s, i) => s + i.qty * i.price, 0); },
             discount() { return this.items.reduce((s, i) => s + (Number(i.line_discount) || 0), 0) + (Number(this.orderDiscount) || 0); },
             total() { return Math.max(0, this.subtotal() - this.discount()) + this.delivery; },
@@ -151,7 +151,7 @@
                                     <p class="font-medium text-gray-800" x-text="it.label"></p>
                                     <p class="text-xs" :class="it.preorder ? 'text-amber-700' : 'text-gray-400'" x-text="it.preorder ? @js(__('Pre-order: order will wait on Hold')) : it.sub"></p>
                                 </div>
-                                <label class="col-span-4 text-xs text-gray-500 md:col-span-2"><span x-text="it.unit === 'g' ? @js(__('Grams')) : @js(__('Qty'))"></span>
+                                <label class="col-span-4 text-xs text-gray-500 md:col-span-2"><span x-text="({ g: @js(__('Grams')), kg: @js(__('KG')), ml: @js(__('ML')), l: @js(__('Litres')), packet: @js(__('Packets')), box: @js(__('Boxes')) })[it.unit] || @js(__('Qty'))"></span>
                                     <input type="number" step="any" min="0.001" :name="`items[${i}][qty]`" x-model.number="it.qty" @input="recharge()" class="{{ $input }} mt-0.5 px-2 py-1">
                                 </label>
                                 <label class="col-span-4 text-xs text-gray-500 md:col-span-2">{{ __('Discount') }}

@@ -184,11 +184,18 @@ class OrderController extends Controller
         return back()->with('success', __('Order :no is now :s.', ['no' => $order->order_no, 's' => OrderStatus::map()[$order->status_id]['name']]));
     }
 
-    public function note(Order $order, Request $request): RedirectResponse
+    public function note(Order $order, Request $request): RedirectResponse|JsonResponse
     {
         abort_unless(Order::visibleTo($request->user())->whereKey($order->id)->exists(), 403);
         $data = $request->validate(['type' => ['required', Rule::in(['manual', 'call', 'chat'])], 'body' => ['required', 'string', 'max:2000']]);
         $this->orders->note($order, $data['type'], $data['body'], $request->user());
+
+        // Added from a page that stays open (Order management): send back the entry so it can slide into the history.
+        if ($request->expectsJson()) {
+            $entry = (object) ['note_type' => $data['type'], 'body' => $data['body'], 'user' => $request->user()->name, 'created_at' => now()];
+
+            return response()->json(['html' => view('components.timeline', ['entries' => [$entry], 'attributes' => new \Illuminate\View\ComponentAttributeBag])->render()]);
+        }
 
         return back()->with('success', __('Note added.'));
     }

@@ -249,7 +249,7 @@
                         <div class="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200">
                             @foreach ($detail['items'] as $i)
                                 <div class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                                    <span class="min-w-0 text-gray-800">{{ $i->name_snapshot }} <b class="whitespace-nowrap">×{{ rtrim(rtrim(number_format((float) $i->qty, 3), '0'), '.') }}{{ $i->unit === 'g' ? ' g' : '' }}</b></span>
+                                    <span class="min-w-0 text-gray-800">{{ $i->name_snapshot }} <b class="whitespace-nowrap">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b></span>
                                     <span class="flex shrink-0 items-center gap-3">
                                         <span class="tabular-nums text-gray-600">{{ $money($i->line_total) }}</span>
                                         <x-badge :color="$stock[$i->availability_status][0] ?? 'gray'">{{ $stock[$i->availability_status][1] ?? $i->availability_status }}</x-badge>
@@ -278,16 +278,37 @@
 
                         {{-- Short histories start open. Once the user opens or closes it, that choice sticks (adding a note must not fold it away). --}}
                         <details class="mt-3 rounded-lg border border-gray-200" @if ($detail['notes']->count() <= 4) open @endif
-                            x-data x-init="const s = localStorage.getItem('iqs_desk_history'); if (s !== null) $el.open = s === '1'">
-                            <summary @click="localStorage.setItem('iqs_desk_history', $el.parentElement.open ? '0' : '1')" class="cursor-pointer px-4 py-2.5 text-sm font-medium text-gray-700">{{ __('History') }} <span class="text-gray-400">({{ $detail['notes']->count() }})</span></summary>
+                            x-data="{
+                                count: {{ $detail['notes']->count() }}, saving: false, failed: false,
+                                async addNote(form) {
+                                    if (this.saving) return;
+                                    this.saving = true; this.failed = false;
+                                    try {
+                                        const r = await fetch(form.action, { method: 'POST', headers: { Accept: 'application/json' }, body: new FormData(form) });
+                                        if (!r.ok) throw new Error();
+                                        const box = document.createElement('div');
+                                        box.innerHTML = (await r.json()).html;
+                                        const li = box.querySelector('li');
+                                        const list = this.$refs.timeline;
+                                        if (list.children.length) li.insertAdjacentHTML('afterbegin', '<span class=&quot;absolute left-[11px] top-6 -bottom-0 w-px bg-gray-200&quot; aria-hidden=&quot;true&quot;></span>');
+                                        li.classList.add('note-in');
+                                        list.prepend(li);
+                                        this.count++;
+                                        form.reset();
+                                    } catch (e) { this.failed = true }
+                                    this.saving = false;
+                                },
+                            }" x-init="const s = localStorage.getItem('iqs_desk_history'); if (s !== null) $el.open = s === '1'">
+                            <summary @click="localStorage.setItem('iqs_desk_history', $el.parentElement.open ? '0' : '1')" class="cursor-pointer px-4 py-2.5 text-sm font-medium text-gray-700">{{ __('History') }} <span class="text-gray-400">(<span x-text="count">{{ $detail['notes']->count() }}</span>)</span></summary>
                             <div class="space-y-3 border-t border-gray-100 px-4 py-3">
-                                <form method="POST" action="{{ route('orders.notes', $order) }}" class="flex gap-2" @submit="localStorage.setItem('iqs_desk_history', '1')">
+                                <form method="POST" action="{{ route('orders.notes', $order) }}" class="flex gap-2" @submit.prevent="addNote($el)">
                                     @csrf
                                     <input type="hidden" name="type" value="manual">
                                     <input name="body" required maxlength="2000" placeholder="{{ __('Add a note') }}" class="{{ $input }}">
                                     <x-button size="sm" variant="secondary">{{ __('Add') }}</x-button>
                                 </form>
-                                <x-timeline :entries="$detail['notes']" class="pt-2" />
+                                <p x-show="failed" x-cloak class="text-sm text-red-600">{{ __('The note was not saved. Try again.') }}</p>
+                                <x-timeline :entries="$detail['notes']" class="pt-2" x-ref="timeline" />
                             </div>
                         </details>
                     </div>

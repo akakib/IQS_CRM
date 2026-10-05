@@ -44,7 +44,7 @@
                 <b>{{ $o->ship_name }}</b> · {{ $o->ship_phone }}{{ $o->ship_alt_phone ? ' / '.$o->ship_alt_phone : '' }}<br>
                 {{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}
             </div>
-            <div class="items">{{ $o->items->map(fn ($i) => $i->name_snapshot.' '.($i->unit === 'g' ? '' : '×').rtrim(rtrim($i->qty, '0'), '.').($i->unit === 'g' ? ' g' : ''))->join(' · ') }}</div>
+            <div class="items">{{ $o->items->map(fn ($i) => $i->name_snapshot.' '.\App\Support\Units::qty($i->qty, $i->unit))->join(' · ') }}</div>
             @if ($l)
                 <div class="codes">
                     {!! \App\Support\Barcode\Code128::svg($l->barcode, 2, 60) !!}

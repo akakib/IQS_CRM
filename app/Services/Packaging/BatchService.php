@@ -84,8 +84,6 @@ class BatchService
 
     private function qty(object $line): string
     {
-        $q = rtrim(rtrim(number_format((float) $line->qty, 3, '.', ''), '0'), '.');
-
-        return $line->unit === 'g' ? "{$q} g" : $q;
+        return \App\Support\Units::qty($line->qty, $line->unit);
     }
 }

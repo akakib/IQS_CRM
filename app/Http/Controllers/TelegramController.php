@@ -64,7 +64,7 @@ class TelegramController extends Controller
             'batch' => $batch->batch_no,
             'lines' => $batches->pickList($batch->id)->map(fn ($l) => [
                 'variant_id' => $l->variant_id, 'name' => $l->name, 'shelf' => $l->shelf_code,
-                'qty' => rtrim(rtrim(number_format((float) $l->qty, 3, '.', ''), '0'), '.').($l->unit === 'g' ? ' g' : ''),
+                'qty' => \App\Support\Units::qty($l->qty, $l->unit),
             ]),
         ]);
     }

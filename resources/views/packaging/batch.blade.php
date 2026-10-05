@@ -22,7 +22,7 @@
                         <tr>
                             <td class="py-2 pr-2 font-mono text-xs">{{ $l->shelf_code ?? '-' }}</td>
                             <td class="py-2 pr-2">{{ $l->name }} <span class="font-mono text-xs text-gray-400">{{ $l->sku }}</span></td>
-                            <td class="py-2 pr-2 text-right font-semibold tabular-nums">{{ rtrim(rtrim(number_format((float) $l->qty, 3, '.', ''), '0'), '.') }}{{ $l->unit === 'g' ? ' g' : '' }}</td>
+                            <td class="py-2 pr-2 text-right font-semibold tabular-nums">{{ \App\Support\Units::qty($l->qty, $l->unit) }}</td>
                             <td class="py-2 text-right tabular-nums text-gray-500">{{ $l->orders }}</td>
                             <td class="py-2 pl-2 text-right">
                                 <form method="POST" action="{{ route('packaging.report') }}">

@@ -38,7 +38,7 @@ class ProductRequest extends FormRequest
             'variants.*.sku' => ['required', 'string', 'max:60', 'distinct'],
             'variants.*.barcode' => ['nullable', 'string', 'max:60', 'distinct'],
             'variants.*.shelf_code' => ['nullable', 'string', 'max:30'],
-            'variants.*.unit' => ['required', Rule::in(['pcs', 'g', 'box'])],
+            'variants.*.unit' => ['required', Rule::in(\App\Support\Units::keys())],
             'variants.*.pack_qty' => ['required', 'numeric', 'gt:0', 'max:1000000'],
             'variants.*.weight_g' => ['nullable', 'integer', 'min:0', 'max:1000000'],
             'variants.*.cost_price' => ['nullable', 'numeric', 'min:0', 'max:9999999'],

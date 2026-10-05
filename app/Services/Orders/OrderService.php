@@ -233,7 +233,7 @@ class OrderService
                 'unit_price' => $price,
                 'line_discount' => $discount,
                 'line_total' => round(max(0, $qty * $price - $discount), 2),
-                'weight_g' => (int) round($v->unit === 'g' ? $qty : ($v->weight_g ?? 0) * $qty),
+                'weight_g' => \App\Support\Units::weight((float) $qty, $v->unit, $v->weight_g),
             ];
         }, $rows);
     }

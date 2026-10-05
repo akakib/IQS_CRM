@@ -77,8 +77,9 @@
                             <label class="text-xs text-gray-500">{{ __('Shelf') }}<input type="text" :name="`variants[${i}][shelf_code]`" x-model="row.shelf_code" maxlength="30" placeholder="A1" class="{{ $small }} mt-1 font-mono"></label>
                             <div class="text-xs text-gray-500">{{ __('Unit') }}
                                 <input type="hidden" :name="`variants[${i}][unit]`" :value="row.unit">
-                                <div class="mt-1 grid grid-cols-3 overflow-hidden rounded-md border border-gray-300 text-center">
-                                    @foreach (['pcs' => __('Pcs'), 'g' => __('Gram'), 'box' => __('Box')] as $unit => $unitLabel)
+                                {{-- Counted: Pcs, Packet, Box. Measured (the price is per one of the unit): Gram, KG, ML, Litre. --}}
+                                <div class="mt-1 grid grid-cols-4 gap-px overflow-hidden rounded-md border border-gray-300 bg-gray-300 text-center">
+                                    @foreach (\App\Support\Units::LABELS as $unit => $unitLabel)
                                         <button type="button" @click="row.unit = @js($unit)" class="py-1.5 text-xs"
                                             :class="row.unit === @js($unit) ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50'">{{ $unitLabel }}</button>
                                     @endforeach

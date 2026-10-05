@@ -37,7 +37,7 @@
                 if (!p || !p.sellable) return;
                 const e = this.items.find(i => i.variant_id === p.value);
                 if (e) e.qty = Number(e.qty) + 1;
-                else this.items.push({ variant_id: p.value, label: p.label, sub: p.sub, price: p.price || 0, unit: p.unit, weight_g: p.weight_g, qty: p.unit === 'g' ? 500 : 1, line_discount: 0 });
+                else this.items.push({ variant_id: p.value, label: p.label, sub: p.sub, price: p.price || 0, unit: p.unit, weight_g: p.weight_g, qty: ({ g: 500, ml: 250 })[p.unit] || 1, line_discount: 0 });
                 this.q = ''; this.results = []; this.searched = false;
             },
             money(n) { return '৳' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); },
@@ -69,7 +69,7 @@
                             <div class="grid grid-cols-12 items-center gap-2 rounded-lg border border-gray-100 p-2 text-sm">
                                 <input type="hidden" :name="`items[${i}][variant_id]`" :value="it.variant_id">
                                 <div class="col-span-12 md:col-span-5"><p class="font-medium text-gray-800" x-text="it.label"></p><p class="text-xs text-gray-400" x-text="it.sub + ' · ' + money(it.price)"></p></div>
-                                <label class="col-span-4 text-xs text-gray-500 md:col-span-2"><span x-text="it.unit === 'g' ? @js(__('Grams')) : @js(__('Qty'))"></span>
+                                <label class="col-span-4 text-xs text-gray-500 md:col-span-2"><span x-text="({ g: @js(__('Grams')), kg: @js(__('KG')), ml: @js(__('ML')), l: @js(__('Litres')), packet: @js(__('Packets')), box: @js(__('Boxes')) })[it.unit] || @js(__('Qty'))"></span>
                                     <input type="number" step="any" min="0.001" :name="`items[${i}][qty]`" x-model.number="it.qty" class="{{ $input }} mt-0.5 px-2 py-1"></label>
                                 <label class="col-span-4 text-xs text-gray-500 md:col-span-2">{{ __('Discount') }}
                                     <input type="number" step="0.01" min="0" :name="`items[${i}][line_discount]`" x-model.number="it.line_discount" class="{{ $input }} mt-0.5 px-2 py-1"></label>

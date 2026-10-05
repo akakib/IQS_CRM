@@ -17,6 +17,7 @@ return [
         'order_held_for_stock' => ['Order held: item out of stock or pre-order', 'normal'],
         'amendment_pending_approval' => ['Order change waiting for approval', 'normal'],
         'cod_update_needed' => ['COD changed after booking: update it at the courier', 'urgent'],
+        'courier_cancel_needed' => ['Cancelled after booking: delete it at the courier', 'urgent'],
         'courier_action_pending' => ['Courier update pending (COD, rebook)', 'urgent'],
         'sync_failed' => ['Website sync failed', 'normal'],
         'oos_review_due' => ['Out of stock item due for review', 'info'],

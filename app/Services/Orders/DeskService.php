@@ -478,6 +478,19 @@ class DeskService
         if ($set) {
             DB::table('orders')->where('id', $order->id)->update($set);
         }
+        // Cancelled after booking: the old label must never scan again, and someone deletes the booking at the courier by hand.
+        if ($to['key'] === 'cancelled' && $order->active_shipment_id
+            && DB::table('shipments')->where('id', $order->active_shipment_id)->whereNull('cancelled_at')->whereNull('final_at')->exists()) {
+            DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')
+                ->update(['voided_at' => now(), 'void_reason' => __('Order cancelled'), 'updated_at' => now()]);
+            $cn = DB::table('shipments')->where('id', $order->active_shipment_id)->value('consignment_id');
+            $this->notifications->send('courier_cancel_needed', __('Delete :no at the courier', ['no' => $order->order_no]),
+                __('Cancelled after booking (CN :cn). Delete it in the courier panel, then press "Deleted" on the order.', ['cn' => $cn ?? '-'])
+                    .($order->packed_at ? ' '.__('It was packed: open the box and put the items back.') : ''), [
+                    'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+                    'user_ids' => array_values(array_unique(array_filter([$order->moderator_id, $actor?->id, $order->packer_id, ...$this->managerIds()]))),
+                ]);
+        }
         if ($to['final']) {
             DB::table('order_assignments')->where('order_id', $order->id)->whereNull('ended_at')->update(['ended_at' => now(), 'ended_reason' => 'finished']);
         }

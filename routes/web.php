@@ -127,6 +127,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/notes', [OrderController::class, 'note'])->middleware('can:orders.view')->name('orders.notes');
     Route::post('/orders/{order}/presence', [OrderController::class, 'presence'])->middleware('can:orders.view')->name('orders.presence');
     Route::post('/orders/{order}/cod-updated', [OrderController::class, 'codUpdated'])->middleware('can:orders.edit')->name('orders.cod-updated');
+    Route::post('/orders/{order}/courier-cancelled', [OrderController::class, 'courierCancelled'])->middleware('can:orders.edit')->name('orders.courier-cancelled');
     Route::get('/orders/{order}/edit', [OrderController::class, 'edit'])->middleware('can:orders.edit')->name('orders.edit');
     Route::post('/orders/{order}/amend', [OrderController::class, 'amend'])->middleware('can:orders.edit')->name('orders.amend');
     Route::post('/orders/{order}/amendments/{amendment}', [OrderController::class, 'decideAmendment'])->whereNumber('amendment')->middleware('can:orders.approve')->name('orders.amendments.decide');

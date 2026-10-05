@@ -187,6 +187,35 @@ class OrderService
         ]), $by);
     }
 
+    /**
+     * Cancelled after the courier was booked, and nobody has confirmed the booking was deleted at the courier.
+     *
+     * @return array{courier: string, cn: ?string, packed: bool}|null
+     */
+    public function pendingCourierCancel(Order $order): ?array
+    {
+        if (! $order->active_shipment_id || OrderStatus::map()[$order->status_id]['key'] !== 'cancelled') {
+            return null;
+        }
+        $shipment = DB::table('shipments')->where('id', $order->active_shipment_id)->whereNull('cancelled_at')->whereNull('final_at')
+            ->first(['courier', 'consignment_id']);
+
+        return $shipment ? ['courier' => ucfirst((string) $shipment->courier), 'cn' => $shipment->consignment_id, 'packed' => $order->packed_at !== null] : null;
+    }
+
+    /** The booking was deleted at the courier (by hand, or the courier said so). */
+    public function markCourierCancelled(Order $order, ?User $by, string $how = 'hand'): void
+    {
+        $pending = $this->pendingCourierCancel($order);
+        if (! $pending) {
+            return;
+        }
+        DB::table('shipments')->where('id', $order->active_shipment_id)->update(['cancelled_at' => now(), 'updated_at' => now()]);
+        $this->note($order, 'courier', $how === 'courier'
+            ? __(':c confirmed the parcel is cancelled (CN :cn).', ['c' => $pending['courier'], 'cn' => $pending['cn'] ?? '-'])
+            : __('Parcel deleted at :c by hand (CN :cn), confirmed by :n.', ['c' => $pending['courier'], 'cn' => $pending['cn'] ?? '-', 'n' => $by?->name ?? '-']), $by);
+    }
+
     public function note(Order $order, string $type, string $body, ?User $by, array $meta = []): void
     {
         DB::table('order_notes')->insert([

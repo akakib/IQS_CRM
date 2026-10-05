@@ -86,6 +86,12 @@ class CourierUpdateProcessor
         }
 
         $current = OrderStatus::map()[$order->status_id];
+        if ($current['key'] === 'cancelled' && $status === 'cancelled') {
+            $this->orders->markCourierCancelled($order, null, 'courier');
+            $this->mark($eventId, null);
+
+            return 'cancel_confirmed';
+        }
         if ($current['key'] === $target || $current['final']) {
             $this->mark($eventId, null);
 

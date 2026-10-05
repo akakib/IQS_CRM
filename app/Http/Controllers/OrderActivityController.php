@@ -98,6 +98,8 @@ class OrderActivityController extends Controller
         $now = now()->toDateTimeString();
 
         return [
+            // Cancelled after booking, still to delete at the courier (by hand): first, it costs money if a rider takes it.
+            'courier_cancel' => ['label' => __('Delete at courier'), 'sql' => "o.status_id = ? AND EXISTS (SELECT 1 FROM shipments sc WHERE sc.id = o.active_shipment_id AND sc.cancelled_at IS NULL AND sc.final_at IS NULL)", 'bind' => [$s('cancelled')], 'tone' => 'red'],
             // Anything waiting with nobody on it (also an order taken back after a missed timer) is "nobody took", like the Control room counts it.
             'waiting' => ['label' => __('New, nobody took'), 'sql' => 'o.status_id IN (?, ?, ?) AND o.moderator_id IS NULL', 'bind' => [$s('new'), $s('record_verified'), $s('no_answer')], 'tone' => 'gray'],
             'verify' => ['label' => __('Verify'), 'sql' => 'o.status_id = ? AND o.moderator_id IS NOT NULL', 'bind' => [$s('new')], 'tone' => 'blue'],

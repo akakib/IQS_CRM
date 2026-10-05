@@ -195,6 +195,15 @@ class OrderController extends Controller
         return back()->with('success', __('COD confirmed at the courier. :no can be handed over.', ['no' => $order->order_no]));
     }
 
+    /** The booking of a cancelled order was deleted by hand in the courier's panel. */
+    public function courierCancelled(Order $order, Request $request): RedirectResponse
+    {
+        $this->authorizeWork($order, $request->user());
+        $this->orders->markCourierCancelled($order, $request->user());
+
+        return back()->with('success', __('Parcel :no is cancelled at the courier too.', ['no' => $order->order_no]));
+    }
+
     /** Screens with this order open check in here every few seconds (who else is on it, who is editing). */
     public function presence(Order $order, Request $request, \App\Services\Orders\OrderPresence $presence): JsonResponse
     {

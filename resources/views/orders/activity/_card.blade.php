@@ -15,8 +15,8 @@
 <button type="button" @click="$dispatch('open-order', {{ $o->id }})"
     @class([
         'block w-full cursor-grab rounded-xl border bg-white p-3 text-left shadow-sm transition hover:border-primary hover:shadow',
-        'border-red-300 ring-1 ring-red-200' => $late || $repack || $o->cod_pending,
-        'border-gray-200' => ! $late && ! $repack && ! $o->cod_pending,
+        'border-red-300 ring-1 ring-red-200' => $late || $repack || $o->cod_pending || $key === 'cancelled',
+        'border-gray-200' => ! $late && ! $repack && ! $o->cod_pending && $key !== 'cancelled',
     ])>
     <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
@@ -29,7 +29,9 @@
 
     {{-- What is happening now --}}
     <div class="mt-2 text-xs">
-        @if ($o->cod_pending)
+        @if ($key === 'cancelled')
+            <span class="font-medium text-red-700">{{ __('Cancelled: delete it at the courier') }}@if ($o->packed_at) · {{ __('unpack the box') }}@endif</span>
+        @elseif ($o->cod_pending)
             <span class="font-medium text-red-700">{{ __('COD changed: update it at the courier') }}</span>
         @elseif ($repack)
             <span class="font-medium text-red-700">{{ __('Edited after packing: repack') }}</span>

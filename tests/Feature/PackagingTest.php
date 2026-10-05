@@ -216,12 +216,33 @@ class PackagingTest extends TestCase
     public function test_cancelled_or_held_order_is_refused_at_packaging(): void
     {
         $order = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $code = $this->label($order);
         app(OrderStateMachine::class)->transition($order, 'cancelled', $this->desk, 'user',
             DB::table('status_reasons')->where('reason_type', 'cancel')->where('system_key', 'customer_cancelled')->value('id'));
 
-        $this->actingAs($this->packer)->postJson('/packaging/scan', ['code' => $this->label($order)])
+        $this->actingAs($this->packer)->postJson('/packaging/scan', ['code' => $code])
             ->assertJson(['ok' => false, 'level' => 'red']);
         $this->assertSame('cancelled', $this->key($order));
+    }
+
+    public function test_a_parcel_cancelled_after_booking_is_deleted_at_the_courier_by_hand_and_confirmed(): void
+    {
+        $order = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        app(OrderStateMachine::class)->transition($order, 'cancelled', $this->desk, 'user',
+            DB::table('status_reasons')->where('reason_type', 'cancel')->where('system_key', 'customer_cancelled')->value('id'));
+        $service = app(\App\Services\Orders\OrderService::class);
+
+        // The label no longer scans, people are told, and the order says what to do.
+        $this->assertNull(DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')->value('id'));
+        $this->assertDatabaseHas('app_notifications', ['title' => 'Delete '.$order->order_no.' at the courier']);
+        $this->assertNotNull($service->pendingCourierCancel($order->fresh()));
+        $this->actingAs($this->desk)->get("/orders/{$order->id}")->assertSee('Delete this parcel at');
+
+        // A packer cannot confirm; a manager can, and it is recorded.
+        $this->actingAs($this->packer)->post("/orders/{$order->id}/courier-cancelled")->assertForbidden();
+        $this->actingAs($this->desk)->post("/orders/{$order->id}/courier-cancelled")->assertSessionHas('success');
+        $this->assertNull($service->pendingCourierCancel($order->fresh()));
+        $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'courier', 'user_id' => $this->desk->id]);
     }
 
     public function test_packer_reports_missing_item_admin_marks_out_of_stock_and_orders_hold(): void

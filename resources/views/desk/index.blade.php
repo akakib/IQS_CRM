@@ -217,6 +217,7 @@
                 @endif
                 <x-order-presence :order="$order" mode="view" />
                 <x-cod-update :order="$order" />
+                <x-courier-cancel :order="$order" />
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">

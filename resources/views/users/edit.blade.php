@@ -1,5 +1,5 @@
 <x-layouts.app :heading="__('Edit staff')">
-    <form method="POST" action="{{ route('users.update', $user) }}">
+    <form method="POST" action="{{ route('users.update', $user) }}" enctype="multipart/form-data">
         @method('PUT')
         @include('users._form')
     </form>

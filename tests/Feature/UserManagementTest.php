@@ -90,6 +90,28 @@ class UserManagementTest extends TestCase
         $this->assertTrue(Hash::check('owner-set-pass', $staff->fresh()->password));
     }
 
+    public function test_a_staff_photo_can_be_uploaded_replaced_and_removed(): void
+    {
+        $staff = User::factory()->create();
+        $put = fn (array $extra) => $this->put("/users/{$staff->id}", ['name' => $staff->name, 'email' => $staff->email] + $extra);
+
+        $put(['photo' => \Illuminate\Http\UploadedFile::fake()->image('me.jpg', 200, 200)])->assertSessionHasNoErrors();
+        $first = $staff->fresh()->photo_path;
+        $this->assertStringStartsWith('uploads/avatars/', $first);
+        $this->assertFileExists(public_path($first));
+
+        $put(['photo' => \Illuminate\Http\UploadedFile::fake()->image('new.png', 200, 200)])->assertSessionHasNoErrors();
+        $second = $staff->fresh()->photo_path;
+        $this->assertNotSame($first, $second);
+        $this->assertFileDoesNotExist(public_path($first)); // the old file is gone
+
+        $put(['remove_photo' => '1'])->assertSessionHasNoErrors();
+        $this->assertNull($staff->fresh()->photo_path);
+        $this->assertFileDoesNotExist(public_path($second));
+
+        $put(['photo' => \Illuminate\Http\UploadedFile::fake()->create('cv.pdf', 10, 'application/pdf')])->assertSessionHasErrors('photo');
+    }
+
     public function test_staff_can_be_deactivated_and_then_cannot_log_in(): void
     {
         $staff = User::factory()->create(['password' => 'staff-pass']);

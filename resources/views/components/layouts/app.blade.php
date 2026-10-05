@@ -41,9 +41,7 @@
             <x-notification-bell />
             <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                 <button type="button" @click="open = !open" class="flex items-center gap-2 text-gray-700">
-                    <span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
-                        {{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}
-                    </span>
+                    <x-avatar :name="auth()->user()->name" :photo="auth()->user()->photo_path" size="md" />
                     <span class="hidden text-sm font-medium sm:block">{{ auth()->user()->name }}</span>
                 </button>
                 <div x-show="open" x-cloak class="absolute right-0 mt-2 w-56 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">

@@ -1,6 +1,26 @@
 <div class="max-w-2xl rounded-xl border border-gray-200 bg-white p-6">
     @csrf
 
+    {{-- Photo: shown small and round beside the person's name on order cards. --}}
+    <div class="mb-5 flex items-center gap-4" x-data="{ preview: @js($user->photo_path ? asset($user->photo_path) : null), removed: false }">
+        <template x-if="preview && !removed"><img :src="preview" alt="" class="h-16 w-16 shrink-0 rounded-full object-cover"></template>
+        <template x-if="!preview || removed"><x-avatar :name="$user->name ?: '?'" size="lg" /></template>
+        <div class="min-w-0">
+            <label class="inline-flex cursor-pointer items-center rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                {{ __('Choose photo') }}
+                <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" class="hidden"
+                    @change="const f = $event.target.files[0]; if (f) { preview = URL.createObjectURL(f); removed = false }">
+            </label>
+            @if ($user->photo_path)
+                <label class="ml-2 inline-flex items-center gap-1.5 text-sm text-gray-600">
+                    <input type="checkbox" name="remove_photo" value="1" x-model="removed" class="rounded border-gray-300 text-primary"> {{ __('Remove photo') }}
+                </label>
+            @endif
+            <p class="mt-1 text-xs text-gray-500">{{ __('JPG, PNG or WebP, up to 2 MB. A square face photo looks best.') }}</p>
+            @error('photo')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
+    </div>
+
     <div class="grid gap-x-4 md:grid-cols-2">
         <x-form.input name="name" :label="__('Name')" :value="$user->name" required maxlength="255" autofocus />
         <x-form.input name="email" type="email" :label="__('Email (login)')" :value="$user->email" required maxlength="255" />

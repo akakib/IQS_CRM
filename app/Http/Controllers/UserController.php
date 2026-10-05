@@ -54,7 +54,8 @@ class UserController extends Controller
 
     public function store(UserRequest $request): RedirectResponse
     {
-        $user = User::create([...$request->validated(), 'is_active' => true, 'email_verified_at' => now()]);
+        $user = User::create([...collect($request->validated())->except(['photo', 'remove_photo'])->all(), 'is_active' => true, 'email_verified_at' => now()]);
+        $this->savePhoto($request, $user);
 
         return redirect()->route('users.index')
             ->with('success', __('Staff ":name" added.', ['name' => $user->name]));
@@ -67,8 +68,9 @@ class UserController extends Controller
 
     public function update(UserRequest $request, User $user): RedirectResponse
     {
-        $data = $request->validated();
+        $data = collect($request->validated())->except(['photo', 'remove_photo'])->all();
         $passwordReset = filled($data['password'] ?? null);
+        $this->savePhoto($request, $user);
 
         if (! $passwordReset) {
             unset($data['password']);
@@ -84,6 +86,28 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', $passwordReset
             ? __('Staff ":name" updated and password reset.', ['name' => $user->name])
             : __('Staff ":name" updated.', ['name' => $user->name]));
+    }
+
+    /**
+     * Photo goes to public/uploads/avatars (no storage link needed on the host).
+     * A new upload or "Remove photo" deletes the old file.
+     */
+    private function savePhoto(Request $request, User $user): void
+    {
+        $old = $user->photo_path;
+        if ($request->hasFile('photo')) {
+            $file = $request->file('photo');
+            $name = $user->id.'-'.Str::lower(Str::random(8)).'.'.$file->extension();
+            $file->move(public_path('uploads/avatars'), $name);
+            $user->forceFill(['photo_path' => 'uploads/avatars/'.$name])->save();
+        } elseif ($request->boolean('remove_photo')) {
+            $user->forceFill(['photo_path' => null])->save();
+        } else {
+            return;
+        }
+        if ($old && str_starts_with($old, 'uploads/avatars/') && is_file(public_path($old))) {
+            @unlink(public_path($old));
+        }
     }
 
     public function toggleStatus(Request $request, User $user): RedirectResponse

@@ -26,6 +26,8 @@ class UserRequest extends FormRequest
             'work_location_id' => ['nullable', Rule::exists('locations', 'id')->whereNull('deleted_at')],
             'telegram_user_id' => ['nullable', 'string', 'max:50'],
             'voice_name' => ['nullable', 'string', 'max:60'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'remove_photo' => ['nullable', 'boolean'],
             // Required when creating; optional on edit (filled = Owner resets it).
             'password' => [$user ? 'nullable' : 'required', 'confirmed', Password::min(8)],
         ];

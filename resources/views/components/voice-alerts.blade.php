@@ -33,8 +33,13 @@
                 </button>
             </div>
             <div class="px-4 pt-3">
-                <p class="text-xs font-medium uppercase text-gray-500">{{ __('Voice on this device') }}</p>
-                <p class="mt-1 text-xs text-gray-500">{{ __('Tap one to hear it. Without a choice, an Indian accent voice is used (male when this device has one).') }}</p>
+                <p class="text-xs font-medium uppercase text-gray-500">{{ __('Voice') }}</p>
+                <div class="mt-2 grid grid-cols-2 gap-2">
+                    <button type="button" @click="setGender('male')" class="rounded-lg border py-2 text-sm font-medium" :class="gender === 'male' && !pick ? 'border-primary bg-primary-soft text-primary' : 'border-gray-300 text-gray-700 hover:bg-gray-50'">{{ __('Male') }}</button>
+                    <button type="button" @click="setGender('female')" class="rounded-lg border py-2 text-sm font-medium" :class="gender === 'female' && !pick ? 'border-primary bg-primary-soft text-primary' : 'border-gray-300 text-gray-700 hover:bg-gray-50'">{{ __('Female') }}</button>
+                </div>
+                <p class="mt-2 text-xs text-gray-500">{{ __('Indian English. Sounds robotic? Download a better voice on the phone (iPhone: Settings > Accessibility > Spoken Content > Voices > English > India, pick an Enhanced one). On a computer, Edge has natural voices.') }}</p>
+                <p class="mt-3 text-xs font-medium uppercase text-gray-500">{{ __('Or pick one') }}</p>
             </div>
             <div class="mt-2 max-h-64 overflow-y-auto px-2 pb-2">
                 <template x-for="v in voices" :key="v.name">

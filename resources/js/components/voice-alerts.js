@@ -16,7 +16,8 @@
 // Browsers only allow sound after the person has clicked or typed on the page.
 // An alert that arrives before that waits and is said on the next click.
 const SEEN_KEY = 'iqs_voice_seen';
-const PICK_KEY = 'iqs_voice_choice'; // renamed once so earlier test picks fall back to the Indian accent
+const PICK_KEY = 'iqs_voice_choice2'; // renamed so earlier picks (Hindi, Bangla) fall back to the Indian English default
+const GENDER_KEY = 'iqs_voice_gender';
 
 export default function voiceAlerts({ url, name, voice = true, interval = 30000 }) {
     return {
@@ -27,12 +28,14 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
         queue: [],
         voices: [],
         pick: '',
+        gender: 'male',
         warnTimer: null,
 
         init() {
             try {
                 this.on = localStorage.getItem('iqs_voice') !== 'off';
                 this.pick = localStorage.getItem(PICK_KEY) || '';
+                this.gender = localStorage.getItem(GENDER_KEY) || 'male';
             } catch (e) {}
             const flush = () => this.flush();
             document.addEventListener('pointerdown', flush, { capture: true });
@@ -53,7 +56,7 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
         },
 
         get current() {
-            return chosenVoice(this.pick)?.name || '';
+            return chosenVoice(this.pick, this.gender)?.name || '';
         },
 
         setOn(value) {
@@ -68,7 +71,18 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
             }
         },
 
-        choose(voiceName) {
+        // Male / female: the best-sounding Indian English voice of that kind on this device.
+        setGender(g) {
+            this.gender = g;
+            this.pick = '';
+            try {
+                localStorage.setItem(GENDER_KEY, g);
+                localStorage.removeItem(PICK_KEY);
+            } catch (e) {}
+            this.test();
+        },
+
+                choose(voiceName) {
             this.pick = voiceName;
             try {
                 localStorage.setItem(PICK_KEY, voiceName);
@@ -158,7 +172,7 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
             // Said right away; if the browser refuses (no click yet), the line is held for the next click (onerror below).
             const u = new SpeechSynthesisUtterance(text);
             // (Not named "voice": that is the on/off switch from the server, read on the first line above.)
-            const picked = chosenVoice(this.pick);
+            const picked = chosenVoice(this.pick, this.gender);
             u.lang = picked?.lang || 'en-IN';
             if (picked) u.voice = picked;
             u.rate = 0.92;
@@ -186,38 +200,49 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
     };
 }
 
-// English voices, plus Bangla and Hindi ones (they read English with a South Asian accent).
+// English voices only (Indian English first). The device decides which exist.
 function usableVoices() {
     const all = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [];
-    const rank = (v) => (v.lang === 'en-IN' ? 0 : v.lang.startsWith('hi') ? 1 : v.lang.startsWith('bn') ? 2 : v.lang === 'en-GB' ? 3 : 4);
+    const rank = (v) => (v.lang === 'en-IN' ? 0 : v.lang === 'en-GB' ? 1 : 2) * 10 - quality(v);
 
-    return all.filter((v) => /^(en|bn|hi)/i.test(v.lang)).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    return all.filter((v) => /^en/i.test(v.lang)).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+}
+
+// Higher = sounds more natural: downloaded "Enhanced"/"Premium" voices (iPhone, Mac),
+// "Natural"/"Online" voices (Edge), Google's network voices.
+function quality(v) {
+    return /premium/i.test(v.name) ? 3 : /enhanced|natural|neural/i.test(v.name) ? 2 : /online|google/i.test(v.name) ? 1 : 0;
+}
+
+// Known Indian English voices by gender: iPhone (Rishi, Veena), Edge (Prabhat, Aarav, Kunal, Rehaan / Neerja, Aashi, Ananya, Kavya),
+// Windows (Ravi / Heera).
+const MALE = /\b(Rishi|Prabhat|Aarav|Kunal|Rehaan|Ravi|Hemant|Madhur)\b/i;
+const FEMALE = /\b(Veena|Neerja|Aashi|Ananya|Kavya|Heera|Lekha|Isha)\b/i;
+
+export function genderOf(v) {
+    return MALE.test(v.name) ? 'male' : FEMALE.test(v.name) ? 'female' : null;
 }
 
 function voiceLabel(v) {
-    const where = { 'en-IN': 'English, India', 'en-GB': 'English, UK', 'en-US': 'English, US', 'en-AU': 'English, Australia', 'bn-BD': 'Bangla, Bangladesh', 'bn-IN': 'Bangla, India', 'hi-IN': 'Hindi, India' }[v.lang] || v.lang;
-    const short = v.name.replace(/^(Microsoft|Google)\s+/, '').replace(/\s*-\s*.*$/, '').replace(/\s*\(.*\)$/, '');
+    const where = { 'en-IN': 'India', 'en-GB': 'UK', 'en-US': 'US', 'en-AU': 'Australia' }[v.lang] || v.lang;
+    const short = v.name.replace(/^(Microsoft|Google)\s+/, '').replace(/\s*-\s*.*$/, '');
+    const g = genderOf(v);
 
-    return `${short} (${where})`;
+    return `${short} · ${where}${g ? ' · ' + (g === 'male' ? 'Male' : 'Female') : ''}`;
 }
 
-// Known male Indian voices: Edge (Prabhat, Madhur, Aarav, Kunal, Rehaan), Windows (Ravi, Hemant), iPhone (Rishi).
-const MALE = /\b(Prabhat|Madhur|Aarav|Kunal|Rehaan|Ravi|Hemant|Rishi)\b/i;
-
-// The voice picked in this browser; otherwise an Indian accent: an English (India)
-// voice, else a Hindi one (it reads English sentences with an Indian accent; Chrome on
-// Windows has "Google Hindi" but no English India voice), then any English voice.
-function chosenVoice(pick) {
+// The voice picked in this browser; otherwise the best-sounding Indian English voice of the chosen gender,
+// then any Indian English voice, then UK, then any English.
+function chosenVoice(pick, gender = 'male') {
     const voices = usableVoices();
+    const indian = voices.filter((v) => v.lang === 'en-IN');
 
     return (
         (pick && voices.find((v) => v.name === pick)) ||
-        voices.find((v) => v.lang === 'en-IN' && MALE.test(v.name)) ||
-        voices.find((v) => v.lang === 'en-IN') ||
-        voices.find((v) => v.lang?.startsWith('hi') && MALE.test(v.name)) ||
-        voices.find((v) => v.lang?.startsWith('hi')) ||
+        indian.find((v) => genderOf(v) === gender) ||
+        indian[0] ||
         voices.find((v) => v.lang === 'en-GB') ||
-        voices.find((v) => v.lang?.startsWith('en')) ||
+        voices[0] ||
         null
     );
 }

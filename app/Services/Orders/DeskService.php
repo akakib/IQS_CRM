@@ -305,6 +305,10 @@ class DeskService
      */
     public function noResponse(Order $order, User $user, ?string $note = null): string
     {
+        // One try per wait: pressing again before the return time must not burn the remaining tries and cancel the order.
+        if ($order->next_call_at && $order->next_call_at->isFuture() && OrderStatus::map()[$order->status_id]['key'] === 'no_answer') {
+            throw ValidationException::withMessages(['order' => __('Already marked No response. Call again at :t.', ['t' => $order->next_call_at->format('g:i A')])]);
+        }
         $delays = array_values(array_filter(array_map('intval', explode(',', (string) settings('desk.no_response_returns')))));
         $try = (int) $order->no_response_count + 1;
         $this->orders->note($order, 'call', trim(__('Called: no response (try :n)', ['n' => $try]).($note ? ' · '.$note : '')), $user, ['outcome' => 'no_answer']);

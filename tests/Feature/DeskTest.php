@@ -205,6 +205,11 @@ class DeskTest extends TestCase
         $this->assertTrue($a->fresh()->had_setback);
         $this->get('/desk?tab=again')->assertSee($a->order_no);
 
+        // Pressing again before the return time does nothing: the tries are not burned.
+        $this->act($a, 'no_response')->assertSessionHasErrors('order');
+        $this->assertSame(1, $a->fresh()->no_response_count);
+        $this->assertSame('no_answer', $this->key($a));
+
         // 30 minutes later it is back in the Call tab, with a timer.
         $this->travel(31)->minutes();
         Artisan::call('desk:tick');

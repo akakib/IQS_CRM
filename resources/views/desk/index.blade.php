@@ -297,6 +297,8 @@
                         @php
                             $actions = match (true) {
                                 $key === 'new' => [['verify', __('Record OK, call next'), 'v', 'primary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
+                                // Waiting for the next try: no second "No response" until that time comes (the customer may still call back, so the rest stay).
+                                $key === 'no_answer' && $order->next_call_at && $order->next_call_at->isFuture() => [['confirm', $order->channel === 'web' ? __('Call verified') : __('Confirm'), 'v', 'primary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 in_array($key, ['record_verified', 'no_answer'], true) => [['confirm', $order->channel === 'web' ? __('Call verified') : __('Confirm'), 'v', 'primary'], ['no_response', __('No response'), 'n', 'secondary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 $key === 'hold' => [$detail['consignment'] ? ['back_to_packaging', __('Back to packaging'), 'p', 'primary'] : ['resume', __('Resume, call next'), 'r', 'primary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 $key === 'confirmed' && $order->booking_state === 'none' => [['send', __('Send to packaging'), 'p', 'primary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],

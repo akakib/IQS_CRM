@@ -42,6 +42,7 @@
             money(n) { return '৳' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); },
         }">
         @csrf
+        @if (request('back') === 'desk')<input type="hidden" name="back" value="desk"><input type="hidden" name="tab" value="{{ request('tab') }}">@endif
         <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">
 
         <div class="grid gap-6 xl:grid-cols-3">

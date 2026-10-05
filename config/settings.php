@@ -10,7 +10,7 @@ return [
     'store.name' => ['string', 'Iqbal Store', 'Store name', 'Store', ['required', 'string', 'max:100']],
     'store.hotline' => ['string', '', 'Rider hotline number', 'Store', ['nullable', 'regex:/^01[3-9]\d{8}$/']],
     'appearance.primary_color' => ['string', '#0d542b', 'Main colour (buttons, links, the current page in the menu)', 'Appearance', ['required', 'regex:/^#[0-9a-fA-F]{6}$/']],
-    'appearance.font' => ['string', 'Instrument Sans', 'Font', 'Appearance', ['required', 'string', 'max:40']],
+    'appearance.font' => ['string', 'Figtree', 'Font', 'Appearance', ['required', 'string', 'max:40']],
     'store.logo' => ['string', '', 'Logo', 'Store', ['nullable', 'image', 'max:1024']],
 
     'orders.pickup_cutoffs' => ['json', ['15:00'], 'Courier pickup cut-off times', 'Orders', ['array', 'min:1', 'max:6']],

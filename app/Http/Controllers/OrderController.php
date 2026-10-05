@@ -243,7 +243,10 @@ class OrderController extends Controller
 
         $result = $editor->request($order, $data, (int) $data['reason_id'], $request->user(), (int) $data['lock_version']);
 
-        return redirect()->route('orders.show', $order)->with('success', $result['applied'] ? __('Order updated.') : __('Change sent to a manager for approval.'));
+        // Opened from Order management: go back to the same order there.
+        $to = $request->input('back') === 'desk' ? route('desk.index', array_filter(['tab' => in_array($request->input('tab'), DeskController::TABS, true) ? $request->input('tab') : null, 'order' => $order->id])) : route('orders.show', $order);
+
+        return redirect($to)->with('success', $result['applied'] ? __('Order updated.') : __('Change sent to a manager for approval.'));
     }
 
     public function decideAmendment(Order $order, int $amendment, Request $request, OrderEditor $editor): RedirectResponse

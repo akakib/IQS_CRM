@@ -8,6 +8,7 @@
 
 return [
     'fonts' => [
+        'Figtree' => 'figtree:400,500,600,700',
         'System default' => null,
         'Instrument Sans' => 'instrument-sans:400,500,600,700',
         'Inter' => 'inter:400,500,600,700',

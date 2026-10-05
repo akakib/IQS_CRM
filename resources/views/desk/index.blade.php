@@ -186,6 +186,13 @@
                                     <x-order-status :order="$order" :statuses="$statuses" />
                                     @if ($order->action_due_at)<x-countdown :seconds="$secondsLeft($order->action_due_at)" />@endif
                                     @if ($order->no_response_count)<x-badge color="amber">{{ __('No response ×:n', ['n' => $order->no_response_count]) }}</x-badge>@endif
+                                    {{-- Wrong item, address or phone: fix it in the full form and come straight back here. --}}
+                                    @if (($statuses[$order->status_id]['edit_policy'] ?? 'locked') !== 'locked')
+                                        <a href="{{ route('orders.edit', ['order' => $order, 'back' => 'desk', 'tab' => $tab]) }}" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">
+                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.86 4.49l2.65 2.65M4 20l1-4L16.5 4.5a1.87 1.87 0 012.65 2.65L7.65 18.65 4 20z"/></svg>
+                                            {{ __('Edit order') }}
+                                        </a>
+                                    @endif
                                 </div>
                                 <h2 class="mt-1 text-2xl font-semibold text-gray-900">{{ $order->ship_name }}</h2>
                                 <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>

@@ -19,7 +19,7 @@ class NotificationService
 {
     /**
      * @param  array{link?: string, subject?: array{0: string, 1: int}, group_key?: string, priority?: string,
-     *               order_moderator_id?: int|null, user_ids?: list<int>}  $opts
+     *               order_moderator_id?: int|null, user_ids?: list<int>, except_user_ids?: list<int>}  $opts
      * @return int number of people notified
      */
     public function send(string $typeKey, string $title, ?string $body = null, array $opts = []): int
@@ -30,7 +30,7 @@ class NotificationService
         }
 
         $priority = $opts['priority'] ?? $type->default_priority;
-        $channels = $this->recipients($type->id, $opts);
+        $channels = array_diff_key($this->recipients($type->id, $opts), array_flip($opts['except_user_ids'] ?? []));
         if ($channels === []) {
             return 0;
         }

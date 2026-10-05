@@ -131,7 +131,7 @@ class DeskController extends Controller
             'waiting' => (int) $waiting->n,
             'oldestWaiting' => $waiting->oldest,
             'limit' => (int) settings('desk.active_limit'),
-            'canTake' => $user->can('orders.take'),
+            'canTake' => $user->can('orders.take') && ! $user->isOwner(), // owners watch, staff take
             'reasons' => ['hold' => ($reasons['hold'] ?? collect())->pluck('label_en', 'id')->all(), 'cancel' => ($reasons['cancel'] ?? collect())->pluck('label_en', 'id')->all()],
             'returns' => array_values(array_filter(array_map('intval', explode(',', (string) settings('desk.no_response_returns'))))),
         ]);

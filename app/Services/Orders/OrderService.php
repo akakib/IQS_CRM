@@ -121,7 +121,8 @@ class OrderService
 
             if (! $order->moderator_id) {
                 $this->notifications->send('new_order', __('New order :no · ৳:t', ['no' => $order->order_no, 't' => number_format((float) $order->grand_total)]),
-                    $order->ship_name, ['link' => route('desk.index'), 'subject' => ['order', $order->id], 'group_key' => 'new_order']);
+                    $order->ship_name, ['link' => route('desk.index'), 'subject' => ['order', $order->id], 'group_key' => 'new_order',
+                        'except_user_ids' => app(DeskService::class)->notFreeForNewOrders()]);
             }
 
             return $order->refresh();

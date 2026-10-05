@@ -386,6 +386,26 @@ class DeskTest extends TestCase
         $this->assertNotNull($b->fresh()->moderator_id);
     }
 
+    public function test_busy_people_and_the_owner_are_not_told_about_new_orders_and_the_owner_cannot_take(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]);
+        $a = $this->web();
+        $this->desk()->takeNext($this->mahim); // Mahim's hands are full
+        $owner = User::factory()->create(['name' => 'Boss']);
+        $owner->roles()->attach(\App\Models\Role::create(['name' => 'Owner', 'system_key' => 'owner'])->id);
+        app(\App\Services\PermissionService::class)->bump();
+
+        $busy = $this->desk()->notFreeForNewOrders();
+        $this->assertContains($this->mahim->id, $busy);
+        $this->assertNotContains($this->rima->id, $busy);
+
+        $this->assertTrue($owner->fresh()->isOwner());
+        $this->assertContains($owner->id, $busy);
+        $this->web();
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->desk()->takeNext($owner->fresh());
+    }
+
     public function test_chat_orders_belong_to_their_creator_without_timer_or_limit(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]);

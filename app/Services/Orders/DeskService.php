@@ -53,8 +53,29 @@ class DeskService
             ->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))->count();
     }
 
+    /**
+     * People who should not be told "a new order is waiting": owners (they
+     * watch, they do not work orders), anyone on a break, and anyone whose
+     * hands are full (holding as many orders as the limit allows).
+     *
+     * @return list<int>
+     */
+    public function notFreeForNewOrders(): array
+    {
+        $limit = (int) settings('desk.active_limit');
+        $full = DB::table('orders')->where('channel', 'web')->whereNotNull('moderator_id')->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))
+            ->groupBy('moderator_id')->havingRaw('COUNT(*) >= ?', [$limit])->pluck('moderator_id')->all();
+        $resting = DB::table('users')->whereNotNull('current_break_id')->pluck('id')->all();
+        $owners = User::where('is_active', true)->get()->filter(fn (User $u) => $u->isOwner())->pluck('id')->all();
+
+        return array_values(array_unique(array_map('intval', [...$full, ...$resting, ...$owners])));
+    }
+
     public function takeNext(User $user): Order
     {
+        if ($user->isOwner()) {
+            throw ValidationException::withMessages(['order' => __('Owners watch orders from Order activity; staff take them.')]);
+        }
         if ($user->current_break_id) {
             throw ValidationException::withMessages(['order' => __('You are on a break. Press Start work first.')]);
         }

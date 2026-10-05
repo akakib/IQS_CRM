@@ -60,16 +60,31 @@
         @endif
     </div>
 
-    {{-- Who holds it --}}
+    {{-- Who worked on it: the moderator who prepared the order, and (once packaging started) the packer. --}}
     <div class="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
         @if ($o->moderator)
-            <span class="flex min-w-0 items-center gap-1.5">
+            <span class="flex min-w-0 items-center gap-1.5" title="{{ __('Order by :n', ['n' => $o->moderator]) }}">
                 <x-avatar :name="$o->moderator" :photo="$o->moderator_photo" size="sm" />
-                <span class="truncate text-xs font-medium text-gray-700">{{ $o->moderator }}</span>
+                <span class="min-w-0">
+                    <span class="block truncate text-xs font-medium text-gray-700">{{ $o->moderator }}</span>
+                    @if ($o->packer)<span class="block text-[10px] leading-none text-gray-400">{{ __('Order') }}</span>@endif
+                </span>
+                @if ($o->moderator_on_break)<span class="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{{ __('On break') }}</span>@endif
             </span>
-            @if ($o->moderator_on_break)<span class="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{{ __('On break') }}</span>@endif
         @else
             <span class="text-xs text-gray-400">{{ __('Nobody') }}</span>
+        @endif
+        @if ($o->packer)
+            <span class="flex min-w-0 shrink-0 items-center gap-1.5" title="{{ __('Packaging by :n', ['n' => $o->packer]) }}">
+                <span class="min-w-0 text-right">
+                    <span class="block truncate text-xs font-medium text-gray-700">{{ $o->packer }}</span>
+                    <span class="block text-[10px] leading-none text-gray-400">{{ __('Packing') }}</span>
+                </span>
+                <span class="relative">
+                    <x-avatar :name="$o->packer" :photo="$o->packer_photo" size="sm" />
+                    <span class="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-purple-600 text-white ring-2 ring-white" aria-hidden="true"><x-icon name="box" class="h-2 w-2" /></span>
+                </span>
+            </span>
         @endif
     </div>
 </button>

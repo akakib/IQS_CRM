@@ -1,9 +1,5 @@
 @php
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
-    $items = $order->items->map(fn ($i) => [
-        'variant_id' => $i->variant_id, 'label' => $i->name_snapshot, 'sub' => $i->sku_snapshot, 'price' => (float) $i->unit_price,
-        'unit' => $i->unit, 'weight_g' => (int) ($i->variant?->weight_g ?? 0), 'qty' => (float) $i->qty, 'line_discount' => (float) $i->line_discount,
-    ])->values();
 @endphp
 
 {{-- embed=1: the form sits in the edit popup on Order management, so no sidebar or header. --}}
@@ -23,8 +19,25 @@
     @endif
 
     <form method="POST" action="{{ route('orders.amend', $order) }}"
+        @submit="if (!$el.querySelector('input[name=reason_id]')?.value) { $event.preventDefault(); needReason = true; $nextTick(() => $refs.reason.scrollIntoView({ behavior: 'smooth', block: 'center' })) }"
         x-data="{
-            items: {{ \Illuminate\Support\Js::from($items) }}, q: '', results: [], active: 0, timer: null, searched: false,
+            items: {{ \Illuminate\Support\Js::from($items) }}, q: '', results: [], active: 0, timer: null, searched: false, needReason: false,
+            orderDiscount: {{ (float) old('order_discount', $orderDiscount) }}, delivery: {{ (float) $order->delivery_charge }}, chargeTimer: null,
+            subtotal() { return this.items.reduce((s, i) => s + Number(i.qty) * i.price, 0); },
+            lineDiscounts() { return this.items.reduce((s, i) => s + (Number(i.line_discount) || 0), 0); },
+            discount() { return this.lineDiscounts() + (Number(this.orderDiscount) || 0); },
+            total() { return Math.max(0, this.subtotal() - this.discount()) + this.delivery; },
+            weight() { const per = { g: 1, kg: 1000, ml: 1, l: 1000 }; return this.items.reduce((s, i) => s + (per[i.unit] ? Number(i.qty) * per[i.unit] : i.weight_g * i.qty), 0); },
+            {{-- Website orders keep the delivery charge they were sold with; other channels follow the delivery rules. --}}
+            recharge() {
+                if (@js($order->channel === 'web')) return;
+                clearTimeout(this.chargeTimer);
+                this.chargeTimer = setTimeout(async () => {
+                    const zone = document.querySelector('input[name=zone_id]')?.value || '';
+                    const url = @js(route('orders.delivery-charge')) + `?zone_id=${zone}&weight_g=${Math.round(this.weight())}&total=${Math.max(0, this.subtotal() - this.discount())}`;
+                    try { this.delivery = (await (await fetch(url, { headers: { Accept: 'application/json' } })).json()).charge; } catch (e) {}
+                }, 300);
+            },
             search() {
                 clearTimeout(this.timer);
                 if (this.q.trim().length < 2) { this.results = []; this.searched = false; return; }
@@ -70,7 +83,7 @@
                                 <input type="hidden" :name="`items[${i}][variant_id]`" :value="it.variant_id">
                                 <div class="col-span-12 md:col-span-5"><p class="font-medium text-gray-800" x-text="it.label"></p><p class="text-xs text-gray-400" x-text="it.sub + ' · ' + money(it.price)"></p></div>
                                 <label class="col-span-4 text-xs text-gray-500 md:col-span-2"><span x-text="({ g: @js(__('Grams')), kg: @js(__('KG')), ml: @js(__('ML')), l: @js(__('Litres')), packet: @js(__('Packets')), box: @js(__('Boxes')) })[it.unit] || @js(__('Qty'))"></span>
-                                    <input type="number" step="any" min="0.001" :name="`items[${i}][qty]`" x-model.number="it.qty" class="{{ $input }} mt-0.5 px-2 py-1"></label>
+                                    <input type="number" step="any" min="0.001" :name="`items[${i}][qty]`" x-model.number="it.qty" @input="recharge()" class="{{ $input }} mt-0.5 px-2 py-1"></label>
                                 <label class="col-span-4 text-xs text-gray-500 md:col-span-2">{{ __('Discount') }}
                                     <input type="number" step="0.01" min="0" :name="`items[${i}][line_discount]`" x-model.number="it.line_discount" class="{{ $input }} mt-0.5 px-2 py-1"></label>
                                 <p class="col-span-1 hidden text-right tabular-nums md:block" x-text="money(Math.max(0, it.qty * it.price - (it.line_discount || 0)))"></p>
@@ -105,8 +118,30 @@
             </div>
 
             <div class="space-y-6">
+                {{-- Totals as they will be after saving. --}}
+                <x-card :title="__('Total')">
+                    <dl class="space-y-2 text-sm" x-init="$watch('items', () => recharge(), { deep: true })">
+                        <div class="flex justify-between"><dt class="text-gray-500">{{ __('Subtotal') }}</dt><dd class="tabular-nums" x-text="money(subtotal())"></dd></div>
+                        <div class="flex justify-between" x-show="lineDiscounts() > 0"><dt class="text-gray-500">{{ __('Line discounts') }}</dt><dd class="tabular-nums" x-text="'−' + money(lineDiscounts())"></dd></div>
+                        <div class="flex items-center justify-between gap-2"><dt class="text-gray-500">{{ __('Order discount') }}</dt>
+                            <dd><input type="number" step="0.01" min="0" name="order_discount" x-model.number="orderDiscount" @input="recharge()" class="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm tabular-nums focus:border-primary focus:outline-none"></dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">{{ $order->channel === 'web' ? __('Delivery (as sold)') : __('Delivery (from rules)') }}</dt><dd class="tabular-nums" x-text="money(delivery)"></dd></div>
+                        <div class="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold"><dt>{{ __('New total') }}</dt><dd class="tabular-nums" x-text="money(total())"></dd></div>
+                        <div class="flex justify-between text-xs text-gray-500"><dt>{{ __('Total before this change') }}</dt><dd class="tabular-nums">৳{{ number_format((float) $order->grand_total, 2) }}</dd></div>
+                        @if ($paid > 0)
+                            <div class="flex justify-between"><dt class="text-gray-500">{{ __('Advance paid') }}</dt><dd class="tabular-nums">−৳{{ number_format($paid, 2) }}</dd></div>
+                        @endif
+                        <div class="flex justify-between font-medium"><dt>{{ __('Cash to collect (COD)') }}</dt><dd class="tabular-nums" x-text="money(Math.max(0, total() - {{ $paid }}))"></dd></div>
+                    </dl>
+                    <p x-show="discount() > {{ $discountLimit }} && discount() > {{ (float) $order->discount_total }}" x-cloak class="mt-2 text-xs text-amber-700">{{ __('Discount above ৳:n needs a manager: the change will wait for approval.', ['n' => number_format($discountLimit)]) }}</p>
+                </x-card>
+
                 <x-card :title="__('Why the change?')">
+                    <div x-ref="reason" @click="needReason = false" :class="needReason && 'rounded-lg ring-2 ring-red-500 ring-offset-2'">
                     <x-simple-select name="reason_id" :options="['' => __('Choose a reason')] + $reasons" :value="(string) old('reason_id', '')" full-width class="w-full" />
+                    </div>
+                    <p x-show="needReason" x-cloak class="mt-2 text-sm font-medium text-red-600">{{ __('Choose why the order is changing, then save.') }}</p>
+                    @error('reason_id')<p class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>@enderror
                     <p class="mt-2 text-xs text-gray-500">{{ __('"Entry error" counts against whoever made the mistake.') }}</p>
                 </x-card>
                 <x-button class="w-full">{{ __('Save change') }}</x-button>

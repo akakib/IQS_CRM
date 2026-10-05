@@ -224,10 +224,57 @@ class OrderController extends Controller
 
         return view('orders.edit', [
             'order' => $order,
+            'items' => $this->editLines($order, $request->old('items')),
             'zones' => DeliveryZone::where('is_active', true)->orderBy('sort_order')->pluck('name', 'id')->all(),
             'reasons' => StatusReason::options('amendment'),
             'policy' => OrderStatus::map()[$order->status_id]['edit_policy'],
+            'orderDiscount' => app(\App\Services\Orders\OrderEditor::class)->orderDiscount($order),
+            'paid' => (float) DB::table('order_payments')->where('order_id', $order->id)->where('status', 'verified')->whereIn('payment_type', ['advance', 'adjustment'])->sum('amount'),
+            'discountLimit' => (float) settings('orders.discount_limit'),
         ]);
+    }
+
+    /**
+     * Lines for the edit form. After a save that came back with an error, the
+     * lines as the person left them (added, removed, changed), not the saved
+     * ones, so nothing they did is lost. Lines already on the order keep the
+     * price they were sold at; new ones show today's online price.
+     */
+    private function editLines(Order $order, ?array $typed): \Illuminate\Support\Collection
+    {
+        $sold = $order->items->keyBy('variant_id');
+        $line = fn ($i) => [
+            'variant_id' => $i->variant_id, 'label' => $i->name_snapshot, 'sub' => $i->sku_snapshot, 'price' => (float) $i->unit_price,
+            'unit' => $i->unit, 'weight_g' => (int) ($i->variant?->weight_g ?? 0), 'qty' => (float) $i->qty, 'line_discount' => (float) $i->line_discount,
+        ];
+        if (! is_array($typed) || $typed === []) {
+            return $order->items->map($line)->values();
+        }
+
+        $ids = collect($typed)->pluck('variant_id')->map(fn ($id) => (int) $id)->filter()->unique();
+        $online = DB::table('price_lists')->where('system_key', 'online')->value('id');
+        $variants = DB::table('product_variants as v')->join('products as p', 'p.id', '=', 'v.product_id')
+            ->leftJoin('variant_prices as vp', fn ($j) => $j->on('vp.variant_id', '=', 'v.id')->where('vp.price_list_id', $online))
+            ->whereIn('v.id', $ids)
+            ->get(['v.id', 'v.sku', 'v.name as variant', 'v.unit', 'v.weight_g', 'p.name as product', 'vp.regular_price', 'vp.sale_price', 'vp.sale_starts_at', 'vp.sale_ends_at'])
+            ->keyBy('id');
+
+        return collect($typed)->map(function ($t) use ($sold, $variants, $line) {
+            $id = (int) ($t['variant_id'] ?? 0);
+            if (isset($sold[$id])) {
+                $row = $line($sold[$id]);
+            } elseif ($v = $variants[$id] ?? null) {
+                $row = [
+                    'variant_id' => $id, 'label' => $v->product.' · '.$v->variant, 'sub' => $v->sku,
+                    'price' => $v->regular_price === null ? 0.0 : (float) (new \App\Models\VariantPrice((array) $v))->effective(),
+                    'unit' => $v->unit, 'weight_g' => (int) $v->weight_g, 'qty' => 1.0, 'line_discount' => 0.0,
+                ];
+            } else {
+                return null;
+            }
+
+            return ['qty' => (float) ($t['qty'] ?? $row['qty']), 'line_discount' => (float) ($t['line_discount'] ?? 0)] + $row;
+        })->filter()->values();
     }
 
     public function amend(Order $order, Request $request, OrderEditor $editor): RedirectResponse|Response
@@ -240,6 +287,7 @@ class OrderController extends Controller
             'items.*.variant_id' => ['required', 'integer'],
             'items.*.qty' => ['required', 'numeric', 'gt:0'],
             'items.*.line_discount' => ['nullable', 'numeric', 'min:0'],
+            'order_discount' => ['nullable', 'numeric', 'min:0'],
             'ship_name' => ['required', 'string', 'max:150'],
             'ship_phone' => ['required', 'string', 'max:20'],
             'ship_alt_phone' => ['nullable', 'string', 'max:20'],

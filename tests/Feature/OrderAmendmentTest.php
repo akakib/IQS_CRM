@@ -64,6 +64,45 @@ class OrderAmendmentTest extends TestCase
         $order->forceFill(['status_id' => OrderStatus::idFor($key)] + $extra)->save();
     }
 
+    public function test_order_discount_is_kept_on_edit_can_be_changed_and_a_big_one_waits_for_a_manager(): void
+    {
+        $order = app(OrderService::class)->create([
+            'channel' => 'messenger', 'phone' => '01712345678', 'name' => 'Karim', 'address_line' => 'Road 1',
+            'zone_id' => DB::table('delivery_zones')->where('system_key', 'inside_dhaka')->value('id'),
+            'items' => [['variant_id' => $this->dates->id, 'qty' => 2]], 'order_discount' => 50,
+        ], $this->agent);
+        $this->assertSame('50.00', $order->fresh()->discount_total);
+
+        // An edit that does not mention the discount keeps it (it used to be dropped).
+        app(OrderEditor::class)->request($order, ['items' => [['variant_id' => $this->dates->id, 'qty' => 3]]], $this->reason('customer_request'), $this->agent, $order->fresh()->lock_version);
+        $order->refresh();
+        $this->assertSame('50.00', $order->discount_total);
+        $this->assertSame(round(1800 - 50 + (float) $order->delivery_charge, 2), (float) $order->grand_total);
+
+        // Only the discount changes: that is a change on its own.
+        $result = app(OrderEditor::class)->request($order, ['items' => [['variant_id' => $this->dates->id, 'qty' => 3]], 'order_discount' => 100], $this->reason('customer_request'), $this->agent, $order->lock_version);
+        $this->assertTrue($result['applied']);
+        $this->assertSame('100.00', $order->fresh()->discount_total);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'amendment']);
+
+        // Above the limit (200): waits for a manager, nothing changes yet.
+        $result = app(OrderEditor::class)->request($order->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 3]], 'order_discount' => 500], $this->reason('customer_request'), $this->agent, $order->fresh()->lock_version);
+        $this->assertFalse($result['applied']);
+        $this->assertSame('100.00', $order->fresh()->discount_total);
+    }
+
+    public function test_a_save_that_comes_back_with_an_error_keeps_the_lines_as_left(): void
+    {
+        $order = $this->order();
+        $this->actingAs($this->agent)->from("/orders/{$order->id}/edit")->post("/orders/{$order->id}/amend", [
+            'lock_version' => $order->lock_version,
+            'items' => [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 4]],
+            'ship_name' => 'Karim', 'ship_phone' => '01712345678', 'ship_address' => 'Road 1',
+        ])->assertSessionHasErrors('reason_id');
+
+        $this->get("/orders/{$order->id}/edit")->assertOk()->assertSee('NUTS');
+    }
+
     public function test_free_edit_applies_now_with_version_note_and_new_totals(): void
     {
         $order = $this->order();

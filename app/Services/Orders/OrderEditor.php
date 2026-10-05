@@ -45,15 +45,23 @@ class OrderEditor
 
             $newItems = $this->items($order, $proposed['items'] ?? [], $by);
             $shipping = $this->shipping($order, $proposed);
+            // The order-level discount is discount_total minus the line discounts. Not sent = keep it (it used to be lost on every edit).
+            $currentDiscount = $this->orderDiscount($order);
+            $orderDiscount = isset($proposed['order_discount']) ? round((float) $proposed['order_discount'], 2) : $currentDiscount;
             $changes = $this->diff($order, $newItems, $shipping);
+            if (abs($orderDiscount - $currentDiscount) > 0.001) {
+                $changes[] = ['type' => 'discount', 'item' => 'order', 'from' => $currentDiscount, 'to' => $orderDiscount];
+            }
             if ($changes === []) {
                 throw ValidationException::withMessages(['items' => __('Nothing was changed.')]);
             }
 
             $contentChanged = collect($changes)->contains(fn ($c) => in_array($c['type'], ['added', 'removed', 'qty', 'price'], true));
-            $totals = $this->calculator->totals($newItems, $shipping['zone_id'], (float) ($proposed['order_discount'] ?? 0),
+            $totals = $this->calculator->totals($newItems, $shipping['zone_id'], $orderDiscount,
                 $order->channel === 'web' ? (float) $order->delivery_charge : null);
-            $needsApproval = $status['edit_policy'] === 'approval' && ! $by->can('orders.approve');
+            // A bigger discount than the limit needs a manager, same as when the order is created.
+            $discountTooBig = $totals['discount_total'] > (float) settings('orders.discount_limit') && $totals['discount_total'] > (float) $order->discount_total + 0.001;
+            $needsApproval = ($status['edit_policy'] === 'approval' || $discountTooBig) && ! $by->can('orders.approve');
 
             $id = DB::table('order_amendments')->insertGetId([
                 'order_id' => $order->id,
@@ -233,6 +241,14 @@ class OrderEditor
         return $changes;
     }
 
+    /** The discount on the whole order (not on a line). */
+    public function orderDiscount(Order $order): float
+    {
+        $lines = (float) DB::table('order_items')->where('order_id', $order->id)->sum('line_discount');
+
+        return round(max(0, (float) $order->discount_total - $lines), 2);
+    }
+
     private function describe(array $changes): string
     {
         return collect($changes)->map(fn ($c) => match ($c['type']) {
@@ -241,6 +257,7 @@ class OrderEditor
             'qty' => __(':i ×:a → ×:b', ['i' => $c['item'], 'a' => $c['from'] + 0, 'b' => $c['to'] + 0]),
             'price' => __(':i price ৳:a → ৳:b', ['i' => $c['item'], 'a' => $c['from'], 'b' => $c['to']]),
             'address' => __(':f changed', ['f' => str_replace(['ship_', '_'], ['', ' '], $c['item'])]),
+            'discount' => __('order discount ৳:a → ৳:b', ['a' => $c['from'] + 0, 'b' => $c['to'] + 0]),
         })->join(', ');
     }
 }

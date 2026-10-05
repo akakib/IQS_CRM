@@ -128,7 +128,7 @@ html.dark .shadow-xl {
     box-shadow: 0 10px 30px rgb(0 0 0 / 0.55);
 }
 
-/* One slim scrollbar for the whole app: the page, panels, popups and dropdowns. (.thin-scroll is kept as a harmless marker on old markup.) */
+/* One slim (3px) scrollbar for the whole app: the page, panels, popups and dropdowns. (.thin-scroll is kept as a harmless marker on old markup.) */
 /* Firefox only: Chrome ignores the ::-webkit rules below once scrollbar-width is set, and its "thin" is still 10px. */
 @supports not selector(::-webkit-scrollbar) {
     * {
@@ -137,8 +137,8 @@ html.dark .shadow-xl {
     }
 }
 *::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 3px;
+    height: 3px;
 }
 *::-webkit-scrollbar-thumb {
     background: var(--color-gray-300);

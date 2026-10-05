@@ -25,7 +25,7 @@
     $openByDefault = array_slice(array_keys($groups), 0, 2);
 @endphp
 
-<nav class="flex-1 overflow-y-auto px-3 py-3"
+<nav class="thin-scroll flex-1 overflow-y-auto px-3 py-3"
     x-data="{
         groups: {}, defaults: @js($openByDefault),
         init() {

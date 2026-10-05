@@ -23,6 +23,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationRuleController;
 use App\Http\Controllers\PointsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShippingController;
@@ -55,7 +56,9 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::redirect('/', '/dashboard');
-    Route::view('/dashboard', 'dashboard')->name('dashboard');
+    Route::get('/dashboard', [ReportController::class, 'dashboard'])->name('dashboard');
+    Route::get('/kpi', [ReportController::class, 'kpi'])->middleware('can:kpi.view')->name('kpi.index');
+    Route::get('/analysis', [ReportController::class, 'analysis'])->middleware('can:analysis.view')->name('analysis.index');
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

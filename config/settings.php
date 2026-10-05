@@ -28,5 +28,6 @@ return [
     'kpi.weight_volume' => ['int', 40, 'KPI weight: order volume (%)', 'KPI', ['required', 'integer', 'min:0', 'max:100']],
     'kpi.weight_speed' => ['int', 20, 'KPI weight: speed (%)', 'KPI', ['required', 'integer', 'min:0', 'max:100']],
     'kpi.weight_quality' => ['int', 40, 'KPI weight: quality, delivered rate (%)', 'KPI', ['required', 'integer', 'min:0', 'max:100']],
+    'analysis.cod_fee_percent' => ['decimal', 1, 'Courier COD fee on cash collected (%)', 'Reports', ['required', 'numeric', 'min:0', 'max:10']],
     'reports.owner_summary_time' => ['string', '22:00', 'Time of the nightly owner summary on Telegram (HH:MM)', 'Reports', ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/']],
 ];

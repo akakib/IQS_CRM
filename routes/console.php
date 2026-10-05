@@ -32,3 +32,7 @@ Schedule::command('channel-sync:run')->everyMinute()->withoutOverlapping(5);
 
 // Access already stops at expires_at; this only clears the expired rows.
 Schedule::command('permissions:prune-expired')->hourly();
+
+// Owner's nightly numbers on Telegram, at the time set in Settings.
+Schedule::command('reports:owner-summary')->everyMinute()
+    ->when(fn () => now()->format('H:i') === (string) settings('reports.owner_summary_time'));

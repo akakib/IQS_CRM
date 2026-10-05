@@ -17,4 +17,5 @@
 </style>
 <script>
     try { if (localStorage.getItem('iqs_theme') === 'dark') document.documentElement.classList.add('dark') } catch (e) {}
+    try { if (localStorage.getItem('iqs_sidebar_mini') === '1') document.documentElement.classList.add('sidebar-mini') } catch (e) {}
 </script>

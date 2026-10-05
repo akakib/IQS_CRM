@@ -168,3 +168,36 @@ html[data-order-locked] .lockable {
     pointer-events: none;
     opacity: 0.4;
 }
+
+/* Folded sidebar on a computer (menu button, remembered per browser): icons only,
+   every page still one click away, the name shows on hover. */
+.mini-only {
+    display: none;
+}
+@media (min-width: 1024px) {
+    html.sidebar-mini .app-sidebar {
+        width: 72px;
+    }
+    html.sidebar-mini .app-main {
+        margin-left: 72px;
+    }
+    html.sidebar-mini .app-sidebar .mini-hide {
+        display: none;
+    }
+    html.sidebar-mini .app-sidebar .mini-only {
+        display: block;
+    }
+    html.sidebar-mini .app-sidebar .mini-center {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+    }
+    html.sidebar-mini .app-sidebar .mini-nav {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    /* Folded groups would hide pages: in icon mode every page shows. */
+    html.sidebar-mini .app-sidebar [data-mini-open] {
+        display: block !important;
+    }
+}

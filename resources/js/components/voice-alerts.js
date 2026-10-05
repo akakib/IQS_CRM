@@ -1,9 +1,10 @@
 // <x-voice-alerts>: spoken alerts for moderators, in English, with their own name.
 // The page asks the server every 30 seconds what is new for this person and
 // says it out loud with the browser's own voice (nothing is sent anywhere):
-//   a new order started (its timer began), a new order given to them,
-//   a No response order back to call, two minutes left on the current order,
-//   new orders waiting while they have room for one. No order numbers.
+//   two minutes left on the current order, a timer that started by itself on an
+//   order they never opened, a new order given to them, a No response order back
+//   to call, new orders waiting while they have room for one. No order numbers.
+//   Nothing is said for what they just did themselves (Take next, opening an order).
 // What was already said is remembered for the browser tab (sessionStorage), so
 // a page reload does not repeat it. The very first check only records the state.
 //
@@ -77,7 +78,7 @@ export default function voiceAlerts({ url, name, interval = 30000 }) {
 
         test() {
             window.speechSynthesis?.cancel();
-            this.say(`${name}, new order. Your time has started.`, true);
+            this.say(`${name}, two minutes left on current order.`, true);
         },
 
         load() {
@@ -115,9 +116,10 @@ export default function voiceAlerts({ url, name, interval = 30000 }) {
             };
 
             if (prev && !d.on_break) {
-                // A timer started (Take next, opening the next order, or the untouched-order rule): a new order is on.
-                if (d.timed && d.timed.id !== prev.timed) {
-                    this.say(`${name}, new order. Your time has started.`);
+                // A timer they did not start themselves: the order sat unopened for 15 minutes and its clock began.
+                // (Take next or opening an order starts the clock on the order on screen: no voice, they know.)
+                if (d.timed && d.timed.id !== prev.timed && d.timed.id !== open) {
+                    this.say(`${name}, your time has started. Open your order now.`);
                 } else if (d.mine.some((o) => !prev.mine.includes(o.id) && o.id !== open)) {
                     this.say(`${name}, you have a new order.`); // given to them, not opened yet
                 }

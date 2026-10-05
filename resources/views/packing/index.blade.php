@@ -9,6 +9,15 @@
 <div class="mx-auto max-w-3xl"
     x-data="{
         last: null, list: null, ticked: [], busy: false, holding: false, holdReason: null,
+        open: null, previews: {},
+        async peek(id) {
+            if (this.open === id) { this.open = null; return }
+            this.open = id;
+            if (!this.previews[id]) {
+                try { this.previews[id] = await (await fetch(@js(url('/packing/orders')) + '/' + id, { headers: { Accept: 'application/json' } })).json() }
+                catch (e) { this.previews[id] = { error: true } }
+            }
+        },
         csrf: document.querySelector('meta[name=csrf-token]').content,
         async post(url, body) {
             const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf }, body: JSON.stringify(body) });
@@ -144,23 +153,58 @@
 
     <div class="mt-3 space-y-2">
         @forelse ($queue as $o)
-            <div @class(['flex items-center justify-between gap-3 rounded-xl border bg-white p-4',
-                'border-red-300 bg-red-50/40' => $o->is_red, 'border-orange-300' => ! $o->is_red && $o->is_orange, 'border-gray-200' => ! $o->is_red && ! $o->is_orange])>
-                <div class="min-w-0">
-                    <p class="flex flex-wrap items-center gap-2">
-                        <span class="font-mono text-base font-bold text-gray-900">{{ $o->order_no }}</span>
-                        @if ($o->is_red)<x-badge color="red">{{ __('Repack') }}</x-badge>
-                        @elseif ($o->is_orange)<x-badge color="amber">{{ __('New label') }}</x-badge>
-                        @elseif ($o->edited_after_pack)<x-badge color="purple">{{ __('Edited') }}</x-badge>@endif
-                    </p>
-                    <p class="mt-0.5 text-xs text-gray-500">
-                        {{ trans_choice(':count item|:count items', $o->items) }} · {{ $o->ship_district ?: $o->ship_thana ?: '-' }}
-                        @if ($o->moderator) · {{ __('by :n', ['n' => $o->moderator]) }}@endif
-                    </p>
-                </div>
-                <div class="shrink-0 text-right">
-                    <p class="text-sm font-semibold tabular-nums {{ $o->packing_sent_at && Carbon::parse($o->packing_sent_at)->lt(now()->subMinutes(30)) ? 'text-red-600' : 'text-gray-700' }}">{{ $wait($o->packing_sent_at) }}</p>
-                    <p class="text-xs text-gray-500">{{ $o->packer ? __('Packing: :n', ['n' => $o->packer]) : __('Waiting') }}</p>
+            <div @class(['overflow-hidden rounded-xl border bg-white',
+                'border-red-300' => $o->is_red, 'border-orange-300' => ! $o->is_red && $o->is_orange, 'border-gray-200' => ! $o->is_red && ! $o->is_orange])>
+                {{-- Tap to see what is inside. Looking does not start packing; scanning the label does. --}}
+                <button type="button" @click="peek({{ $o->id }})" @class(['flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-gray-50', 'bg-red-50/40' => $o->is_red])>
+                    <span class="min-w-0">
+                        <span class="flex flex-wrap items-center gap-2">
+                            <span class="font-mono text-base font-bold text-gray-900">{{ $o->order_no }}</span>
+                            @if ($o->is_red)<x-badge color="red">{{ __('Repack') }}</x-badge>
+                            @elseif ($o->is_orange)<x-badge color="amber">{{ __('New label') }}</x-badge>
+                            @elseif ($o->edited_after_pack)<x-badge color="purple">{{ __('Edited') }}</x-badge>@endif
+                        </span>
+                        <span class="mt-0.5 block text-xs text-gray-500">
+                            {{ trans_choice(':count item|:count items', $o->items) }} · {{ $o->ship_district ?: $o->ship_thana ?: '-' }}
+                            @if ($o->moderator) · {{ __('by :n', ['n' => $o->moderator]) }}@endif
+                        </span>
+                    </span>
+                    <span class="flex shrink-0 items-center gap-3">
+                        <span class="text-right">
+                            <span class="block text-sm font-semibold tabular-nums {{ $o->packing_sent_at && Carbon::parse($o->packing_sent_at)->lt(now()->subMinutes(30)) ? 'text-red-600' : 'text-gray-700' }}">{{ $wait($o->packing_sent_at) }}</span>
+                            <span class="block text-xs text-gray-500">{{ $o->packer ? __('Packing: :n', ['n' => $o->packer]) : __('Waiting') }}</span>
+                        </span>
+                        <svg class="h-4 w-4 text-gray-400 transition-transform" :class="open === {{ $o->id }} && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </span>
+                </button>
+
+                <div x-show="open === {{ $o->id }}" x-cloak class="border-t border-gray-100 bg-gray-50/60 px-4 py-3">
+                    <template x-if="!previews[{{ $o->id }}]"><p class="text-sm text-gray-400">{{ __('Loading…') }}</p></template>
+                    <template x-if="previews[{{ $o->id }}]?.error"><p class="text-sm text-red-600">{{ __('Could not load. Tap again.') }}</p></template>
+                    <template x-if="previews[{{ $o->id }}]?.items">
+                        <div>
+                            <p x-show="previews[{{ $o->id }}].repack" class="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{{ __('Edited after packing. Change the box:') }} <span x-text="previews[{{ $o->id }}].diff"></span></p>
+                            <div class="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
+                                <template x-for="i in previews[{{ $o->id }}].items" :key="i.id">
+                                    <div class="flex items-center justify-between gap-3 px-3 py-2.5">
+                                        <span class="min-w-0">
+                                            <span class="block text-sm font-medium text-gray-900" x-text="i.name"></span>
+                                            <span class="text-xs text-gray-500" x-show="i.shelf">{{ __('Shelf') }} <b x-text="i.shelf"></b></span>
+                                        </span>
+                                        <span class="shrink-0 text-base font-bold tabular-nums text-gray-900" x-text="'×' + i.qty"></span>
+                                    </div>
+                                </template>
+                            </div>
+                            <p class="mt-2 text-xs text-gray-500">
+                                <template x-if="previews[{{ $o->id }}].label && previews[{{ $o->id }}].label_current">
+                                    <span>{{ __('To start packing, scan its label:') }} <b class="font-mono text-gray-800" x-text="previews[{{ $o->id }}].label"></b><span x-show="!previews[{{ $o->id }}].label_printed"> · {{ __('not printed yet') }}</span></span>
+                                </template>
+                                <template x-if="previews[{{ $o->id }}].label && !previews[{{ $o->id }}].label_current">
+                                    <span class="font-medium text-orange-700">{{ __('The order changed: a new label must be printed before it can be scanned.') }}</span>
+                                </template>
+                            </p>
+                        </div>
+                    </template>
                 </div>
             </div>
         @empty

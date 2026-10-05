@@ -140,6 +140,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/packing', [PackingController::class, 'index'])->name('packing.index');
         Route::redirect('/packing/scan', '/packing')->name('packing.scan');
         Route::get('/packing/labels', [PackingController::class, 'labels'])->name('packing.labels');
+        Route::get('/packing/orders/{order}', [PackingController::class, 'preview'])->name('packing.preview');
         Route::get('/packing/batches/{batch}', [PackingController::class, 'batch'])->whereNumber('batch')->name('packing.batch');
         Route::post('/packing/report', [PackingController::class, 'report'])->name('packing.report');
         Route::get('/packing/issues', [PackingController::class, 'issues'])->name('packing.issues');

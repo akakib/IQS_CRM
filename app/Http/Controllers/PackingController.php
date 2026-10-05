@@ -111,6 +111,22 @@ class PackingController extends Controller
         return response()->json($scans->open($data['code'], $request->user()));
     }
 
+    /**
+     * Tap a card in the queue: what is in the order (items and shelves) and
+     * which label to scan. Looking does not claim it; scanning the label does.
+     */
+    public function preview(Order $order, ScanService $scans): JsonResponse
+    {
+        $label = DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')->first(['barcode', 'printed_at', 'order_version']);
+        $repack = $order->packMark() === 'repack';
+
+        return response()->json($scans->checklist($order, $repack) + [
+            'label' => $label->barcode ?? null,
+            'label_printed' => (bool) ($label->printed_at ?? false),
+            'label_current' => $label && (int) $label->order_version === (int) $order->current_version,
+        ]);
+    }
+
     /** Every item ticked: Packed. */
     public function pack(Order $order, Request $request, ScanService $scans): JsonResponse
     {

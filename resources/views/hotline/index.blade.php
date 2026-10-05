@@ -43,7 +43,7 @@
                     <p class="mt-3 text-sm"><b>{{ $o->ship_name }}</b> · <a href="tel:{{ $o->ship_phone }}" class="font-mono text-green-900">{{ $o->ship_phone }}</a>{{ $o->ship_alt_phone ? ' / '.$o->ship_alt_phone : '' }}</p>
                     <p class="text-sm text-gray-600">{{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}</p>
                     <p class="mt-2 text-sm text-gray-700">{{ $o->items->map(fn ($i) => $i->name_snapshot.' ×'.rtrim(rtrim($i->qty, '0'), '.'))->join(', ') }}</p>
-                    <p class="mt-2 text-sm">{{ __('Owner') }}: <b>{{ $o->owner?->name ?? __('nobody') }}</b></p>
+                    <p class="mt-2 text-sm">{{ __('Assigned to') }}: <b>{{ $o->moderator?->name ?? __('nobody') }}</b></p>
                     @foreach ($detail['issues'] as $i)
                         <p class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ __('Open issue: :t, due :d', ['t' => $types[$i->issue_type] ?? $i->issue_type, 'd' => \Illuminate\Support\Carbon::parse($i->sla_due_at)->diffForHumans()]) }}</p>
                     @endforeach
@@ -69,7 +69,7 @@
                 </x-card>
 
                 @can('hotline.create')
-                    <x-card :title="__('Bigger issue: send to the owner')" x-data="{ type: 'partial' }">
+                    <x-card :title="__('Bigger issue: send to the assigned moderator')" x-data="{ type: 'partial' }">
                         <form method="POST" action="{{ route('hotline.issue', $o) }}" class="space-y-2">
                             @csrf
                             <input type="hidden" name="issue_type" :value="type">

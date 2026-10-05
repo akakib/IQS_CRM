@@ -33,7 +33,7 @@ class OrderController extends Controller
             'tab' => ['take', 'mine', 'all'],
             'status' => $statusKeys,
             'channel' => ['web', 'messenger', 'whatsapp', 'phone', 'b2b'],
-            'owner' => 'int',
+            'moderator' => 'int',
             'from' => 'date',
             'to' => 'date',
         ], 'desc');
@@ -45,14 +45,14 @@ class OrderController extends Controller
 
         // Large, fast-growing list: simple pagination (no COUNT), indexed filters.
         $orders = Order::query()->visibleTo($user)
-            ->select(['id', 'order_no', 'channel', 'status_id', 'owner_id', 'ship_name', 'ship_phone', 'grand_total', 'cod_amount',
+            ->select(['id', 'order_no', 'channel', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'grand_total', 'cod_amount',
                 'is_duplicate_flag', 'packed_version', 'current_version', 'edited_after_pack', 'created_at'])
-            ->with('owner:id,name')
-            ->when($tab === 'take', fn ($w) => $w->whereNull('owner_id')->whereIn('status_id', $working))
-            ->when($tab === 'mine', fn ($w) => $w->where('owner_id', $user->id)->whereNotIn('status_id', $finals))
+            ->with('moderator:id,name')
+            ->when($tab === 'take', fn ($w) => $w->whereNull('moderator_id')->whereIn('status_id', $working))
+            ->when($tab === 'mine', fn ($w) => $w->where('moderator_id', $user->id)->whereNotIn('status_id', $finals))
             ->when($list->filter('status'), fn ($w, $k) => $w->where('status_id', OrderStatus::idFor($k)))
             ->when($list->filter('channel'), fn ($w, $c) => $w->where('channel', $c))
-            ->when($list->filter('owner'), fn ($w, $id) => $w->where('owner_id', $id))
+            ->when($list->filter('moderator'), fn ($w, $id) => $w->where('moderator_id', $id))
             ->when($list->filter('from'), fn ($w, $d) => $w->where('created_at', '>=', $d.' 00:00:00'))
             ->when($list->filter('to'), fn ($w, $d) => $w->where('created_at', '<=', $d.' 23:59:59'))
             ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s
@@ -64,8 +64,8 @@ class OrderController extends Controller
             ->withQueryString();
 
         $counts = [
-            'take' => Order::visibleTo($user)->whereNull('owner_id')->whereIn('status_id', $working)->count(),
-            'mine' => Order::where('owner_id', $user->id)->whereNotIn('status_id', $finals)->count(),
+            'take' => Order::visibleTo($user)->whereNull('moderator_id')->whereIn('status_id', $working)->count(),
+            'mine' => Order::where('moderator_id', $user->id)->whereNotIn('status_id', $finals)->count(),
         ];
 
         return view('orders.index', [
@@ -74,7 +74,7 @@ class OrderController extends Controller
             'tab' => $tab,
             'counts' => $counts,
             'statuses' => OrderStatus::map(),
-            'ownerOptions' => $user->permissionScope('orders.view') === 'all' ? User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
+            'moderatorOptions' => $user->permissionScope('orders.view') === 'all' ? User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
         ]);
     }
 
@@ -123,7 +123,7 @@ class OrderController extends Controller
         $user = $request->user();
         abort_unless(Order::visibleTo($user)->whereKey($order->id)->exists(), 403);
 
-        $order->load(['items', 'owner:id,name', 'zone:id,name', 'customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en']);
+        $order->load(['items', 'moderator:id,name', 'zone:id,name', 'customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en']);
         $notes = DB::table('order_notes as n')->leftJoin('users as u', 'u.id', '=', 'n.user_id')
             ->where('n.order_id', $order->id)->orderByDesc('n.id')->limit(200)
             ->get(['n.id', 'n.note_type', 'n.body', 'n.created_at', 'n.status_at_time_id', 'u.name as user']);
@@ -144,13 +144,13 @@ class OrderController extends Controller
             'verification' => $verification,
             'amendments' => $amendments,
             'canEdit' => OrderStatus::map()[$order->status_id]['edit_policy'] !== 'locked'
-                && ($order->owner_id === $user->id || $user->permissionScope('orders.view') === 'all') && $user->can('orders.edit'),
+                && ($order->moderator_id === $user->id || $user->permissionScope('orders.view') === 'all') && $user->can('orders.edit'),
             'notes' => $notes,
             'payments' => $payments,
             'statuses' => OrderStatus::map(),
             'targets' => $this->machine->allowedTargets($order, $user),
             'reasons' => ['cancel' => StatusReason::options('cancel'), 'hold' => StatusReason::options('hold'), 'status' => StatusReason::options('status'), 'return' => StatusReason::options('return'), 'reassign' => StatusReason::options('reassign')],
-            'canClaim' => $order->owner_id === null && in_array($order->status_id, OrderStatus::idsFor(['new', 'record_verified']), true) && $user->can('orders.edit'),
+            'canClaim' => $order->moderator_id === null && in_array($order->status_id, OrderStatus::idsFor(['new', 'record_verified']), true) && $user->can('orders.edit'),
             'staffOptions' => $user->can('orders.reassign') ? User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
         ]);
     }
@@ -167,7 +167,7 @@ class OrderController extends Controller
         $user = $request->user();
         abort_unless(Order::visibleTo($user)->whereKey($order->id)->exists(), 403);
         // Working an order you do not own is not allowed (except for those who see all orders).
-        abort_if($order->owner_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
+        abort_if($order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
 
         $data = $request->validate([
             'to' => ['required', 'string'],
@@ -205,7 +205,7 @@ class OrderController extends Controller
         $data = $request->validate(['user_id' => ['required', Rule::exists('users', 'id')->where('is_active', true)], 'reason_id' => ['required', Rule::exists('status_reasons', 'id')->where('reason_type', 'reassign')]]);
         $this->orders->reassign($order, $request->user(), User::findOrFail($data['user_id']), (int) $data['reason_id']);
 
-        return back()->with('success', __('Owner changed.'));
+        return back()->with('success', __('Reassigned.'));
     }
 
     public function verifyPayment(Order $order, int $payment, Request $request): RedirectResponse
@@ -265,7 +265,7 @@ class OrderController extends Controller
     private function authorizeWork(Order $order, User $user): void
     {
         abort_unless(Order::visibleTo($user)->whereKey($order->id)->exists(), 403);
-        abort_if($order->owner_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
+        abort_if($order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
     }
 
     /** Live delivery-charge preview for the order form (the server recomputes on save). */

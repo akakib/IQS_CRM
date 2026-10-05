@@ -10,9 +10,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Delivery issues: the order owner is responsible end-to-end. Opened by the
+ * Delivery issues: the assigned moderator is responsible end-to-end. Opened by the
  * hotline or by courier webhooks; each has an SLA; unhandled ones escalate
- * to managers (and count against the owner's KPI later).
+ * to managers (and count against the moderator's KPI later).
  */
 class DeliveryIssueService
 {
@@ -31,7 +31,7 @@ class DeliveryIssueService
         $id = DB::table('delivery_issues')->insertGetId([
             'order_id' => $order->id, 'shipment_id' => $shipmentId, 'issue_type' => $type,
             'rider_phone' => Phone::normalize($riderPhone), 'note' => $note, 'opened_by' => $by?->id,
-            'assigned_to' => $order->owner_id, 'sla_due_at' => now()->addMinutes((int) settings('orders.issue_sla_minutes')),
+            'assigned_to' => $order->moderator_id, 'sla_due_at' => now()->addMinutes((int) settings('orders.issue_sla_minutes')),
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
@@ -41,7 +41,7 @@ class DeliveryIssueService
         ]), $by, ['delivery_issue_id' => $id]);
 
         $this->notifications->send('delivery_issue', __(':no: :t', ['no' => $order->order_no, 't' => $label]), trim(($note ?? '').' '.($riderPhone ? __('Rider :p', ['p' => $riderPhone]) : '')), [
-            'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'order_owner_id' => $order->owner_id,
+            'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'order_moderator_id' => $order->moderator_id,
             'group_key' => 'delivery_issue:'.$order->id,
         ]);
 

@@ -90,15 +90,15 @@ class CourierWebhookTest extends TestCase
         $this->assertSame('ready_for_packaging', $this->key());
     }
 
-    public function test_hold_opens_a_delivery_issue_for_the_owner(): void
+    public function test_hold_opens_a_delivery_issue_for_the_moderator(): void
     {
         $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => $this->cn, 'status' => 'hold']);
 
         $issue = DB::table('delivery_issues')->where('order_id', $this->order->id)->first();
         $this->assertSame('hold', $issue->issue_type);
-        $this->assertSame($this->order->owner_id, $issue->assigned_to);
+        $this->assertSame($this->order->moderator_id, $issue->assigned_to);
         $this->assertNotNull($issue->sla_due_at);
-        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->order->owner_id, 'subject_type' => 'order', 'priority' => 'urgent']);
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->order->moderator_id, 'subject_type' => 'order', 'priority' => 'urgent']);
         $this->assertSame('ready_for_packaging', $this->key());
     }
 

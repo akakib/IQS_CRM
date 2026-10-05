@@ -60,7 +60,7 @@
                     @foreach (['in_stock' => __('In stock'), 'backorder' => __('Pre-order'), 'out_of_stock' => __('Out of stock')] as $key => $label)
                         <button type="button" @click="s = @js($key)" class="rounded-lg px-2.5 py-1 text-xs" :class="s === @js($key) ? 'bg-white text-gray-900' : 'bg-white/10'">{{ $label }}</button>
                     @endforeach
-                    <input type="date" name="expected_restock_date" x-show="s !== 'in_stock'" min="{{ now()->toDateString() }}" class="rounded-lg border-0 px-2 py-1 text-xs text-gray-900" aria-label="{{ __('Expected restock date') }}">
+                    <div x-show="s !== 'in_stock'" class="text-gray-900"><x-date-input name="expected_restock_date" :min="now()->toDateString()" :placeholder="__('Expected restock date')" size="sm" /></div>
                     <button type="submit" class="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-medium hover:bg-green-600">{{ __('Apply') }}</button>
                 </form>
             </x-slot:actions>

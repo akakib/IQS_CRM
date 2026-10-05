@@ -112,7 +112,7 @@
                 <form method="POST" action="{{ route('marketing.spend.store') }}" class="space-y-2">
                     @csrf
                     <x-simple-select name="ad_account_id" :options="$accountOptions" :value="array_key_first($accountOptions)" full-width class="w-full" />
-                    <input type="date" name="spend_date" required value="{{ today()->toDateString() }}" class="{{ $input }}">
+                    <x-date-input name="spend_date" :value="today()->toDateString()" :max="today()->toDateString()" :clearable="false" full-width />
                     <input type="number" name="spend_usd" step="0.01" min="0" required placeholder="{{ __('Spend (USD)') }}" class="{{ $input }}">
                     <div class="grid grid-cols-2 gap-2">
                         <input type="number" name="messages" min="0" placeholder="{{ __('Messages') }}" class="{{ $input }}">

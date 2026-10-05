@@ -16,7 +16,7 @@ class PointsEngine
 {
     /**
      * @param  array<string, mixed>  $context  condition inputs (see config/points.php fields)
-     * @param  array{order_owner?: ?int, actor?: ?int, packer?: ?int, previous_owner?: ?int}  $people
+     * @param  array{order_moderator?: ?int, actor?: ?int, packer?: ?int, previous_moderator?: ?int}  $people
      * @return int entries written
      */
     public function fire(string $trigger, ?Order $order, array $context, array $people): int

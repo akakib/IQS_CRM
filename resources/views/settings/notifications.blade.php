@@ -2,7 +2,7 @@
     $targetLabels = [
         'role' => __('Everyone with role'),
         'user' => __('One person'),
-        'order_owner' => __('The order owner'),
+        'order_moderator' => __('The assigned moderator'),
         'actor_manager' => __('Managers'),
     ];
     $priorityOptions = ['info' => __('Info'), 'normal' => __('Normal'), 'urgent' => __('Urgent')];

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('external_ref', 100)->nullable();          // WooCommerce order id
             $table->foreignId('customer_id')->constrained();
             $table->foreignId('status_id')->constrained('order_statuses');
-            $table->foreignId('owner_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('moderator_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->unsignedInteger('current_version')->default(1);
             $table->unsignedInteger('packed_version')->nullable();
@@ -64,7 +64,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['status_id', 'id']);
-            $table->index(['owner_id', 'status_id']);
+            $table->index(['moderator_id', 'status_id']);
             $table->index(['customer_id', 'id']);
             $table->index('created_at');
             $table->index(['channel', 'external_ref']);
@@ -154,12 +154,12 @@ return new class extends Migration
             $table->index(['to_status_id', 'created_at']);
         });
 
-        // Ownership history.
+        // Assignment history.
         Schema::create('order_assignments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained();
-            $table->enum('role', ['owner', 'temporary']);
+            $table->enum('role', ['moderator', 'temporary']);
             $table->enum('how', ['claimed', 'created', 'assigned', 'reassigned']);
             $table->foreignId('assigned_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('reason_id')->nullable()->constrained('status_reasons')->nullOnDelete();

@@ -1,7 +1,7 @@
 @php($pct = fn ($v) => $v === null ? '-' : $v.'%')
 
 <x-layouts.app :heading="__('KPI scorecard')">
-    <p class="mb-4 text-sm text-gray-500">{{ __('Order volume, speed and quality per order owner. Separate from points. Weights: volume :v%, speed :s%, quality :q% (Settings > General).', ['v' => $weights['volume'], 's' => $weights['speed'], 'q' => $weights['quality']]) }}</p>
+    <p class="mb-4 text-sm text-gray-500">{{ __('Order volume, speed and quality per assigned moderator. Separate from points. Weights: volume :v%, speed :s%, quality :q% (Settings > General).', ['v' => $weights['volume'], 's' => $weights['speed'], 'q' => $weights['quality']]) }}</p>
 
     <form method="GET" action="{{ route('kpi.index') }}" class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-3">
         <x-date-range :from="$from" :to="$to" />

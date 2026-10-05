@@ -42,7 +42,7 @@ class PointsController extends Controller
             'trigger_key' => ['required', Rule::in(array_keys(config('points.triggers')))],
             'name' => ['required', 'string', 'max:150'],
             'points' => ['required', 'numeric', 'between:-1000,1000', 'not_in:0'],
-            'recipient' => ['required', Rule::in(['order_owner', 'actor', 'packer', 'previous_owner'])],
+            'recipient' => ['required', Rule::in(['order_moderator', 'actor', 'packer', 'previous_moderator'])],
             'settle_on' => ['required', Rule::in(['immediate', 'order_final'])],
             'requires_delivery' => ['boolean'],
             'conditions' => ['array', 'max:6'],
@@ -210,20 +210,20 @@ class PointsController extends Controller
     public function storeQa(Request $request, Order $order): RedirectResponse
     {
         $data = $request->validate(['result' => ['required', Rule::in(['call_verified', 'not_called', 'wrong_info'])], 'note' => ['nullable', 'string', 'max:500']]);
-        abort_unless($order->owner_id, 422);
+        abort_unless($order->moderator_id, 422);
         if (DB::table('qa_reviews')->where('order_id', $order->id)->exists()) {
             return back()->with('error', __('This order was already checked.'));
         }
 
         DB::transaction(function () use ($order, $data, $request) {
             DB::table('qa_reviews')->insert([
-                'order_id' => $order->id, 'agent_id' => $order->owner_id, 'reviewer_id' => $request->user()->id,
+                'order_id' => $order->id, 'agent_id' => $order->moderator_id, 'reviewer_id' => $request->user()->id,
                 'result' => $data['result'], 'note' => $data['note'] ?? null, 'created_at' => now(),
             ]);
             // The customer says nobody called: a manager still confirms it on the flags tab.
             if ($data['result'] !== 'call_verified') {
                 DB::table('integrity_flags')->insert([
-                    'order_id' => $order->id, 'user_id' => $order->owner_id, 'flag_type' => 'qa_'.$data['result'], 'detected_by' => 'qa',
+                    'order_id' => $order->id, 'user_id' => $order->moderator_id, 'flag_type' => 'qa_'.$data['result'], 'detected_by' => 'qa',
                     'details' => $data['note'] ?? __('Call-back check failed.'), 'status' => 'open', 'created_at' => now(), 'updated_at' => now(),
                 ]);
             }
@@ -239,16 +239,16 @@ class PointsController extends Controller
      */
     private function qaSample(): Collection
     {
-        $rows = DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')->join('users as u', 'u.id', '=', 'o.owner_id')
+        $rows = DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')->join('users as u', 'u.id', '=', 'o.moderator_id')
             ->where('e.to_status_id', OrderStatus::idFor('confirmed'))->where('e.source', 'user')
             ->where('e.created_at', '>=', now()->subDays(7))
             ->whereNotExists(fn ($q) => $q->from('qa_reviews as q')->whereColumn('q.order_id', 'o.id'))
             ->orderByDesc('e.id')->limit(2000)
-            ->get(['o.id', 'o.order_no', 'o.owner_id', 'u.name as agent', 'o.ship_name', 'o.ship_phone', 'o.grand_total', 'e.created_at as confirmed_at'])
+            ->get(['o.id', 'o.order_no', 'o.moderator_id', 'u.name as agent', 'o.ship_name', 'o.ship_phone', 'o.grand_total', 'e.created_at as confirmed_at'])
             ->unique('id');
 
         $seed = now()->format('oW');
 
-        return $rows->groupBy('owner_id')->flatMap(fn ($g) => $g->sortBy(fn ($r) => crc32($seed.'-'.$r->id))->take(5))->values();
+        return $rows->groupBy('moderator_id')->flatMap(fn ($g) => $g->sortBy(fn ($r) => crc32($seed.'-'.$r->id))->take(5))->values();
     }
 }

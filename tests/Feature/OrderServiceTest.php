@@ -58,13 +58,13 @@ class OrderServiceTest extends TestCase
         ], $by ?? $this->agent);
     }
 
-    public function test_chat_order_is_created_with_totals_snapshot_and_owner(): void
+    public function test_chat_order_is_created_with_totals_snapshot_and_moderator(): void
     {
         $order = $this->make();
 
         $this->assertSame('IQ'.(10000 + $order->id), $order->order_no);
         $this->assertSame('new', OrderStatus::map()[$order->status_id]['key']);
-        $this->assertSame($this->agent->id, $order->owner_id);
+        $this->assertSame($this->agent->id, $order->moderator_id);
         $this->assertSame('1200.00', $order->subtotal);
         $this->assertSame('90.00', $order->delivery_charge); // 1100 g inside Dhaka
         $this->assertSame('1290.00', $order->grand_total);
@@ -104,10 +104,10 @@ class OrderServiceTest extends TestCase
     {
         $web1 = $this->make([], null, 'web');
         $web2 = $this->make(['phone' => '01812345678'], null, 'web');
-        $this->assertNull($web1->owner_id);
+        $this->assertNull($web1->moderator_id);
 
         app(OrderService::class)->claim($web1, $this->agent);
-        $this->assertSame($this->agent->id, $web1->fresh()->owner_id);
+        $this->assertSame($this->agent->id, $web1->fresh()->moderator_id);
 
         try {
             app(OrderService::class)->claim($web2, $this->agent);
@@ -132,7 +132,7 @@ class OrderServiceTest extends TestCase
         $sm->transition($web1, 'confirmed', $this->agent, 'user');
 
         app(OrderService::class)->claim($web2, $this->agent);
-        $this->assertSame($this->agent->id, $web2->fresh()->owner_id);
+        $this->assertSame($this->agent->id, $web2->fresh()->moderator_id);
     }
 
     public function test_state_machine_rules_reasons_and_events(): void
@@ -209,11 +209,11 @@ class OrderServiceTest extends TestCase
     {
         $order = $this->make();
         $other = User::factory()->create(['name' => 'Pranto']);
-        $reason = DB::table('status_reasons')->where('reason_type', 'reassign')->where('system_key', 'owner_error')->value('id');
+        $reason = DB::table('status_reasons')->where('reason_type', 'reassign')->where('system_key', 'moderator_error')->value('id');
 
         app(OrderService::class)->reassign($order, $this->owner(), $other, $reason);
 
-        $this->assertSame($other->id, $order->fresh()->owner_id);
+        $this->assertSame($other->id, $order->fresh()->moderator_id);
         $this->assertNotNull(DB::table('order_assignments')->where('order_id', $order->id)->where('user_id', $this->agent->id)->value('ended_at'));
         $this->assertDatabaseHas('order_assignments', ['order_id' => $order->id, 'user_id' => $other->id, 'how' => 'reassigned', 'reason_id' => $reason]);
     }

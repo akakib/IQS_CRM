@@ -22,7 +22,7 @@ class ReportController extends Controller
 
         if ($user->can('orders.view')) {
             $tiles[] = [__('Orders today'), DB::table('orders')->where('created_at', '>=', $today)->count(), route('orders.index'), null];
-            $tiles[] = [__('Waiting to be taken'), DB::table('orders')->whereNull('owner_id')->where('status_id', OrderStatus::idFor('new'))->count(), route('orders.queue'), null];
+            $tiles[] = [__('Waiting to be taken'), DB::table('orders')->whereNull('moderator_id')->where('status_id', OrderStatus::idFor('new'))->count(), route('orders.queue'), null];
             $tiles[] = [__('Confirmed today'), $todayCount('confirmed'), null, null];
             $tiles[] = [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null];
         }
@@ -38,7 +38,7 @@ class ReportController extends Controller
         }
         $myPoints = (float) DB::table('point_ledger')->where('user_id', $user->id)->where('status', 'final')->where('created_at', '>=', now()->startOfMonth())->sum('points');
 
-        return view('dashboard', ['tiles' => $tiles, 'myPoints' => $myPoints, 'myWorking' => DB::table('orders')->where('owner_id', $user->id)
+        return view('dashboard', ['tiles' => $tiles, 'myPoints' => $myPoints, 'myWorking' => DB::table('orders')->where('moderator_id', $user->id)
             ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->get(['id', 'order_no', 'ship_name'])]);
     }
 
@@ -61,7 +61,7 @@ class ReportController extends Controller
         return view('reports.analysis', [
             'totals' => $profit->totals($from, $to, $channel),
             'rows' => $rows,
-            'owners' => $group === 'owner' ? DB::table('users')->whereIn('id', collect($rows->items())->pluck('g')->filter())->pluck('name', 'id') : collect(),
+            'moderators' => $group === 'moderator' ? DB::table('users')->whereIn('id', collect($rows->items())->pluck('g')->filter())->pluck('name', 'id') : collect(),
             'group' => $group, 'channel' => $channel, 'from' => $from, 'to' => $to, 'perPage' => $perPage,
             'seeProfit' => $request->user()->canSeeField('profit'),
             'seeCost' => $request->user()->canSeeField('cost_price'),

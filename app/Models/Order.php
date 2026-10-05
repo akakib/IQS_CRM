@@ -45,9 +45,9 @@ class Order extends Model
         return $this->belongsTo(OrderStatus::class, 'status_id');
     }
 
-    public function owner(): BelongsTo
+    public function moderator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'owner_id');
+        return $this->belongsTo(User::class, 'moderator_id');
     }
 
     public function zone(): BelongsTo
@@ -83,8 +83,8 @@ class Order extends Model
     {
         return match ($user->permissionScope('orders.view')) {
             'all' => $query,
-            'own', 'team' => $query->where(fn ($q) => $q->where('orders.owner_id', $user->id)
-                ->orWhere(fn ($q) => $q->whereNull('orders.owner_id')->whereIn('orders.status_id', OrderStatus::idsFor(['new', 'record_verified'])))),
+            'own', 'team' => $query->where(fn ($q) => $q->where('orders.moderator_id', $user->id)
+                ->orWhere(fn ($q) => $q->whereNull('orders.moderator_id')->whereIn('orders.status_id', OrderStatus::idsFor(['new', 'record_verified'])))),
             default => $query->whereRaw('1 = 0'),
         };
     }

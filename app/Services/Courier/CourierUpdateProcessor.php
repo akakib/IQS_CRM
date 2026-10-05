@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Applies one courier update (webhook or re-sync) to its order:
  * tracking messages go to the timeline; delivery statuses move the order
- * (system source) or open a delivery issue for the owner when a decision
+ * (system source) or open a delivery issue for the assigned moderator when a decision
  * is needed (hold, partial / cancel waiting for approval, unknown).
  */
 class CourierUpdateProcessor
@@ -128,13 +128,13 @@ class CourierUpdateProcessor
         }
         $id = DB::table('delivery_issues')->insertGetId([
             'order_id' => $order->id, 'shipment_id' => $shipment->id, 'issue_type' => $type, 'note' => $note,
-            'opened_by' => null, 'assigned_to' => $order->owner_id,
+            'opened_by' => null, 'assigned_to' => $order->moderator_id,
             'sla_due_at' => now()->addMinutes((int) settings('orders.issue_sla_minutes')),
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->orders->note($order, 'courier', $note, null, ['delivery_issue_id' => $id]);
         $this->notifications->send('delivery_issue', __(':no: :n', ['no' => $order->order_no, 'n' => $note]), $order->ship_name, [
-            'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'order_owner_id' => $order->owner_id,
+            'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'order_moderator_id' => $order->moderator_id,
             'group_key' => 'delivery_issue:'.$order->id,
         ]);
     }

@@ -17,7 +17,7 @@
                         <span class="text-sm text-gray-600">· {{ $i->ship_name }} · ৳{{ number_format((float) $i->cod_amount) }}</span>
                         <p class="text-sm text-gray-800">{{ ucfirst(str_replace('_', ' ', $i->issue_type)) }}{{ $i->note ? ': '.$i->note : '' }}</p>
                         @if ($i->rider_phone)<a href="tel:{{ $i->rider_phone }}" class="text-xs text-green-900">☎ {{ __('Rider') }} {{ $i->rider_phone }}</a>@endif
-                        @if ($all)<p class="text-xs text-gray-500">{{ __('Owner') }}: {{ $i->owner ?? '-' }}</p>@endif
+                        @if ($all)<p class="text-xs text-gray-500">{{ __('Assigned to') }}: {{ $i->moderator ?? '-' }}</p>@endif
                     </div>
                     <x-badge :color="$due->isPast() ? 'red' : 'amber'">{{ $due->isPast() ? __('Overdue :t', ['t' => $due->diffForHumans(null, true)]) : __('Due in :t', ['t' => $due->diffForHumans(null, true)]) }}</x-badge>
                 </div>

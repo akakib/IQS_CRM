@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
-/** Rider hotline: find a parcel fast, solve small things here, hand big ones to the owner. */
+/** Rider hotline: find a parcel fast, solve small things here, hand big ones to the assigned moderator. */
 class HotlineController extends Controller
 {
     public function index(Request $request): View
@@ -25,8 +25,8 @@ class HotlineController extends Controller
             $digits = preg_replace('/\D/', '', $q);
             $phone = Phone::normalize($q);
             $results = Order::query()
-                ->select(['orders.id', 'order_no', 'status_id', 'owner_id', 'ship_name', 'ship_phone', 'cod_amount', 'created_at', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag'])
-                ->with('owner:id,name')
+                ->select(['orders.id', 'order_no', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'cod_amount', 'created_at', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag'])
+                ->with('moderator:id,name')
                 ->where(fn ($w) => $w
                     ->where('order_no', strtoupper($q))
                     ->when($phone, fn ($w) => $w->orWhere('ship_phone', $phone)->orWhere('ship_alt_phone', $phone))
@@ -38,7 +38,7 @@ class HotlineController extends Controller
         $selected = $results->count() === 1 ? $results->first() : ($request->integer('order') ? Order::find($request->integer('order')) : null);
         $detail = null;
         if ($selected) {
-            $selected->load(['items:id,order_id,name_snapshot,qty,unit', 'owner:id,name']);
+            $selected->load(['items:id,order_id,name_snapshot,qty,unit', 'moderator:id,name']);
             $detail = [
                 'order' => $selected,
                 'shipment' => DB::table('shipments')->where('id', $selected->active_shipment_id)->first(['consignment_id', 'courier_status', 'cod_amount']),
@@ -68,7 +68,7 @@ class HotlineController extends Controller
         ]);
         $issues->open($order, $data['issue_type'], $data['rider_phone'] ?? null, $data['note'] ?? null, $request->user());
 
-        return back()->with('success', __('Sent to :n with a timer.', ['n' => $order->owner?->name ?? __('the managers')]));
+        return back()->with('success', __('Sent to :n with a timer.', ['n' => $order->moderator?->name ?? __('the managers')]));
     }
 
     public function issues(Request $request): View
@@ -80,7 +80,7 @@ class HotlineController extends Controller
             ->whereNull('i.resolved_at')
             ->when(! $all, fn ($q) => $q->where('i.assigned_to', $user->id))
             ->orderBy('i.sla_due_at')
-            ->get(['i.*', 'o.order_no', 'o.ship_name', 'o.cod_amount', 'u.name as owner']);
+            ->get(['i.*', 'o.order_no', 'o.ship_name', 'o.cod_amount', 'u.name as moderator']);
 
         return view('hotline.issues', ['issues' => $issues, 'all' => $all]);
     }

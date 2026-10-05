@@ -1,9 +1,9 @@
 @php
     $tk = fn ($v) => '৳'.number_format((float) $v);
-    $groups = ['day' => __('By day'), 'channel' => __('By channel'), 'owner' => __('By person'), 'product' => __('By product'), 'category' => __('By category')];
+    $groups = ['day' => __('By day'), 'channel' => __('By channel'), 'moderator' => __('By moderator'), 'product' => __('By product'), 'category' => __('By category')];
     $lineLevel = in_array($group, ['product', 'category'], true);
     $label = fn ($r) => match ($group) {
-        'owner' => $owners[$r->g] ?? __('Nobody'),
+        'moderator' => $moderators[$r->g] ?? __('Nobody'),
         'channel' => ucfirst($r->g),
         'day' => \Illuminate\Support\Carbon::parse($r->g)->format('d M Y'),
         default => $r->label ?? __('Uncategorised'),

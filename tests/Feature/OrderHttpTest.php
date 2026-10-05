@@ -60,7 +60,7 @@ class OrderHttpTest extends TestCase
         ])->assertRedirect();
 
         $order = Order::first();
-        $this->assertSame($this->agent->id, $order->owner_id);
+        $this->assertSame($this->agent->id, $order->moderator_id);
         $this->assertSame('whatsapp', $order->channel);
         $this->assertSame('130.00', $order->delivery_charge);
     }
@@ -79,7 +79,7 @@ class OrderHttpTest extends TestCase
         $this->actingAs($this->agent)->get('/orders?tab=take')->assertOk()->assertSee($order->order_no);
         $this->get("/orders/{$order->id}")->assertOk()->assertSee('Assign to me');
         $this->post("/orders/{$order->id}/claim")->assertSessionHas('success');
-        $this->assertSame($this->agent->id, $order->fresh()->owner_id);
+        $this->assertSame($this->agent->id, $order->fresh()->moderator_id);
         $this->get('/orders?tab=mine')->assertSee($order->order_no);
     }
 

@@ -112,13 +112,13 @@ class NotificationTest extends TestCase
         $this->assertSame(3, (int) DB::table('app_notifications')->where('user_id', $user->id)->value('group_count'));
     }
 
-    public function test_order_owner_target_and_telegram_delivery_is_queued(): void
+    public function test_order_moderator_target_and_telegram_delivery_is_queued(): void
     {
         Queue::fake();
         $owner = User::factory()->create(['telegram_user_id' => '12345']);
-        $this->rule('delivery_issue', ['target' => 'order_owner', 'channel_telegram' => true]);
+        $this->rule('delivery_issue', ['target' => 'order_moderator', 'channel_telegram' => true]);
 
-        $this->service()->send('delivery_issue', 'Customer not answering', null, ['order_owner_id' => $owner->id]);
+        $this->service()->send('delivery_issue', 'Customer not answering', null, ['order_moderator_id' => $owner->id]);
 
         $this->assertDatabaseHas('notification_deliveries', ['channel' => 'telegram', 'status' => 'queued']);
         Queue::assertPushed(SendNotificationDelivery::class);

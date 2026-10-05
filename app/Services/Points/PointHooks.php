@@ -71,37 +71,37 @@ class PointHooks
     {
         return match ($trigger) {
             'order_packed' => ['packer' => $actor?->id],
-            'order_delivered', 'order_partial', 'order_returned' => ['order_owner' => $order->owner_id, 'packer' => $this->packer($order)],
-            default => ['order_owner' => $order->owner_id, 'actor' => $actor?->id],
+            'order_delivered', 'order_partial', 'order_returned' => ['order_moderator' => $order->moderator_id, 'packer' => $this->packer($order)],
+            default => ['order_moderator' => $order->moderator_id, 'actor' => $actor?->id],
         };
     }
 
     public function claimed(Order $order, User $user): void
     {
-        $this->engine->fire('order_claimed', $order, $this->context('order_claimed', $order, $user), ['order_owner' => $user->id, 'actor' => $user->id]);
+        $this->engine->fire('order_claimed', $order, $this->context('order_claimed', $order, $user), ['order_moderator' => $user->id, 'actor' => $user->id]);
     }
 
-    public function reassigned(Order $order, ?int $previousOwner, int $reasonId): void
+    public function reassigned(Order $order, ?int $previousModerator, int $reasonId): void
     {
         $blame = DB::table('status_reasons')->where('id', $reasonId)->value('blame_stage') ?? 'none';
-        $this->engine->fire('order_reassigned', $order, ['blame' => $blame], ['previous_owner' => $previousOwner, 'order_owner' => $order->owner_id]);
+        $this->engine->fire('order_reassigned', $order, ['blame' => $blame], ['previous_moderator' => $previousModerator, 'order_moderator' => $order->moderator_id]);
     }
 
     public function amended(Order $order, int $reasonId, bool $afterPack): void
     {
         $blame = DB::table('status_reasons')->where('id', $reasonId)->value('blame_stage') ?? 'none';
         // Counted once per order and rule (the ledger is unique per order + rule + person).
-        $this->engine->fire('amendment', $order, ['blame' => $blame, 'after_pack' => $afterPack], ['order_owner' => $order->owner_id ?? $order->created_by]);
+        $this->engine->fire('amendment', $order, ['blame' => $blame, 'after_pack' => $afterPack], ['order_moderator' => $order->moderator_id ?? $order->created_by]);
     }
 
     public function escalated(Order $order): void
     {
-        $this->engine->fire('issue_escalated', $order, [], ['order_owner' => $order->owner_id]);
+        $this->engine->fire('issue_escalated', $order, [], ['order_moderator' => $order->moderator_id]);
     }
 
     public function fakeStatus(?Order $order, int $userId): void
     {
-        $this->engine->fire('fake_status', $order, [], ['actor' => $userId, 'order_owner' => $userId]);
+        $this->engine->fire('fake_status', $order, [], ['actor' => $userId, 'order_moderator' => $userId]);
     }
 
     /** Integrity: a web order confirmed seconds after taking it is not a real call. Manager reviews it. */
@@ -126,7 +126,7 @@ class PointHooks
 
     private function minutesSinceClaim(Order $order): ?float
     {
-        $claimedAt = DB::table('order_assignments')->where('order_id', $order->id)->where('user_id', $order->owner_id)->orderByDesc('id')->value('started_at');
+        $claimedAt = DB::table('order_assignments')->where('order_id', $order->id)->where('user_id', $order->moderator_id)->orderByDesc('id')->value('started_at');
         $confirmedAt = DB::table('order_events')->where('order_id', $order->id)->where('to_status_id', OrderStatus::idFor('confirmed'))->orderByDesc('id')->value('created_at');
 
         return $claimedAt ? round(\Illuminate\Support\Carbon::parse($claimedAt)->diffInSeconds($confirmedAt ? \Illuminate\Support\Carbon::parse($confirmedAt) : now(), true) / 60, 1) : null;
@@ -137,7 +137,7 @@ class PointHooks
         return DB::table('order_events')->where('order_id', $order->id)->where('to_status_id', OrderStatus::idFor('confirmed'))->orderByDesc('id')->value('source') === 'rule';
     }
 
-    /** Not verified by the rules = the owner chose to send a risky order. */
+    /** Not verified by the rules = the moderator chose to send a risky order. */
     private function risky(Order $order): bool
     {
         $outcome = DB::table('verification_runs')->where('order_id', $order->id)->orderByDesc('id')->value('outcome');

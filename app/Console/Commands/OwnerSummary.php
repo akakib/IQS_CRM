@@ -30,7 +30,7 @@ class OwnerSummary extends Command
             .__('Revenue: :r', ['r' => $tk($t['revenue'])])."\n"
             .__('Ad cost: :a', ['a' => $tk((float) DB::table('ad_spend_daily')->where('spend_date', $day)->sum('bdt_cost'))])."\n"
             .__('Profit after ads: :p', ['p' => $tk($t['profit'])])."\n"
-            .__('Still waiting to be taken: :n', ['n' => DB::table('orders')->whereNull('owner_id')->where('status_id', OrderStatus::idFor('new'))->count()]);
+            .__('Still waiting to be taken: :n', ['n' => DB::table('orders')->whereNull('moderator_id')->where('status_id', OrderStatus::idFor('new'))->count()]);
 
         $issues = DB::table('delivery_issues')->whereNull('resolved_at')->count();
         $flags = DB::table('integrity_flags')->where('status', 'open')->count();

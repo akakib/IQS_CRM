@@ -106,7 +106,7 @@ class PermissionTest extends TestCase
     {
         Schema::create('test_notes', function (Blueprint $t) {
             $t->id();
-            $t->foreignId('owner_id');
+            $t->foreignId('moderator_id');
             $t->string('body');
         });
         $note = new class extends Model
@@ -125,7 +125,7 @@ class PermissionTest extends TestCase
         $alice = User::factory()->create();
         $bob = User::factory()->create();
         $this->giveRole($alice, $this->role(['notes.view' => 'own']));
-        $note->newQuery()->insert([['owner_id' => $alice->id, 'body' => 'mine'], ['owner_id' => $bob->id, 'body' => 'theirs']]);
+        $note->newQuery()->insert([['moderator_id' => $alice->id, 'body' => 'mine'], ['moderator_id' => $bob->id, 'body' => 'theirs']]);
 
         $this->assertSame(['mine'], $note->newQuery()->visibleTo($alice, 'notes.view')->pluck('body')->all());
         $this->assertSame([], $note->newQuery()->visibleTo($bob, 'notes.view')->pluck('body')->all());

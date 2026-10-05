@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('trigger_key', 50)->index();
             $table->string('name', 150);
             $table->decimal('points', 8, 2);                         // + or -
-            $table->enum('recipient', ['order_owner', 'actor', 'packer', 'previous_owner']);
+            $table->enum('recipient', ['order_moderator', 'actor', 'packer', 'previous_moderator']);
             $table->enum('settle_on', ['immediate', 'order_final'])->default('order_final');
             $table->boolean('requires_delivery')->default(false);   // revoked if the order ends not delivered
             $table->boolean('is_active')->default(true);

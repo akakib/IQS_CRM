@@ -86,7 +86,7 @@
                     <form method="POST" action="{{ route('usd-lots.store') }}" class="space-y-2">
                         @csrf
                         <x-simple-select name="vendor_id" :options="$vendorOptions" :value="array_key_first($vendorOptions)" full-width class="w-full" />
-                        <input type="date" name="purchased_on" required value="{{ old('purchased_on', today()->toDateString()) }}" class="{{ $input }}">
+                        <x-date-input name="purchased_on" :value="old('purchased_on', today()->toDateString())" :max="today()->toDateString()" :clearable="false" full-width />
                         <div class="grid grid-cols-2 gap-2">
                             <input type="number" name="usd" x-model="usd" step="0.01" min="1" required placeholder="{{ __('USD') }}" class="{{ $input }}">
                             <input type="number" name="rate" x-model="rate" step="0.01" min="50" required placeholder="{{ __('Rate (৳ per $)') }}" class="{{ $input }}">
@@ -97,9 +97,9 @@
                             <x-simple-select name="payment_method_id" :options="['' => __('How it was paid')] + $methods" value="" full-width class="w-full" />
                             <input name="transaction_ref" maxlength="100" placeholder="{{ __('Transaction ID') }}" class="{{ $input }}">
                         </div>
-                        <label class="block text-xs text-gray-500" x-show="!(usd && rate) || paid < usd * rate">{{ __('Rest due on') }}
-                            <input type="date" name="due_date" class="{{ $input }} mt-1">
-                        </label>
+                        <div x-show="!(usd && rate) || paid < usd * rate">
+                            <x-date-input name="due_date" :value="old('due_date')" :min="today()->toDateString()" :placeholder="__('Rest due on')" full-width />
+                        </div>
                         <input name="note" maxlength="255" placeholder="{{ __('Note (optional)') }}" class="{{ $input }}">
                         <x-button class="w-full">{{ __('Save lot') }}</x-button>
                     </form>
@@ -110,7 +110,7 @@
                         @csrf
                         <x-simple-select name="vendor_id" :options="$vendorOptions" :value="array_key_first($vendorOptions)" full-width class="w-full" />
                         <input type="number" name="amount_bdt" step="0.01" min="1" required placeholder="{{ __('Amount (৳)') }}" class="{{ $input }}">
-                        <input type="date" name="paid_on" required value="{{ today()->toDateString() }}" class="{{ $input }}">
+                        <x-date-input name="paid_on" :value="today()->toDateString()" :max="today()->toDateString()" :clearable="false" full-width />
                         <x-simple-select name="payment_method_id" :options="$methods" :value="array_key_first($methods)" full-width class="w-full" />
                         <input name="transaction_ref" maxlength="100" placeholder="{{ __('Transaction ID') }}" class="{{ $input }}">
                         <x-button size="sm" class="w-full">{{ __('Record payment') }}</x-button>

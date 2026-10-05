@@ -27,7 +27,7 @@ return new class extends Migration
         Schema::create('notification_rules', function (Blueprint $table) {
             $table->id();
             $table->foreignId('type_id')->constrained('notification_types')->cascadeOnDelete();
-            $table->enum('target', ['role', 'user', 'order_owner', 'actor_manager']);
+            $table->enum('target', ['role', 'user', 'order_moderator', 'actor_manager']);
             $table->foreignId('role_id')->nullable()->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
             $table->boolean('channel_in_app')->default(true);

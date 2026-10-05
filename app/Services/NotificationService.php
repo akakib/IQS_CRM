@@ -12,14 +12,14 @@ use Illuminate\Support\Facades\DB;
  *
  *   app(NotificationService::class)->send('delivery_issue', 'Rider: customer not answering', null, [
  *       'link' => route('orders.show', $order), 'subject' => ['order', $order->id],
- *       'order_owner_id' => $order->owner_id, 'group_key' => 'delivery_issue:'.$order->id,
+ *       'order_moderator_id' => $order->moderator_id, 'group_key' => 'delivery_issue:'.$order->id,
  *   ]);
  */
 class NotificationService
 {
     /**
      * @param  array{link?: string, subject?: array{0: string, 1: int}, group_key?: string, priority?: string,
-     *               order_owner_id?: int|null, user_ids?: list<int>}  $opts
+     *               order_moderator_id?: int|null, user_ids?: list<int>}  $opts
      * @return int number of people notified
      */
     public function send(string $typeKey, string $title, ?string $body = null, array $opts = []): int
@@ -120,7 +120,7 @@ class NotificationService
             match ($rule->target) {
                 'role' => $add($this->usersWithRole(fn ($q) => $q->where('r.id', $rule->role_id)), $rule),
                 'user' => $add(array_filter([$rule->user_id]), $rule),
-                'order_owner' => $add(array_filter([$opts['order_owner_id'] ?? null]), $rule),
+                'order_moderator' => $add(array_filter([$opts['order_moderator_id'] ?? null]), $rule),
                 'actor_manager' => $add($this->usersWithRole(fn ($q) => $q->where('r.system_key', 'manager')), $rule),
             };
         }

@@ -57,7 +57,7 @@ class HotlineTest extends TestCase
         $this->cn = DB::table('shipments')->where('order_id', $order->id)->value('consignment_id');
     }
 
-    public function test_hotline_finds_by_cn_and_phone_and_shows_cod_owner_items(): void
+    public function test_hotline_finds_by_cn_and_phone_and_shows_cod_moderator_items(): void
     {
         $this->actingAs($this->owner());
 
@@ -65,7 +65,7 @@ class HotlineTest extends TestCase
         $this->get('/hotline?q=+8801712345678')->assertSee($this->order->order_no);
     }
 
-    public function test_bigger_issue_goes_to_the_owner_with_a_timer_and_escalates_when_late(): void
+    public function test_bigger_issue_goes_to_the_moderator_with_a_timer_and_escalates_when_late(): void
     {
         $this->actingAs($this->owner());
         $this->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'partial', 'rider_phone' => '01811111111', 'note' => 'Wants only one item'])

@@ -94,8 +94,8 @@ class OrderConfigSeeder extends Seeder
         ['return', 'Courier failed', 'courier', 'courier_failed', 'manual'],
         ['return', 'Returned, reason not set yet', 'none', 'unclassified', 'manual'],
         ['status', 'Reopened by mistake', 'none', 'reopen', 'manual'],
-        ['reassign', 'Owner on leave or off shift', 'none', 'on_leave', 'manual'],
-        ['reassign', 'Owner could not handle it', 'sales', 'owner_error', 'manual'],
+        ['reassign', 'Moderator on leave or off shift', 'none', 'on_leave', 'manual'],
+        ['reassign', 'Moderator could not handle it', 'sales', 'moderator_error', 'manual'],
         ['reassign', 'Workload balance', 'none', 'workload', 'manual'],
     ];
 

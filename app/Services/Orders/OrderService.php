@@ -13,7 +13,7 @@ use App\Support\Phone;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Creating orders, ownership (claim / reassign), notes and payments. */
+/** Creating orders, assignment (claim / reassign), notes and payments. */
 class OrderService
 {
     public function __construct(
@@ -72,7 +72,7 @@ class OrderService
                 'external_ref' => $data['external_ref'] ?? null,
                 'customer_id' => $customer->id,
                 'status_id' => OrderStatus::idFor('new'),
-                'owner_id' => $isChat ? $by?->id : null,
+                'moderator_id' => $isChat ? $by?->id : null,
                 'created_by' => $by?->id,
                 'ship_name' => trim($data['name'] ?: $customer->name),
                 'ship_phone' => $phone,
@@ -117,7 +117,7 @@ class OrderService
 
             app(\App\Services\Tracking\TrackingService::class)->handle($order, 'order_created');
 
-            if (! $order->owner_id) {
+            if (! $order->moderator_id) {
                 $this->notifications->send('new_order', __('New order :no · ৳:t', ['no' => $order->order_no, 't' => number_format((float) $order->grand_total)]),
                     $order->ship_name, ['link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'group_key' => 'new_order']);
             }
@@ -132,15 +132,15 @@ class OrderService
      */
     public function claim(Order $order, User $user): Order
     {
-        $working = DB::table('orders')->where('owner_id', $user->id)
+        $working = DB::table('orders')->where('moderator_id', $user->id)
             ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->count();
         if ($working >= (int) settings('orders.max_working_orders')) {
             throw ValidationException::withMessages(['order' => __('Finish your current order first (confirm, hold, no answer or cancel it).')]);
         }
 
         // Atomic: of two people pressing at once, exactly one wins.
-        $won = DB::table('orders')->where('id', $order->id)->whereNull('owner_id')
-            ->update(['owner_id' => $user->id, 'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now()]);
+        $won = DB::table('orders')->where('id', $order->id)->whereNull('moderator_id')
+            ->update(['moderator_id' => $user->id, 'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now()]);
         if (! $won) {
             throw ValidationException::withMessages(['order' => __('Someone else took this order a moment ago.')]);
         }
@@ -153,19 +153,19 @@ class OrderService
         return $order;
     }
 
-    /** Admin only: move ownership, with a reason (it can count against the previous owner). */
+    /** Admin only: move the order to another moderator, with a reason (it can count against the previous one). */
     public function reassign(Order $order, User $by, User $to, int $reasonId): Order
     {
         return DB::transaction(function () use ($order, $by, $to, $reasonId) {
-            $previous = $order->owner_id;
+            $previous = $order->moderator_id;
             DB::table('order_assignments')->where('order_id', $order->id)->whereNull('ended_at')->update(['ended_at' => now()]);
-            $order->forceFill(['owner_id' => $to->id, 'lock_version' => $order->lock_version + 1])->save();
+            $order->forceFill(['moderator_id' => $to->id, 'lock_version' => $order->lock_version + 1])->save();
             $this->openAssignment($order, $to->id, 'reassigned', $by->id, $reasonId);
 
             $reason = DB::table('status_reasons')->where('id', $reasonId)->value('label_en');
             $from = $previous ? DB::table('users')->where('id', $previous)->value('name') : __('nobody');
-            $this->note($order, 'assignment', __('Owner changed from :a to :b · :r', ['a' => $from, 'b' => $to->name, 'r' => $reason]), $by,
-                ['previous_owner_id' => $previous, 'reason_id' => $reasonId]);
+            $this->note($order, 'assignment', __('Reassigned from :a to :b · :r', ['a' => $from, 'b' => $to->name, 'r' => $reason]), $by,
+                ['previous_moderator_id' => $previous, 'reason_id' => $reasonId]);
             $order->refresh();
             app(\App\Services\Points\PointHooks::class)->reassigned($order, $previous, $reasonId);
 
@@ -273,7 +273,7 @@ class OrderService
     private function openAssignment(Order $order, int $userId, string $how, ?int $by, ?int $reasonId = null): void
     {
         DB::table('order_assignments')->insert([
-            'order_id' => $order->id, 'user_id' => $userId, 'role' => 'owner', 'how' => $how,
+            'order_id' => $order->id, 'user_id' => $userId, 'role' => 'moderator', 'how' => $how,
             'assigned_by' => $by, 'reason_id' => $reasonId, 'started_at' => now(),
         ]);
     }

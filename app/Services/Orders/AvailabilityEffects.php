@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * When a variant's availability changes:
  * - Out of stock / Pre-order: open, unpacked orders containing it move to
- *   Hold (stock out / stock arriving); the owner gets a task. A booked order
+ *   Hold (stock out / stock arriving); the assigned moderator gets a task. A booked order
  *   also gets a "cancel the booking" note for the courier desk.
  * - Back in stock: orders waiting on Hold "stock arriving" whose items are
  *   all sellable again are released to Confirmed, oldest first.
@@ -42,7 +42,7 @@ class AvailabilityEffects
                 $this->orders->note($order, 'courier', __('Booked parcel is on hold: cancel or keep the Steadfast booking.'), null);
             }
             $this->notifications->send('order_held_for_stock', __(':no on hold: offer a substitute or wait', ['no' => $order->order_no]), null, [
-                'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => array_filter([$order->owner_id]),
+                'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => array_filter([$order->moderator_id]),
             ]);
         }
     }

@@ -73,7 +73,7 @@ class ReportsTest extends TestCase
         $this->assertEqualsWithDelta($cod - 800 - $delivery - $cod / 100 - 20, $t['profit'], 0.01);
     }
 
-    public function test_kpi_scores_the_order_owner(): void
+    public function test_kpi_scores_the_order_moderator(): void
     {
         $this->deliveredOrder();
         $rows = app(KpiScorecard::class)->rows(today()->toDateString(), today()->toDateString());
@@ -87,7 +87,7 @@ class ReportsTest extends TestCase
     {
         $this->deliveredOrder();
         $owner = $this->owner();
-        foreach (['day', 'channel', 'owner', 'product', 'category'] as $g) {
+        foreach (['day', 'channel', 'moderator', 'product', 'category'] as $g) {
             $this->actingAs($owner)->get(route('analysis.index', ['group' => $g]))->assertOk()->assertSee('Profit before ads');
         }
         $this->get(route('kpi.index'))->assertOk()->assertSee('Mahim');

@@ -17,7 +17,7 @@ return [
     'orders.freeze_minutes_before_pickup' => ['int', 30, 'Freeze content edits before pickup (minutes)', 'Orders', ['required', 'integer', 'min:0', 'max:600']],
     'orders.max_working_orders' => ['int', 1, 'Orders one person can work on at a time (new / record verified)', 'Orders', ['required', 'integer', 'min:1', 'max:20']],
     'orders.max_no_answer' => ['int', 3, 'No-answer tries before the order must be held or cancelled', 'Orders', ['required', 'integer', 'min:1', 'max:10']],
-    'orders.issue_sla_minutes' => ['int', 60, 'Minutes the order owner has to handle a delivery issue', 'Orders', ['required', 'integer', 'min:5', 'max:1440']],
+    'orders.issue_sla_minutes' => ['int', 60, 'Minutes the assigned moderator has to handle a delivery issue', 'Orders', ['required', 'integer', 'min:5', 'max:1440']],
     'orders.discount_limit' => ['decimal', 200, 'Largest discount (৳) without manager approval', 'Orders', ['required', 'numeric', 'min:0', 'max:1000000']],
     'tracking.web_event_id' => ['string', 'wc_purchase_{external_ref}', 'Purchase event ID used by the website pixel ({external_ref} = website order id)', 'Tracking', ['required', 'string', 'max:100']],
     'verification.rerun_on_edit' => ['bool', true, 'Re-run verification when phone or amount changes', 'Orders', ['boolean']],

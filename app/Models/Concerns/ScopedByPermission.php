@@ -8,21 +8,21 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * Applies a permission's data scope to a query:
  *   Order::visibleTo($user, 'orders.view')->...
- * all = no filter, own/team = rows whose owner column is the user
+ * all = no filter, own/team = rows whose moderator column is the user
  * (team falls back to own until teams exist), none = no rows.
  */
 trait ScopedByPermission
 {
-    protected function ownerColumn(): string
+    protected function scopeUserColumn(): string
     {
-        return 'owner_id';
+        return 'moderator_id';
     }
 
     public function scopeVisibleTo(Builder $query, User $user, string $permission): Builder
     {
         return match ($user->permissionScope($permission)) {
             'all' => $query,
-            'own', 'team' => $query->where($this->qualifyColumn($this->ownerColumn()), $user->id),
+            'own', 'team' => $query->where($this->qualifyColumn($this->scopeUserColumn()), $user->id),
             default => $query->whereRaw('1 = 0'),
         };
     }

@@ -84,7 +84,7 @@ class NotificationRuleController extends Controller
     {
         $data = $request->validate([
             'type_id' => ['required', Rule::exists('notification_types', 'id')],
-            'target' => ['required', Rule::in(['role', 'user', 'order_owner', 'actor_manager'])],
+            'target' => ['required', Rule::in(['role', 'user', 'order_moderator', 'actor_manager'])],
             'role_id' => ['nullable', 'required_if:target,role', Rule::exists('roles', 'id')],
             'user_id' => ['nullable', 'required_if:target,user', Rule::exists('users', 'id')],
         ]);

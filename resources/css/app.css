@@ -9,3 +9,16 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* Date picker on phones: centred on screen instead of under the field. */
+@media (max-width: 639px) {
+    .picker-panel {
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+    }
+}

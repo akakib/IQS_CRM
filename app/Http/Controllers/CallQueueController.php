@@ -31,7 +31,7 @@ class CallQueueController extends Controller
         $orders = Order::query()
             ->select(['id', 'order_no', 'channel', 'status_id', 'customer_id', 'ship_name', 'ship_phone', 'ship_thana', 'ship_district', 'grand_total', 'cod_amount', 'is_duplicate_flag', 'customer_note', 'created_at', 'packed_version', 'current_version', 'edited_after_pack'])
             ->with(['items:id,order_id,name_snapshot,qty,unit,variant_id', 'items.variant:id,availability_status,expected_restock_date', 'customer:id,orders_count,delivered_count,returned_count,risk_level'])
-            ->where('owner_id', $user->id)->whereIn('status_id', $ids)
+            ->where('moderator_id', $user->id)->whereIn('status_id', $ids)
             ->orderByRaw('status_id = ? desc', [OrderStatus::idFor('record_verified')])->orderBy('id')
             ->limit(50)->get();
 
@@ -41,7 +41,7 @@ class CallQueueController extends Controller
         return view('orders.queue', [
             'orders' => $orders,
             'attempts' => $attempts,
-            'waiting' => Order::whereNull('owner_id')->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->count(),
+            'waiting' => Order::whereNull('moderator_id')->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->count(),
             'statuses' => OrderStatus::map(),
             'maxNoAnswer' => (int) settings('orders.max_no_answer'),
             'reasons' => ['hold' => \App\Models\StatusReason::options('hold'), 'cancel' => \App\Models\StatusReason::options('cancel')],
@@ -51,7 +51,7 @@ class CallQueueController extends Controller
     /** Claim the oldest waiting order (verified ones first). */
     public function takeNext(Request $request): RedirectResponse
     {
-        $next = Order::whereNull('owner_id')->whereIn('status_id', OrderStatus::idsFor(['record_verified', 'new']))
+        $next = Order::whereNull('moderator_id')->whereIn('status_id', OrderStatus::idsFor(['record_verified', 'new']))
             ->orderByRaw('status_id = ? desc', [OrderStatus::idFor('record_verified')])->orderBy('id')->first();
         if (! $next) {
             return back()->with('error', __('No order is waiting.'));
@@ -64,7 +64,7 @@ class CallQueueController extends Controller
     public function logCall(Order $order, Request $request): RedirectResponse
     {
         $user = $request->user();
-        abort_unless($order->owner_id === $user->id, 403);
+        abort_unless($order->moderator_id === $user->id, 403);
         $data = $request->validate([
             'outcome' => ['required', Rule::in(['confirmed', 'no_answer', 'callback', 'hold', 'cancelled'])],
             'note' => ['nullable', 'string', 'max:500'],

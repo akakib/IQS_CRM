@@ -1,6 +1,6 @@
 @php
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
-    $recipients = ['order_owner' => __('Order owner'), 'actor' => __('Person who did it'), 'packer' => __('Packer'), 'previous_owner' => __('Previous owner')];
+    $recipients = ['order_moderator' => __('Assigned moderator'), 'actor' => __('Person who did it'), 'packer' => __('Packer'), 'previous_moderator' => __('Previously assigned moderator')];
     $settle = ['order_final' => __('When the order ends'), 'immediate' => __('Right away')];
     $fmt = fn ($v) => is_bool($v) ? ($v ? 'true' : 'false') : (string) ($v ?? '-');
     $stages = collect($triggers)->groupBy(fn ($t) => $t[1], true);
@@ -90,7 +90,7 @@
                     <x-simple-select name="trigger_key" :options="collect($triggers)->map(fn ($t) => __($t[0]))->all()" :value="array_key_first($triggers)" full-width class="w-full" />
                     <input name="name" required maxlength="150" placeholder="{{ __('Rule name') }}" class="{{ $input }}">
                     <input name="points" type="number" step="0.5" required placeholder="{{ __('Points, e.g. 2 or -3') }}" class="{{ $input }}">
-                    <x-simple-select name="recipient" :options="$recipients" value="order_owner" full-width class="w-full" />
+                    <x-simple-select name="recipient" :options="$recipients" value="order_moderator" full-width class="w-full" />
                     <x-simple-select name="settle_on" :options="$settle" value="order_final" full-width class="w-full" />
                     <label class="flex items-center gap-2 text-sm text-gray-600">
                         <input type="hidden" name="requires_delivery" value="0">

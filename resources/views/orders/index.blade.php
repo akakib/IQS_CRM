@@ -20,8 +20,8 @@
         <input type="hidden" name="tab" value="{{ $tab }}">
         <x-simple-select name="status" :options="$statusOptions" :value="$list->filter('status') ?? ''" />
         <x-simple-select name="channel" :options="['' => __('Any channel'), 'web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone')]" :value="$list->filter('channel') ?? ''" />
-        @if ($ownerOptions)
-            <x-simple-select name="owner" :options="['' => __('Any owner')] + $ownerOptions" :value="$list->filter('owner') ?? ''" />
+        @if ($moderatorOptions)
+            <x-simple-select name="moderator" :options="['' => __('Anyone')] + $moderatorOptions" :value="$list->filter('moderator') ?? ''" />
         @endif
         <x-date-range :from="$list->filter('from')" :to="$list->filter('to')" />
     </x-list.filter-bar>
@@ -34,7 +34,7 @@
                 <th><x-list.sort :list="$list" column="id">{{ __('Order') }}</x-list.sort></th>
                 <th>{{ __('Customer') }}</th>
                 <th>{{ __('Status') }}</th>
-                <th>{{ __('Owner') }}</th>
+                <th>{{ __('Assigned to') }}</th>
                 <th class="text-right"><x-list.sort :list="$list" column="grand_total">{{ __('Total') }}</x-list.sort></th>
                 <th>{{ __('Placed') }}</th>
             </x-slot:head>
@@ -43,7 +43,7 @@
                     <td><span class="font-mono font-medium text-gray-800">{{ $o->order_no }}</span> <span class="text-xs text-gray-400">{{ $o->channel }}</span></td>
                     <td><p class="text-gray-800">{{ $o->ship_name }}</p><p class="font-mono text-xs text-gray-500">{{ Mask::value($o->ship_phone, 'customer_contact') }}</p></td>
                     <td><x-order-status :order="$o" :statuses="$statuses" /></td>
-                    <td class="text-gray-600">{{ $o->owner?->name ?? '-' }}</td>
+                    <td class="text-gray-600">{{ $o->moderator?->name ?? '-' }}</td>
                     <td class="text-right tabular-nums text-gray-800">৳{{ number_format((float) $o->grand_total) }}</td>
                     <td class="text-gray-500">{{ $o->created_at->format('d M, g:i A') }}</td>
                 </tr>
@@ -55,7 +55,7 @@
                 <a href="{{ route('orders.show', $o) }}" class="block">
                     <x-record-card :title="$o->order_no.' · '.$o->ship_name" :subtitle="Mask::value($o->ship_phone, 'customer_contact')">
                         <x-slot:badge><x-order-status :order="$o" :statuses="$statuses" /></x-slot:badge>
-                        <x-slot:footer>{{ $o->created_at->format('d M, g:i A') }} · {{ $o->owner?->name ?? __('Not taken') }}</x-slot:footer>
+                        <x-slot:footer>{{ $o->created_at->format('d M, g:i A') }} · {{ $o->moderator?->name ?? __('Not taken') }}</x-slot:footer>
                         <x-slot:actions><span class="font-semibold tabular-nums">৳{{ number_format((float) $o->grand_total) }}</span></x-slot:actions>
                     </x-record-card>
                 </a>

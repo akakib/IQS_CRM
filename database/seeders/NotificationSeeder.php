@@ -13,9 +13,9 @@ class NotificationSeeder extends Seeder
     private const DEFAULT_RULES = [
         'new_order' => [['role', 'moderator', true, false]],
         'order_needs_repack' => [['role', 'packaging', true, true], ['role', 'manager', true, false]],
-        'delivery_issue' => [['order_owner', null, true, true]],
+        'delivery_issue' => [['order_moderator', null, true, true]],
         'stock_issue_reported' => [['role', 'owner', true, true], ['role', 'manager', true, false]],
-        'hold_expected_date_passed' => [['order_owner', null, true, false], ['role', 'manager', true, false]],
+        'hold_expected_date_passed' => [['order_moderator', null, true, false], ['role', 'manager', true, false]],
         'amendment_pending_approval' => [['role', 'manager', true, false]],
         'courier_action_pending' => [['role', 'manager', true, true]],
         'sync_failed' => [['role', 'manager', true, false]],

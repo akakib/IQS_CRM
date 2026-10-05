@@ -7,7 +7,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * KPI: order volume, speed and quality per order owner, from order_events
+ * KPI: order volume, speed and quality per assigned moderator, from order_events
  * (the append-only history). Separate from points by design.
  *
  *   volume  = confirmed / the team's highest confirmed
@@ -22,26 +22,26 @@ class KpiScorecard
     {
         $range = [$from.' 00:00:00', $to.' 23:59:59'];
         $counts = DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')
-            ->whereNotNull('o.owner_id')->whereBetween('e.created_at', $range)
+            ->whereNotNull('o.moderator_id')->whereBetween('e.created_at', $range)
             ->whereIn('e.to_status_id', OrderStatus::idsFor(['confirmed', 'delivered', 'partial_delivered', 'returned', 'cancelled']))
-            ->groupBy('o.owner_id', 'e.to_status_id')
-            ->selectRaw('o.owner_id, e.to_status_id, COUNT(DISTINCT e.order_id) as n')->get();
+            ->groupBy('o.moderator_id', 'e.to_status_id')
+            ->selectRaw('o.moderator_id, e.to_status_id, COUNT(DISTINCT e.order_id) as n')->get();
 
         $taken = DB::table('order_assignments')->whereBetween('started_at', $range)->whereIn('how', ['claimed', 'created', 'reassigned'])
             ->groupBy('user_id')->selectRaw('user_id, COUNT(DISTINCT order_id) as n')->pluck('n', 'user_id');
 
         // Take -> confirm minutes for orders confirmed in the range (by a person, not a rule).
         $speeds = DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')
-            ->join('order_assignments as a', fn ($j) => $j->on('a.order_id', '=', 'o.id')->on('a.user_id', '=', 'o.owner_id'))
+            ->join('order_assignments as a', fn ($j) => $j->on('a.order_id', '=', 'o.id')->on('a.user_id', '=', 'o.moderator_id'))
             ->where('e.to_status_id', OrderStatus::idFor('confirmed'))->where('e.source', 'user')->whereBetween('e.created_at', $range)
-            ->get(['o.owner_id', 'e.order_id', 'e.created_at', 'a.started_at'])
-            ->groupBy('owner_id')->map(fn ($rows) => $this->median($rows->unique('order_id')
+            ->get(['o.moderator_id', 'e.order_id', 'e.created_at', 'a.started_at'])
+            ->groupBy('moderator_id')->map(fn ($rows) => $this->median($rows->unique('order_id')
                 ->map(fn ($r) => max(0, Carbon::parse($r->started_at)->diffInSeconds(Carbon::parse($r->created_at), false) / 60))->all()));
 
         $byUser = [];
         foreach ($counts as $c) {
             $status = OrderStatus::map()[$c->to_status_id]['key'];
-            $byUser[$c->owner_id][$status] = (int) $c->n;
+            $byUser[$c->moderator_id][$status] = (int) $c->n;
         }
         $userIds = array_unique(array_merge(array_keys($byUser), $taken->keys()->all()));
         if ($userIds === []) {

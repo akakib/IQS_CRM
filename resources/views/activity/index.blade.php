@@ -17,8 +17,8 @@
             <x-simple-select name="type" :options="['' => __('All records')] + $typeOptions" :value="$filters['type'] ?? ''" full-width />
         </div>
         <div class="grid grid-cols-2 gap-2 md:flex">
-            <input type="date" name="from" value="{{ $filters['from'] }}" @change="$refs.filters.requestSubmit()" class="{{ $inputClass }}" aria-label="{{ __('From') }}">
-            <input type="date" name="to" value="{{ $filters['to'] }}" @change="$refs.filters.requestSubmit()" class="{{ $inputClass }}" aria-label="{{ __('To') }}">
+            <x-date-input name="from" :value="$filters['from']" :placeholder="__('From')" @date-change="$nextTick(() => $refs.filters.requestSubmit())" />
+            <x-date-input name="to" :value="$filters['to']" :placeholder="__('To')" @date-change="$nextTick(() => $refs.filters.requestSubmit())" />
         </div>
         <div class="flex items-center gap-2 md:ml-auto">
             <x-simple-select name="per_page" :options="array_combine($perPageOptions, array_map(fn ($n) => __(':n / page', ['n' => $n]), $perPageOptions))" :value="$filters['per_page']" />

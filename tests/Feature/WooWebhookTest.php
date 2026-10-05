@@ -65,7 +65,7 @@ class WooWebhookTest extends TestCase
         $order = Order::firstWhere('external_ref', '5001');
         $this->assertNotNull($order);
         $this->assertSame('web', $order->channel);
-        $this->assertNull($order->owner_id);
+        $this->assertNull($order->moderator_id);
         $this->assertSame('01712345678', $order->ship_phone);
         $this->assertSame('Nusrat Jahan', $order->ship_name);
         $this->assertSame('560.00', $order->items->first()->unit_price);

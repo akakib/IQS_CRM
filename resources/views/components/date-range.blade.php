@@ -13,7 +13,8 @@
 @endphp
 
 <div {{ $attributes->merge(['class' => 'flex flex-wrap items-center gap-2']) }}
-    x-data="{ from: @js($from), to: @js($to), changed() { this.$nextTick(() => this.$dispatch('select-change', 'dates')) } }">
+    x-data="{ from: @js($from), to: @js($to), changed() { this.$nextTick(() => this.$dispatch('select-change', 'dates')) } }"
+    @date-change="changed()">
     <x-dropdown align="left">
         <x-slot:trigger><span x-text="from || to ? (from ?? '…') + ' → ' + (to ?? '…') : @js(__('Any date'))"></span></x-slot:trigger>
         @foreach ($presets as $label => [$f, $t])
@@ -21,8 +22,6 @@
         @endforeach
         <button type="button" @click="from = null; to = null; changed()">{{ __('Any date') }}</button>
     </x-dropdown>
-    <input type="date" name="{{ $fromName }}" x-model="from" @change="changed()" aria-label="{{ __('From') }}"
-        class="rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-green-800 focus:outline-none">
-    <input type="date" name="{{ $toName }}" x-model="to" @change="changed()" aria-label="{{ __('To') }}"
-        class="rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-green-800 focus:outline-none">
+    <x-date-input :name="$fromName" :value="$from" x-model="from" :placeholder="__('From')" />
+    <x-date-input :name="$toName" :value="$to" x-model="to" :placeholder="__('To')" />
 </div>

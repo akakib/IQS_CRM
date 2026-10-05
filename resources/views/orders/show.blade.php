@@ -2,7 +2,7 @@
     use App\Support\Permissions\Mask;
     $user = auth()->user();
     $s = $statuses[$order->status_id];
-    $canAct = $order->owner_id === $user->id || $user->permissionScope('orders.view') === 'all';
+    $canAct = $order->moderator_id === $user->id || $user->permissionScope('orders.view') === 'all';
     $noteIcon = ['status' => '●', 'call' => '☎', 'chat' => '✉', 'payment' => '৳', 'assignment' => '👤', 'amendment' => '✎', 'courier' => '🚚', 'verification' => '✓', 'rider' => '🛵'];
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
 @endphp
@@ -73,7 +73,7 @@
                                 <x-simple-select :options="['' => __('Choose a reason')] + $reasons[$type]" value="" full-width class="w-full" />
                             </div>
                         @endforeach
-                        <input x-show="to === 'hold'" type="date" name="hold_expected_date" min="{{ now()->toDateString() }}" class="{{ $input }}" aria-label="{{ __('Expected date') }}">
+                        <div x-show="to === 'hold'"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Expected date')" full-width /></div>
                         <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="{{ $input }}">
                         @error('reason_id')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
                         @error('status')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
@@ -185,14 +185,14 @@
                 @endcan
             </x-card>
 
-            <x-card :title="__('Owner')">
-                <p class="text-sm text-gray-800">{{ $order->owner?->name ?? __('Not taken yet') }}</p>
+            <x-card :title="__('Assigned to')">
+                <p class="text-sm text-gray-800">{{ $order->moderator?->name ?? __('Not taken yet') }}</p>
                 @if ($staffOptions)
                     <form method="POST" action="{{ route('orders.reassign', $order) }}" class="mt-3 space-y-2">
                         @csrf
                         <x-simple-select name="user_id" :options="['' => __('Give to…')] + $staffOptions" value="" full-width class="w-full" />
                         <x-simple-select name="reason_id" :options="['' => __('Reason')] + $reasons['reassign']" value="" full-width class="w-full" />
-                        <x-button size="sm" variant="secondary">{{ __('Change owner') }}</x-button>
+                        <x-button size="sm" variant="secondary">{{ __('Reassign') }}</x-button>
                     </form>
                 @endif
             </x-card>

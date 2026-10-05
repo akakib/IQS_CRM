@@ -201,3 +201,9 @@ html[data-order-locked] .lockable {
         display: block !important;
     }
 }
+
+/* Order activity: while the board is being pulled sideways the hand is closed everywhere (also over cards). */
+html.board-grabbing,
+html.board-grabbing * {
+    cursor: grabbing !important;
+}

@@ -26,12 +26,12 @@
                 window.addEventListener('pointermove', e => {
                     if (!box) return;
                     const dx = e.clientX - startX;
-                    if (!moved && Math.abs(dx) > 5) { moved = true; box.classList.add('cursor-grabbing', 'select-none') }
+                    if (!moved && Math.abs(dx) > 5) { moved = true; box.classList.add('cursor-grabbing', 'select-none'); document.documentElement.classList.add('board-grabbing') }
                     if (moved) box.scrollLeft = startLeft - dx;
                 });
                 window.addEventListener('pointerup', () => {
                     if (!box) return;
-                    box.classList.remove('cursor-grabbing', 'select-none');
+                    box.classList.remove('cursor-grabbing', 'select-none'); document.documentElement.classList.remove('board-grabbing');
                     box = null;
                     if (moved) setTimeout(() => moved = false, 0);
                 });

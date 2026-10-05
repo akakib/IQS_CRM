@@ -25,7 +25,7 @@ return [
     'points.min_confirm_minutes' => ['decimal', 1, 'Flag a web order confirmed faster than this after taking it (minutes)', 'Points', ['required', 'numeric', 'min:0', 'max:60']],
     'points.monthly_negative_cap' => ['int', 50, 'Most minus points one person can lose in a month (0 = no limit)', 'Points', ['required', 'integer', 'min:0', 'max:100000']],
     'points.dispute_days' => ['int', 3, 'Days a person has to dispute a point', 'Points', ['required', 'integer', 'min:0', 'max:60']],
-    'desk.active_limit' => ['int', 5, 'Website orders one moderator can hold at a time (waiting to verify or call)', 'Order desk', ['required', 'integer', 'min:1', 'max:50']],
+    'desk.active_limit' => ['int', 1, 'Website orders one moderator can hold at a time (waiting to verify or call). 1 = finish one before taking the next', 'Order desk', ['required', 'integer', 'min:1', 'max:50']],
     'desk.action_timer_minutes' => ['int', 10, 'Minutes to act on an order before it goes back to New', 'Order desk', ['required', 'integer', 'min:1', 'max:240']],
     'desk.untouched_start_minutes' => ['int', 15, 'An order its moderator never opens starts its timer by itself after (minutes)', 'Order desk', ['required', 'integer', 'min:1', 'max:240']],
     'desk.extend_minutes' => ['int', 5, 'Extra minutes a moderator can add to the timer, once per order', 'Order desk', ['required', 'integer', 'min:1', 'max:60']],

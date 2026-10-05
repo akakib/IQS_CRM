@@ -60,7 +60,7 @@ class DeskService
         }
         $limit = (int) settings('desk.active_limit');
         if ($this->activeCount($user->id) >= $limit) {
-            throw ValidationException::withMessages(['order' => __('You already hold :n orders. Finish one first.', ['n' => $limit])]);
+            throw ValidationException::withMessages(['order' => $limit === 1 ? __('Finish the order you have before taking the next one.') : __('You already hold :n orders. Finish one first.', ['n' => $limit])]);
         }
 
         $this->sweepExpired(); // timers that ran out free their orders right now

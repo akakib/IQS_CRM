@@ -61,7 +61,7 @@
                 <p class="text-sm font-semibold text-gray-800">{{ trans_choice('{0} No new orders|{1} New order waiting|[2,*] New orders waiting', $waiting) }}</p>
                 <p class="text-xs text-gray-500">
                     @if ($waiting) {{ __('Oldest: :t ago', ['t' => $age($oldestWaiting)]) }} · @endif
-                    {{ __('You hold :a of :l', ['a' => $counts['active'], 'l' => $limit]) }}
+                    {{ $limit === 1 ? ($counts['active'] ? __('One order at a time: finish yours to take the next') : __('One order at a time')) : __('You hold :a of :l', ['a' => $counts['active'], 'l' => $limit]) }}
                     @if ($counts['again']) · {{ __(':n waiting on No response', ['n' => $counts['again']]) }} @endif
                 </p>
             </div>
@@ -70,7 +70,7 @@
             <form method="POST" action="{{ route('desk.next') }}">
                 @csrf
                 <x-button class="w-full sm:w-auto" data-key="t" :disabled="! $waiting || $atLimit">
-                    {{ $atLimit ? __('Finish one first') : __('Take next') }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">T</kbd>
+                    {{ $atLimit ? ($limit === 1 ? __('Finish this order first') : __('Finish one first')) : __('Take next') }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">T</kbd>
                 </x-button>
             </form>
         @endif

@@ -44,6 +44,8 @@ class DeskTest extends TestCase
         (new PointsSeeder)->run();
         Artisan::call('notifications:sync');
         OrderStatus::forget();
+        // The shop default is one order at a time; most tests here need a moderator holding several.
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 5]);
 
         $role = $this->role(['orders.view' => 'own', 'orders.create', 'orders.edit', 'orders.take'], [], 'Moderator');
         $this->mahim = User::factory()->create(['name' => 'Mahim']);
@@ -296,6 +298,30 @@ class DeskTest extends TestCase
         $this->assertNotNull($a->packaging_sent_at);
         $this->assertSame('none', $a->booking_state);
         $this->get('/desk?tab=packaging')->assertSee($a->order_no)->assertSee('Waiting for a packer');
+    }
+
+    public function test_by_default_the_next_order_cannot_be_taken_before_the_current_one_is_finished(): void
+    {
+        $this->assertSame(1, config('settings')['desk.active_limit'][1]);
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]);
+        [$a, $b] = [$this->web(), $this->web()];
+
+        $this->actingAs($this->mahim)->post('/desk/next');
+        $this->travel(4)->seconds();
+        $this->post('/desk/next')->assertSessionHasErrors('order');
+        $this->assertNull($b->fresh()->moderator_id);
+        $this->get('/desk')->assertOk()->assertSee('Finish this order first');
+
+        // Verified but not called yet: still the same unfinished order.
+        $this->act($a, 'verify');
+        $this->travel(4)->seconds();
+        $this->post('/desk/next')->assertSessionHasErrors('order');
+
+        // Called and confirmed: the next one can be taken.
+        $this->act($a->fresh(), 'confirm');
+        $this->travel(4)->seconds();
+        $this->post('/desk/next');
+        $this->assertSame($this->mahim->id, $b->fresh()->moderator_id);
     }
 
     public function test_while_one_timer_runs_other_waiting_orders_cannot_be_worked_on(): void

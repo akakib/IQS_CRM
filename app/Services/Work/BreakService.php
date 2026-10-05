@@ -54,8 +54,7 @@ class BreakService
             return;
         }
         $this->close((int) $user->current_break_id, now(), false);
-        $user->current_break_id = null;
-        $this->desk->armTimer($user->id);
+        $user->current_break_id = null; // the timer starts again when they open an order
     }
 
     /**

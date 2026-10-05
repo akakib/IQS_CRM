@@ -116,7 +116,9 @@ class DeskTest extends TestCase
         Artisan::call('desk:tick');
 
         $this->assertNull($a->fresh()->moderator_id); // back in New
-        $this->assertNotNull($b->fresh()->action_due_at); // the next timer started
+        $this->assertNull($b->fresh()->action_due_at); // no clock starts behind the moderator's back
+        $this->actingAs($this->mahim)->get('/desk')->assertOk();
+        $this->assertNotNull($b->fresh()->action_due_at); // it starts when the order is open in front of them
         $this->assertDatabaseHas('order_assignments', ['order_id' => $a->id, 'user_id' => $this->mahim->id, 'ended_reason' => 'timeout']);
         $this->assertSame(-1.0, (float) DB::table('point_ledger')->where('user_id', $this->mahim->id)->sum('points'));
 
@@ -139,7 +141,8 @@ class DeskTest extends TestCase
         $this->assertSame('new', $this->key($a));
         $this->assertSame(-1.0, (float) DB::table('point_ledger')->where('user_id', $this->mahim->id)->sum('points'));
 
-        // The second order got its own timer; just opening the desk after it runs out takes it back too.
+        // The second order gets its timer once it is open; just opening the desk after it runs out takes it back too.
+        $this->get('/desk')->assertOk();
         $this->assertNotNull($b->fresh()->action_due_at);
         $this->travel(11)->minutes();
         $this->get('/desk')->assertOk()->assertSee('Time ran out on '.$b->order_no);
@@ -180,7 +183,9 @@ class DeskTest extends TestCase
         $this->act($a, 'verify')->assertSessionHas('success');
 
         $this->assertSame('record_verified', $this->key($a));
-        $this->assertNotNull($a->fresh()->action_due_at); // still mine to call: a fresh 10 minutes
+        $this->assertNull($a->fresh()->action_due_at); // the action stopped the clock
+        $this->get('/desk?tab=call')->assertOk();
+        $this->assertNotNull($a->fresh()->action_due_at); // open again to call: a fresh 10 minutes
         $this->travel(5)->minutes();
         $this->act($a, 'confirm', ['note' => 'will take it'])->assertSessionHas('success');
 
@@ -210,11 +215,12 @@ class DeskTest extends TestCase
         $this->assertSame(1, $a->fresh()->no_response_count);
         $this->assertSame('no_answer', $this->key($a));
 
-        // 30 minutes later it is back in the Call tab, with a timer.
+        // 30 minutes later it is back in the Call tab; opening it starts the timer.
         $this->travel(31)->minutes();
         Artisan::call('desk:tick');
-        $this->assertNotNull($a->fresh()->action_due_at);
+        $this->assertNull($a->fresh()->action_due_at);
         $this->get('/desk?tab=call')->assertSee($a->order_no);
+        $this->assertNotNull($a->fresh()->action_due_at);
 
         $this->act($a, 'no_response');
         $this->assertTrue($a->fresh()->next_call_at->equalTo(now()->addMinutes(300)));
@@ -292,6 +298,46 @@ class DeskTest extends TestCase
         $this->get('/desk?tab=packaging')->assertSee($a->order_no)->assertSee('Waiting for a packer');
     }
 
+    public function test_while_one_timer_runs_other_waiting_orders_cannot_be_worked_on(): void
+    {
+        [$a, $b] = [$this->web(), $this->web()];
+        $this->actingAs($this->mahim)->post('/desk/next'); // a: taken, clock running
+        $this->travel(4)->seconds();
+        $this->post('/desk/next');                          // b: taken, no clock (one at a time)
+        $this->assertNotNull($a->fresh()->action_due_at);
+        $this->assertNull($b->fresh()->action_due_at);
+
+        // Looking at b does not move the clock, and b cannot be acted on.
+        $this->get('/desk?tab=verify&order='.$b->id)->assertOk()->assertSee('Finish that one first');
+        $this->assertNull($b->fresh()->action_due_at);
+        $this->act($b, 'verify')->assertSessionHasErrors('order');
+        $this->assertSame('new', $this->key($b));
+
+        // Arriving at the desk with no tab chosen lands on the order whose clock is running.
+        $this->get('/desk')->assertOk()->assertSee('+'.settings('desk.extend_minutes').' min', false);
+
+        // Finishing a frees b: opening it starts its clock.
+        $this->act($a, 'verify')->assertSessionHas('success');
+        $this->act($a->fresh(), 'hold', ['reason_id' => DB::table('status_reasons')->where('reason_type', 'hold')->value('id')]);
+        $this->get('/desk?tab=verify&order='.$b->id)->assertOk();
+        $this->assertNotNull($b->fresh()->action_due_at);
+    }
+
+    public function test_an_order_never_opened_starts_its_timer_after_the_untouched_limit(): void
+    {
+        $a = $this->web();
+        $this->desk()->assign($a->id, $this->mahim->id, 'auto'); // handed over automatically: nobody is looking at it
+        $this->assertNull($a->fresh()->action_due_at);
+
+        $this->travel(10)->minutes();
+        Artisan::call('desk:tick');
+        $this->assertNull($a->fresh()->action_due_at);
+
+        $this->travel(6)->minutes(); // 16 minutes untouched (limit 15)
+        Artisan::call('desk:tick');
+        $this->assertNotNull($a->fresh()->action_due_at);
+    }
+
     public function test_chat_orders_belong_to_their_creator_without_timer_or_limit(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]);
@@ -299,7 +345,7 @@ class DeskTest extends TestCase
             'channel' => 'messenger', 'phone' => '01712000001', 'name' => 'Chat', 'address_line' => 'Road 2',
             'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
         ], $this->mahim);
-        $this->desk()->armTimer($this->mahim->id);
+        $this->desk()->armTimer($this->mahim->id, $chat->id);
 
         $this->assertSame($this->mahim->id, $chat->moderator_id);
         $this->assertNull($chat->fresh()->action_due_at);

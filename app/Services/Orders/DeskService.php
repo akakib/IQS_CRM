@@ -95,34 +95,69 @@ class DeskService
         ]);
         $name = DB::table('users')->where('id', $userId)->value('name');
         $this->systemNote($orderId, $how === 'auto' ? __('Given to :n automatically (nobody took it).', ['n' => $name]) : __(':n took the order.', ['n' => $name]), $how === 'auto' ? null : $userId);
-        $this->armTimer($userId);
+        if ($how !== 'auto') {
+            $this->armTimer($userId, $orderId); // they took it and it opens in front of them
+        }
 
         return true;
     }
 
     /**
-     * Start the action timer on this person's oldest waiting order, unless
-     * one is already running. Chat orders never get a timer.
+     * Start the action timer on the order this person has in front of them.
+     * One timer at a time: nothing happens while another one is running, so
+     * a clock never starts on an order they are not looking at. Chat orders
+     * never get a timer.
      */
-    public function armTimer(int $userId): void
+    public function armTimer(int $userId, int $orderId): bool
+    {
+        $id = $this->timerCandidates($userId)?->where('id', $orderId)->value('id');
+
+        return $id ? $this->startTimer($userId, (int) $id) : false;
+    }
+
+    /**
+     * Safety net for orders nobody opens: when this person has no timer
+     * running and their oldest waiting order has sat untouched for the
+     * configured minutes, its timer starts by itself.
+     */
+    public function armUntouched(int $userId): bool
+    {
+        $since = now()->subMinutes((int) settings('desk.untouched_start_minutes'));
+        $id = $this->timerCandidates($userId)
+            ?->whereRaw('COALESCE(next_call_at, assigned_at) <= ?', [$since])
+            ->orderBy('assigned_at')->orderBy('id')->value('id');
+
+        return $id ? $this->startTimer($userId, (int) $id) : false;
+    }
+
+    /** Orders of this person that may get the timer now; null while on a break or while a timer is already running. */
+    private function timerCandidates(int $userId): ?\Illuminate\Database\Query\Builder
     {
         $user = DB::table('users')->where('id', $userId)->first(['id', 'current_break_id']);
         if (! $user || $user->current_break_id) {
-            return;
+            return null;
         }
         $mine = DB::table('orders')->where('moderator_id', $userId)->where('channel', 'web');
         if ((clone $mine)->whereNotNull('action_due_at')->exists()) {
-            return;
+            return null;
         }
 
-        $next = (clone $mine)->where(fn ($q) => $q->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))
-            ->orWhere(fn ($q) => $q->where('status_id', OrderStatus::idFor('no_answer'))->where('next_call_at', '<=', now())))
-            ->orderBy('assigned_at')->orderBy('id')->value('id');
-        if ($next) {
-            DB::table('orders')->where('id', $next)->update([
-                'action_due_at' => $this->calendar->deadline($userId, (int) settings('desk.action_timer_minutes')),
-            ]);
-        }
+        return $mine->where(fn ($q) => $q->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))
+            ->orWhere(fn ($q) => $q->where('status_id', OrderStatus::idFor('no_answer'))->where('next_call_at', '<=', now())));
+    }
+
+    private function startTimer(int $userId, int $orderId): bool
+    {
+        return (bool) DB::table('orders')->where('id', $orderId)->whereNull('action_due_at')->update([
+            'action_due_at' => $this->calendar->deadline($userId, (int) settings('desk.action_timer_minutes')),
+        ]);
+    }
+
+    /** The order whose timer is running for this person, if any. */
+    public function timedOrder(int $userId): ?object
+    {
+        return DB::table('orders')->where('moderator_id', $userId)->whereNotNull('action_due_at')->orderBy('action_due_at')
+            ->first(['id', 'order_no', 'action_due_at', 'status_id', 'timer_extended_at']);
     }
 
     /**
@@ -157,7 +192,6 @@ class DeskService
                 ->where('ended_at', '>=', now()->startOfDay())->count();
             app(PointHooks::class)->timerMissed(Order::find($orderId), $userId, $today);
         }
-        $this->armTimer($userId);
     }
 
     /** How many times this person took extra time today. */
@@ -224,14 +258,17 @@ class DeskService
         return $ids->count();
     }
 
-    /** No response orders whose return time came: start their moderator's timer. */
-    public function armReturned(): void
+    /** Cron safety net: start the timer for everyone whose waiting order has sat untouched too long. */
+    public function armUntouchedAll(): void
     {
-        $userIds = DB::table('orders')->where('status_id', OrderStatus::idFor('no_answer'))->where('channel', 'web')
-            ->whereNotNull('moderator_id')->whereNull('action_due_at')->where('next_call_at', '<=', now())
+        $since = now()->subMinutes((int) settings('desk.untouched_start_minutes'));
+        $userIds = DB::table('orders')->where('channel', 'web')->whereNotNull('moderator_id')->whereNull('action_due_at')
+            ->where(fn ($q) => $q->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))
+                ->orWhere(fn ($q) => $q->where('status_id', OrderStatus::idFor('no_answer'))->where('next_call_at', '<=', now())))
+            ->whereRaw('COALESCE(next_call_at, assigned_at) <= ?', [$since])
             ->distinct()->limit(200)->pluck('moderator_id');
         foreach ($userIds as $userId) {
-            $this->armTimer((int) $userId);
+            $this->armUntouched((int) $userId);
         }
     }
 
@@ -420,9 +457,7 @@ class DeskService
         if ($to['final']) {
             DB::table('order_assignments')->where('order_id', $order->id)->whereNull('ended_at')->update(['ended_at' => now(), 'ended_reason' => 'finished']);
         }
-        if ($order->moderator_id) {
-            $this->armTimer((int) $order->moderator_id);
-        }
+        // The next timer is not started here: it starts when the moderator opens their next order.
     }
 
     /** @return list<int> */

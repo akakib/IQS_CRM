@@ -145,12 +145,7 @@ class OrderService
             $order->refresh();
             app(\App\Services\Points\PointHooks::class)->reassigned($order, $previous, $reasonId);
 
-            // Timers: the new moderator's clock starts, the previous one moves to their next order.
-            $desk = app(DeskService::class);
-            $desk->armTimer($to->id);
-            if ($previous) {
-                $desk->armTimer($previous);
-            }
+            // No timer starts here: it starts when the new moderator opens the order.
 
             return $order;
         });

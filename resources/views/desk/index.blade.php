@@ -99,9 +99,12 @@
             }" class="sticky top-[68px] z-20">
             @unless ($armedIsOpen)
                 <a x-show="left > 120" href="{{ $url(['tab' => $statuses[$armed->status_id]['key'] === 'new' ? 'verify' : 'call', 'order' => $armed->id]) }}"
-                    class="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 hover:bg-amber-100">
-                    <span>{{ __('Your timer is running on :no. Finish that one first.', ['no' => $armed->order_no]) }}</span>
-                    <span class="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-xs font-semibold tabular-nums" x-text="clock"></span>
+                    class="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 shadow-sm hover:bg-amber-100">
+                    <span class="min-w-0"><b>{{ __('Timer running: :no', ['no' => $armed->order_no]) }}</b> <span class="hidden sm:inline">{{ __('Finish that one first.') }}</span></span>
+                    <span class="flex shrink-0 items-center gap-2">
+                        <span class="rounded-full bg-white px-2.5 py-0.5 text-sm font-bold tabular-nums" x-text="clock"></span>
+                        <span class="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-white">{{ __('Open') }}</span>
+                    </span>
                 </a>
             @endunless
             <div x-show="left <= 120" x-cloak class="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border px-4 py-3 text-sm shadow-sm"
@@ -326,7 +329,17 @@
                                 $key === 'confirmed' && $order->booking_state === 'failed' => [['send', __('Try booking again'), 'p', 'primary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 default => [],
                             };
+                            // The clock is running on another order: this one waits its turn.
+                            if ($blocked) {
+                                $actions = [];
+                            }
                         @endphp
+                        @if ($blocked && $timed)
+                            <div class="mx-5 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                <p>{{ __('Your timer is running on :no. Finish that one first, then this order opens for work.', ['no' => $timed->order_no]) }}</p>
+                                <a href="{{ $url(['tab' => $statuses[$timed->status_id]['key'] === 'new' ? 'verify' : 'call', 'order' => $timed->id]) }}" class="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-dark">{{ __('Open :no', ['no' => $timed->order_no]) }}</a>
+                            </div>
+                        @endif
                         @if ($actions)
                             {{-- The form holds only the note; the buttons below belong to it through form="desk-act",
                                  so the bar can stick to the bottom of the card without covering the order on a phone. --}}

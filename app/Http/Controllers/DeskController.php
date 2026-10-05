@@ -66,15 +66,13 @@ class DeskController extends Controller
             ->selectRaw(implode(', ', $select), $bindings)->first();
         $counts = collect($counts)->mapWithKeys(fn ($n, $k) => [substr($k, 2) => (int) $n])->all();
 
-        // Work waiting but no timer running (first visit of the day, or after a break): start it now.
-        if (! $counts['timed'] && $counts['verify'] + $counts['call'] > 0) {
-            $this->desk->armTimer($user->id);
-            $counts['timed'] = 1;
-        }
+        // One timer at a time. Arriving without choosing a tab or an order lands on the order whose clock is running.
+        $timed = $counts['timed'] ? $this->desk->timedOrder($user->id) : null;
+        $toTimed = $timed && ! $request->has('tab') && ! $request->has('order');
 
-        // Default tab: the first one with work in it.
+        // Default tab: the running order's tab, else the first one with work in it.
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab')
-            : (collect(self::TABS)->first(fn ($t) => $counts[$t] > 0) ?? 'call');
+            : ($toTimed ? ($timed->status_id === $s('new') ? 'verify' : 'call') : (collect(self::TABS)->first(fn ($t) => $counts[$t] > 0) ?? 'call'));
 
         $page = max(1, (int) $request->query('page', 1));
         $rows = DB::table('orders')->where('moderator_id', $user->id)->whereRaw($where[$tab][0], $where[$tab][1])
@@ -86,11 +84,29 @@ class DeskController extends Controller
 
         // The open order: the one asked for (if it is mine), else the first in the list.
         // (An order just taken back is not reopened, even if the address still names it.)
-        $openId = ($lost ? 0 : (int) $request->query('order')) ?: ($rows->first()->id ?? 0);
+        $openId = ($lost ? 0 : (int) $request->query('order')) ?: ($toTimed ? $timed->id : ($rows->first()->id ?? 0));
         $order = $openId ? Order::with(['customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en', 'packer:id,name'])->find($openId) : null;
         if ($order && $order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all') {
             $order = null;
         }
+
+        // No timer running: it starts on the order now open in front of them (never on one they cannot see),
+        // or, as a safety net, on an order that has sat untouched too long.
+        if (! $timed) {
+            if ($order && $order->moderator_id === $user->id && $this->desk->armTimer($user->id, $order->id)) {
+                $order->refresh();
+                if ($row = $rows->firstWhere('id', $order->id)) {
+                    $row->action_due_at = $order->action_due_at;
+                }
+                $counts['timed'] = 1;
+            } elseif ($this->desk->armUntouched($user->id)) {
+                $counts['timed'] = 1;
+            }
+            $timed = $counts['timed'] ? $this->desk->timedOrder($user->id) : null;
+        }
+        // The open order needs the clock but it is running on another one: finish that one first.
+        $openNeedsTimer = $order && $order->moderator_id === $user->id && $order->channel === 'web' && ! $order->action_due_at
+            && (in_array($order->status_id, [$s('new'), $s('record_verified')], true) || ($order->status_id === $s('no_answer') && (! $order->next_call_at || $order->next_call_at->isPast())));
 
         $waiting = $this->desk->waitingQuery()->selectRaw('COUNT(*) as n, MIN(created_at) as oldest')->first();
         // Packer-only hold reasons (item not found on the shelf) are not offered to moderators.
@@ -105,9 +121,8 @@ class DeskController extends Controller
             'order' => $order,
             'detail' => $order ? $this->detail($order) : null,
             // The timer runs on one order at a time. If the open order is not that one, point to it.
-            'timed' => $counts['timed'] && (! $order || ! $order->action_due_at)
-                ? DB::table('orders')->where('moderator_id', $user->id)->whereNotNull('action_due_at')->orderBy('action_due_at')->first(['id', 'order_no', 'action_due_at', 'status_id', 'timer_extended_at'])
-                : null,
+            'timed' => $timed && (! $order || $order->id !== $timed->id) ? $timed : null,
+            'blocked' => $timed && $openNeedsTimer && $order->id !== $timed->id,
             'lost' => $lost,
             'extendMinutes' => (int) settings('desk.extend_minutes'),
             'extendsLeft' => $counts['timed'] ? max(0, (int) settings('desk.extend_daily_limit') - $this->desk->extensionsToday($user->id)) : 0,
@@ -155,6 +170,13 @@ class DeskController extends Controller
         }
         if ($order->lock_version !== (int) $data['lock_version']) {
             throw ValidationException::withMessages(['order' => __('This order just changed. Look again before acting.')]);
+        }
+        // One order at a time: while the clock runs on another order, a waiting order cannot be worked on.
+        $other = $order->moderator_id === $user->id && $order->channel === 'web' && ! $order->action_due_at
+            && in_array(OrderStatus::map()[$order->status_id]['key'], ['new', 'record_verified', 'no_answer'], true)
+            ? $this->desk->timedOrder($user->id) : null;
+        if ($other) {
+            throw ValidationException::withMessages(['order' => __('Your timer is running on :no. Finish that one first.', ['no' => $other->order_no])]);
         }
         $note = $data['note'] ?? null;
         $reason = $data['reason_id'] ?? null;

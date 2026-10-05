@@ -25,7 +25,7 @@ class DeskTick extends Command
     public function handle(DeskService $desk, BreakService $breaks, TelegramService $telegram): int
     {
         $released = $desk->sweepExpired();
-        $desk->armReturned();
+        $desk->armUntouchedAll();
         $assigned = $desk->autoAssign();
         $desk->runBookings();
         $closed = $breaks->autoClose();

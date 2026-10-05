@@ -25,7 +25,7 @@
     $openByDefault = array_slice(array_keys($groups), 0, 2);
 @endphp
 
-<nav class="mini-nav thin-scroll flex-1 overflow-y-auto px-3 py-3"
+<nav class="mini-nav thin-scroll flex-1 overflow-y-auto px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+2rem)]"
     x-data="{
         groups: {}, defaults: @js($openByDefault),
         init() {

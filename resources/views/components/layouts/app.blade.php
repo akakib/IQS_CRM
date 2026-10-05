@@ -22,7 +22,7 @@
     <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-black/50 lg:hidden"></div>
 
     <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
-        class="app-sidebar fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-gray-200 bg-white transition-[transform,width] duration-200 lg:translate-x-0">
+        class="app-sidebar fixed left-0 top-0 z-50 flex h-dvh w-[260px] flex-col border-r border-gray-200 bg-white transition-[transform,width] duration-200 lg:translate-x-0">
         <div class="mini-center flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <a href="{{ route('dashboard') }}" class="text-xl font-bold text-gray-800"><span class="mini-hide">{{ config('app.name') }}</span><span class="mini-only">{{ \Illuminate\Support\Str::of(config('app.name'))->before(' ') }}</span></a>
             <button type="button" @click="sidebarOpen = false" class="text-gray-500 hover:text-gray-700 lg:hidden" aria-label="{{ __('Close menu') }}">

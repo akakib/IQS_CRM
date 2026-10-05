@@ -21,6 +21,7 @@ use App\Http\Controllers\Webhooks\WooCommerceWebhookController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationRuleController;
+use App\Http\Controllers\PointsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
@@ -206,6 +207,20 @@ Route::middleware('auth')->group(function () {
             ->get(['id', 'name', 'email'])->map(fn ($u) => ['value' => $u->id, 'label' => $u->name, 'sub' => $u->email]))
             ->name('dev.search-demo');
     }
+
+    // Points: everyone sees their own; managing rules and reviews needs points.manage.
+    Route::get('/points', [PointsController::class, 'mine'])->name('points.mine');
+    Route::post('/points/{entry}/dispute', [PointsController::class, 'dispute'])->whereNumber('entry')->name('points.dispute');
+    Route::middleware('can:points.manage')->group(function () {
+        Route::get('/points/review', [PointsController::class, 'review'])->name('points.review');
+        Route::post('/points/review/flags/{flag}', [PointsController::class, 'decideFlag'])->whereNumber('flag')->name('points.review.flag');
+        Route::post('/points/review/disputes/{entry}', [PointsController::class, 'decideDispute'])->whereNumber('entry')->name('points.review.dispute');
+        Route::post('/points/review/qa/{order}', [PointsController::class, 'storeQa'])->name('points.review.qa');
+        Route::get('/settings/points', [PointsController::class, 'rules'])->name('settings.points');
+        Route::post('/settings/points', [PointsController::class, 'storeRule'])->name('settings.points.store');
+        Route::put('/settings/points/{rule}', [PointsController::class, 'updateRule'])->whereNumber('rule')->name('settings.points.update');
+        Route::post('/settings/points/test', [PointsController::class, 'test'])->name('settings.points.test');
+    });
 
     Route::get('/activity', [ActivityLogController::class, 'index'])->middleware('can:activity.view')->name('activity.index');
 

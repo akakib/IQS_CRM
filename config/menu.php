@@ -9,6 +9,7 @@
 return [
     'overview' => ['Overview', [
         ['Dashboard', 'dashboard', 'dashboard', null],
+        ['My points', 'points.mine', 'points.mine', null],
     ]],
     'orders' => ['Orders', [
         ['All orders', 'orders.index', 'orders.index', 'orders.view'],
@@ -40,7 +41,6 @@ return [
     'team' => ['Team', [
         ['Staff', 'users.index', 'users.*', 'staff.view'],
         ['Roles', 'roles.index', 'roles.*', 'roles.view'],
-        ['My points', 'points.mine', 'points.mine', null],
         ['Points review', 'points.review', 'points.review*', 'points.manage'],
     ]],
     'settings' => ['Settings', [

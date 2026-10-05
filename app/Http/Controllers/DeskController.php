@@ -86,7 +86,7 @@ class DeskController extends Controller
         // The open order: the one asked for (if it is mine), else the first in the list.
         // (An order just taken back is not reopened, even if the address still names it.)
         $openId = ($lost ? 0 : (int) $request->query('order')) ?: ($toTimed ? $timed->id : ($rows->first()->id ?? 0));
-        $order = $openId ? Order::with(['customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en', 'packer:id,name'])->find($openId) : null;
+        $order = $openId ? Order::with(['customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en', 'packer:id,name,photo_path', 'moderator:id,name,photo_path'])->find($openId) : null;
         if ($order && $order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all') {
             $order = null;
         }

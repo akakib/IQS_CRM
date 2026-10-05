@@ -199,6 +199,17 @@
                                     <span>{{ ucfirst($order->channel) }}</span>
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
+                                    {{-- Who has it (and who packs it): shown to managers and whenever it is not the viewer's own order. --}}
+                                    @if (! $embed && ($order->moderator_id !== auth()->id() || auth()->user()->can('orders.reassign')))
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-0.5 pr-2 text-xs text-gray-700" title="{{ __('Assigned to') }}">
+                                            @if ($order->moderator)<x-avatar :name="$order->moderator->name" :photo="$order->moderator->photo_path" size="xs" /> {{ $order->moderator_id === auth()->id() ? __('You') : $order->moderator->name }}@else<span class="px-1.5">{{ __('Nobody') }}</span>@endif
+                                        </span>
+                                        @if ($order->packer)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-purple-50 py-0.5 pl-0.5 pr-2 text-xs text-purple-800" title="{{ __('Packaging') }}">
+                                                <x-avatar :name="$order->packer->name" :photo="$order->packer->photo_path" size="xs" /> {{ $order->packer->name }}
+                                            </span>
+                                        @endif
+                                    @endif
                                     @if ($order->action_due_at)<x-countdown :seconds="$secondsLeft($order->action_due_at)" />@endif
                                     @if ($order->no_response_count)<x-badge color="amber">{{ __('No response ×:n', ['n' => $order->no_response_count]) }}</x-badge>@endif
                                     {{-- Wrong item, address or phone: fix it in the popup without leaving this page. --}}

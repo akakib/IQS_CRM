@@ -37,7 +37,7 @@
                 if (!p || !p.sellable) return;
                 const e = this.items.find(i => i.variant_id === p.value);
                 if (e) e.qty = Number(e.qty) + 1;
-                else this.items.push({ variant_id: p.value, label: p.label, sub: p.sub, price: p.price || 0, unit: p.unit, weight_g: p.weight_g, qty: ({ g: 500, ml: 250 })[p.unit] || 1, line_discount: 0 });
+                else this.items.push({ variant_id: p.value, label: p.label, sub: String(p.sub || '').split(' · ')[0], price: p.price || 0, unit: p.unit, weight_g: p.weight_g, qty: ({ g: 500, ml: 250 })[p.unit] || 1, line_discount: 0 });
                 this.q = ''; this.results = []; this.searched = false;
             },
             money(n) { return '৳' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); },

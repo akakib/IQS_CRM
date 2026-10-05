@@ -278,10 +278,10 @@
 
                         {{-- Short histories start open. Once the user opens or closes it, that choice sticks (adding a note must not fold it away). --}}
                         <details class="mt-3 rounded-lg border border-gray-200" @if ($detail['notes']->count() <= 4) open @endif
-                            x-data x-init="try { const s = localStorage.getItem('iqs_desk_history'); if (s !== null) $el.open = s === '1' } catch (e) {}">
-                            <summary @click="try { localStorage.setItem('iqs_desk_history', $el.parentElement.open ? '0' : '1') } catch (e) {}" class="cursor-pointer px-4 py-2.5 text-sm font-medium text-gray-700">{{ __('History') }} <span class="text-gray-400">({{ $detail['notes']->count() }})</span></summary>
+                            x-data x-init="const s = localStorage.getItem('iqs_desk_history'); if (s !== null) $el.open = s === '1'">
+                            <summary @click="localStorage.setItem('iqs_desk_history', $el.parentElement.open ? '0' : '1')" class="cursor-pointer px-4 py-2.5 text-sm font-medium text-gray-700">{{ __('History') }} <span class="text-gray-400">({{ $detail['notes']->count() }})</span></summary>
                             <div class="space-y-3 border-t border-gray-100 px-4 py-3">
-                                <form method="POST" action="{{ route('orders.notes', $order) }}" class="flex gap-2" @submit="try { localStorage.setItem('iqs_desk_history', '1') } catch (e) {}">
+                                <form method="POST" action="{{ route('orders.notes', $order) }}" class="flex gap-2" @submit="localStorage.setItem('iqs_desk_history', '1')">
                                     @csrf
                                     <input type="hidden" name="type" value="manual">
                                     <input name="body" required maxlength="2000" placeholder="{{ __('Add a note') }}" class="{{ $input }}">

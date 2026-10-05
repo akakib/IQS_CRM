@@ -178,7 +178,14 @@
                             @elseif ($tab === 'again')
                                 <span class="text-xs text-amber-700">{{ Carbon::parse($row->next_call_at)->isToday() ? Carbon::parse($row->next_call_at)->format('g:i A') : Carbon::parse($row->next_call_at)->format('d M, g A') }}</span>
                             @elseif ($tab === 'packaging')
-                                <x-badge :color="$statuses[$row->status_id]['color']">{{ $row->booking_state === 'failed' ? __('Booking failed') : ($row->booking_state === 'queued' ? __('Booking…') : __($statuses[$row->status_id]['name'])) }}</x-badge>
+                                <span class="flex flex-col items-end gap-1">
+                                    <x-badge :color="$statuses[$row->status_id]['color']">{{ $row->booking_state === 'failed' ? __('Booking failed') : ($row->booking_state === 'queued' ? __('Booking…') : __($statuses[$row->status_id]['name'])) }}</x-badge>
+                                    @if ($row->packer_name)
+                                        <span class="flex items-center gap-1 text-[11px] text-purple-800" title="{{ __('Packaging by :n', ['n' => $row->packer_name]) }}"><x-avatar :name="$row->packer_name" :photo="$row->packer_photo" size="xs" /> {{ $row->packer_name }}</span>
+                                    @elseif ($row->booking_state !== 'queued' && $row->booking_state !== 'failed')
+                                        <span class="text-[11px] text-gray-400">{{ __('No packer yet') }}</span>
+                                    @endif
+                                </span>
                             @else
                                 <span class="text-xs text-gray-400">{{ $age($row->assigned_at ?? $row->created_at) }}</span>
                             @endif
@@ -224,12 +231,12 @@
                                         <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-0.5 pr-2 text-xs text-gray-700" title="{{ __('Assigned to') }}">
                                             @if ($order->moderator)<x-avatar :name="$order->moderator->name" :photo="$order->moderator->photo_path" size="xs" /> {{ $order->moderator_id === auth()->id() ? __('You') : $order->moderator->name }}@else<span class="px-1.5">{{ __('Nobody') }}</span>@endif
                                         </span>
-                                        @if ($order->packer)
+                                    @endif
+                                    @if ($order->packer)
                                             <span class="inline-flex items-center gap-1 rounded-full bg-purple-50 py-0.5 pl-0.5 pr-2 text-xs text-purple-800" title="{{ __('Packaging') }}">
                                                 <x-avatar :name="$order->packer->name" :photo="$order->packer->photo_path" size="xs" /> {{ $order->packer->name }}
                                             </span>
                                         @endif
-                                    @endif
                                     @if ($order->action_due_at)<x-countdown :seconds="$secondsLeft($order->action_due_at)" />@endif
                                     @if ($order->no_response_count)<x-badge color="amber">{{ __('No response ×:n', ['n' => $order->no_response_count]) }}</x-badge>@endif
                                     {{-- Wrong item, address or phone: fix it in the popup without leaving this page. --}}
@@ -312,11 +319,14 @@
                                     <p class="font-medium text-red-700">{{ __('Courier booking failed: :e', ['e' => $order->booking_error]) }}</p>
                                 @else
                                     <p class="text-gray-700">{{ __('CN :cn', ['cn' => $detail['consignment'] ?? '-']) }} · {{ __('in the packaging queue since :t', ['t' => $order->packaging_sent_at?->format('g:i A') ?? '-']) }}</p>
-                                    <p class="mt-1 font-medium text-gray-900">
+                                    <p class="mt-2 flex items-center gap-2 font-medium text-gray-900">
+                                        @if ($order->packer)<x-avatar :name="$order->packer->name" :photo="$order->packer->photo_path" size="sm" />@endif
+                                        <span>
                                         @if ($order->packed_at) {{ __('Packed by :n at :t', ['n' => $order->packer->name ?? '-', 't' => $order->packed_at->format('g:i A')]) }}
                                         @elseif (in_array($key, ['packed', 'ready_for_pickup'], true)) {{ __('Packed') }}
-                                        @elseif ($order->packer_id) {{ __('Packaging: :n, since :t', ['n' => $order->packer->name ?? '-', 't' => $order->packaging_started_at?->format('g:i A')]) }}
-                                        @else {{ __('Waiting for a packer') }} @endif
+                                        @elseif ($order->packer_id) {{ __(':n is packing it, since :t', ['n' => $order->packer->name ?? '-', 't' => $order->packaging_started_at?->format('g:i A')]) }}
+                                        @else <span class="text-gray-600">{{ __('Waiting for a packer: the first packer to scan its label takes it.') }}</span> @endif
+                                        </span>
                                     </p>
                                 @endif
                             </div>

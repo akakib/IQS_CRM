@@ -76,11 +76,13 @@ class DeskController extends Controller
             : ($toTimed ? ($timed->status_id === $s('new') ? 'verify' : 'call') : (collect(self::TABS)->first(fn ($t) => $counts[$t] > 0) ?? 'call'));
 
         $page = max(1, (int) $request->query('page', 1));
-        $rows = DB::table('orders')->where('moderator_id', $user->id)->whereRaw($where[$tab][0], $where[$tab][1])
-            ->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('id')
+        $rows = DB::table('orders')->leftJoin('users as pk', 'pk.id', '=', 'orders.packer_id')
+            ->where('moderator_id', $user->id)->whereRaw($where[$tab][0], $where[$tab][1])
+            ->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('orders.id')
             ->forPage($page, self::PER_PAGE)
-            ->get(['id', 'order_no', 'ship_name', 'ship_thana', 'ship_district', 'grand_total', 'channel', 'status_id', 'created_at', 'assigned_at',
-                'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'is_duplicate_flag', 'packer_id', 'packed_at']);
+            ->get(['orders.id', 'order_no', 'ship_name', 'ship_thana', 'ship_district', 'grand_total', 'channel', 'status_id', 'orders.created_at', 'assigned_at',
+                'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'is_duplicate_flag', 'packer_id', 'packed_at',
+                'pk.name as packer_name', 'pk.photo_path as packer_photo']);
         $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ['tab' => $tab]]);
 
         // The open order: the one asked for (if it is mine), else the first in the list.

@@ -297,7 +297,7 @@ class DeskTest extends TestCase
         $this->assertNotNull($a->active_shipment_id);
         $this->assertNotNull($a->packaging_sent_at);
         $this->assertSame('none', $a->booking_state);
-        $this->get('/desk?tab=packaging')->assertSee($a->order_no)->assertSee('Waiting for a packer');
+        $this->get('/desk?tab=packaging')->assertSee($a->order_no)->assertSee('Waiting for a packer')->assertSee('No packer yet');
     }
 
     public function test_by_default_the_next_order_cannot_be_taken_before_the_current_one_is_finished(): void

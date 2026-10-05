@@ -57,8 +57,10 @@ class OrderEditor
             }
 
             $contentChanged = collect($changes)->contains(fn ($c) => in_array($c['type'], ['added', 'removed', 'qty', 'price'], true));
+            // A website order keeps the delivery charge it was sold with, unless the delivery area changes.
+            $keepSoldCharge = $order->channel === 'web' && (int) $shipping['zone_id'] === (int) $order->zone_id;
             $totals = $this->calculator->totals($newItems, $shipping['zone_id'], $orderDiscount,
-                $order->channel === 'web' ? (float) $order->delivery_charge : null);
+                $keepSoldCharge ? (float) $order->delivery_charge : null);
             // A bigger discount than the limit needs a manager, same as when the order is created.
             $discountTooBig = $totals['discount_total'] > (float) settings('orders.discount_limit') && $totals['discount_total'] > (float) $order->discount_total + 0.001;
             $needsApproval = ($status['edit_policy'] === 'approval' || $discountTooBig) && ! $by->can('orders.approve');

@@ -87,6 +87,7 @@ class OrderController extends Controller
             'methods' => PaymentMethod::where('is_active', true)->get(['id', 'name', 'requires_trx_id']),
             'districts' => config('bd.districts'),
             'discountLimit' => (float) settings('orders.discount_limit'),
+            'districts' => config('bd.districts'),
         ]);
     }
 

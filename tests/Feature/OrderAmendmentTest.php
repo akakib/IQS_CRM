@@ -91,6 +91,25 @@ class OrderAmendmentTest extends TestCase
         $this->assertSame('100.00', $order->fresh()->discount_total);
     }
 
+    public function test_a_website_order_keeps_its_sold_delivery_charge_until_the_delivery_area_changes(): void
+    {
+        $zone = fn (string $key) => DB::table('delivery_zones')->where('system_key', $key)->value('id');
+        $order = app(OrderService::class)->create([
+            'channel' => 'web', 'phone' => '01712345678', 'name' => 'Karim', 'address_line' => 'Road 1', 'zone_id' => $zone('inside_dhaka'),
+            'items' => [['variant_id' => $this->dates->id, 'qty' => 2]],
+        ], null, 'webhook');
+        $order->forceFill(['delivery_charge' => 33])->save(); // as sold on the website
+
+        // Same area: the sold charge stays.
+        app(OrderEditor::class)->request($order->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 3]]], $this->reason('customer_request'), $this->agent, $order->fresh()->lock_version);
+        $this->assertSame('33.00', $order->fresh()->delivery_charge);
+
+        // Another area: the delivery rules decide.
+        $expected = app(\App\Services\Orders\DeliveryCharges::class)->for($zone('outside_dhaka'), (int) $order->fresh()->total_weight_g, 1800.0);
+        app(OrderEditor::class)->request($order->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 3]], 'zone_id' => $zone('outside_dhaka')], $this->reason('customer_request'), $this->agent, $order->fresh()->lock_version);
+        $this->assertSame(number_format($expected, 2, '.', ''), $order->fresh()->delivery_charge);
+    }
+
     public function test_a_save_that_comes_back_with_an_error_keeps_the_lines_as_left(): void
     {
         $order = $this->order();

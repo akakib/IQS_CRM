@@ -25,17 +25,21 @@
         x-data="{
             items: {{ \Illuminate\Support\Js::from($items) }}, q: '', results: [], active: 0, timer: null, searched: false, needReason: false,
             orderDiscount: {{ (float) old('order_discount', $orderDiscount) }}, delivery: {{ (float) $order->delivery_charge }}, chargeTimer: null,
+            zone: @js((string) old('zone_id', $order->zone_id ?? '')), soldZone: @js((string) ($order->zone_id ?? '')), soldCharge: {{ (float) $order->delivery_charge }},
+            district: @js((string) old('ship_district', $order->ship_district ?? '')), soldDistrict: @js((string) ($order->ship_district ?? '')),
+            get zoneChanged() { return this.zone !== this.soldZone },
+            get placeChanged() { return this.zoneChanged || this.district !== this.soldDistrict },
             subtotal() { return this.items.reduce((s, i) => s + Number(i.qty) * i.price, 0); },
             lineDiscounts() { return this.items.reduce((s, i) => s + (Number(i.line_discount) || 0), 0); },
             discount() { return this.lineDiscounts() + (Number(this.orderDiscount) || 0); },
             total() { return Math.max(0, this.subtotal() - this.discount()) + this.delivery; },
             weight() { const per = { g: 1, kg: 1000, ml: 1, l: 1000 }; return this.items.reduce((s, i) => s + (per[i.unit] ? Number(i.qty) * per[i.unit] : i.weight_g * i.qty), 0); },
-            {{-- Website orders keep the delivery charge they were sold with; other channels follow the delivery rules. --}}
+            {{-- A website order keeps the delivery charge it was sold with while its delivery area stays the same; otherwise (and for other channels) the delivery rules decide. --}}
             recharge() {
-                if (@js($order->channel === 'web')) return;
+                if (@js($order->channel === 'web') && !this.zoneChanged) { this.delivery = this.soldCharge; return }
                 clearTimeout(this.chargeTimer);
                 this.chargeTimer = setTimeout(async () => {
-                    const zone = document.querySelector('input[name=zone_id]')?.value || '';
+                    const zone = this.zone || '';
                     const url = @js(route('orders.delivery-charge')) + `?zone_id=${zone}&weight_g=${Math.round(this.weight())}&total=${Math.max(0, this.subtotal() - this.discount())}`;
                     try { this.delivery = (await (await fetch(url, { headers: { Accept: 'application/json' } })).json()).charge; } catch (e) {}
                 }, 300);
@@ -107,7 +111,15 @@
                         <div class="flex justify-between" x-show="lineDiscounts() > 0"><dt class="text-gray-500">{{ __('Line discounts') }}</dt><dd class="tabular-nums" x-text="'−' + money(lineDiscounts())"></dd></div>
                         <div class="flex items-center justify-between gap-2"><dt class="text-gray-500">{{ __('Order discount') }}</dt>
                             <dd><input type="number" step="0.01" min="0" name="order_discount" x-model.number="orderDiscount" @input="recharge()" class="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm tabular-nums focus:border-primary focus:outline-none"></dd></div>
-                        <div class="flex justify-between"><dt class="text-gray-500">{{ $order->channel === 'web' ? __('Delivery (as sold)') : __('Delivery (from rules)') }}</dt><dd class="tabular-nums" x-text="money(delivery)"></dd></div>
+                        {{-- Delivery area: changing it updates the charge right here. --}}
+                        <div class="flex items-center justify-between gap-2" @select-change.stop="zone = $event.detail; recharge()">
+                            <dt class="flex min-w-0 items-center gap-2 text-gray-500">
+                                <span class="shrink-0">{{ __('Delivery') }}</span>
+                                <x-simple-select name="zone_id" :options="$zones" :value="(string) old('zone_id', $order->zone_id ?? '')" :placeholder="__('Choose area')" size="sm" />
+                            </dt>
+                            <dd class="shrink-0 text-right tabular-nums"><span x-text="money(delivery)"></span>
+                                <span class="block text-[11px] text-gray-400" x-text="@js($order->channel === 'web') && !zoneChanged ? @js(__('as sold')) : @js(__('from the delivery rules'))"></span></dd>
+                        </div>
                         <div class="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold"><dt>{{ __('New total') }}</dt><dd class="tabular-nums" x-text="money(total())"></dd></div>
                         <div class="flex justify-between text-xs text-gray-500"><dt>{{ __('Total before this change') }}</dt><dd class="tabular-nums">৳{{ number_format((float) $order->grand_total, 2) }}</dd></div>
                         @if ($paid > 0)
@@ -115,6 +127,7 @@
                         @endif
                         <div class="flex justify-between font-medium"><dt>{{ __('Cash to collect (COD)') }}</dt><dd class="tabular-nums" x-text="money(Math.max(0, total() - {{ $paid }}))"></dd></div>
                     </dl>
+                    <p x-show="zoneChanged" x-cloak class="mt-2 text-xs text-amber-700">{{ __('Delivery area changed: the charge follows the new area. Check the address below.') }}</p>
                     <p x-show="discount() > {{ $discountLimit }} && discount() > {{ (float) $order->discount_total }}" x-cloak class="mt-2 text-xs text-amber-700">{{ __('Discount above ৳:n needs a manager: the change will wait for approval.', ['n' => number_format($discountLimit)]) }}</p>
                 </x-card>
             </div>
@@ -124,19 +137,24 @@
                         <x-form.input name="ship_name" :label="__('Name')" :value="$order->ship_name" required />
                         <x-form.input name="ship_phone" :label="__('Phone')" :value="$order->ship_phone" required inputmode="tel" />
                         <x-form.input name="ship_alt_phone" :label="__('Other phone')" :value="$order->ship_alt_phone" inputmode="tel" />
-                        <x-form.input name="ship_district" :label="__('District')" :value="$order->ship_district" />
+                        @php
+                            $districtOptions = ['' => __('Choose district')] + array_combine(config('bd.districts'), config('bd.districts'));
+                            if ($order->ship_district && ! isset($districtOptions[$order->ship_district])) {
+                                $districtOptions[$order->ship_district] = $order->ship_district; // keep a spelling that is not in the list
+                            }
+                        @endphp
+                        <div class="mb-4" @select-change.stop="district = $event.detail">
+                            <label class="mb-2 block text-sm font-medium text-gray-700">{{ __('District') }}</label>
+                            <x-simple-select name="ship_district" :options="$districtOptions" :value="(string) old('ship_district', $order->ship_district ?? '')" searchable full-width class="w-full" />
+                        </div>
                         <x-form.input name="ship_thana" :label="__('Thana / area')" :value="$order->ship_thana" />
                     </div>
                     <label class="mb-2 block text-sm font-medium text-gray-700" for="ship_address">{{ __('Address') }}</label>
                     <textarea id="ship_address" name="ship_address" rows="2" required maxlength="500" class="{{ $input }}">{{ old('ship_address', $order->ship_address) }}</textarea>
-                    <div class="mt-3" x-data="{ zone: @js((string) old('zone_id', $order->zone_id ?? '')) }">
-                        <input type="hidden" name="zone_id" :value="zone">
-                        <div class="flex flex-wrap gap-2">
-                            @foreach ($zones as $id => $zone)
-                                <button type="button" @click="zone = '{{ $id }}'" class="rounded-full border px-2.5 py-1 text-xs" :class="zone == '{{ $id }}' ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $zone }}</button>
-                            @endforeach
-                        </div>
-                    </div>
+                    {{-- The delivery area is chosen in the Total card. Changing where it goes: check the address once more. --}}
+                    <p x-show="placeChanged" x-cloak class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        {{ __('The delivery area changed. Check the district, area and address are right before saving.') }}
+                    </p>
                 </x-card>
             </div>
             <div class="space-y-6 xl:col-start-3 xl:row-start-2">

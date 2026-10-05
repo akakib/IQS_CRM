@@ -17,8 +17,9 @@ class PointsSeeder extends Seeder
         $rules = [
             ['order_delivered', 'Order delivered', 3, 'order_moderator', 'order_final', false, []],
             ['order_delivered', 'Saved order bonus (had No response or Hold, then delivered)', 2, 'order_moderator', 'order_final', false, [['saved', '=', 'true']]],
+            ['order_delivered', 'Repeat customer order the moderator entered (follow-up sale)', 2, 'order_moderator', 'order_final', false, [['repeat_customer', '=', 'true'], ['own_entry', '=', 'true']]],
             ['order_partial', 'Partial delivery', 1, 'order_moderator', 'order_final', false, []],
-            ['order_cancelled', 'Cancelled by a sales mistake', -1, 'order_moderator', 'order_final', false, [['blame', '=', 'sales']]],
+            ['order_cancelled', 'Order cancelled (any reason)', -1, 'order_moderator', 'order_final', false, []],
             ['order_returned', 'Returned by a sales mistake', -3, 'order_moderator', 'order_final', false, [['blame', '=', 'sales']]],
             ['order_returned', 'Returned by a packing mistake', -3, 'packer', 'order_final', false, [['blame', '=', 'packing']]],
             ['order_packed', 'Packed within 30 minutes of release', 1, 'packer', 'order_final', false, [['minutes_since_release', '<=', '30']]],
@@ -26,6 +27,7 @@ class PointsSeeder extends Seeder
             ['amendment', 'Entry error fixed after packing', -2, 'order_moderator', 'immediate', false, [['blame', '=', 'sales'], ['after_pack', '=', 'true']]],
             ['order_reassigned', 'Order taken away for own mistake', -1, 'previous_moderator', 'immediate', false, [['blame', '=', 'sales']]],
             ['issue_escalated', 'Delivery issue not handled in time', -1, 'order_moderator', 'immediate', false, []],
+            ['timer_extended', 'Took extra time on the timer', -0.5, 'actor', 'immediate', false, []],
             ['timer_missed', 'Action timer missed', -1, 'actor', 'immediate', false, []],
             ['timer_missed', 'Action timer missed again (more than 3 today)', -1, 'actor', 'immediate', false, [['releases_today', '>', '3']]],
             ['fake_status', 'Fake status change (confirmed by a manager)', -10, 'actor', 'immediate', false, []],

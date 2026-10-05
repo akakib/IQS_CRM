@@ -25,6 +25,8 @@ return [
     'points.dispute_days' => ['int', 3, 'Days a person has to dispute a point', 'Points', ['required', 'integer', 'min:0', 'max:60']],
     'desk.active_limit' => ['int', 5, 'Website orders one moderator can hold at a time (waiting to verify or call)', 'Order desk', ['required', 'integer', 'min:1', 'max:50']],
     'desk.action_timer_minutes' => ['int', 10, 'Minutes to act on an order before it goes back to New', 'Order desk', ['required', 'integer', 'min:1', 'max:240']],
+    'desk.extend_minutes' => ['int', 5, 'Extra minutes a moderator can add to the timer, once per order', 'Order desk', ['required', 'integer', 'min:1', 'max:60']],
+    'desk.extend_daily_limit' => ['int', 5, 'Times a day one moderator can add extra time (0 = not allowed)', 'Order desk', ['required', 'integer', 'min:0', 'max:100']],
     'desk.auto_assign_minutes' => ['int', 15, 'Give an order nobody took to the least busy active moderator after (minutes)', 'Order desk', ['required', 'integer', 'min:1', 'max:1440']],
     'desk.active_window_minutes' => ['int', 10, 'A moderator counts as active when they used the system in the last (minutes)', 'Order desk', ['required', 'integer', 'min:1', 'max:120']],
     'desk.no_response_returns' => ['string', '30,300,1440', 'No response: minutes until the order comes back, one per try (after the last one it is cancelled)', 'Order desk', ['required', 'regex:/^\d+(,\d+){0,5}$/']],

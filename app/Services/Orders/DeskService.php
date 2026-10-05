@@ -160,6 +160,58 @@ class DeskService
         $this->armTimer($userId);
     }
 
+    /** How many times this person took extra time today. */
+    public function extensionsToday(int $userId): int
+    {
+        return DB::table('orders')->where('timer_extended_by', $userId)->where('timer_extended_at', '>=', now()->startOfDay())->count();
+    }
+
+    /**
+     * Extra minutes on a running timer: once per order, a limited number of
+     * times a day, and only before the time is up. Recorded and scored.
+     */
+    public function extend(Order $order, User $user): void
+    {
+        $limit = (int) settings('desk.extend_daily_limit');
+        $used = $this->extensionsToday($user->id);
+        $fail = match (true) {
+            $order->moderator_id !== $user->id => __('This order is not with you.'),
+            ! $order->action_due_at => __('No timer is running on this order.'),
+            $order->action_due_at->isPast() => __('Time is already up on this order.'),
+            $order->timer_extended_at !== null => __('Extra time was already taken on this order.'),
+            $used >= $limit => __('You have used your :n extra-time requests for today.', ['n' => $limit]),
+            default => null,
+        };
+        if ($fail) {
+            throw ValidationException::withMessages(['order' => $fail]);
+        }
+
+        $minutes = (int) settings('desk.extend_minutes');
+        // The WHERE repeats the checks, so two clicks cannot both add time.
+        $done = DB::table('orders')->where('id', $order->id)->where('moderator_id', $user->id)->whereNull('timer_extended_at')
+            ->where('action_due_at', '>', now())
+            ->update(['action_due_at' => $order->action_due_at->copy()->addMinutes($minutes), 'timer_extended_at' => now(), 'timer_extended_by' => $user->id]);
+        if (! $done) {
+            return;
+        }
+        $this->systemNote($order->id, __(':n took :m more minutes.', ['n' => $user->name, 'm' => $minutes]), $user->id);
+        app(PointHooks::class)->timerExtended($order, $user->id, $used + 1);
+    }
+
+    /**
+     * Release every order whose time is up and say which of them were this
+     * person's (the desk shows that as a message).
+     *
+     * @return list<string> order numbers taken back from this person
+     */
+    public function sweepFor(int $userId): array
+    {
+        $mine = DB::table('orders')->where('moderator_id', $userId)->whereNotNull('action_due_at')->where('action_due_at', '<=', now())->pluck('order_no')->all();
+        $this->sweepExpired();
+
+        return $mine;
+    }
+
     /** @return int orders released because their timer ran out */
     public function sweepExpired(): int
     {

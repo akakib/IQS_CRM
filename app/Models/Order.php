@@ -37,6 +37,7 @@ class Order extends Model
             'assigned_at' => 'datetime',
             'action_due_at' => 'datetime',
             'next_call_at' => 'datetime',
+            'timer_extended_at' => 'datetime',
             'packing_sent_at' => 'datetime',
             'packing_started_at' => 'datetime',
             'packed_at' => 'datetime',

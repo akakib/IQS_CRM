@@ -60,7 +60,7 @@ class PointHooks
             'order_claimed' => ['minutes_waiting' => $this->minutesWaiting($order)],
             'order_confirmed' => ['minutes_since_claim' => $this->minutesSinceClaim($order), 'risky' => $this->risky($order), 'by_rule' => $actor === null && $this->confirmedByRule($order)],
             'order_packed' => ['minutes_since_release' => $this->minutesSinceRelease($order)],
-            'order_delivered' => ['channel' => $order->channel, 'saved' => (bool) $order->had_setback, 'risky' => $this->risky($order)],
+            'order_delivered' => ['channel' => $order->channel, 'saved' => (bool) $order->had_setback, 'risky' => $this->risky($order)] + $this->followUp($order),
             'order_partial' => ['channel' => $order->channel, 'risky' => $this->risky($order), 'blame' => $this->lastReasonBlame($order)],
             'order_returned' => ['channel' => $order->channel, 'risky' => $this->risky($order), 'blame' => $this->lastReasonBlame($order)],
             'order_cancelled' => ['channel' => $order->channel, 'shipped' => (bool) $order->active_shipment_id, 'risky' => $this->risky($order),
@@ -99,6 +99,12 @@ class PointHooks
     public function escalated(Order $order): void
     {
         $this->engine->fire('issue_escalated', $order, [], ['order_moderator' => $order->moderator_id]);
+    }
+
+    /** The moderator asked for extra minutes on the action timer. */
+    public function timerExtended(Order $order, int $userId, int $extensionsToday): void
+    {
+        $this->engine->fire('timer_extended', $order, ['extensions_today' => $extensionsToday], ['actor' => $userId]);
     }
 
     /** The action timer ran out and the order went back to New. */
@@ -143,6 +149,25 @@ class PointHooks
     private function confirmedByRule(Order $order): bool
     {
         return DB::table('order_events')->where('order_id', $order->id)->where('to_status_id', OrderStatus::idFor('confirmed'))->orderByDesc('id')->value('source') === 'rule';
+    }
+
+    /**
+     * A follow-up sale: the customer bought (and received) before, and this
+     * time the moderator brought the order in themselves (chat or phone).
+     *
+     * @return array{repeat_customer: bool, own_entry: bool, days_since_last_order: ?float}
+     */
+    private function followUp(Order $order): array
+    {
+        $delivered = OrderStatus::idsFor(['delivered', 'partial_delivered']);
+        $previous = DB::table('orders')->where('customer_id', $order->customer_id)->where('id', '<', $order->id)->orderByDesc('id')
+            ->get(['status_id', 'created_at']);
+
+        return [
+            'repeat_customer' => $previous->contains(fn ($o) => in_array($o->status_id, $delivered, true)),
+            'own_entry' => $order->channel !== 'web' && $order->moderator_id && (int) $order->created_by === (int) $order->moderator_id,
+            'days_since_last_order' => $previous->isNotEmpty() ? round($order->created_at->diffInHours($previous->first()->created_at, true) / 24, 1) : null,
+        ];
     }
 
     /** Not verified by the rules = the moderator chose to send a risky order. */

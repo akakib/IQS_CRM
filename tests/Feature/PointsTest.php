@@ -80,13 +80,14 @@ class PointsTest extends TestCase
         $this->assertSame(3.0, $this->points('final'));
 
         // Had a No response or Hold on the way, then delivered: 3 + 2 bonus.
+        // (It is the same customer again, entered by the moderator: + 2 for the follow-up sale.)
         $saved = $this->order();
         $saved->forceFill(['had_setback' => true])->save();
         $this->move($saved, 'delivered', null);
-        $this->assertSame(8.0, $this->points('final'));
+        $this->assertSame(3.0 + 3 + 2 + 2, $this->points('final'));
     }
 
-    public function test_cancel_by_sales_mistake_costs_one_point_and_customer_cancel_nothing(): void
+    public function test_every_cancel_costs_the_moderator_a_point_whatever_the_reason(): void
     {
         $order = $this->order();
         $this->move($order, 'cancelled', $this->agent, 'entry_error');
@@ -94,7 +95,7 @@ class PointsTest extends TestCase
 
         $other = $this->order();
         $this->move($other, 'cancelled', $this->agent, 'customer_cancelled');
-        $this->assertSame(-1.0, $this->points('final'));
+        $this->assertSame(-2.0, $this->points('final'));
     }
 
     public function test_admin_can_pay_more_for_a_channel_and_a_reversed_delivery_is_clawed_back(): void
@@ -110,6 +111,24 @@ class PointsTest extends TestCase
         // Courier corrects it to returned: delivery points go.
         $this->move($order, 'returned', null);
         $this->assertSame(0.0, $this->points('final'));
+    }
+
+    public function test_follow_up_sale_to_a_repeat_customer_earns_extra(): void
+    {
+        $first = $this->order();               // same phone, so the same customer
+        $this->move($first, 'delivered', null);
+        $this->assertSame(3.0, $this->points('final'));
+
+        $this->travel(5)->days();
+        $again = $this->order();               // entered by the moderator on Messenger
+        $this->move($again, 'delivered', null);
+        $this->assertSame(8.0, $this->points('final')); // 3 + 2 for the follow-up sale
+    }
+
+    public function test_extra_time_costs_half_a_point(): void
+    {
+        app(PointHooks::class)->timerExtended($this->order(), $this->agent->id, 1);
+        $this->assertSame(-0.5, $this->points('final'));
     }
 
     public function test_missed_timer_costs_a_point_and_more_after_three_in_a_day(): void

@@ -101,6 +101,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/desk', [DeskController::class, 'index'])->middleware('can:orders.edit')->name('desk.index');
     Route::post('/desk/next', [DeskController::class, 'takeNext'])->middleware('can:orders.take')->name('desk.next');
     Route::post('/desk/{order}/act', [DeskController::class, 'act'])->middleware('can:orders.edit')->name('desk.act');
+    Route::post('/desk/{order}/extend', [DeskController::class, 'extend'])->middleware('can:orders.edit')->name('desk.extend');
 
     Route::get('/desk/control', [TeamController::class, 'control'])->middleware('can:orders.reassign')->name('desk.control');
     Route::get('/attendance', [TeamController::class, 'attendance'])->middleware('can:attendance.view')->name('attendance.index');

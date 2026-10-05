@@ -20,7 +20,12 @@
         'confirmed' => __('Confirmed. Send it to packing: the courier is booked for you.'),
     ];
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none';
-    $showDetailOnPhone = request()->filled('order');
+    $showDetailOnPhone = request()->filled('order') && $order && ! $lost;
+    // The one order whose timer is running: the open one, or another of mine.
+    $armed = $order && $order->action_due_at && $isMine ? $order : $timed;
+    $armedSeconds = $armed ? $secondsLeft($armed->action_due_at) : 0;
+    $armedIsOpen = $armed && $order && $armed->id === $order->id;
+    $canExtend = $armed && ! $armed->timer_extended_at && $extendsLeft > 0;
 @endphp
 
 <x-layouts.app :heading="__('Order management')">
@@ -75,6 +80,56 @@
         <x-tabs :tabs="collect($tabLabels)->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
     </div>
 
+
+    @if ($lost)
+        <div class="mb-3 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" x-data="{ show: true }" x-show="show">
+            <p>{{ trans_choice('{1} Time ran out on :list. It went back to New and anyone can take it.|[2,*] Time ran out on :list. They went back to New and anyone can take them.', count($lost), ['list' => implode(', ', $lost)]) }}</p>
+            <button type="button" @click="show = false" class="shrink-0 text-red-400 hover:text-red-700" aria-label="{{ __('Close') }}">&times;</button>
+        </div>
+    @endif
+
+    {{-- Timer watch. Quiet until 2 minutes are left, red in the last 30 seconds; when the time is up the page
+         reloads by itself (same tab, same page) and the server takes the order back. --}}
+    @if ($armed && $armedSeconds > 0)
+        <div x-data="{
+                start: Date.now(), base: {{ $armedSeconds }}, now: Date.now(), leaving: false,
+                init() { setInterval(() => { this.now = Date.now(); if (this.left === 0 && !this.leaving) { this.leaving = true; setTimeout(() => window.location.reload(), 1200) } }, 1000) },
+                get left() { return Math.max(0, this.base - Math.floor((this.now - this.start) / 1000)) },
+                get clock() { return Math.floor(this.left / 60) + ':' + String(this.left % 60).padStart(2, '0') },
+            }" class="sticky top-[68px] z-20">
+            @unless ($armedIsOpen)
+                <a x-show="left > 120" href="{{ $url(['tab' => $statuses[$armed->status_id]['key'] === 'new' ? 'verify' : 'call', 'order' => $armed->id]) }}"
+                    class="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 hover:bg-amber-100">
+                    <span>{{ __('Your timer is running on :no. Finish that one first.', ['no' => $armed->order_no]) }}</span>
+                    <span class="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-xs font-semibold tabular-nums" x-text="clock"></span>
+                </a>
+            @endunless
+            <div x-show="left <= 120" x-cloak class="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border px-4 py-3 text-sm shadow-sm"
+                :class="left <= 30 ? 'border-red-300 bg-red-600 text-white' : 'border-red-200 bg-red-50 text-red-800'">
+                <p class="min-w-0 flex-1">
+                    <template x-if="left > 0"><span><b class="tabular-nums" x-text="clock"></b> {{ __('left on :no. Act now, or it goes back to New.', ['no' => $armed->order_no]) }}</span></template>
+                    <template x-if="left === 0"><span>{{ __('Time is up on :no. Taking it back…', ['no' => $armed->order_no]) }}</span></template>
+                </p>
+                <div class="flex shrink-0 items-center gap-2" x-show="left > 0">
+                    @unless ($armedIsOpen)
+                        <a href="{{ $url(['tab' => $statuses[$armed->status_id]['key'] === 'new' ? 'verify' : 'call', 'order' => $armed->id]) }}" class="rounded-lg border border-current px-3 py-1.5 text-xs font-semibold">{{ __('Open it') }}</a>
+                    @endunless
+                    @if ($canExtend)
+                        <form method="POST" action="{{ route('desk.extend', $armed->id) }}">
+                            @csrf
+                            <button type="submit" class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm hover:bg-red-50">{{ __('+:m min', ['m' => $extendMinutes]) }}</button>
+                        </form>
+                    @endif
+                </div>
+                @if ($canExtend)
+                    <p class="w-full text-[11px] opacity-80" x-show="left > 0">{{ __('Extra time: once per order, :n left today. It is recorded.', ['n' => $extendsLeft]) }}</p>
+                @elseif ($armed->timer_extended_at)
+                    <p class="w-full text-[11px] opacity-80" x-show="left > 0">{{ __('Extra time was already used on this order.') }}</p>
+                @endif
+            </div>
+        </div>
+    @endif
+
     <div class="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
         {{-- My orders in this stage --}}
         <aside @class(['lg:block', 'hidden' => $showDetailOnPhone])>
@@ -119,16 +174,6 @@
                 </div>
             @else
                 <a href="{{ $url(['tab' => $tab]) }}" class="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-green-900 lg:hidden">&larr; {{ __('My orders') }} · {{ $tabLabels[$tab] }} ({{ $counts[$tab] }})</a>
-
-                @if ($timed)
-                    <a href="{{ $url(['tab' => $statuses[$timed->status_id]['key'] === 'new' ? 'verify' : 'call', 'order' => $timed->id]) }}"
-                        class="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100">
-                        <span>{{ $secondsLeft($timed->action_due_at) > 0
-                            ? __('Your timer is running on :no. Finish that one first.', ['no' => $timed->order_no])
-                            : __('Time is up on :no. Act on it now, or it goes back to New.', ['no' => $timed->order_no]) }}</span>
-                        <x-countdown :seconds="$secondsLeft($timed->action_due_at)" />
-                    </a>
-                @endif
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">

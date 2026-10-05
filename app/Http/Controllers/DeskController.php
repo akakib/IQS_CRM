@@ -36,6 +36,9 @@ class DeskController extends Controller
     {
         $user = $request->user();
         $s = fn (string $key) => OrderStatus::idFor($key);
+
+        // Time that ran out is enforced here, on every visit, not only by the cron.
+        $lost = $this->desk->sweepFor($user->id);
         $now = now()->toDateTimeString();
         $packing = [$s('ready_for_packaging'), $s('packed'), $s('ready_for_pickup')];
 
@@ -66,6 +69,7 @@ class DeskController extends Controller
         // Work waiting but no timer running (first visit of the day, or after a break): start it now.
         if (! $counts['timed'] && $counts['verify'] + $counts['call'] > 0) {
             $this->desk->armTimer($user->id);
+            $counts['timed'] = 1;
         }
 
         // Default tab: the first one with work in it.
@@ -81,7 +85,8 @@ class DeskController extends Controller
         $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ['tab' => $tab]]);
 
         // The open order: the one asked for (if it is mine), else the first in the list.
-        $openId = (int) $request->query('order') ?: ($rows->first()->id ?? 0);
+        // (An order just taken back is not reopened, even if the address still names it.)
+        $openId = ($lost ? 0 : (int) $request->query('order')) ?: ($rows->first()->id ?? 0);
         $order = $openId ? Order::with(['customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en', 'packer:id,name'])->find($openId) : null;
         if ($order && $order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all') {
             $order = null;
@@ -100,9 +105,12 @@ class DeskController extends Controller
             'order' => $order,
             'detail' => $order ? $this->detail($order) : null,
             // The timer runs on one order at a time. If the open order is not that one, point to it.
-            'timed' => $order && ! $order->action_due_at
-                ? DB::table('orders')->where('moderator_id', $user->id)->whereNotNull('action_due_at')->orderBy('action_due_at')->first(['id', 'order_no', 'action_due_at', 'status_id'])
+            'timed' => $counts['timed'] && (! $order || ! $order->action_due_at)
+                ? DB::table('orders')->where('moderator_id', $user->id)->whereNotNull('action_due_at')->orderBy('action_due_at')->first(['id', 'order_no', 'action_due_at', 'status_id', 'timer_extended_at'])
                 : null,
+            'lost' => $lost,
+            'extendMinutes' => (int) settings('desk.extend_minutes'),
+            'extendsLeft' => $counts['timed'] ? max(0, (int) settings('desk.extend_daily_limit') - $this->desk->extensionsToday($user->id)) : 0,
             'statuses' => OrderStatus::map(),
             'waiting' => (int) $waiting->n,
             'oldestWaiting' => $waiting->oldest,
@@ -138,6 +146,13 @@ class DeskController extends Controller
             'lock_version' => ['required', 'integer'],
             'tab' => ['nullable', Rule::in(self::TABS)],
         ]);
+        // Time already up: the action does not count; the order goes back to New.
+        if ($order->moderator_id === $user->id && $order->action_due_at && $order->action_due_at->isPast()) {
+            $this->desk->release($order->id, 'timeout');
+
+            return redirect()->route('desk.index', array_filter(['tab' => $data['tab'] ?? null]))
+                ->with('error', __('Time ran out on :no. It went back to New.', ['no' => $order->order_no]));
+        }
         if ($order->lock_version !== (int) $data['lock_version']) {
             throw ValidationException::withMessages(['order' => __('This order just changed. Look again before acting.')]);
         }
@@ -190,6 +205,14 @@ class DeskController extends Controller
         }
 
         return redirect()->route('desk.index', array_filter($next))->with('success', $message);
+    }
+
+    /** "+5 min" on the running timer. */
+    public function extend(Order $order, Request $request): RedirectResponse
+    {
+        $this->desk->extend($order, $request->user());
+
+        return back()->with('success', __(':m more minutes on :no.', ['m' => settings('desk.extend_minutes'), 'no' => $order->order_no]));
     }
 
     /** @return array<string, mixed> everything the detail pane shows beyond the order row */

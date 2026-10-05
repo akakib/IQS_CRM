@@ -124,6 +124,55 @@ class DeskTest extends TestCase
         $this->assertSame($a->id, $this->desk()->takeNext($this->rima)->id);
     }
 
+    public function test_time_up_is_enforced_on_the_next_visit_and_on_the_next_click_without_cron(): void
+    {
+        [$a, $b] = [$this->web(), $this->web()];
+        $this->actingAs($this->mahim)->post('/desk/next');
+        $this->travel(4)->seconds();
+        $this->post('/desk/next');
+        $this->assertNotNull($a->fresh()->action_due_at);
+
+        // Clicking after the time is up does nothing for the order: it goes back and costs the point.
+        $this->travel(11)->minutes();
+        $this->act($a, 'verify')->assertSessionHas('error');
+        $this->assertNull($a->fresh()->moderator_id);
+        $this->assertSame('new', $this->key($a));
+        $this->assertSame(-1.0, (float) DB::table('point_ledger')->where('user_id', $this->mahim->id)->sum('points'));
+
+        // The second order got its own timer; just opening the desk after it runs out takes it back too.
+        $this->assertNotNull($b->fresh()->action_due_at);
+        $this->travel(11)->minutes();
+        $this->get('/desk')->assertOk()->assertSee('Time ran out on '.$b->order_no);
+        $this->assertNull($b->fresh()->moderator_id);
+    }
+
+    public function test_extra_time_once_per_order_with_a_daily_limit_and_a_small_cost(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['desk.extend_daily_limit' => 1]);
+        [$a, $b] = [$this->web(), $this->web()];
+        $this->actingAs($this->mahim)->post('/desk/next');
+        $due = $a->fresh()->action_due_at;
+
+        $this->travel(8)->minutes();
+        $this->get('/desk')->assertOk()->assertSee('+5 min');
+        $this->post("/desk/{$a->id}/extend")->assertSessionHas('success');
+        $this->assertTrue($a->fresh()->action_due_at->equalTo($due->copy()->addMinutes(5)));
+        $this->assertSame(-0.5, (float) DB::table('point_ledger')->where('user_id', $this->mahim->id)->sum('points'));
+
+        $this->post("/desk/{$a->id}/extend")->assertSessionHasErrors('order'); // once per order
+
+        // 12 minutes after taking it: still mine thanks to the extra time.
+        $this->travel(4)->minutes();
+        $this->act($a, 'verify')->assertSessionHas('success');
+        $this->assertSame($this->mahim->id, $a->fresh()->moderator_id);
+
+        // Daily limit of 1 is used up.
+        $this->act($a, 'confirm');
+        $this->travel(4)->seconds();
+        $this->post('/desk/next');
+        $this->post("/desk/{$b->id}/extend")->assertSessionHasErrors('order');
+    }
+
     public function test_acting_in_time_stops_the_timer(): void
     {
         $a = $this->web();
@@ -341,7 +390,8 @@ class DeskTest extends TestCase
         DB::enableQueryLog();
         $this->get('/desk')->assertOk()->assertSee('Take next')->assertSee('Record OK, call next');
         // user + permissions (2), counts, list, waiting, reasons, order, customer, items, notes, duplicates
-        $this->assertLessThanOrEqual(12, count(DB::getQueryLog()));
+        // + expired-timer check (2) and extra-time count (1)
+        $this->assertLessThanOrEqual(15, count(DB::getQueryLog()));
         DB::disableQueryLog();
 
         $this->get('/desk/control')->assertForbidden();

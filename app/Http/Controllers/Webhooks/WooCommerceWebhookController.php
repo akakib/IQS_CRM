@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Orders\WooOrderIntake;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,6 +25,8 @@ class WooCommerceWebhookController extends Controller
 
         // WooCommerce pings the URL once when the webhook is saved.
         if ($request->has('webhook_id') && ! $request->header('X-WC-Webhook-Topic')) {
+            Cache::put('woo:webhook:ping', now()->toIso8601String(), now()->addDays(30)); // Website connection shows "connected"
+
             return response()->json(['status' => 'pong']);
         }
 
@@ -32,8 +35,11 @@ class WooCommerceWebhookController extends Controller
         }
         $expected = base64_encode(hash_hmac('sha256', $body, $secret, true));
         if (! hash_equals($expected, (string) $request->header('X-WC-Webhook-Signature'))) {
+            Cache::put('woo:webhook:rejected', now()->toIso8601String(), now()->addDays(30)); // the page says: the secret does not match
+
             return response()->json(['message' => 'Invalid signature'], 401);
         }
+        Cache::put('woo:webhook:accepted', now()->toIso8601String(), now()->addDays(30));
 
         $topic = (string) $request->header('X-WC-Webhook-Topic');
         $payload = json_decode($body, true);

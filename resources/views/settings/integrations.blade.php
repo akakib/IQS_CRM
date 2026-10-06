@@ -17,6 +17,25 @@
             @else
                 <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('Not set. Ask for WOO_WEBHOOK_SECRET to be added to the server settings.') }}</p>
             @endif
+
+            @php
+                $when = fn ($t) => $t ? \Illuminate\Support\Carbon::parse($t)->timezone(config('app.timezone'))->format('d M, g:i A') : null;
+                $latest = max((string) $wooPing, (string) $wooAccepted);
+                $broken = $wooRejected && $wooRejected > $latest;
+                $connected = $latest !== '' && ! $broken;
+            @endphp
+            <div class="mt-4 rounded-lg border px-3 py-2 {{ $broken ? 'border-red-200 bg-red-50' : ($connected ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50') }}">
+                <p class="text-sm font-semibold {{ $broken ? 'text-red-700' : ($connected ? 'text-green-800' : 'text-gray-700') }}">
+                    {{ $broken ? __('Not connected: the website called, but the secret did not match') : ($connected ? __('Connected: the website reaches IQS') : __('Not connected yet')) }}
+                </p>
+                <dl class="mt-1 grid gap-1 text-xs text-gray-600 sm:grid-cols-3">
+                    <div><dt class="uppercase text-gray-500">{{ __('Webhook saved (ping)') }}</dt><dd>{{ $when($wooPing) ?? __('None yet') }}</dd></div>
+                    <div><dt class="uppercase text-gray-500">{{ __('Last order received') }}</dt><dd>{{ $when($wooLastOrder) ?? __('None yet') }}</dd></div>
+                    <div><dt class="uppercase text-gray-500">{{ __('Last refused call') }}</dt><dd>{{ $when($wooRejected) ?? __('None') }}</dd></div>
+                </dl>
+                <p class="mt-1 text-xs text-gray-500">{{ $broken ? __('Copy the Secret above into the WooCommerce webhook again and save it.') : __('Save the webhook in WooCommerce: it pings this URL at once. Then place a test order.') }}</p>
+                <a href="{{ route('settings.integrations') }}" class="mt-1 inline-block text-xs font-medium text-primary hover:underline">{{ __('Check again') }}</a>
+            </div>
         </x-card>
 
         <x-card :title="__('Steadfast → IQS (delivery status webhook)')">

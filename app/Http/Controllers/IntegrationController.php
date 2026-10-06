@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Orders\WooOrderIntake;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -17,6 +18,11 @@ class IntegrationController extends Controller
             'secret' => (string) config('store.woocommerce.webhook_secret'),
             'steadfastUrl' => route('webhooks.steadfast'),
             'steadfastToken' => (string) config('courier.steadfast.webhook_token'),
+            // Is the website really calling us? Saved by the webhook endpoint itself.
+            'wooPing' => Cache::get('woo:webhook:ping'),
+            'wooAccepted' => Cache::get('woo:webhook:accepted'),
+            'wooRejected' => Cache::get('woo:webhook:rejected'),
+            'wooLastOrder' => DB::table('integration_inbox')->where('source', 'woocommerce')->max('received_at'),
             'storeDriver' => app(\App\Services\Catalog\Store\StoreDriver::class)->name(),
             'inbox' => DB::table('integration_inbox')->orderByDesc('id')->limit(30)
                 ->get(['id', 'source', 'external_id', 'topic', 'status', 'error', 'order_id', 'received_at']),

@@ -210,8 +210,15 @@ class WooWebhookTest extends TestCase
 
     public function test_bad_signature_is_rejected_and_duplicates_are_ignored(): void
     {
+        $owner = $this->owner();
+        // Website connection shows the state: nothing, refused (wrong secret), connected (Woo's ping on save).
+        $this->actingAs($owner)->get('/settings/integrations')->assertSee('Not connected yet');
         $this->send($this->payload(), 'wrong')->assertStatus(401);
         $this->assertSame(0, Order::count());
+        $this->get('/settings/integrations')->assertSee('the secret did not match');
+        $this->travel(1)->minute();
+        $this->post('/webhooks/woocommerce', ['webhook_id' => 7])->assertJson(['status' => 'pong']);
+        $this->get('/settings/integrations')->assertSee('Connected: the website reaches IQS');
 
         $this->send($this->payload())->assertOk();
         $this->send($this->payload())->assertJson(['status' => 'duplicate']);

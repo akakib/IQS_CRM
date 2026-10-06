@@ -62,22 +62,34 @@
     {{-- New orders: nobody picks; "Take next" always gives the oldest one. --}}
     @unless ($embed)
     <div @class(['mb-4 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
-        <div class="flex items-center gap-4">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold tabular-nums {{ $waiting ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400' }}">{{ $waiting }}</div>
+        @php $anyWaiting = $waiting + $advanceWaiting; @endphp
+        {{-- Live: the pulse (every 30 s) updates the count, the wording and Take next without a reload. --}}
+        <div class="flex items-center gap-4" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }},
+                label() { return this.n === 0 ? @js(__('No new orders')) : (this.adv === this.n ? (this.n === 1 ? @js(__('1 order waiting for its advance')) : this.n + ' ' + @js(__('orders waiting for their advance'))) : (this.n === 1 ? @js(__('New order waiting')) : @js(__('New orders waiting')))) } }"
+            @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold tabular-nums" :class="n ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'" x-text="n">{{ $anyWaiting }}</div>
             <div>
-                <p class="text-sm font-semibold text-gray-800">{{ trans_choice('{0} No new orders|{1} New order waiting|[2,*] New orders waiting', $waiting) }}</p>
+                <p class="text-sm font-semibold text-gray-800" x-text="label()">
+                    @if (! $waiting && $advanceWaiting)
+                        {{ trans_choice('{1} 1 order waiting for its advance|[2,*] :n orders waiting for their advance', $advanceWaiting, ['n' => $advanceWaiting]) }}
+                    @else
+                        {{ trans_choice('{0} No new orders|{1} New order waiting|[2,*] New orders waiting', $waiting) }}
+                    @endif
+                </p>
                 <p class="text-xs text-gray-500">
                     @if ($waiting) {{ __('Oldest: :t ago', ['t' => $age($oldestWaiting)]) }} · @endif
+                    @if ($waiting && $advanceWaiting) {{ __(':n waiting for advance', ['n' => $advanceWaiting]) }} · @endif
                     {{ $limit === 1 ? ($counts['active'] ? __('One order at a time: finish yours to take the next') : __('One order at a time')) : __('You hold :a of :l', ['a' => $counts['active'], 'l' => $limit]) }}
                     @if ($counts['again']) · {{ __(':n waiting on No response', ['n' => $counts['again']]) }} @endif
                 </p>
             </div>
         </div>
         @if ($canTake)
-            <form method="POST" action="{{ route('desk.next') }}">
+            <form method="POST" action="{{ route('desk.next') }}" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
                 @csrf
-                <x-button class="w-full sm:w-auto" data-key="t" :disabled="! $waiting || $atLimit">
-                    {{ $atLimit ? ($limit === 1 ? __('Finish this order first') : __('Finish one first')) : __('Take next') }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">⇧T</kbd>
+                {{-- Advance holds are outside the active limit: with hands full they can still be taken. --}}
+                <x-button class="w-full sm:w-auto" data-key="t" :disabled="! $anyWaiting || ($atLimit && ! $advanceWaiting)" x-bind:disabled="!n || ({{ $atLimit ? 'true' : 'false' }} && !adv)">
+                    {{ $atLimit && ! $advanceWaiting ? ($limit === 1 ? __('Finish this order first') : __('Finish one first')) : __('Take next') }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">⇧T</kbd>
                 </x-button>
             </form>
         @endif
@@ -211,7 +223,7 @@
             @if (! $order)
                 <div class="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
                     <p class="text-sm font-medium text-gray-700">{{ __('This list is empty') }}</p>
-                    <p class="mt-1 text-sm text-gray-500">{{ $waiting && $canTake ? __('Press Take next to get the oldest new order.') : __('New orders will show at the top when they arrive.') }}</p>
+                    <p class="mt-1 text-sm text-gray-500">{{ ($waiting || $advanceWaiting) && $canTake ? __('Press Take next to get the oldest waiting order.') : __('New orders will show at the top when they arrive.') }}</p>
                 </div>
             @else
                 @unless ($embed)

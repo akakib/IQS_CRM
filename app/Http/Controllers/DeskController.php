@@ -118,6 +118,7 @@ class DeskController extends Controller
             && (in_array($order->status_id, [$s('new'), $s('record_verified')], true) || ($order->status_id === $s('no_answer') && (! $order->next_call_at || $order->next_call_at->isPast())));
 
         $waiting = $this->desk->waitingQuery()->selectRaw('COUNT(*) as n, MIN(created_at) as oldest')->first();
+        $advanceWaiting = (int) $this->desk->waitingAdvanceQuery()->count(); // nobody's yet: a call to ask for the advance
         // Packer-only hold reasons (item not found on the shelf) are not offered to moderators.
         $reasons = DB::table('status_reasons')->whereIn('reason_type', ['hold', 'cancel'])->where('is_active', true)
             ->where(fn ($q) => $q->whereNull('system_key')->orWhereNotIn('system_key', ['item_not_found', 'item_damaged']))
@@ -138,6 +139,7 @@ class DeskController extends Controller
             'extendsLeft' => $counts['timed'] ? max(0, (int) settings('desk.extend_daily_limit') - $this->desk->extensionsToday($user->id)) : 0,
             'statuses' => OrderStatus::map(),
             'waiting' => (int) $waiting->n,
+            'advanceWaiting' => $advanceWaiting,
             'oldestWaiting' => $waiting->oldest,
             'limit' => (int) settings('desk.active_limit'),
             'canTake' => $user->can('orders.take') && ! $user->isOwner(), // owners watch, staff take
@@ -197,7 +199,8 @@ class DeskController extends Controller
                 ->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no, 'tab' => 'call'])->values(),
             'timed' => $timed ? ['id' => $timed->id, 'no' => $timed->order_no, 'due' => $timed->action_due_at,
                 'left' => (int) max(0, now()->diffInSeconds(\Illuminate\Support\Carbon::parse($timed->action_due_at), false))] : null,
-            'waiting' => (int) $this->desk->waitingQuery()->count(),
+            'waiting' => (int) $this->desk->waitingQuery()->count() + ($advanceWaiting = (int) $this->desk->waitingAdvanceQuery()->count()),
+            'advance_waiting' => $advanceWaiting,
             'can_take' => $active->count() < (int) settings('desk.active_limit'),
             // The bell reads its counts from here on pages that have the pulse (one request instead of two).
             'notifications' => $bell,

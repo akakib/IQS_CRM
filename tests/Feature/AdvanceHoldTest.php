@@ -104,6 +104,9 @@ class AdvanceHoldTest extends TestCase
         $this->assertSame('record_verified', $this->key($call));
 
         $this->actingAs($this->mod);
+        // The desk says both are waiting, and the pulse counts both (so the voice tells about them).
+        $this->get('/desk')->assertSee('New order waiting')->assertSee('1 waiting for advance');
+        $this->assertSame(2, $this->getJson('/desk/pulse')->json('waiting'));
         // 1. Call order first.
         $this->next()->assertSessionHasNoErrors();
         $this->assertSame($this->mod->id, $call->fresh()->moderator_id);
@@ -121,6 +124,8 @@ class AdvanceHoldTest extends TestCase
 
         // 3. Nothing left: the usual message.
         $this->next()->assertSessionHasErrors('order');
+        $this->web(9);
+        $this->get('/desk')->assertSee('1 order waiting for its advance'); // only an advance hold waits: said so, Take next enabled
 
         // 4. The cap: at most 5 advance holds per person.
         for ($i = 0; $i < 4; $i++) {

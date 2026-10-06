@@ -43,12 +43,15 @@ class DeskController extends Controller
         $now = now()->toDateTimeString();
         $packaging = [$s('ready_for_packaging'), $s('packed'), $s('ready_for_pickup')];
 
+        $advanceReason = (int) $this->desk->advanceReasonId();
         // tab => [SQL condition, bindings]. Written once, used for the counts and for the list.
         $where = [
             'verify' => ['status_id = ?', [$s('new')]],
-            'call' => ['(status_id = ? OR (status_id = ? AND (next_call_at IS NULL OR next_call_at <= ?)))', [$s('record_verified'), $s('no_answer'), $now]],
+            // Asking for the advance is a call too: an advance hold (not yet allowed without) sits in Call, not On hold.
+            'call' => ['(status_id = ? OR (status_id = ? AND (next_call_at IS NULL OR next_call_at <= ?)) OR (status_id = ? AND hold_reason_id = ? AND advance_waived_at IS NULL))',
+                [$s('record_verified'), $s('no_answer'), $now, $s('hold'), $advanceReason]],
             'again' => ['(status_id = ? AND next_call_at > ?)', [$s('no_answer'), $now]],
-            'hold' => ['status_id = ?', [$s('hold')]],
+            'hold' => ['(status_id = ? AND NOT (hold_reason_id = ? AND advance_waived_at IS NULL))', [$s('hold'), $advanceReason]],
             'send' => ["(status_id = ? AND booking_state IN ('none', 'failed'))", [$s('confirmed')]], // Booking failed (shown only when there is one)
             'packaging' => ["((status_id = ? AND booking_state = 'queued') OR status_id IN (?, ?, ?))", [$s('confirmed'), ...$packaging]],
         ];
@@ -176,12 +179,16 @@ class DeskController extends Controller
         $rows = DB::table('orders')->where('moderator_id', $user->id)->where('channel', 'web')
             ->whereIn('status_id', [$s('new'), $s('record_verified'), $s('no_answer')])
             ->get(['id', 'order_no', 'status_id', 'next_call_at', 'action_due_at']);
+        // Advance holds given to them (a call to ask for the advance): told and opened like a new order, outside the limit.
+        $advance = DB::table('orders')->where('moderator_id', $user->id)->where('status_id', $s('hold'))
+            ->where('hold_reason_id', $this->desk->advanceReasonId())->whereNull('advance_waived_at')->get(['id', 'order_no']);
         $timed = $rows->whereNotNull('action_due_at')->sortBy('action_due_at')->first();
         $active = $rows->whereIn('status_id', [$s('new'), $s('record_verified')]);
 
         return response()->json([
             'on_break' => (bool) $user->current_break_id,
-            'mine' => $active->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no, 'tab' => $o->status_id === $s('new') ? 'verify' : 'call'])->values(),
+            'mine' => $active->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no, 'tab' => $o->status_id === $s('new') ? 'verify' : 'call'])
+                ->concat($advance->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no, 'tab' => 'call']))->values(),
             'returned' => $rows->where('status_id', $s('no_answer'))->filter(fn ($o) => $o->next_call_at && $o->next_call_at <= now()->toDateTimeString())
                 ->map(fn ($o) => ['id' => $o->id, 'no' => $o->order_no, 'tab' => 'call'])->values(),
             'timed' => $timed ? ['id' => $timed->id, 'no' => $timed->order_no, 'due' => $timed->action_due_at,
@@ -209,7 +216,7 @@ class DeskController extends Controller
             }
         }
         $order = $this->desk->takeNext($user);
-        $tab = match (OrderStatus::map()[$order->status_id]['key']) { 'new' => 'verify', 'hold' => 'hold', default => 'call' };
+        $tab = OrderStatus::map()[$order->status_id]['key'] === 'new' ? 'verify' : 'call'; // an advance hold is a call too
 
         return redirect()->route('desk.index', ['tab' => $tab, 'order' => $order->id])->with('success', __(':no is yours.', ['no' => $order->order_no]));
     }

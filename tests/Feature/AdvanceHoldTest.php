@@ -114,7 +114,7 @@ class AdvanceHoldTest extends TestCase
         $this->assertNull($held->fresh()->moderator_id);
         // Call done: the advance hold is next, outside the active limit and without a timer.
         app(OrderStateMachine::class)->transition($call->fresh(), 'cancelled', $this->mod, 'user', (int) DB::table('status_reasons')->where('reason_type', 'cancel')->value('id'));
-        $this->next()->assertRedirect("/desk?tab=hold&order={$held->id}");
+        $this->next()->assertRedirect("/desk?tab=call&order={$held->id}");
         $this->assertSame($this->mod->id, $held->fresh()->moderator_id);
         $this->assertNull($held->fresh()->action_due_at); // no timer on a hold
         $this->assertSame(0, app(DeskService::class)->activeCount($this->mod->id));
@@ -134,7 +134,11 @@ class AdvanceHoldTest extends TestCase
         $this->assertNull($sixth->fresh()->moderator_id);
 
         // 5. The desk shows it in the Hold tab with the advance box; Resume is not offered.
-        $this->get("/desk?tab=hold&order={$held->id}")->assertOk()->assertSee('Advance needed')->assertSee('Customer paid: add payment')->assertDontSee('Resume, call next');
+        $this->get("/desk?tab=call&order={$held->id}")->assertOk()->assertSee('Advance needed')->assertSee('Customer paid: add payment')->assertDontSee('Resume, call next');
+        // In Call (where calls are), not in On hold; the pulse tells about it like a new order.
+        $this->get('/desk?tab=call')->assertSee($held->order_no);
+        $this->get('/desk?tab=hold')->assertDontSee($held->order_no);
+        $this->assertContains($held->id, collect($this->getJson('/desk/pulse')->json('mine'))->pluck('id')->all());
     }
 
     public function test_paid_during_the_call_goes_straight_to_booking_no_second_call(): void

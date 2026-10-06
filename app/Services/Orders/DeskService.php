@@ -379,7 +379,7 @@ class DeskService
             $userId = array_key_first($room);
             if ($this->assign($orderId, $userId, 'auto')) {
                 $this->notifications->send('order_assigned', __('Order :no was given to you (ask for the advance)', ['no' => $orderNo]), null, [
-                    'link' => route('desk.index', ['tab' => 'hold', 'order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId],
+                    'link' => route('desk.index', ['tab' => 'call', 'order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId],
                 ]);
                 if (++$room[$userId] >= self::ADVANCE_CAP) {
                     unset($room[$userId]);
@@ -698,7 +698,7 @@ class DeskService
             DB::table('orders')->where('id', $o->id)->update(['advance_reminded_at' => now()]);
             $this->notifications->send('hold_date_reached', __('Advance still missing: :no', ['no' => $o->order_no]),
                 __('৳:a not received yet. It is cancelled by itself after :d days.', ['a' => number_format((float) $o->advance_required - (float) $o->advance_verified), 'd' => $days]), [
-                    'link' => route('desk.index', ['tab' => 'hold', 'order' => $o->id]), 'subject' => ['order', $o->id],
+                    'link' => route('desk.index', ['tab' => 'call', 'order' => $o->id]), 'subject' => ['order', $o->id],
                     'user_ids' => array_filter([$o->moderator_id]) ?: $this->managerIds(),
                 ]);
             $out['reminded']++;

@@ -57,12 +57,16 @@ class OrderController extends Controller
             ->when($list->filter('moderator'), fn ($w, $id) => $w->where('moderator_id', $id))
             ->when($list->filter('from'), fn ($w, $d) => $w->where('created_at', '>=', $d.' 00:00:00'))
             ->when($list->filter('to'), fn ($w, $d) => $w->where('created_at', '<=', $d.' 23:59:59'))
-            ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s
-                ->where('order_no', strtoupper($q))
-                ->when(strlen($digits) >= 4, fn ($s) => $s->orWhere('ship_phone', 'like', (str_starts_with($digits, '0') ? $digits : '0'.$digits).'%')->orWhere('order_no', 'IQ'.$digits))
-                ->orWhere('ship_name', 'like', $q.'%')
-                // CN (or the courier's tracking code), also of a deleted older parcel
-                ->orWhereIn('id', \Illuminate\Support\Facades\DB::table('shipments')->select('order_id')->where('consignment_id', $q)->orWhere('tracking_code', strtoupper($q)))))
+            ->when($q !== '', function ($w) use ($q, $digits) {
+                // CN or tracking code (also of a deleted older parcel): looked up first, so the main query is
+                // indexed columns OR'ed together (not a subquery evaluated per row: that scanned every order).
+                $byCn = DB::table('shipments')->where('consignment_id', $q)->orWhere('tracking_code', strtoupper($q))->limit(20)->pluck('order_id')->all();
+                $w->where(fn ($s) => $s
+                    ->where('order_no', strtoupper($q))
+                    ->when(strlen($digits) >= 4, fn ($s) => $s->orWhere('ship_phone', 'like', (str_starts_with($digits, '0') ? $digits : '0'.$digits).'%')->orWhere('order_no', 'IQ'.$digits))
+                    ->orWhere('ship_name', 'like', $q.'%')
+                    ->when($byCn, fn ($s) => $s->orWhereIn('id', $byCn)));
+            })
             ->tap(fn ($w) => $list->applySort($w))
             ->simplePaginate($list->perPage)
             ->withQueryString();

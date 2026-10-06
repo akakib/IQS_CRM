@@ -85,9 +85,9 @@ class OrderActivityController extends Controller
     private function base(array $f)
     {
         return DB::table('orders as o')
-            // Delivered and returned orders never appear in a column: leaving them out lets the index do the work
-            // (measured: 440 ms counting 128k rows of a month, a few ms over the open ones).
-            ->whereNotIn('o.status_id', OrderStatus::idsFor(['delivered', 'partial_delivered', 'returned']))
+            // Only orders still moving appear in a column: a positive list of those statuses lets the
+            // (status_id, id) index do the work instead of reading a month of delivered orders.
+            ->whereIn('o.status_id', array_values(array_diff(array_keys(OrderStatus::map()), OrderStatus::idsFor(['delivered', 'partial_delivered', 'returned']))))
             ->when($f['from'], fn ($q, $d) => $q->where('o.created_at', '>=', Carbon::parse($d)->startOfDay()))
             ->when($f['to'], fn ($q, $d) => $q->where('o.created_at', '<=', Carbon::parse($d)->endOfDay()))
             ->when($f['staff'] === 'none', fn ($q) => $q->whereNull('o.moderator_id'))

@@ -5,6 +5,8 @@
 //   order they never opened, a new order given to them, a No response order back
 //   to call, new orders waiting while they have room for one. No order numbers.
 //   Nothing is said for what they just did themselves (Take next, opening an order).
+// While they are on an order (one of theirs open, not finished, or their timer running)
+// nothing about new orders is said or shown: it waits and is told together once they are free.
 // What was already said is remembered for the browser tab (sessionStorage), so
 // a page reload does not repeat it. The very first check only records the state.
 //
@@ -123,6 +125,12 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
             if (d.notifications) window.dispatchEvent(new CustomEvent('iqs-bell', { detail: d.notifications }));
             const open = window.iqsOpenOrder || null; // the order on screen (Order management sets it)
             const prev = this.load();
+            // On an order (one of theirs open on screen, or their timer running): new orders are kept quiet
+            // until that one is done. Nothing is lost: they are announced together the first poll they are free.
+            const busy = !!window.iqsBusy || !!(d.timed && d.timed.id === open);
+            const arrived = prev ? [...d.mine.filter((o) => !prev.mine.includes(o.id)), ...d.returned.filter((o) => !prev.back.includes(o.id))].filter((o) => o.id !== open) : [];
+            const pending = [...(prev?.pending || []), ...arrived.filter((o) => !(prev?.pending || []).some((p) => p.id === o.id))]
+                .filter((o) => d.mine.some((m) => m.id === o.id) || d.returned.some((m) => m.id === o.id)); // still theirs
             const seen = {
                 mine: d.mine.map((o) => o.id),
                 back: d.returned.map((o) => o.id),
@@ -130,26 +138,26 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
                 waiting: d.waiting,
                 saidWaitingAt: prev?.saidWaitingAt || 0,
                 warned: prev?.warned || null,
+                pending: busy ? pending : [],
             };
 
-            // Order management listens: a new order in hand shows up without a reload.
-            if (prev) {
-                const appeared = [...d.mine.filter((o) => !prev.mine.includes(o.id)), ...d.returned.filter((o) => !prev.back.includes(o.id))].filter((o) => o.id !== open);
-                if (appeared.length) window.dispatchEvent(new CustomEvent('desk-new-order', { detail: appeared[0] }));
+            // Free, and something is waiting: Order management opens it (or shows the bar), the voice says it once.
+            if (prev && !busy && pending.length) {
+                window.dispatchEvent(new CustomEvent('desk-new-order', { detail: pending[0] }));
+                if (!d.on_break) {
+                    const backs = pending.filter((o) => d.returned.some((m) => m.id === o.id)).length;
+                    if (pending.length - backs > 0) this.say(pending.length - backs === 1 ? `${name}, you have a new order.` : `${name}, you have ${pending.length - backs} new orders.`);
+                    if (backs > 0) this.say(`${name}, time to call a customer again.`);
+                }
             }
 
             if (prev && !d.on_break) {
                 // A timer they did not start themselves: the order sat unopened for 15 minutes and its clock began.
                 // (Take next or opening an order starts the clock on the order on screen: no voice, they know.)
-                if (d.timed && d.timed.id !== prev.timed && d.timed.id !== open) {
+                if (d.timed && d.timed.id !== prev.timed && d.timed.id !== open && !busy) {
                     this.say(`${name}, your time has started. Open your order now.`);
-                } else if (d.mine.some((o) => !prev.mine.includes(o.id) && o.id !== open)) {
-                    this.say(`${name}, you have a new order.`); // given to them, not opened yet
                 }
-                if (d.returned.some((o) => !prev.back.includes(o.id) && o.id !== open)) {
-                    this.say(`${name}, time to call a customer again.`);
-                }
-                if (d.can_take && d.waiting > prev.waiting && Date.now() - seen.saidWaitingAt > 180000) {
+                if (!busy && d.can_take && d.waiting > prev.waiting && Date.now() - seen.saidWaitingAt > 180000) {
                     this.say(`${name}, new orders are waiting.`);
                     seen.saidWaitingAt = Date.now();
                 }

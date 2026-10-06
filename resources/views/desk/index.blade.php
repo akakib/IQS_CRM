@@ -94,7 +94,8 @@
     @endif
     {{-- A new order came to me while this page was open (given automatically, or a call-again came back). --}}
     @php
-        $busy = $order && $isMine && in_array($key ?? '', ['new', 'record_verified', 'no_answer'], true);
+        // "On an order": any order of theirs open that is not finished. While busy nothing about new orders is shown or said.
+        $busy = $order && $isMine && ! ($statuses[$order->status_id]['final'] ?? false);
     @endphp
     <div x-data="{ fresh: null }" x-cloak x-show="fresh"
         @desk-new-order.window="
@@ -494,7 +495,7 @@
     </div>
 </div>
 
-<script>window.iqsOpenOrder = {{ ($order ?? null)?->id ?? 'null' }};</script>
+<script>window.iqsOpenOrder = {{ ($order ?? null)?->id ?? 'null' }}; window.iqsBusy = @js($busy);</script>
 {{-- Edit popup: the full edit form in a large window over this page. It closes
      only with its Close button (a stray click outside must not lose typing).
      After a save the form tells this page, which reloads on the same order. --}}

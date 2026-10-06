@@ -140,6 +140,7 @@ class DeskController extends Controller
             'statuses' => OrderStatus::map(),
             'waiting' => (int) $waiting->n,
             'advanceWaiting' => $advanceWaiting,
+            'inHand' => $this->desk->inHand($user->id),
             'oldestWaiting' => $waiting->oldest,
             'limit' => (int) settings('desk.active_limit'),
             'canTake' => $user->can('orders.take') && ! $user->isOwner(), // owners watch, staff take
@@ -201,7 +202,7 @@ class DeskController extends Controller
                 'left' => (int) max(0, now()->diffInSeconds(\Illuminate\Support\Carbon::parse($timed->action_due_at), false))] : null,
             'waiting' => (int) $this->desk->waitingQuery()->count() + ($advanceWaiting = (int) $this->desk->waitingAdvanceQuery()->count()),
             'advance_waiting' => $advanceWaiting,
-            'can_take' => $active->count() < (int) settings('desk.active_limit'),
+            'can_take' => $this->desk->inHand($user->id) < (int) settings('desk.active_limit'),
             // The bell reads its counts from here on pages that have the pulse (one request instead of two).
             'notifications' => $bell,
         ]);
@@ -215,10 +216,13 @@ class DeskController extends Controller
         }
         $user = $request->user();
         // Take next = "my next piece of work". Hands full (an order was given to them meanwhile): open what they hold.
-        if (! $user->isOwner() && $this->desk->activeCount($user->id) >= (int) settings('desk.active_limit')) {
+        if (! $user->isOwner() && $this->desk->inHand($user->id) >= (int) settings('desk.active_limit')) {
             $held = $this->desk->timedOrder($user->id)
                 ?? DB::table('orders')->where('moderator_id', $user->id)->where('channel', 'web')
-                    ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->orderBy('assigned_at')->orderBy('id')->first(['id', 'order_no', 'status_id']);
+                    ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->orderBy('assigned_at')->orderBy('id')->first(['id', 'order_no', 'status_id'])
+                ?? DB::table('orders as o')->where('o.moderator_id', $user->id)->where('o.status_id', OrderStatus::idFor('hold'))->where('o.hold_reason_id', $this->desk->advanceReasonId())
+                    ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_notes as n')->whereColumn('n.order_id', 'o.id')->where('n.note_type', 'call'))
+                    ->orderBy('o.assigned_at')->orderBy('o.id')->first(['o.id', 'o.order_no', 'o.status_id']);
             if ($held) {
                 return redirect()->route('desk.index', ['tab' => $held->status_id === OrderStatus::idFor('new') ? 'verify' : 'call', 'order' => $held->id])
                     ->with('success', __('You already have :no: opened it. Finish it, then take the next.', ['no' => $held->order_no]));

@@ -886,8 +886,9 @@ class DeskTest extends TestCase
         $this->get('/desk')->assertOk()->assertSee('Take next')->assertSee('Record OK, call next');
         // user + permissions (2), counts, list, waiting, reasons, order, customer, items, notes, duplicates
         // + expired-timer check (2), extra-time count (1), the due-booking check (1), the Steadfast snapshot (1)
-        // the advance-hold reason id (1: advance holds are counted in the Call tab) and the advance holds waiting (1)
-        $this->assertLessThanOrEqual(19, count(DB::getQueryLog()));
+        // the advance-hold reason id (1: advance holds are counted in the Call tab), the advance holds waiting (1)
+        // and the orders in hand (2: active + uncalled advance holds)
+        $this->assertLessThanOrEqual(21, count(DB::getQueryLog()));
         DB::disableQueryLog();
 
         $this->get('/desk/control')->assertForbidden();

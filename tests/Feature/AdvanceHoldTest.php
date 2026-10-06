@@ -122,17 +122,21 @@ class AdvanceHoldTest extends TestCase
         $this->assertNull($held->fresh()->action_due_at); // no timer on a hold
         $this->assertSame(0, app(DeskService::class)->activeCount($this->mod->id));
 
-        // 3. Nothing left: the usual message.
-        $this->next()->assertSessionHasErrors('order');
-        $this->web(9);
-        $this->get('/desk')->assertSee('1 order waiting for its advance'); // only an advance hold waits: said so, Take next enabled
+        // 3. One order at a time: that advance hold is not called yet, so Take next brings them back to it.
+        $another = $this->web(9);
+        $this->get('/desk')->assertSee('1 order waiting for its advance')->assertSee('Finish this order first');
+        $this->next()->assertRedirect("/desk?tab=call&order={$held->id}");
+        $this->assertNull($another->fresh()->moderator_id);
+        // Called ("will pay by a date"): parked, the hand is free, the next one comes.
+        $this->post("/orders/{$held->id}/advance-date", ['date' => today()->addDay()->toDateString()]);
+        $this->next()->assertRedirect("/desk?tab=call&order={$another->id}");
 
-        // 4. The cap: at most 5 advance holds per person.
-        for ($i = 0; $i < 4; $i++) {
-            $this->web(9);
-        }
-        for ($i = 0; $i < 4; $i++) {
+        // 4. The parked cap: at most 5 advance holds per person, each called before the next.
+        $this->post("/orders/{$another->id}/advance-date", ['date' => today()->addDay()->toDateString()]);
+        for ($i = 0; $i < 3; $i++) {
+            $o = $this->web(9);
             $this->next()->assertSessionHasNoErrors();
+            $this->post("/orders/{$o->id}/advance-date", ['date' => today()->addDay()->toDateString()]);
         }
         $sixth = $this->web(9);
         $this->next()->assertSessionHasErrors('order');
@@ -249,6 +253,7 @@ class AdvanceHoldTest extends TestCase
     public function test_auto_assign_hands_out_old_advance_holds_and_the_alert_counts_them(): void
     {
         $held = $this->web(9);
+        $second = $this->web(9);
         $desk = app(DeskService::class);
         $this->travel(30)->minutes();
         DB::table('users')->whereIn('id', [$this->mod->id])->update(['last_seen_at' => now()]);
@@ -258,6 +263,7 @@ class AdvanceHoldTest extends TestCase
         DB::table('users')->whereIn('id', [$this->mod->id])->update(['last_seen_at' => now()]);
         $desk->autoAssign();
         $this->assertSame($this->mod->id, $held->fresh()->moderator_id);
+        $this->assertNull($second->fresh()->moderator_id); // one at a time: the first is not called yet
         $this->assertDatabaseHas('app_notifications', ['title' => "Order {$held->order_no} was given to you (ask for the advance)"]);
     }
 

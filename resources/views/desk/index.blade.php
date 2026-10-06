@@ -6,7 +6,7 @@
     $url = fn (array $q) => route('desk.index', $q);
     $key = $order ? $statuses[$order->status_id]['key'] : null;
     $isMine = $order && $order->moderator_id === auth()->id();
-    $atLimit = $counts['active'] >= $limit;
+    $atLimit = $inHand >= $limit; // the usual orders plus advance holds not called yet
     $age = fn ($t) => $t ? Carbon::parse($t)->diffForHumans(now(), ['short' => true, 'syntax' => Carbon::DIFF_ABSOLUTE, 'parts' => 1]) : '';
     $money = fn ($v) => '৳'.number_format((float) $v);
     $secondsLeft = fn ($t) => $t ? max(0, (int) now()->diffInSeconds(Carbon::parse($t), false)) : null;
@@ -79,7 +79,7 @@
                 <p class="text-xs text-gray-500">
                     @if ($waiting) {{ __('Oldest: :t ago', ['t' => $age($oldestWaiting)]) }} · @endif
                     @if ($waiting && $advanceWaiting) {{ __(':n waiting for advance', ['n' => $advanceWaiting]) }} · @endif
-                    {{ $limit === 1 ? ($counts['active'] ? __('One order at a time: finish yours to take the next') : __('One order at a time')) : __('You hold :a of :l', ['a' => $counts['active'], 'l' => $limit]) }}
+                    {{ $limit === 1 ? ($inHand ? __('One order at a time: finish yours to take the next') : __('One order at a time')) : __('You hold :a of :l', ['a' => $inHand, 'l' => $limit]) }}
                     @if ($counts['again']) · {{ __(':n waiting on No response', ['n' => $counts['again']]) }} @endif
                 </p>
             </div>
@@ -87,9 +87,9 @@
         @if ($canTake)
             <form method="POST" action="{{ route('desk.next') }}" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
                 @csrf
-                {{-- Advance holds are outside the active limit: with hands full they can still be taken. --}}
-                <x-button class="w-full sm:w-auto" data-key="t" :disabled="! $anyWaiting || ($atLimit && ! $advanceWaiting)" x-bind:disabled="!n || ({{ $atLimit ? 'true' : 'false' }} && !adv)">
-                    {{ $atLimit && ! $advanceWaiting ? ($limit === 1 ? __('Finish this order first') : __('Finish one first')) : __('Take next') }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">⇧T</kbd>
+                {{-- One order at a time: an advance hold not called yet fills the hand like any other. --}}
+                <x-button class="w-full sm:w-auto" data-key="t" :disabled="! $anyWaiting || $atLimit" x-bind:disabled="!n || {{ $atLimit ? 'true' : 'false' }}">
+                    {{ $atLimit ? ($limit === 1 ? __('Finish this order first') : __('Finish one first')) : __('Take next') }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">⇧T</kbd>
                 </x-button>
             </form>
         @endif

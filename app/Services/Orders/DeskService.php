@@ -80,6 +80,22 @@ class DeskService
             ->where('hold_reason_id', $this->advanceReasonId())->whereNull('advance_waived_at')->count();
     }
 
+    /**
+     * Orders this person is working on right now: the usual ones (verify, call)
+     * plus advance holds whose call has not happened yet. An advance hold that
+     * was called (customer will send the money) is parked and does not count:
+     * one order at a time means one call at a time, not waiting days for money.
+     */
+    public function inHand(int $userId): int
+    {
+        $uncalled = DB::table('orders as o')->where('o.moderator_id', $userId)->where('o.status_id', OrderStatus::idFor('hold'))
+            ->where('o.hold_reason_id', $this->advanceReasonId())->whereNull('o.advance_waived_at')
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_notes as n')->whereColumn('n.order_id', 'o.id')->where('n.note_type', 'call'))
+            ->count();
+
+        return $this->activeCount($userId) + $uncalled;
+    }
+
     /** Website orders this person still has to act on (the limit counts these). */
     public function activeCount(int $userId): int
     {
@@ -114,20 +130,21 @@ class DeskService
             throw ValidationException::withMessages(['order' => __('You are on a break. Press Start work first.')]);
         }
         $limit = (int) settings('desk.active_limit');
-        $full = $this->activeCount($user->id) >= $limit;
+        // One order at a time: anything of theirs still to be called (an advance hold too) fills a hand.
+        if ($this->inHand($user->id) >= $limit) {
+            throw ValidationException::withMessages(['order' => $limit === 1 ? __('Finish the order you have before taking the next one.') : __('You already hold :n orders. Finish one first.', ['n' => $limit])]);
+        }
         $this->sweepExpired(); // timers that ran out free their orders right now
 
         // Of two people pressing at once, each gets a different order.
         for ($try = 0; $try < 5; $try++) {
-            $id = $full ? null : $this->waitingQuery()->orderBy('id')->value('id');
+            $id = $this->waitingQuery()->orderBy('id')->value('id');
             if (! $id) {
-                // Nothing to verify or call (or hands full): an order waiting for its advance, which is outside the limit.
+                // Nothing to verify or call: an order waiting for its advance (the call to ask for it), up to the parked cap.
                 $id = $this->advanceHeldCount($user->id) < self::ADVANCE_CAP ? $this->waitingAdvanceQuery()->orderBy('id')->value('id') : null;
             }
             if (! $id) {
-                throw ValidationException::withMessages(['order' => $full
-                    ? ($limit === 1 ? __('Finish the order you have before taking the next one.') : __('You already hold :n orders. Finish one first.', ['n' => $limit]))
-                    : __('No order is waiting.')]);
+                throw ValidationException::withMessages(['order' => __('No order is waiting.')]);
             }
             if ($this->assign($id, $user->id, 'claimed')) {
                 return Order::findOrFail($id);
@@ -345,7 +362,7 @@ class DeskService
         $limit = (int) settings('desk.active_limit');
         $load = [];
         foreach ($this->activeModerators() as $userId) {
-            $count = $this->activeCount($userId);
+            $count = $this->inHand($userId); // an uncalled advance hold fills a hand too
             if ($count < $limit) {
                 $load[$userId] = $count;
             }
@@ -369,11 +386,11 @@ class DeskService
             }
         }
 
-        // Advance holds nobody took in an hour: same idea, outside the active limit, up to the cap each.
+        // Advance holds nobody took in an hour: only to someone with a free hand (one order at a time) and room under the parked cap.
         $advance = $this->waitingAdvanceQuery()->where('queue_since', '<=', now()->subMinutes(60))->orderBy('id')->limit(50)->pluck('order_no', 'id');
         $room = [];
         foreach ($this->activeModerators() as $userId) {
-            if (($n = $this->advanceHeldCount($userId)) < self::ADVANCE_CAP) {
+            if (isset($load[$userId]) && $load[$userId] < $limit && ($n = $this->advanceHeldCount($userId)) < self::ADVANCE_CAP) {
                 $room[$userId] = $n;
             }
         }
@@ -384,12 +401,11 @@ class DeskService
             asort($room);
             $userId = array_key_first($room);
             if ($this->assign($orderId, $userId, 'auto')) {
+                unset($room[$userId]); // their hand is full now (the call has not happened yet)
                 $this->notifications->send('order_assigned', __('Order :no was given to you (ask for the advance)', ['no' => $orderNo]), null, [
                     'link' => route('desk.index', ['tab' => 'call', 'order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId],
                 ]);
-                if (++$room[$userId] >= self::ADVANCE_CAP) {
-                    unset($room[$userId]);
-                }
+
             }
         }
 

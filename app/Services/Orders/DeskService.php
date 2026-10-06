@@ -65,7 +65,13 @@ class DeskService
 
     public function advanceReasonId(): ?int
     {
-        return DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id');
+        // Asked many times per request (tabs, pulse, follow-ups); never changes. Kept for the request.
+        $app = app();
+        if (! $app->bound('desk.advance-reason-id')) {
+            $app->instance('desk.advance-reason-id', DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id'));
+        }
+
+        return $app->make('desk.advance-reason-id');
     }
 
     private function advanceHeldCount(int $userId): int

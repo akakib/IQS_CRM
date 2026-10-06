@@ -25,12 +25,20 @@ class OrderStatus extends Model
      */
     public static function map(): array
     {
-        return Cache::rememberForever('order_statuses:map', fn () => self::orderBy('sort_order')->get()
+        // Read once per request: a page asks for it dozens of times, and the cache lives in the database on the server.
+        $app = app();
+        if ($app->bound('order-statuses.map')) {
+            return $app->make('order-statuses.map');
+        }
+        $map = Cache::rememberForever('order_statuses:map', fn () => self::orderBy('sort_order')->get()
             ->mapWithKeys(fn ($s) => [$s->id => [
                 'id' => $s->id, 'key' => $s->system_key, 'name' => $s->name_en, 'color' => $s->color,
                 'group' => $s->stage_group, 'final' => $s->is_final, 'edit_policy' => $s->edit_policy,
                 'requires_reason' => $s->requires_reason, 'active' => $s->is_active,
             ]])->all());
+        $app->instance('order-statuses.map', $map);
+
+        return $map;
     }
 
     public static function idFor(string $key): int
@@ -52,6 +60,7 @@ class OrderStatus extends Model
     public static function forget(): void
     {
         Cache::forget('order_statuses:map');
+        app()->forgetInstance('order-statuses.map');
     }
 
     protected static function booted(): void

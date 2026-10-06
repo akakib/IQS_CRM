@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Services\Catalog\WooProductIntake;
 use App\Services\Orders\WooOrderIntake;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,12 +44,13 @@ class WooCommerceWebhookController extends Controller
 
         $topic = (string) $request->header('X-WC-Webhook-Topic');
         $payload = json_decode($body, true);
-        if (! in_array($topic, ['order.created', 'order.updated'], true) || ! isset($payload['id'])) {
+        if (! in_array($topic, ['order.created', 'order.updated', 'product.created', 'product.updated', 'product.deleted'], true) || ! isset($payload['id'])) {
             return response()->json(['status' => 'ignored']);
         }
 
         // One row per distinct body: a retry of the same webhook is a duplicate, a real change is new.
-        $externalId = 'order:'.$payload['id'].':'.substr(sha1($body), 0, 16);
+        $kind = str_starts_with($topic, 'product.') ? 'product' : 'order';
+        $externalId = $kind.':'.$payload['id'].':'.substr(sha1($body), 0, 16);
         $inboxId = DB::table('integration_inbox')->where('source', 'woocommerce')->where('external_id', $externalId)->value('id');
         if ($inboxId) {
             return response()->json(['status' => 'duplicate']);
@@ -59,7 +61,7 @@ class WooCommerceWebhookController extends Controller
             'payload' => $body, 'status' => 'received', 'received_at' => now(),
         ]);
 
-        app()->terminating(fn () => app(WooOrderIntake::class)->process($inboxId));
+        app()->terminating(fn () => $kind === 'product' ? app(WooProductIntake::class)->process($inboxId) : app(WooOrderIntake::class)->process($inboxId));
 
         return response()->json(['status' => 'received']);
     }

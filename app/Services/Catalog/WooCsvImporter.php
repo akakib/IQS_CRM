@@ -108,8 +108,8 @@ class WooCsvImporter
         return $n;
     }
 
-    /** @return string created | updated | skipped */
-    private function importRow(array $row, ?int $userId): string
+    /** One product row (CSV columns; the API importer builds the same shape). @return string created | updated | skipped */
+    public function importRow(array $row, ?int $userId): string
     {
         $type = strtolower(trim($row['Type'] ?? ''));
         $id = trim((string) ($row['ID'] ?? ''));
@@ -212,7 +212,13 @@ class WooCsvImporter
             $data['barcode'] = $variant->barcode;
         }
 
+        $existed = $variant->exists;
+        $before = $existed ? $variant->availability_status : null;
         $variant = $this->products->saveVariant($product, $variant, $data, $userId, 'import', queueSync: false);
+        // The website is the master for stock status: a change goes the normal way (and releases waiting orders).
+        if ($existed && $before !== $data['availability_status']) {
+            $this->products->setAvailability([$variant->id], $data['availability_status'], $userId);
+        }
 
         if ($extProduct) {
             DB::table('channel_product_links')->updateOrInsert(

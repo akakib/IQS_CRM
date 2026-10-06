@@ -22,6 +22,7 @@ class IntegrationController extends Controller
             'wooPing' => Cache::get('woo:webhook:ping'),
             'wooAccepted' => Cache::get('woo:webhook:accepted'),
             'wooRejected' => Cache::get('woo:webhook:rejected'),
+            'websiteAccount' => \App\Models\WebsiteAccount::current(),
             'wooLastOrder' => DB::table('integration_inbox')->where('source', 'woocommerce')->max('received_at'),
             'storeDriver' => app(\App\Services\Catalog\Store\StoreDriver::class)->name(),
             'inbox' => DB::table('integration_inbox')->orderByDesc('id')->limit(30)

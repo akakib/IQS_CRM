@@ -19,9 +19,10 @@ class ProductImportController extends Controller
     public function index(): View
     {
         return view('products.import', [
+            'websiteApi' => app(\App\Services\Catalog\Store\WooApi::class)->configured(),
             'imports' => DB::table('product_imports as i')->leftJoin('users as u', 'u.id', '=', 'i.user_id')
                 ->orderByDesc('i.id')->limit(10)
-                ->get(['i.id', 'i.file_name', 'i.status', 'i.rows_done', 'i.rows_total', 'i.created_count', 'i.updated_count', 'i.skipped_count', 'i.created_at', 'u.name as user']),
+                ->get(['i.id', 'i.source', 'i.file_name', 'i.status', 'i.rows_done', 'i.rows_total', 'i.created_count', 'i.updated_count', 'i.skipped_count', 'i.created_at', 'u.name as user']),
         ]);
     }
 
@@ -53,12 +54,13 @@ class ProductImportController extends Controller
         return view('products.import-show', ['import' => $row]);
     }
 
-    public function step(int $import, WooCsvImporter $importer): JsonResponse
+    public function step(int $import, WooCsvImporter $importer, \App\Services\Catalog\WooApiImporter $api): JsonResponse
     {
-        abort_unless(DB::table('product_imports')->where('id', $import)->exists(), 404);
+        $source = DB::table('product_imports')->where('id', $import)->value('source');
+        abort_unless($source, 404);
         @set_time_limit(120);
 
-        $row = $importer->step($import);
+        $row = $source === 'api' ? $api->step($import) : $importer->step($import);
 
         return response()->json([
             'status' => $row->status,

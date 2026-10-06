@@ -36,7 +36,11 @@ class AppServiceProvider extends ServiceProvider
         // Website receiver: fake everywhere except production with STORE_DRIVER=woocommerce.
         $this->app->singleton(StoreDriver::class, fn ($app) => $app->environment(['testing', 'staging', 'local']) || config('store.driver') !== 'woocommerce'
             ? new FakeStoreDriver
-            : new WooCommerceDriver(config('store.woocommerce')));
+            : new WooCommerceDriver(array_merge(config('store.woocommerce'), array_filter([
+                'url' => \App\Models\WebsiteAccount::current()?->url,
+                'key' => \App\Models\WebsiteAccount::current()?->consumer_key,
+                'secret' => \App\Models\WebsiteAccount::current()?->consumer_secret,
+            ]))));
         $this->app->bind(CourierDriver::class, fn ($app) => $app->make(CourierManager::class)->driver());
     }
 

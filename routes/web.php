@@ -290,6 +290,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:access.manage')->group(function () {
         Route::get('/health', HealthController::class)->name('health');
         Route::get('/settings/integrations', [IntegrationController::class, 'index'])->name('settings.integrations');
+        Route::post('/settings/website-api', [\App\Http\Controllers\WebsiteApiController::class, 'store'])->name('settings.website-api.store');
+        Route::put('/settings/website-api/{account}', [\App\Http\Controllers\WebsiteApiController::class, 'update'])->whereNumber('account')->name('settings.website-api.update');
+        Route::post('/settings/website-api/{account}/check', [\App\Http\Controllers\WebsiteApiController::class, 'check'])->whereNumber('account')->name('settings.website-api.check');
+        Route::post('/settings/website-api/pull', [\App\Http\Controllers\WebsiteApiController::class, 'pull'])->name('settings.website-api.pull');
         Route::get('/settings/couriers', [\App\Http\Controllers\CourierAccountController::class, 'index'])->name('settings.couriers');
         Route::post('/settings/couriers', [\App\Http\Controllers\CourierAccountController::class, 'store'])->name('settings.couriers.store');
         Route::put('/settings/couriers/{account}', [\App\Http\Controllers\CourierAccountController::class, 'update'])->whereNumber('account')->name('settings.couriers.update');

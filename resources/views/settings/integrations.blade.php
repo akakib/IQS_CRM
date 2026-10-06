@@ -38,6 +38,8 @@
             </div>
         </x-card>
 
+        @include('settings._website-api')
+
         <x-card :title="__('Steadfast → IQS (delivery status webhook)')">
             <p class="mb-3 text-sm text-gray-600">{{ __('Steadfast merchant panel > webhook: paste this URL and set the Bearer token below.') }}</p>
             <p class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ __('Callback URL') }}</p>

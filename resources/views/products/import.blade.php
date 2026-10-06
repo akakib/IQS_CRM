@@ -2,6 +2,20 @@
     <x-products.subnav active="import" />
 
     <div class="grid gap-6 lg:grid-cols-2">
+        <x-card :title="__('Pull from the website')">
+            <p class="mb-3 text-sm text-gray-600">{{ __('Reads every product straight from the website through its API: no file needed, and it can be run again any time to catch up. Product changes on the website also arrive by themselves through the product webhooks.') }}</p>
+            @if ($websiteApi)
+                <form method="POST" action="{{ route('settings.website-api.pull') }}" id="website-pull">@csrf
+                    <button type="button" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+                        @click="$dispatch('open-confirm', { id: 'website-pull-confirm', form: 'website-pull' })">{{ __('Pull products from the website') }}</button>
+                </form>
+                <x-confirm-modal id="website-pull-confirm" :verb="__('Pull now')" :danger="false"
+                    :message="__('Every product on the website is read and saved here (matched by website id, then SKU). Names, prices, stock status, images and SEO here are replaced by the website\'s. Nothing is sent to the website.')" />
+            @else
+                <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('Save the website API keys first:') }} <a href="{{ route('settings.integrations') }}" class="font-medium underline">{{ __('Settings > Website connection') }}</a></p>
+            @endif
+        </x-card>
+
         <x-card :title="__('Upload a WooCommerce product export')">
             <ol class="mb-4 list-inside list-decimal space-y-1 text-sm text-gray-600">
                 <li>{{ __('WordPress admin > Products > Export.') }}</li>
@@ -23,7 +37,7 @@
             @forelse ($imports as $i)
                 <a href="{{ route('products.import.show', $i->id) }}" class="flex items-center justify-between gap-2 border-b border-gray-50 py-2 text-sm last:border-0 hover:bg-gray-50">
                     <span class="min-w-0">
-                        <span class="block truncate font-medium text-gray-800">{{ $i->file_name }}</span>
+                        <span class="block truncate font-medium text-gray-800">{{ $i->source === 'api' ? __('Website API') : $i->file_name }}</span>
                         <span class="text-xs text-gray-500">{{ \Illuminate\Support\Carbon::parse($i->created_at)->format('d M Y, g:i A') }} · {{ $i->user }} · {{ __(':c new, :u updated, :s skipped', ['c' => $i->created_count, 'u' => $i->updated_count, 's' => $i->skipped_count]) }}</span>
                     </span>
                     <x-badge :color="['done' => 'green', 'failed' => 'red', 'running' => 'blue', 'pending' => 'gray'][$i->status]">{{ ucfirst($i->status) }}</x-badge>

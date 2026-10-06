@@ -27,6 +27,7 @@ return [
     ]],
     'catalog' => ['Catalog', [
         ['Products', 'products.index', 'products.*', 'products.view', 'tag'],
+        ['Categories', 'categories.index', 'categories.*', 'products.edit', 'list'],
         ['Customers', 'customers.index', 'customers.*', 'customers.view', 'users'],
     ]],
     'analysis' => ['Analysis', [

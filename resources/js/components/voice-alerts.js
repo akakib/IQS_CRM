@@ -48,7 +48,9 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
                 window.speechSynthesis.addEventListener?.('voiceschanged', () => this.loadVoices());
             }
             this.poll();
-            setInterval(() => this.poll(), interval);
+            setInterval(() => { if (!document.hidden) this.poll() }, interval); // a hidden tab asks nothing
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) this.poll() });
+            window.iqsPulse = true; // the bell knows the pulse brings its counts
         },
 
         loadVoices() {
@@ -118,6 +120,7 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
             } catch (e) {
                 return;
             }
+            if (d.notifications) window.dispatchEvent(new CustomEvent('iqs-bell', { detail: d.notifications }));
             const open = window.iqsOpenOrder || null; // the order on screen (Order management sets it)
             const prev = this.load();
             const seen = {

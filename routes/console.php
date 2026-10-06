@@ -17,6 +17,7 @@ Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3')
     ->everyMinute()->withoutOverlapping(5);
 
 Schedule::command('backup:database')->dailyAt('03:00');
+Schedule::command('data:trim-raw-payloads')->dailyAt('03:40');
 
 // Shop team end-of-day report on Telegram.
 Schedule::command('telegram:shop-summary')->dailyAt('21:00');

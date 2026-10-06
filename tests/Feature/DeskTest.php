@@ -621,6 +621,9 @@ class DeskTest extends TestCase
 
     public function test_voice_pulse_reports_what_the_moderator_has_and_does_not_count_as_presence(): void
     {
+        // The bell's counts ride along, so a page with the pulse makes one background request, not two.
+        $this->actingAs($this->mahim)->getJson('/desk/pulse')->assertOk()->assertJsonStructure(['notifications' => ['unread', 'urgent']]);
+
         [$a, $b] = [$this->web(), $this->web()];
         $this->actingAs($this->mahim)->post('/desk/next');
         $this->mahim->forceFill(['last_seen_at' => now()->subMinutes(30)])->save();

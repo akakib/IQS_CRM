@@ -1,5 +1,6 @@
 // <x-order-presence>: who else has this order open, and who is editing it.
-// Checks in every 8 seconds. mode "view" (Order management, the activity popup)
+// Checks in every 20 seconds while viewing, every 8 while editing (the lock
+// matters there), and not at all while the tab is hidden. mode "view" (Order management, the activity popup)
 // or "edit" (the edit form). While someone else edits:
 //   - view screens show a yellow bar and their action buttons (.lockable) are off;
 //   - an edit form shows the bar and its Save is off; a manager can take over.
@@ -13,7 +14,8 @@ export default function orderPresence({ url, mode, me }) {
 
         init() {
             this.checkIn();
-            this.timer = setInterval(() => this.checkIn(), 8000);
+            this.timer = setInterval(() => { if (!document.hidden) this.checkIn() }, mode === 'edit' ? 8000 : 20000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) this.checkIn() });
             const leave = () => {
                 const body = new FormData();
                 body.append('_token', document.querySelector('meta[name=csrf-token]').content);

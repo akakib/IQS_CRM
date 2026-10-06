@@ -170,10 +170,14 @@ class DeskController extends Controller
             if (Cache::add('desk:auto-assign', 1, 60)) {
                 $this->desk->autoAssign();
             }
-            if (! DB::table('orders')->where('moderator_id', $user->id)->whereNotNull('action_due_at')->exists()) {
+            if (! DB::table('orders')->where('moderator_id', $user->id)->where('channel', 'web')->whereNotNull('action_due_at')->exists()) {
                 $this->desk->armUntouched($user->id);
             }
         }
+
+        $bell = (array) DB::table('app_notifications')->where('user_id', $user->id)->whereNull('read_at')
+            ->selectRaw("COUNT(*) as unread, COALESCE(SUM(CASE WHEN priority = 'urgent' AND acted_at IS NULL THEN 1 ELSE 0 END), 0) as urgent")->first();
+        $bell = ['unread' => (int) $bell['unread'], 'urgent' => (int) $bell['urgent']];
 
         $s = fn (string $key) => OrderStatus::idFor($key);
         $rows = DB::table('orders')->where('moderator_id', $user->id)->where('channel', 'web')
@@ -195,6 +199,8 @@ class DeskController extends Controller
                 'left' => (int) max(0, now()->diffInSeconds(\Illuminate\Support\Carbon::parse($timed->action_due_at), false))] : null,
             'waiting' => (int) $this->desk->waitingQuery()->count(),
             'can_take' => $active->count() < (int) settings('desk.active_limit'),
+            // The bell reads its counts from here on pages that have the pulse (one request instead of two).
+            'notifications' => $bell,
         ]);
     }
 

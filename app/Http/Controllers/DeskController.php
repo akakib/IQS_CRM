@@ -208,6 +208,41 @@ class DeskController extends Controller
         ]);
     }
 
+    /**
+     * A "new order" notification was clicked. Theirs already: open it. Someone else's: say who.
+     * Still waiting: the click is a Take next (oldest first, one at a time), so a click never
+     * jumps the queue. Owners and managers just see the order.
+     */
+    public function fromNotice(Order $order, Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $tabFor = fn (Order $o) => match (OrderStatus::map()[$o->status_id]['key']) { 'new' => 'verify', 'record_verified', 'no_answer', 'hold' => 'call', default => 'packaging' };
+        if ($order->moderator_id === $user->id) {
+            return redirect()->route('desk.index', ['tab' => $tabFor($order), 'order' => $order->id]);
+        }
+        if (! $user->can('orders.take') || $user->isOwner()) {
+            return redirect()->route('orders.show', $order);
+        }
+        if ($order->moderator_id) {
+            return redirect()->route('desk.index')->with('success', __(':no is already with :n.', ['no' => $order->order_no, 'n' => DB::table('users')->where('id', $order->moderator_id)->value('name')]));
+        }
+        if (OrderStatus::map()[$order->status_id]['final']) {
+            return redirect()->route('desk.index')->with('success', __(':no is already closed.', ['no' => $order->order_no]));
+        }
+        if ($this->desk->inHand($user->id) >= (int) settings('desk.active_limit')) {
+            return redirect()->route('desk.index')->with('success', __('Finish the order you have first, then press Take next.'));
+        }
+        try {
+            $taken = $this->desk->takeNext($user);
+        } catch (ValidationException $e) {
+            return redirect()->route('desk.index')->with('success', collect($e->errors())->flatten()->first());
+        }
+
+        return redirect()->route('desk.index', ['tab' => $tabFor($taken), 'order' => $taken->id])->with('success', $taken->id === $order->id
+            ? __(':no is yours.', ['no' => $taken->order_no])
+            : __(':no is yours (the oldest waiting order goes first).', ['no' => $taken->order_no]));
+    }
+
     public function takeNext(Request $request): RedirectResponse
     {
         // A double click must not hand out two orders: one Take next per person every 3 seconds.

@@ -109,6 +109,22 @@ class DeskTest extends TestCase
         $this->assertSame('ready_for_packaging', $this->key($confirmed)); // booked right away
     }
 
+    public function test_clicking_a_new_order_notice_takes_the_next_order_or_says_who_has_it(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]); // the shop default: one at a time
+        $older = $this->web();
+        $newer = $this->web();
+        // Mahim clicks the notice of the newer one: he gets the oldest (no jumping the queue).
+        $this->actingAs($this->mahim)->get("/desk/notice/{$newer->id}")->assertRedirect("/desk?tab=verify&order={$older->id}");
+        $this->assertSame($this->mahim->id, $older->fresh()->moderator_id);
+        // Clicking again while that one is open: finish it first.
+        $this->get("/desk/notice/{$newer->id}")->assertSessionHas('success', 'Finish the order you have first, then press Take next.');
+        // Rima clicks the same notice: she gets the newer one; Mahim clicking his own opens it.
+        $this->actingAs($this->rima)->get("/desk/notice/{$newer->id}")->assertRedirect("/desk?tab=verify&order={$newer->id}");
+        $this->actingAs($this->mahim)->get("/desk/notice/{$older->id}")->assertRedirect("/desk?tab=verify&order={$older->id}");
+        $this->get("/desk/notice/{$newer->id}")->assertSessionHas('success', "{$newer->order_no} is already with Rima.");
+    }
+
     public function test_take_next_gives_the_oldest_order_and_stops_at_the_limit(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 2]);

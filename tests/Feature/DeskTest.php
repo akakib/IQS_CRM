@@ -117,12 +117,22 @@ class DeskTest extends TestCase
         // Mahim clicks the notice of the newer one: he gets the oldest (no jumping the queue).
         $this->actingAs($this->mahim)->get("/desk/notice/{$newer->id}")->assertRedirect("/desk?tab=verify&order={$older->id}");
         $this->assertSame($this->mahim->id, $older->fresh()->moderator_id);
-        // Clicking again while that one is open: finish it first.
-        $this->get("/desk/notice/{$newer->id}")->assertSessionHas('success', 'Finish the order you have first, then press Take next.');
+        // Clicking again while that one runs (its 10-minute timer started on Take next): back to it, nothing taken.
+        $this->get("/desk/notice/{$newer->id}")->assertRedirect("/desk?tab=verify&order={$older->id}")
+            ->assertSessionHas('success', "Your timer is running on {$older->order_no}. Finish it first, then press Take next.");
+        $this->assertNull($newer->fresh()->moderator_id);
         // Rima clicks the same notice: she gets the newer one; Mahim clicking his own opens it.
         $this->actingAs($this->rima)->get("/desk/notice/{$newer->id}")->assertRedirect("/desk?tab=verify&order={$newer->id}");
         $this->actingAs($this->mahim)->get("/desk/notice/{$older->id}")->assertRedirect("/desk?tab=verify&order={$older->id}");
         $this->get("/desk/notice/{$newer->id}")->assertSessionHas('success', "{$newer->order_no} is already with Rima.");
+
+        // Room for more (limit 3) but a 10-minute timer runs: the click goes back to that order, nothing is taken.
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 3]);
+        $third = $this->web();
+        $this->assertNotNull($older->fresh()->action_due_at); // still running from Take next
+        $this->get("/desk/notice/{$third->id}")->assertRedirect("/desk?tab=verify&order={$older->id}")
+            ->assertSessionHas('success', "Your timer is running on {$older->order_no}. Finish it first, then press Take next.");
+        $this->assertNull($third->fresh()->moderator_id);
     }
 
     public function test_take_next_gives_the_oldest_order_and_stops_at_the_limit(): void

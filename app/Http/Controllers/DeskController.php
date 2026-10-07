@@ -229,6 +229,11 @@ class DeskController extends Controller
         if (OrderStatus::map()[$order->status_id]['final']) {
             return redirect()->route('desk.index')->with('success', __(':no is already closed.', ['no' => $order->order_no]));
         }
+        // A 10-minute timer is running on another order: back to that one, nothing is taken.
+        if ($timed = $this->desk->timedOrder($user->id)) {
+            return redirect()->route('desk.index', ['tab' => $tabFor(Order::find($timed->id)), 'order' => $timed->id])
+                ->with('success', __('Your timer is running on :no. Finish it first, then press Take next.', ['no' => $timed->order_no]));
+        }
         if ($this->desk->inHand($user->id) >= (int) settings('desk.active_limit')) {
             return redirect()->route('desk.index')->with('success', __('Finish the order you have first, then press Take next.'));
         }

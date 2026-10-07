@@ -23,7 +23,7 @@
         @endforeach
     </div>
 
-    {{-- Grab the board with the mouse and pull it sideways (hand cursor); touch scrolls as usual. --}}
+    {{-- Grab the empty board with the mouse and pull it sideways (open hand); a card shows the click pointer. Touch scrolls as usual. --}}
     <div data-drag-scroll class="flex cursor-grab gap-4 overflow-x-auto pb-4">
         @foreach ($columns as $key => $col)
             <section class="w-full shrink-0 md:w-72" x-show="wide || col === @js($key)" @if ($key !== $firstKey) x-cloak @endif>

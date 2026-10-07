@@ -169,6 +169,10 @@ class DeskController extends Controller
         if (Cache::add('desk:hold-followup', 1, now()->addMinutes(10))) {
             $this->desk->followUpHolds();
         }
+        // No cron yet: the pulse also runs the website order sweep, every 10 minutes, after the response.
+        if (Cache::add('woo:sweep', 1, now()->addMinutes(10))) {
+            app()->terminating(fn () => app(\App\Services\Orders\WooOrderSweep::class)->run());
+        }
         if (! $user->current_break_id) {
             if (Cache::add('desk:auto-assign', 1, 60)) {
                 $this->desk->autoAssign();

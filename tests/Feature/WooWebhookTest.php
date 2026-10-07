@@ -12,6 +12,8 @@ use Database\Seeders\OrderConfigSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use App\Models\WebsiteAccount;
 use Tests\TestCase;
 
 class WooWebhookTest extends TestCase
@@ -164,6 +166,34 @@ class WooWebhookTest extends TestCase
         $this->assertDatabaseHas('order_payments', ['order_id' => $order->id, 'amount' => 1000, 'status' => 'verified']);
         $this->assertStringContainsString('Website paid ৳1,000.00 but the order total here is ৳1,090.00', DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'system')->orderBy('id')->get()->pluck('body')->join(' '));
         $this->assertSame('90.00', $order->fresh()->cod_amount);
+    }
+
+    public function test_the_sweep_brings_orders_a_webhook_missed_and_changes_once(): void
+    {
+        WebsiteAccount::create(['name' => 'Shop', 'url' => 'https://shop.test', 'consumer_key' => 'ck', 'consumer_secret' => 'cs']);
+        $missed = $this->payload(['id' => 7001, 'number' => '7001', 'billing' => ['phone' => '+8801712340001']]);
+        $already = $this->payload(['id' => 7002, 'number' => '7002', 'billing' => ['phone' => '+8801712340002']]);
+        $this->send($already)->assertOk(); // this one came by webhook
+        Http::fake(['shop.test/wp-json/wc/v3/orders*' => Http::sequence()
+            ->push([$missed, $already])
+            ->push([$missed, $already])
+            ->push([$missed, ['status' => 'cancelled'] + $already]),
+        ]);
+        $sweep = app(\App\Services\Orders\WooOrderSweep::class);
+
+        // 1. The missed one comes in; the one already here with nothing new is left alone.
+        $this->assertSame(1, $sweep->run());
+        $this->assertNotNull(Order::firstWhere('external_ref', '7001'));
+        $this->assertSame(1, Order::where('external_ref', '7002')->count());
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'modified_after='));
+
+        // 2. Run again: nothing twice.
+        $this->assertSame(0, $sweep->run());
+        $this->assertSame(1, Order::where('external_ref', '7001')->count());
+
+        // 3. Cancelled on the website and that webhook lost: the sweep brings the change (nobody called: cancelled here too).
+        $this->assertSame(1, $sweep->run());
+        $this->assertSame('cancelled', OrderStatus::map()[Order::firstWhere('external_ref', '7002')->status_id]['key']);
     }
 
     public function test_website_payment_comes_in_with_the_order(): void

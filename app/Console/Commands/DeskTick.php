@@ -28,6 +28,9 @@ class DeskTick extends Command
         $desk->armUntouchedAll();
         $assigned = $desk->autoAssign();
         $desk->followUpHolds();
+        if (Cache::add('woo:sweep', 1, now()->addMinutes(9))) {
+            app(\App\Services\Orders\WooOrderSweep::class)->run(); // website orders a webhook did not bring
+        }
         $desk->recoverStale(); // a booking that stopped half way: ask the courier before trying again
         $desk->runBookings();
         $closed = $breaks->autoClose();

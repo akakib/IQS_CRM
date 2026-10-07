@@ -357,6 +357,15 @@ class OrderService
         $this->note($order, 'call', __('Called: will send the advance by :d', ['d' => \Illuminate\Support\Carbon::parse($date)->format('d M')]), $by, ['outcome' => 'will_pay']);
     }
 
+    /** The order number of another open order of the same customer from the last 7 days, if any (same rule as the desk's duplicate check). */
+    public function openDuplicate(Order $order): ?string
+    {
+        $open = array_keys(array_filter(OrderStatus::map(), fn ($s) => ! $s['final'] && $s['key'] !== 'cancelled'));
+
+        return DB::table('orders')->where('customer_id', $order->customer_id)->where('id', '!=', $order->id)
+            ->where('created_at', '>=', now()->subDays(7))->whereIn('status_id', $open)->orderByDesc('id')->value('order_no');
+    }
+
     /** Is an advance on this order still waiting for its check without lowering the COD yet? */
     public function hasUncheckedAdvance(Order $order): bool
     {
@@ -401,8 +410,12 @@ class OrderService
             && (float) $order->advance_verified > 0 && $machine->advanceSettled($order) && ! $this->hasUncheckedAdvance($order) && ! $order->taken_back_at) {
             // Held after Confirmed, or (a website order) already called while asking for the advance: on to booking.
             // Not called yet: to Call (address check, upsell). Chat orders: their moderator presses Confirm.
+            // Same customer with another open order: never booked by itself (two parcels, two charges); the
+            // moderator confirms by hand, where Confirm asks "merge first?".
             $called = $order->channel === 'web' && DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'call')->exists();
-            $machine->transition($order, $machine->heldFrom($order) === 'confirmed' || $called ? 'confirmed' : 'record_verified', null, 'rule', null, __('Advance received'));
+            $duplicate = $this->openDuplicate($order);
+            $machine->transition($order, ($machine->heldFrom($order) === 'confirmed' || $called) && ! $duplicate ? 'confirmed' : 'record_verified', null, 'rule', null,
+                $duplicate ? __('Advance received. Same customer has :no open: merge or confirm by hand.', ['no' => $duplicate]) : __('Advance received'));
         }
     }
 

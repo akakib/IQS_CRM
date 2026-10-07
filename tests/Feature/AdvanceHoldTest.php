@@ -161,6 +161,26 @@ class AdvanceHoldTest extends TestCase
         $this->assertSame((float) $held->fresh()->cod_amount, (float) DB::table('shipments')->where('order_id', $held->id)->value('cod_amount'));
     }
 
+    public function test_paid_during_the_call_is_not_booked_by_itself_when_the_customer_has_another_open_order(): void
+    {
+        $first = $this->web(9);
+        $phone = $first->ship_phone;
+        $second = app(OrderService::class)->create([
+            'channel' => 'web', 'phone' => $phone, 'name' => 'Buyer', 'address_line' => 'Road 1', 'thana' => 'Mirpur',
+            'zone_id' => DB::table('delivery_zones')->where('system_key', 'inside_dhaka')->value('id'),
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
+        ], null, 'webhook');
+        app(VerificationEngine::class)->run($second);
+        $this->assertSame('hold', $this->key($second));
+        DB::table('orders')->where('id', $second->id)->update(['moderator_id' => $this->mod->id]);
+        $this->actingAs($this->mod)->post("/orders/{$second->id}/payments", ['called' => 1, 'advance' => ['method_id' => $this->bkash(), 'amount' => (float) $second->fresh()->advance_required, 'transaction_id' => 'DUP1']]);
+        // Not booked: back in Call, the moderator decides (Confirm then asks "merge first?").
+        $this->assertSame('record_verified', $this->key($second));
+        $this->assertSame(0, DB::table('shipments')->where('order_id', $second->id)->count());
+        $this->assertTrue(DB::table('order_notes')->where('order_id', $second->id)->where('body', 'like', '%'.$first->order_no.'%')->exists()); // the timeline says why
+        $this->get("/desk?tab=call&order={$second->id}")->assertSee('Confirm anyway');
+    }
+
     public function test_paid_later_without_a_call_goes_to_call_and_partial_stays_on_hold(): void
     {
         $held = $this->web(9);

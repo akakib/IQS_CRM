@@ -1,7 +1,7 @@
 {{-- Label reader: a USB / Bluetooth scanner (types the code + Enter), typing by
      hand, or the phone camera (button on the right). All emit `scan` with the
-     code. The page answers with $dispatch('scan-result', { ok, message }) for
-     a green/red flash and a beep.
+     code. The page answers with $dispatch('scan-result', { ok, message, level }) for
+     a flash and a beep; level (red, orange, cod, edited) colours the camera bar like the page.
      <x-scan-input @scan="handle($event.detail)" />        camera stays open (many parcels)
      <x-scan-input once @scan="handle($event.detail)" />   camera closes after one read
      quiet = the page shows the result itself, so no message under the box. --}}
@@ -37,7 +37,7 @@
                 <video x-ref="video" playsinline muted class="h-full w-full object-cover"></video>
                 {{-- Aiming frame --}}
                 <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div class="h-28 w-[82%] max-w-md rounded-xl border-2 transition-colors" :class="state === 'ok' ? 'border-green-400' : (state === 'bad' ? 'border-red-500' : 'border-white/80')"></div>
+                    <div class="h-28 w-[82%] max-w-md rounded-xl border-2 transition-colors" :class="state === 'ok' ? 'border-green-400' : (state === 'bad' ? (level === 'cod' ? 'border-amber-400' : 'border-red-500') : 'border-white/80')"></div>
                 </div>
                 <p x-show="starting" class="absolute inset-x-0 top-1/2 mt-20 text-center text-sm text-white/80">{{ __('Starting the camera…') }}</p>
 
@@ -53,7 +53,9 @@
             </div>
 
             {{-- What the last scan did --}}
-            <div class="min-h-[72px] px-4 py-3 text-center" :class="!message ? 'bg-black text-white/60' : (good ? 'bg-green-600 text-white' : 'bg-red-600 text-white')">
+            <div class="min-h-[72px] px-4 py-3 text-center"
+                :class="!message ? 'bg-black text-white/60' : ({ ok: 'bg-green-600 text-white', edited: 'bg-purple-600 text-white', orange: 'bg-orange-500 text-white', warn: 'bg-orange-500 text-white', cod: 'bg-amber-400 text-amber-950' }[level] ?? 'bg-red-600 text-white')">
+                <p x-show="message && level === 'cod'" class="mb-1 inline-block rounded-full bg-amber-950 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-300">{{ __('COD not updated') }}</p>
                 <p class="text-base font-semibold" x-text="message || @js(__('Waiting for a barcode…'))"></p>
                 <p class="font-mono text-xs opacity-80" x-show="lastCode" x-text="lastCode"></p>
             </div>

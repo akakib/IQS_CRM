@@ -29,7 +29,7 @@
             try { this.last = await this.post(@js(route('packaging.scan.post')), { code }) }
             catch (e) { this.last = { ok: false, level: 'red', message: e.message } }
             this.list = this.last.checklist ?? null; this.ticked = []; this.holding = false;
-            $dispatch('scan-result', { ok: this.last.ok, message: this.last.message });
+            $dispatch('scan-result', { ok: this.last.ok, message: this.last.message, level: this.last.level });
         },
         tick(id) { this.ticked = this.ticked.includes(id) ? this.ticked.filter(i => i !== id) : [...this.ticked, id] },
         get allTicked() { return this.list && this.ticked.length === this.list.items.length },

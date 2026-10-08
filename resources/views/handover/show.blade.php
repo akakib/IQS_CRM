@@ -21,7 +21,7 @@
                         this.last = await r.json();
                     } catch (e) { this.last = { ok: false, level: 'red', message: @js(__('Connection problem. Scan again.')) }; }
                     if (this.last.ok) { this.count++; }
-                    $dispatch('scan-result', { ok: this.last.ok, message: this.last.message });
+                    $dispatch('scan-result', { ok: this.last.ok, message: this.last.message, level: this.last.level });
                 },
             }" @scan="handle($event.detail)">
             <div>

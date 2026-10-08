@@ -13,6 +13,7 @@ export default function scanInput({ once = false } = {}) {
         state: null, // 'ok' | 'bad' flash after the page answers
         message: '',
         good: true,
+        level: null, // the page's kind of result (ok, red, orange, cod...): colours the camera bar the same as the page
 
         camera: false,
         cameraError: null,
@@ -36,6 +37,7 @@ export default function scanInput({ once = false } = {}) {
             this.good = !!detail.ok;
             this.state = this.good ? 'ok' : 'bad';
             this.message = detail.message || '';
+            this.level = detail.level || (this.good ? 'ok' : 'red');
             this.beep(this.good);
             setTimeout(() => (this.state = null), 2500);
         },

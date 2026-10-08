@@ -265,7 +265,8 @@ class ScanService
         $text = implode(' · ', array_filter([
             ($station === 'handover' ? __('Stopped at handover') : __('Stopped at packaging')).': '.$message,
             $session ? trim(__('Handover of :d', ['d' => \Illuminate\Support\Carbon::parse($session->pickup_date)->format('d M')]).($session->rider_name ? ', '.__('rider :r', ['r' => $session->rider_name]) : '')) : null,
-            $packer && $order->packed_at ? __('Packed by :p at :t', ['p' => $packer, 't' => \Illuminate\Support\Carbon::parse($order->packed_at)->format('g:i A')]) : ($packer ? __('Packer: :p', ['p' => $packer]) : null),
+            // A packing time after the stop belongs to a later repack: then only the packer's name.
+            $packer && $order->packed_at && \Illuminate\Support\Carbon::parse($order->packed_at)->lte($at) ? __('Packed by :p at :t', ['p' => $packer, 't' => \Illuminate\Support\Carbon::parse($order->packed_at)->format('g:i A')]) : ($packer ? __('Packer: :p', ['p' => $packer]) : null),
         ]));
         DB::table('order_notes')->insert([
             'order_id' => $orderId, 'note_type' => 'scan', 'body' => $text, 'user_id' => $byId, 'created_at' => $at,

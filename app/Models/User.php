@@ -32,6 +32,11 @@ class User extends Authenticatable
         'work_location_id',
         'telegram_user_id',
         'is_active',
+        'desk_limit',
+        'desk_timer_minutes',
+        'desk_extend_minutes',
+        'desk_extend_daily_limit',
+        'desk_voice',
     ];
 
     /**
@@ -55,6 +60,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'desk_voice' => 'boolean',
             'last_seen_at' => 'datetime',
             'employment_type' => EmploymentType::class,
         ];

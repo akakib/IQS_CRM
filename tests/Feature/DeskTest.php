@@ -44,8 +44,7 @@ class DeskTest extends TestCase
         (new PointsSeeder)->run();
         Artisan::call('notifications:sync');
         OrderStatus::forget();
-        // The shop default is one order at a time; most tests here need a moderator holding several.
-        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 5]);
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]); // a batch of one: each Take next gives exactly the oldest order
 
         $role = $this->role(['orders.view' => 'own', 'orders.create', 'orders.edit', 'orders.take'], [], 'Moderator');
         $this->mahim = User::factory()->create(['name' => 'Mahim']);
@@ -135,74 +134,107 @@ class DeskTest extends TestCase
         $this->assertNull($third->fresh()->moderator_id);
     }
 
-    public function test_take_next_gives_the_oldest_order_and_stops_at_the_limit(): void
+    /** The admin's number on a points rule (0 = off, - takes away, + adds). */
+    private function points(string $trigger, float $points): void
+    {
+        DB::table('point_rules')->where('trigger_key', $trigger)->whereNotExists(fn ($q) => $q->selectRaw('1')->from('point_rule_conditions')->whereColumn('rule_id', 'point_rules.id'))
+            ->update(['points' => $points]);
+    }
+
+    public function test_take_next_gives_a_batch_and_the_next_batch_only_when_all_are_done(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 2]);
         [$a, $b, $c] = [$this->web(), $this->web(), $this->web()];
 
-        $this->actingAs($this->mahim)->post('/desk/next')->assertSessionHas('success');
+        $this->actingAs($this->mahim)->get('/desk')->assertSee('Take next 2');
+        $this->post('/desk/next')->assertRedirect(route('desk.index', ['tab' => 'verify', 'order' => $a->id]));
         $this->assertSame($this->mahim->id, $a->fresh()->moderator_id); // oldest first, not picked
-        $this->assertNull($b->fresh()->moderator_id);
-
-        // A double click does not hand out a second order.
-        $this->post('/desk/next')->assertRedirect(route('desk.index'));
-        $this->assertNull($b->fresh()->moderator_id);
-
-        $this->travel(4)->seconds();
-        $this->post('/desk/next');
         $this->assertSame($this->mahim->id, $b->fresh()->moderator_id);
-
-        $this->travel(4)->seconds();
-        $this->post('/desk/next')->assertRedirect(route('desk.index', ['tab' => 'verify', 'order' => $a->id])); // holds 2 of 2: opens what is in hand
         $this->assertNull($c->fresh()->moderator_id);
-
-        $this->get('/desk')->assertOk()->assertSee($a->order_no)->assertSee('Finish one first');
-    }
-
-    public function test_timer_runs_on_one_order_at_a_time_and_a_miss_releases_it_with_a_penalty(): void
-    {
-        [$a, $b] = [$this->web(), $this->web()];
-        $this->desk()->takeNext($this->mahim);
-        $this->desk()->takeNext($this->mahim);
-
-        $this->assertNotNull($a->fresh()->action_due_at); // the oldest has the clock
+        $this->assertNotNull($a->fresh()->action_due_at); // the clock runs on one of them only
         $this->assertNull($b->fresh()->action_due_at);
 
-        $this->travel(11)->minutes();
-        Artisan::call('desk:tick');
+        // One of the two done is not enough: the next batch waits for both.
+        $this->act($a, 'verify');
+        $this->assertSame('record_verified', $this->key($a));
+        $this->travel(4)->seconds();
+        $this->post('/desk/next');
+        $this->assertNull($c->fresh()->moderator_id);
+        $this->get('/desk')->assertOk()->assertSee('Finish your 2 orders first');
 
-        $this->assertNull($a->fresh()->moderator_id); // back in New
-        $this->assertNull($b->fresh()->action_due_at); // no clock starts behind the moderator's back
-        $this->actingAs($this->mahim)->get('/desk')->assertOk();
-        $this->assertNotNull($b->fresh()->action_due_at); // it starts when the order is open in front of them
-        $this->assertDatabaseHas('order_assignments', ['order_id' => $a->id, 'user_id' => $this->mahim->id, 'ended_reason' => 'timeout']);
-        $this->assertSame(-1.0, (float) DB::table('point_ledger')->where('user_id', $this->mahim->id)->sum('points'));
+        DB::table('orders')->whereIn('id', [$a->id, $b->id])->update(['status_id' => OrderStatus::idFor('confirmed'), 'action_due_at' => null]);
+        $this->travel(4)->seconds();
+        $this->post('/desk/next');
+        $this->assertSame($this->mahim->id, $c->fresh()->moderator_id);
 
-        // Someone else pressing Take next gets the released order (oldest first).
-        $this->assertSame($a->id, $this->desk()->takeNext($this->rima)->id);
+        // The admin's own number for one person: Rima gets one at a time, and 0 means no website orders at all.
+        [$d, $e] = [$this->web(), $this->web()];
+        $this->rima->update(['desk_limit' => 1]);
+        $this->assertSame($d->id, $this->desk()->takeNext($this->rima->fresh())->id);
+        $this->assertNull($e->fresh()->moderator_id);
+        $other = User::factory()->create(['name' => 'Jesi', 'desk_limit' => 0]);
+        $other->roles()->attach($this->mahim->roles()->first()->id);
+        $this->expectExceptionMessage('You do not take website orders.');
+        $this->desk()->takeNext($other);
     }
 
-    public function test_time_up_is_enforced_on_the_next_visit_and_on_the_next_click_without_cron(): void
+    public function test_going_over_the_time_limit_is_logged_and_scored_and_the_order_stays(): void
+    {
+        $this->points('timer_missed', -1);
+        $this->points('timer_beaten', 1);
+        $this->mahim->update(['desk_limit' => 2, 'desk_timer_minutes' => 8]);
+        [$a, $b] = [$this->web(), $this->web()];
+        $this->desk()->takeNext($this->mahim);
+
+        $this->assertNotNull($a->fresh()->action_due_at); // the oldest has the clock: his own 8 minutes
+        $this->assertNull($b->fresh()->action_due_at);
+        $this->assertDatabaseHas('order_work_logs', ['order_id' => $a->id, 'user_id' => $this->mahim->id, 'limit_minutes' => 8, 'done_at' => null]);
+
+        $this->travel(9)->minutes();
+        Artisan::call('desk:tick');
+
+        // Over time: still his (he may be on the call), logged and scored once.
+        $this->assertSame($this->mahim->id, $a->fresh()->moderator_id);
+        $this->assertNotNull($a->fresh()->timer_overran_at);
+        $this->assertDatabaseHas('order_work_logs', ['order_id' => $a->id, 'overran' => true, 'done_at' => null]);
+        Artisan::call('desk:tick');
+        $this->assertSame(-1.0, (float) DB::table('point_ledger')->where('user_id', $this->mahim->id)->sum('points'));
+
+        // His next order gets the clock when it is open in front of him; the late one can still be worked.
+        $this->assertNull($b->fresh()->action_due_at);
+        $this->actingAs($this->mahim)->get('/desk?tab=verify&order='.$b->id)->assertOk();
+        $this->assertNotNull($b->fresh()->action_due_at);
+        $this->act($a, 'verify');
+        $this->assertSame('record_verified', $this->key($a));
+        $this->assertNull($a->fresh()->timer_overran_at);
+        $log = DB::table('order_work_logs')->where('order_id', $a->id)->first();
+        $this->assertSame('record_verified', $log->outcome);
+        $this->assertGreaterThanOrEqual(540, $log->seconds);
+
+        // In time: the + rule pays.
+        $this->travel(2)->minutes();
+        $this->act($b, 'verify');
+        $this->assertSame(0.0, (float) DB::table('point_ledger')->where('user_id', $this->mahim->id)->sum('points'));
+        $this->assertDatabaseHas('order_work_logs', ['order_id' => $b->id, 'overran' => false, 'outcome' => 'record_verified']);
+    }
+
+    public function test_an_order_left_untouched_long_after_its_time_limit_goes_back_to_new(): void
     {
         [$a, $b] = [$this->web(), $this->web()];
         $this->actingAs($this->mahim)->post('/desk/next');
-        $this->travel(4)->seconds();
-        $this->post('/desk/next');
-        $this->assertNotNull($a->fresh()->action_due_at);
-
-        // Clicking after the time is up does nothing for the order: it goes back and costs the point.
         $this->travel(11)->minutes();
-        $this->act($a, 'verify')->assertSessionHas('error');
+
+        // Opening the desk after the time is up says so; the order stays.
+        $this->get('/desk')->assertOk()->assertSee('Time limit passed on '.$a->order_no);
+        $this->assertSame($this->mahim->id, $a->fresh()->moderator_id);
+
+        // An hour later with nothing done: back to New for anyone, without a second penalty.
+        $this->travel(61)->minutes();
+        Artisan::call('desk:tick');
         $this->assertNull($a->fresh()->moderator_id);
-        $this->assertSame('new', $this->key($a));
-        $this->assertSame(-1.0, (float) DB::table('point_ledger')->where('user_id', $this->mahim->id)->sum('points'));
-
-        // The second order gets its timer once it is open; just opening the desk after it runs out takes it back too.
-        $this->get('/desk')->assertOk();
-        $this->assertNotNull($b->fresh()->action_due_at);
-        $this->travel(11)->minutes();
-        $this->get('/desk')->assertOk()->assertSee('Time ran out on '.$b->order_no);
-        $this->assertNull($b->fresh()->moderator_id);
+        $this->assertNull($a->fresh()->timer_overran_at);
+        $this->assertDatabaseHas('order_work_logs', ['order_id' => $a->id, 'outcome' => 'idle', 'overran' => true]);
+        $this->assertSame($a->id, $this->desk()->takeNext($this->rima)->id);
     }
 
     public function test_extra_time_once_per_order_with_a_daily_limit_and_a_small_cost(): void
@@ -319,11 +351,11 @@ class DeskTest extends TestCase
         $this->assertDatabaseHas('app_notifications', ['user_id' => $manager->id]);
 
         DB::table('users')->whereIn('id', [$this->mahim->id, $this->rima->id])->update(['last_seen_at' => now()]);
-        $this->assertSame($a->id, $this->desk()->takeNext($this->mahim)->id); // his first order timed out meanwhile; he takes it again
+        $this->assertSame($this->mahim->id, $a->fresh()->moderator_id); // over his time limit, but still his
         $c = $this->web(); // too new to auto-assign
         Artisan::call('desk:tick');
 
-        $this->assertSame($this->rima->id, $b->fresh()->moderator_id); // Rima holds fewer
+        $this->assertSame($this->rima->id, $b->fresh()->moderator_id); // a batch at a time: only Rima's hands are empty
         $this->assertDatabaseHas('order_assignments', ['order_id' => $b->id, 'how' => 'auto']);
         $this->assertNull($c->fresh()->moderator_id);
         $this->assertDatabaseHas('app_notifications', ['user_id' => $this->rima->id, 'subject_id' => $b->id]);
@@ -608,9 +640,8 @@ class DeskTest extends TestCase
     public function test_while_one_timer_runs_other_waiting_orders_cannot_be_worked_on(): void
     {
         [$a, $b] = [$this->web(), $this->web()];
-        $this->actingAs($this->mahim)->post('/desk/next'); // a: taken, clock running
-        $this->travel(4)->seconds();
-        $this->post('/desk/next');                          // b: taken, no clock (one at a time)
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 2]);
+        $this->actingAs($this->mahim)->post('/desk/next'); // a and b taken; the clock runs on a only (one at a time)
         $this->assertNotNull($a->fresh()->action_due_at);
         $this->assertNull($b->fresh()->action_due_at);
 
@@ -659,10 +690,12 @@ class DeskTest extends TestCase
             ->assertJsonPath('mine.0.no', $a->order_no)
             ->assertJsonPath('timed.id', $a->id)
             ->assertJsonPath('waiting', 1)
-            ->assertJsonPath('can_take', true);
+            ->assertJsonPath('can_take', false); // a batch at a time: a is not done yet
         $this->assertTrue($this->mahim->fresh()->last_seen_at->lt(now()->subMinutes(29))); // an open tab is not "active"
 
-        // Without cron, the pulse hands out an order nobody took (at most once a minute).
+        // Without cron, the pulse hands out an order nobody took (at most once a minute) to empty hands.
+        DB::table('orders')->where('id', $a->id)->update(['status_id' => OrderStatus::idFor('confirmed'), 'action_due_at' => null]);
+        $this->getJson('/desk/pulse')->assertJsonPath('can_take', true);
         $this->travel(16)->minutes();
         $this->get('/desk'); // seen at work
         \Illuminate\Support\Facades\Cache::forget('desk:auto-assign');
@@ -901,15 +934,14 @@ class DeskTest extends TestCase
         foreach (range(1, 4) as $i) {
             $this->web();
         }
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 3]);
         $this->actingAs($this->mahim);
-        foreach (range(1, 3) as $i) {
-            $this->post('/desk/next');
-            $this->travel(4)->seconds();
-        }
+        $this->post('/desk/next'); // a batch of 3
+        $this->travel(4)->seconds();
 
         DB::flushQueryLog();
         DB::enableQueryLog();
-        $this->get('/desk')->assertOk()->assertSee('Take next')->assertSee('Record OK, call next');
+        $this->get('/desk')->assertOk()->assertSee('Finish your 3 orders first')->assertSee('Record OK, call next');
         // user + permissions (2), counts, list, waiting, reasons, order, customer, items, notes, duplicates
         // + expired-timer check (2), extra-time count (1), the due-booking check (1), the Steadfast snapshot (1)
         // the advance-hold reason id (1: advance holds are counted in the Call tab), the advance holds waiting (1)

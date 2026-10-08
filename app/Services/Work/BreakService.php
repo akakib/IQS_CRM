@@ -43,7 +43,10 @@ class BreakService
             foreach ($waiting as $orderId) {
                 $this->desk->release($orderId, 'break');
             }
-            // Returned No response orders stay, with their timer paused.
+            // Returned No response orders stay, with their timer paused (that piece of work ends here in the time log).
+            foreach (DB::table('orders')->where('moderator_id', $user->id)->whereNotNull('action_due_at')->pluck('id') as $orderId) {
+                $this->desk->closeWorkLog($orderId, 'break');
+            }
             DB::table('orders')->where('moderator_id', $user->id)->whereNotNull('action_due_at')->update(['action_due_at' => null]);
         });
     }

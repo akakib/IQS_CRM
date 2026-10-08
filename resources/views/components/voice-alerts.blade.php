@@ -8,7 +8,7 @@
         $spoken = trim((string) auth()->user()->voice_name) ?: \Illuminate\Support\Str::of(auth()->user()->name)->trim()->before(' ')->toString();
     @endphp
     <div class="relative"
-        x-data="voiceAlerts({ url: @js(route('desk.pulse')), name: @js($spoken), voice: @js((bool) settings('desk.voice_alerts')) })" @if (! settings('desk.voice_alerts')) x-show="false" @endif
+        x-data="voiceAlerts({ url: @js(route('desk.pulse')), name: @js($spoken), voice: @js($voiceOn = auth()->check() ? app(\App\Services\Work\DeskRules::class)->for(auth()->id())['voice'] : (bool) settings('desk.voice_alerts')) })" @if (! $voiceOn) x-show="false" @endif
         @click.outside="menu = false" @keydown.escape.window="menu = false">
         <button type="button" @click="menu = !menu; if (menu) loadVoices()"
             :aria-label="@js(__('Voice alerts'))"

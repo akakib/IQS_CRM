@@ -26,7 +26,7 @@ class PointsEngine
 
         foreach ($this->matching($trigger, $context) as $rule) {
             $userId = $people[$rule->recipient] ?? null;
-            if (! $userId) {
+            if (! $userId || (float) $rule->points == 0.0) { // 0 = the admin turned this one off
                 continue;
             }
 

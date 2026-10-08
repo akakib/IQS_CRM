@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Courier\BookingService;
 use App\Services\NotificationService;
 use App\Services\Points\PointHooks;
+use App\Services\Work\DeskRules;
 use App\Services\Work\WorkCalendar;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,7 @@ class DeskService
         private OrderService $orders,
         private WorkCalendar $calendar,
         private NotificationService $notifications,
+        private DeskRules $rules,
     ) {}
 
     // ── Taking and assigning ─────────────────────────────────
@@ -112,13 +114,13 @@ class DeskService
      */
     public function notFreeForNewOrders(): array
     {
-        $limit = (int) settings('desk.active_limit');
-        $full = DB::table('orders')->where('channel', 'web')->whereNotNull('moderator_id')->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))
-            ->groupBy('moderator_id')->havingRaw('COUNT(*) >= ?', [$limit])->pluck('moderator_id')->all();
-        $resting = DB::table('users')->whereNotNull('current_break_id')->pluck('id')->all();
+        // A batch at a time: anyone still holding an order of their batch is busy.
+        $busy = DB::table('orders')->where('channel', 'web')->whereNotNull('moderator_id')->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))
+            ->distinct()->pluck('moderator_id')->all();
+        $resting = DB::table('users')->where(fn ($q) => $q->whereNotNull('current_break_id')->orWhere('desk_limit', 0))->pluck('id')->all();
         $owners = User::where('is_active', true)->get()->filter(fn (User $u) => $u->isOwner())->pluck('id')->all();
 
-        return array_values(array_unique(array_map('intval', [...$full, ...$resting, ...$owners])));
+        return array_values(array_unique(array_map('intval', [...$busy, ...$resting, ...$owners])));
     }
 
     public function takeNext(User $user): Order
@@ -129,29 +131,37 @@ class DeskService
         if ($user->current_break_id) {
             throw ValidationException::withMessages(['order' => __('You are on a break. Press Start work first.')]);
         }
-        $limit = (int) settings('desk.active_limit');
-        // One order at a time: anything of theirs still to be called (an advance hold too) fills a hand.
-        if ($this->inHand($user->id) >= $limit) {
-            throw ValidationException::withMessages(['order' => $limit === 1 ? __('Finish the order you have before taking the next one.') : __('You already hold :n orders. Finish one first.', ['n' => $limit])]);
+        $limit = $this->rules->limit($user->id);
+        if ($limit === 0) {
+            throw ValidationException::withMessages(['order' => __('You do not take website orders. A manager can change this on the Staff page.')]);
         }
-        $this->sweepExpired(); // timers that ran out free their orders right now
+        // A batch at a time: anything of theirs still to be called (an advance hold too) must be done first.
+        if ($this->inHand($user->id) > 0) {
+            throw ValidationException::withMessages(['order' => $limit === 1 ? __('Finish the order you have before taking the next one.') : __('Finish all the orders you hold before taking the next :n.', ['n' => $limit])]);
+        }
+        $this->sweepExpired();
 
-        // Of two people pressing at once, each gets a different order.
-        for ($try = 0; $try < 5; $try++) {
+        // Up to their batch size, oldest first. Of two people pressing at once, each gets different orders.
+        $first = null;
+        for ($got = 0, $try = 0; $got < $limit && $try < $limit + 5; $try++) {
             $id = $this->waitingQuery()->orderBy('id')->value('id');
             if (! $id) {
                 // Nothing to verify or call: an order waiting for its advance (the call to ask for it), up to the parked cap.
                 $id = $this->advanceHeldCount($user->id) < self::ADVANCE_CAP ? $this->waitingAdvanceQuery()->orderBy('id')->value('id') : null;
             }
             if (! $id) {
-                throw ValidationException::withMessages(['order' => __('No order is waiting.')]);
+                break;
             }
             if ($this->assign($id, $user->id, 'claimed')) {
-                return Order::findOrFail($id);
+                $first ??= $id;
+                $got++;
             }
         }
+        if (! $first) {
+            throw ValidationException::withMessages(['order' => $try > 0 && $this->waitingQuery()->exists() ? __('Busy: try again.') : __('No order is waiting.')]);
+        }
 
-        throw ValidationException::withMessages(['order' => __('Busy: try again.')]);
+        return Order::findOrFail($first);
     }
 
     /** @return bool false when someone else got the order first */
@@ -217,15 +227,34 @@ class DeskService
             return null;
         }
 
-        return $mine->where(fn ($q) => $q->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))
+        return $mine->whereNull('timer_overran_at')->where(fn ($q) => $q->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))
             ->orWhere(fn ($q) => $q->where('status_id', OrderStatus::idFor('no_answer'))->where('next_call_at', '<=', now())));
     }
 
     private function startTimer(int $userId, int $orderId): bool
     {
-        return (bool) DB::table('orders')->where('id', $orderId)->whereNull('action_due_at')->update([
-            'action_due_at' => $this->calendar->deadline($userId, (int) settings('desk.action_timer_minutes')),
+        $minutes = $this->rules->for($userId)['timer'];
+        $started = (bool) DB::table('orders')->where('id', $orderId)->whereNull('action_due_at')->update([
+            'action_due_at' => $this->calendar->deadline($userId, $minutes),
         ]);
+        if ($started) {
+            DB::table('order_work_logs')->insert(['order_id' => $orderId, 'user_id' => $userId, 'started_at' => now(), 'limit_minutes' => $minutes]);
+        }
+
+        return $started;
+    }
+
+    /** Close the open time log of an order: done, and how it ended. */
+    public function closeWorkLog(int $orderId, string $outcome): ?object
+    {
+        $log = DB::table('order_work_logs')->where('order_id', $orderId)->whereNull('done_at')->orderByDesc('id')->first();
+        if ($log) {
+            DB::table('order_work_logs')->where('id', $log->id)->update([
+                'done_at' => now(), 'seconds' => max(0, now()->diffInSeconds($log->started_at, true)), 'outcome' => $outcome,
+            ]);
+        }
+
+        return $log;
     }
 
     /** The order whose timer is running for this person, if any. */
@@ -248,25 +277,20 @@ class DeskService
         $userId = (int) $order->moderator_id;
 
         $freed = DB::table('orders')->where('id', $orderId)->where('moderator_id', $userId)->update([
-            'moderator_id' => null, 'assigned_at' => null, 'action_due_at' => null, 'queue_since' => now(),
+            'moderator_id' => null, 'assigned_at' => null, 'action_due_at' => null, 'timer_overran_at' => null, 'queue_since' => now(),
             'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now(),
         ]);
         if (! $freed) {
             return;
         }
+        $this->closeWorkLog($orderId, $reason);
         DB::table('order_assignments')->where('order_id', $orderId)->where('user_id', $userId)->whereNull('ended_at')
             ->update(['ended_at' => now(), 'ended_reason' => $reason]);
 
         $name = DB::table('users')->where('id', $userId)->value('name');
-        $this->systemNote($orderId, $reason === 'timeout'
-            ? __('No action in time: taken back from :n, waiting in New again.', ['n' => $name])
+        $this->systemNote($orderId, $reason === 'idle'
+            ? __('Nothing done for a long time after the time limit: taken back from :n, waiting in New again.', ['n' => $name])
             : __(':n went on a break: waiting in New again.', ['n' => $name]), null, ['released_from' => $userId, 'reason' => $reason]);
-
-        if ($reason === 'timeout') {
-            $today = DB::table('order_assignments')->where('user_id', $userId)->where('ended_reason', 'timeout')
-                ->where('ended_at', '>=', now()->startOfDay())->count();
-            app(PointHooks::class)->timerMissed(Order::find($orderId), $userId, $today);
-        }
     }
 
     /** How many times this person took extra time today. */
@@ -281,7 +305,8 @@ class DeskService
      */
     public function extend(Order $order, User $user): void
     {
-        $limit = (int) settings('desk.extend_daily_limit');
+        $rules = $this->rules->for($user->id);
+        $limit = $rules['extend_daily'];
         $used = $this->extensionsToday($user->id);
         $fail = match (true) {
             $order->moderator_id !== $user->id => __('This order is not with you.'),
@@ -295,7 +320,7 @@ class DeskService
             throw ValidationException::withMessages(['order' => $fail]);
         }
 
-        $minutes = (int) settings('desk.extend_minutes');
+        $minutes = $rules['extend'];
         // The WHERE repeats the checks, so two clicks cannot both add time.
         $done = DB::table('orders')->where('id', $order->id)->where('moderator_id', $user->id)->whereNull('timer_extended_at')
             ->where('action_due_at', '>', now())
@@ -303,15 +328,16 @@ class DeskService
         if (! $done) {
             return;
         }
+        DB::table('order_work_logs')->where('order_id', $order->id)->whereNull('done_at')->increment('extended_minutes', $minutes);
         $this->systemNote($order->id, __(':n took :m more minutes.', ['n' => $user->name, 'm' => $minutes]), $user->id);
         app(PointHooks::class)->timerExtended($order, $user->id, $used + 1);
     }
 
     /**
-     * Release every order whose time is up and say which of them were this
+     * Mark every order whose time is up and say which of them were this
      * person's (the desk shows that as a message).
      *
-     * @return list<string> order numbers taken back from this person
+     * @return list<string> order numbers of this person that just went over time
      */
     public function sweepFor(int $userId): array
     {
@@ -321,16 +347,40 @@ class DeskService
         return $mine;
     }
 
-    /** @return int orders released because their timer ran out */
+    /**
+     * Time limit passed: the order stays with the person (they may be on the
+     * call), the overrun is logged and scored, and their next order can get a
+     * timer. Only an order left with nothing done for the idle minutes after
+     * that goes back to New.
+     *
+     * @return int orders that went over time now
+     */
     public function sweepExpired(): int
     {
-        $ids = DB::table('orders')->whereNotNull('action_due_at')->where('action_due_at', '<=', now())
-            ->whereNotNull('moderator_id')->orderBy('action_due_at')->limit(100)->pluck('id');
-        foreach ($ids as $id) {
-            $this->release($id, 'timeout');
+        $due = DB::table('orders')->whereNotNull('action_due_at')->where('action_due_at', '<=', now())
+            ->whereNotNull('moderator_id')->orderBy('action_due_at')->limit(100)->get(['id', 'moderator_id']);
+        $over = 0;
+        foreach ($due as $row) {
+            // The WHERE repeats the check, so two sweeps never count one overrun twice.
+            if (! DB::table('orders')->where('id', $row->id)->whereNotNull('action_due_at')->where('action_due_at', '<=', now())
+                ->update(['action_due_at' => null, 'timer_overran_at' => now()])) {
+                continue;
+            }
+            $over++;
+            $userId = (int) $row->moderator_id;
+            DB::table('order_work_logs')->where('order_id', $row->id)->whereNull('done_at')->update(['overran' => true]);
+            $this->systemNote($row->id, __('Went over the time limit. It stays with :n.', ['n' => DB::table('users')->where('id', $userId)->value('name')]), null, ['overran_by' => $userId]);
+            $today = DB::table('order_work_logs')->where('user_id', $userId)->where('overran', true)->where('started_at', '>=', now()->startOfDay())->count();
+            app(PointHooks::class)->timerMissed(Order::find($row->id), $userId, $today);
         }
 
-        return $ids->count();
+        $idle = DB::table('orders')->whereNotNull('timer_overran_at')->whereNotNull('moderator_id')
+            ->where('timer_overran_at', '<=', now()->subMinutes((int) settings('desk.idle_return_minutes')))->limit(100)->pluck('id');
+        foreach ($idle as $id) {
+            $this->release($id, 'idle');
+        }
+
+        return $over;
     }
 
     /** Cron safety net: start the timer for everyone whose waiting order has sat untouched too long. */
@@ -359,12 +409,13 @@ class DeskService
             ->where('queue_since', '<=', now()->subMinutes((int) settings('desk.auto_assign_minutes')))
             ->orderBy('id')->limit(50)->pluck('order_no', 'id');
 
-        $limit = (int) settings('desk.active_limit');
+        // A batch at a time: only people with empty hands, each up to their own batch size.
         $load = [];
+        $limitOf = [];
         foreach ($this->activeModerators() as $userId) {
-            $count = $this->inHand($userId); // an uncalled advance hold fills a hand too
-            if ($count < $limit) {
-                $load[$userId] = $count;
+            $limitOf[$userId] = $this->rules->limit($userId);
+            if ($limitOf[$userId] > 0 && $this->inHand($userId) === 0) { // an uncalled advance hold fills a hand too
+                $load[$userId] = 0;
             }
         }
 
@@ -380,7 +431,7 @@ class DeskService
                 $this->notifications->send('order_assigned', __('Order :no was given to you', ['no' => $orderNo]), null, [
                     'link' => route('desk.index', ['order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId],
                 ]);
-                if (++$load[$userId] >= $limit) {
+                if (++$load[$userId] >= $limitOf[$userId]) {
                     unset($load[$userId]);
                 }
             }
@@ -390,7 +441,7 @@ class DeskService
         $advance = $this->waitingAdvanceQuery()->where('queue_since', '<=', now()->subMinutes(60))->orderBy('id')->limit(50)->pluck('order_no', 'id');
         $room = [];
         foreach ($this->activeModerators() as $userId) {
-            if (isset($load[$userId]) && $load[$userId] < $limit && ($n = $this->advanceHeldCount($userId)) < self::ADVANCE_CAP) {
+            if (isset($load[$userId]) && $load[$userId] === 0 && ($n = $this->advanceHeldCount($userId)) < self::ADVANCE_CAP) {
                 $room[$userId] = $n;
             }
         }
@@ -758,8 +809,12 @@ class DeskService
     public function onTransition(Order $order, array $from, array $to, ?User $actor): void
     {
         $set = [];
-        if ($order->action_due_at !== null) {
-            $set['action_due_at'] = null; // an action was taken: this timer is done
+        if ($order->action_due_at !== null || $order->timer_overran_at !== null) {
+            $set += ['action_due_at' => null, 'timer_overran_at' => null]; // an action was taken: this timer is done
+            $log = $this->closeWorkLog($order->id, $to['key']);
+            if ($log && ! $log->overran && $order->action_due_at !== null && $actor?->id === (int) $log->user_id) {
+                app(PointHooks::class)->timerBeaten($order, (int) $log->user_id);
+            }
         }
         if (in_array($to['key'], ['no_answer', 'hold'], true) && ! $order->had_setback) {
             $set['had_setback'] = true;

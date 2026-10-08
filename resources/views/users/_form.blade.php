@@ -57,6 +57,24 @@
         </div>
     </div>
 
+    {{-- Own desk rules. Empty = the shop-wide number from Settings, shown as the placeholder. --}}
+    <div class="mt-2 border-t border-gray-100 pt-4">
+        <p class="text-sm font-semibold text-gray-800">{{ __('Order desk') }}</p>
+        <p class="mb-3 text-xs text-gray-500">{{ __('Leave a box empty to use the shop setting. Website orders 0 = this person gets no website orders (for example chat only).') }}</p>
+        <div class="grid gap-x-4 grid-cols-2 md:grid-cols-4">
+            <x-form.input name="desk_limit" type="number" min="0" max="50" :label="__('Website orders at a time')" :value="$user->desk_limit" :placeholder="__('Shop: :n', ['n' => settings('desk.active_limit')])" />
+            <x-form.input name="desk_timer_minutes" type="number" min="1" max="240" :label="__('Time limit per order (min)')" :value="$user->desk_timer_minutes" :placeholder="__('Shop: :n', ['n' => settings('desk.action_timer_minutes')])" />
+            <x-form.input name="desk_extend_minutes" type="number" min="1" max="60" :label="__('Extra time (min)')" :value="$user->desk_extend_minutes" :placeholder="__('Shop: :n', ['n' => settings('desk.extend_minutes')])" />
+            <x-form.input name="desk_extend_daily_limit" type="number" min="0" max="100" :label="__('Extra time per day')" :value="$user->desk_extend_daily_limit" :placeholder="__('Shop: :n', ['n' => settings('desk.extend_daily_limit')])" />
+        </div>
+        <div class="mb-4 md:w-1/2">
+            <label class="mb-2 block text-sm font-medium text-gray-700">{{ __('Voice alerts') }}</label>
+            <x-simple-select name="desk_voice" :options="['' => settings('desk.voice_alerts') ? __('Shop setting (on)') : __('Shop setting (off)'), '1' => __('On'), '0' => __('Off')]"
+                :value="old('desk_voice', $user->desk_voice === null ? '' : (string) (int) $user->desk_voice)" full-width class="w-full" />
+            @error('desk_voice')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
+    </div>
+
     <div class="mt-2 border-t border-gray-100 pt-4">
         <p class="mb-3 text-sm font-semibold text-gray-800">{{ $user->exists ? __('Reset password') : __('Password') }}</p>
         @if ($user->exists)

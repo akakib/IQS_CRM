@@ -135,7 +135,8 @@ class OrderService
         return DB::transaction(function () use ($order, $by, $to, $reasonId) {
             $previous = $order->moderator_id;
             DB::table('order_assignments')->where('order_id', $order->id)->whereNull('ended_at')->update(['ended_at' => now(), 'ended_reason' => 'reassigned']);
-            $order->forceFill(['moderator_id' => $to->id, 'assigned_at' => now(), 'queue_since' => null, 'action_due_at' => null,
+            app(DeskService::class)->closeWorkLog($order->id, 'reassigned');
+            $order->forceFill(['moderator_id' => $to->id, 'assigned_at' => now(), 'queue_since' => null, 'action_due_at' => null, 'timer_overran_at' => null,
                 'lock_version' => $order->lock_version + 1])->save();
             $this->openAssignment($order, $to->id, 'reassigned', $by->id, $reasonId);
 

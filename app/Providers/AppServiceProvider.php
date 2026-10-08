@@ -32,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CourierManager::class);
         $this->app->singleton(SettingsService::class);
         $this->app->scoped(\App\Services\Work\WorkCalendar::class);
+        $this->app->scoped(\App\Services\Work\DeskRules::class);
 
         // Website receiver: fake everywhere except production with STORE_DRIVER=woocommerce.
         $this->app->singleton(StoreDriver::class, fn ($app) => $app->environment(['testing', 'staging', 'local']) || config('store.driver') !== 'woocommerce'

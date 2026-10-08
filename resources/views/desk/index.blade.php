@@ -6,7 +6,7 @@
     $url = fn (array $q) => route('desk.index', $q);
     $key = $order ? $statuses[$order->status_id]['key'] : null;
     $isMine = $order && $order->moderator_id === auth()->id();
-    $atLimit = $inHand >= $limit; // the usual orders plus advance holds not called yet
+    $atLimit = $limit === 0 || $inHand > 0; // a batch at a time: the usual orders plus advance holds not called yet
     $age = fn ($t) => $t ? Carbon::parse($t)->diffForHumans(now(), ['short' => true, 'syntax' => Carbon::DIFF_ABSOLUTE, 'parts' => 1]) : '';
     $money = fn ($v) => '৳'.number_format((float) $v);
     $secondsLeft = fn ($t) => $t ? max(0, (int) now()->diffInSeconds(Carbon::parse($t), false)) : null;
@@ -87,9 +87,9 @@
         @if ($canTake)
             <form method="POST" action="{{ route('desk.next') }}" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
                 @csrf
-                {{-- One order at a time: an advance hold not called yet fills the hand like any other. --}}
+                {{-- A batch at a time: an advance hold not called yet fills the hand like any other. --}}
                 <x-button class="w-full sm:w-auto" data-key="t" :disabled="! $anyWaiting || $atLimit" x-bind:disabled="!n || {{ $atLimit ? 'true' : 'false' }}">
-                    {{ $atLimit ? ($limit === 1 ? __('Finish this order first') : __('Finish one first')) : __('Take next') }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">⇧T</kbd>
+                    {{ $limit === 0 ? __('Website orders off for you') : ($atLimit ? ($inHand === 1 ? __('Finish this order first') : __('Finish your :n orders first', ['n' => $inHand])) : ($limit === 1 ? __('Take next') : __('Take next :n', ['n' => $limit]))) }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">⇧T</kbd>
                 </x-button>
             </form>
         @endif
@@ -123,14 +123,14 @@
     </div>
 
     @if ($lost)
-        <div class="mb-3 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" x-data="{ show: true }" x-show="show">
-            <p>{{ trans_choice('{1} Time ran out on :list. It went back to New and anyone can take it.|[2,*] Time ran out on :list. They went back to New and anyone can take them.', count($lost), ['list' => implode(', ', $lost)]) }}</p>
-            <button type="button" @click="show = false" class="shrink-0 text-red-400 hover:text-red-700" aria-label="{{ __('Close') }}">&times;</button>
+        <div class="mb-3 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" x-data="{ show: true }" x-show="show">
+            <p>{{ trans_choice('{1} Time limit passed on :list. It stays with you: finish it now.|[2,*] Time limit passed on :list. They stay with you: finish them now.', count($lost), ['list' => implode(', ', $lost)]) }}</p>
+            <button type="button" @click="show = false" class="shrink-0 text-amber-500 hover:text-amber-800" aria-label="{{ __('Close') }}">&times;</button>
         </div>
     @endif
 
     {{-- Timer watch. Quiet until 2 minutes are left, red in the last 30 seconds; when the time is up the page
-         reloads by itself (same tab, same page) and the server takes the order back. --}}
+         reloads by itself (same tab, same page) and the server records the overrun; the order stays. --}}
     @if ($armed && $armedSeconds > 0)
         <div x-data="{
                 start: Date.now(), base: {{ $armedSeconds }}, now: Date.now(), leaving: false,

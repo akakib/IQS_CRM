@@ -114,7 +114,7 @@ class DeskController extends Controller
             $timed = $counts['timed'] ? $this->desk->timedOrder($user->id) : null;
         }
         // The open order needs the clock but it is running on another one: finish that one first.
-        $openNeedsTimer = $order && $order->moderator_id === $user->id && $order->channel === 'web' && ! $order->action_due_at
+        $openNeedsTimer = $order && $order->moderator_id === $user->id && $order->channel === 'web' && ! $order->action_due_at && ! $order->timer_overran_at
             && (in_array($order->status_id, [$s('new'), $s('record_verified')], true) || ($order->status_id === $s('no_answer') && (! $order->next_call_at || $order->next_call_at->isPast())));
 
         $waiting = $this->desk->waitingQuery()->selectRaw('COUNT(*) as n, MIN(created_at) as oldest')->first();
@@ -123,6 +123,8 @@ class DeskController extends Controller
         $reasons = DB::table('status_reasons')->whereIn('reason_type', ['hold', 'cancel'])->where('is_active', true)
             ->where(fn ($q) => $q->whereNull('system_key')->orWhereNotIn('system_key', ['item_not_found', 'item_damaged']))
             ->orderBy('sort_order')->get(['id', 'reason_type', 'label_en'])->groupBy('reason_type');
+
+        $rules = app(\App\Services\Work\DeskRules::class)->for($user->id);
 
         return view('desk.index', [
             'tab' => $tab,
@@ -135,14 +137,14 @@ class DeskController extends Controller
             'blocked' => $timed && $openNeedsTimer && $order->id !== $timed->id,
             'lost' => $lost,
             'notYours' => $notYours,
-            'extendMinutes' => (int) settings('desk.extend_minutes'),
-            'extendsLeft' => $counts['timed'] ? max(0, (int) settings('desk.extend_daily_limit') - $this->desk->extensionsToday($user->id)) : 0,
+            'extendMinutes' => $rules['extend'],
+            'extendsLeft' => $counts['timed'] ? max(0, $rules['extend_daily'] - $this->desk->extensionsToday($user->id)) : 0,
             'statuses' => OrderStatus::map(),
             'waiting' => (int) $waiting->n,
             'advanceWaiting' => $advanceWaiting,
             'inHand' => $this->desk->inHand($user->id),
             'oldestWaiting' => $waiting->oldest,
-            'limit' => (int) settings('desk.active_limit'),
+            'limit' => $rules['limit'],
             'canTake' => $user->can('orders.take') && ! $user->isOwner(), // owners watch, staff take
             // Order activity popup: the admin can hand the order to someone else.
             'reassign' => $request->boolean('embed') && $order && $user->can('orders.reassign') ? [
@@ -206,7 +208,7 @@ class DeskController extends Controller
                 'left' => (int) max(0, now()->diffInSeconds(\Illuminate\Support\Carbon::parse($timed->action_due_at), false))] : null,
             'waiting' => (int) $this->desk->waitingQuery()->count() + ($advanceWaiting = (int) $this->desk->waitingAdvanceQuery()->count()),
             'advance_waiting' => $advanceWaiting,
-            'can_take' => $this->desk->inHand($user->id) < (int) settings('desk.active_limit'),
+            'can_take' => app(\App\Services\Work\DeskRules::class)->limit($user->id) > 0 && $this->desk->inHand($user->id) === 0,
             // The bell reads its counts from here on pages that have the pulse (one request instead of two).
             'notifications' => $bell,
         ]);
@@ -238,8 +240,8 @@ class DeskController extends Controller
             return redirect()->route('desk.index', ['tab' => $tabFor(Order::find($timed->id)), 'order' => $timed->id])
                 ->with('success', __('Your timer is running on :no. Finish it first, then press Take next.', ['no' => $timed->order_no]));
         }
-        if ($this->desk->inHand($user->id) >= (int) settings('desk.active_limit')) {
-            return redirect()->route('desk.index')->with('success', __('Finish the order you have first, then press Take next.'));
+        if ($this->desk->inHand($user->id) > 0) {
+            return redirect()->route('desk.index')->with('success', __('Finish the orders you have first, then press Take next.'));
         }
         try {
             $taken = $this->desk->takeNext($user);
@@ -260,7 +262,7 @@ class DeskController extends Controller
         }
         $user = $request->user();
         // Take next = "my next piece of work". Hands full (an order was given to them meanwhile): open what they hold.
-        if (! $user->isOwner() && $this->desk->inHand($user->id) >= (int) settings('desk.active_limit')) {
+        if (! $user->isOwner() && $this->desk->inHand($user->id) > 0) {
             $held = $this->desk->timedOrder($user->id)
                 ?? DB::table('orders')->where('moderator_id', $user->id)->where('channel', 'web')
                     ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->orderBy('assigned_at')->orderBy('id')->first(['id', 'order_no', 'status_id'])
@@ -294,12 +296,10 @@ class DeskController extends Controller
         ]);
         // Opened from Order activity: stay on this order in the popup.
         $embedded = $request->boolean('embed') ? ['embed' => 1, 'order' => $order->id] : null;
-        // Time already up: the action does not count; the order goes back to New.
+        // Time already up: the overrun is recorded first; the action still counts (the order stays theirs).
         if ($order->moderator_id === $user->id && $order->action_due_at && $order->action_due_at->isPast()) {
-            $this->desk->release($order->id, 'timeout');
-
-            return redirect()->route('desk.index', $embedded ?? array_filter(['tab' => $data['tab'] ?? null]))
-                ->with('error', __('Time ran out on :no. It went back to New.', ['no' => $order->order_no]));
+            $this->desk->sweepExpired();
+            $order->refresh();
         }
         if ($order->lock_version !== (int) $data['lock_version']) {
             throw ValidationException::withMessages(['order' => __('This order just changed. Look again before acting.')]);
@@ -308,7 +308,7 @@ class DeskController extends Controller
             throw ValidationException::withMessages(['order' => __(':n is editing this order. Wait until they finish.', ['n' => $other['name']])]);
         }
         // One order at a time: while the clock runs on another order, a waiting order cannot be worked on.
-        $other = $order->moderator_id === $user->id && $order->channel === 'web' && ! $order->action_due_at
+        $other = $order->moderator_id === $user->id && $order->channel === 'web' && ! $order->action_due_at && ! $order->timer_overran_at
             && in_array(OrderStatus::map()[$order->status_id]['key'], ['new', 'record_verified', 'no_answer'], true)
             ? $this->desk->timedOrder($user->id) : null;
         if ($other) {

@@ -26,6 +26,11 @@ class UserRequest extends FormRequest
             'work_location_id' => ['nullable', Rule::exists('locations', 'id')->whereNull('deleted_at')],
             'telegram_user_id' => ['nullable', 'string', 'max:50'],
             'voice_name' => ['nullable', 'string', 'max:60'],
+            'desk_limit' => ['nullable', 'integer', 'min:0', 'max:50'],
+            'desk_timer_minutes' => ['nullable', 'integer', 'min:1', 'max:240'],
+            'desk_extend_minutes' => ['nullable', 'integer', 'min:1', 'max:60'],
+            'desk_extend_daily_limit' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'desk_voice' => ['nullable', 'boolean'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_photo' => ['nullable', 'boolean'],
             // Required when creating; optional on edit (filled = Owner resets it).
@@ -47,6 +52,8 @@ class UserRequest extends FormRequest
             'phone' => $this->input('phone') ?: null,
             'telegram_user_id' => $this->input('telegram_user_id') ?: null,
             'voice_name' => trim((string) $this->input('voice_name')) ?: null,
+            ...collect(['desk_limit', 'desk_timer_minutes', 'desk_extend_minutes', 'desk_extend_daily_limit', 'desk_voice'])
+                ->mapWithKeys(fn ($k) => [$k => ($v = trim((string) $this->input($k))) === '' ? null : $v])->all(),
         ]);
     }
 }

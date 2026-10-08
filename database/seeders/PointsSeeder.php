@@ -28,8 +28,9 @@ class PointsSeeder extends Seeder
             ['order_reassigned', 'Order taken away for own mistake', -1, 'previous_moderator', 'immediate', false, [['blame', '=', 'sales']]],
             ['issue_escalated', 'Delivery issue not handled in time', -1, 'order_moderator', 'immediate', false, []],
             ['timer_extended', 'Took extra time on the timer', -0.5, 'actor', 'immediate', false, []],
-            ['timer_missed', 'Action timer missed', -1, 'actor', 'immediate', false, []],
-            ['timer_missed', 'Action timer missed again (more than 3 today)', -1, 'actor', 'immediate', false, [['releases_today', '>', '3']]],
+            ['timer_beaten', 'Finished an order within the time limit', 0, 'actor', 'immediate', false, []],
+            ['timer_missed', 'Went over the time limit on an order', 0, 'actor', 'immediate', false, []],
+            ['timer_missed', 'Went over the time limit again (more than 3 today)', 0, 'actor', 'immediate', false, [['releases_today', '>', '3']]],
             ['fake_status', 'Fake status change (confirmed by a manager)', -10, 'actor', 'immediate', false, []],
         ];
 

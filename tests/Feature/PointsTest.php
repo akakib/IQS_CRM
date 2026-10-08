@@ -131,9 +131,15 @@ class PointsTest extends TestCase
         $this->assertSame(-0.5, $this->points('final'));
     }
 
-    public function test_missed_timer_costs_a_point_and_more_after_three_in_a_day(): void
+    public function test_going_over_time_costs_what_the_admin_set_and_zero_costs_nothing(): void
     {
         $hooks = app(PointHooks::class);
+        // Shipped at 0: measured, not scored.
+        $hooks->timerMissed($this->order(), $this->agent->id, 1);
+        $this->assertSame(0.0, $this->points('final'));
+        $this->assertSame(0, DB::table('point_ledger')->count());
+
+        DB::table('point_rules')->where('trigger_key', 'timer_missed')->update(['points' => -1]);
         $hooks->timerMissed($this->order(), $this->agent->id, 1);
         $this->assertSame(-1.0, $this->points('final'));
 

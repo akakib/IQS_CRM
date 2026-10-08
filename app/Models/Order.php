@@ -36,6 +36,7 @@ class Order extends Model
             'queue_since' => 'datetime',
             'assigned_at' => 'datetime',
             'action_due_at' => 'datetime',
+            'timer_overran_at' => 'datetime',
             'next_call_at' => 'datetime',
             'timer_extended_at' => 'datetime',
             'packaging_sent_at' => 'datetime',

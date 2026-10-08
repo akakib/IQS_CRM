@@ -107,7 +107,13 @@ class PointHooks
         $this->engine->fire('timer_extended', $order, ['extensions_today' => $extensionsToday], ['actor' => $userId]);
     }
 
-    /** The action timer ran out and the order went back to New. */
+    /** The order was finished (moved on) before its time limit. */
+    public function timerBeaten(Order $order, int $userId): void
+    {
+        $this->engine->fire('timer_beaten', $order, [], ['actor' => $userId]);
+    }
+
+    /** The time limit passed on an order (it stays with the person). */
     public function timerMissed(?Order $order, int $userId, int $releasesToday): void
     {
         $this->engine->fire('timer_missed', $order, ['releases_today' => $releasesToday], ['actor' => $userId]);

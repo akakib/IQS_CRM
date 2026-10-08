@@ -8,7 +8,7 @@
     $ended = ['idle' => __('Given back: nothing done'), 'timeout' => __('Given back: timer'), 'break' => __('Back to New: break'), 'reassigned' => __('Handed to someone else'), 'finished' => null];
 @endphp
 
-<x-layouts.app :heading="__('Work time')">
+<x-layouts.app :heading="__('Team Activity')">
     <div class="mb-4 flex flex-wrap items-center gap-2">
         <a href="{{ $dayUrl(today()) }}" @class(['rounded-full border px-3 py-1.5 text-sm', 'border-primary bg-primary text-white' => $isToday, 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' => ! $isToday])>{{ __('Today') }}</a>
         <a href="{{ $dayUrl(today()->subDay()) }}" @class(['rounded-full border px-3 py-1.5 text-sm', 'border-primary bg-primary text-white' => $isYesterday, 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' => ! $isYesterday])>{{ __('Yesterday') }}</a>

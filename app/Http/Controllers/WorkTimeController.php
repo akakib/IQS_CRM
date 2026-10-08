@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
-/** Work time: one day per person, measured from the orders' own history (no countdown). */
+/** Team Activity: one day per person, measured from the orders' own history (no countdown). */
 class WorkTimeController extends Controller
 {
     public function index(Request $request, WorkTime $report): View

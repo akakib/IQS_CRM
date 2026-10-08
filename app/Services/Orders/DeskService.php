@@ -233,6 +233,9 @@ class DeskService
 
     private function startTimer(int $userId, int $orderId): bool
     {
+        if (! settings('desk.timer_enabled')) {
+            return false; // the countdown is optional and off by default: time is measured without it (OrderTimeline)
+        }
         $minutes = $this->rules->for($userId)['timer'];
         $started = (bool) DB::table('orders')->where('id', $orderId)->whereNull('action_due_at')->update([
             'action_due_at' => $this->calendar->deadline($userId, $minutes),
@@ -289,7 +292,7 @@ class DeskService
 
         $name = DB::table('users')->where('id', $userId)->value('name');
         $this->systemNote($orderId, $reason === 'idle'
-            ? __('Nothing done for a long time after the time limit: taken back from :n, waiting in New again.', ['n' => $name])
+            ? __('Nothing done for :m minutes: taken back from :n, waiting in New again.', ['m' => settings('desk.idle_return_minutes'), 'n' => $name])
             : __(':n went on a break: waiting in New again.', ['n' => $name]), null, ['released_from' => $userId, 'reason' => $reason]);
     }
 
@@ -374,13 +377,39 @@ class DeskService
             app(PointHooks::class)->timerMissed(Order::find($row->id), $userId, $today);
         }
 
-        $idle = DB::table('orders')->whereNotNull('timer_overran_at')->whereNotNull('moderator_id')
-            ->where('timer_overran_at', '<=', now()->subMinutes((int) settings('desk.idle_return_minutes')))->limit(100)->pluck('id');
-        foreach ($idle as $id) {
-            $this->release($id, 'idle');
-        }
+        $this->returnIdle();
 
         return $over;
+    }
+
+    /**
+     * An order in someone's hands with nothing done on it for the idle minutes
+     * (no status change, no note of theirs since) goes back to New, so the
+     * customer is not left waiting. Waiting on the customer (No answer, Hold)
+     * is not idle: those orders are not in the list.
+     *
+     * @return int orders given back
+     */
+    public function returnIdle(): int
+    {
+        $cutoff = now()->subMinutes((int) settings('desk.idle_return_minutes'));
+        $ids = DB::table('orders as o')->where('o.channel', 'web')->whereNotNull('o.moderator_id')
+            ->whereIn('o.status_id', OrderStatus::idsFor(self::ACTIVE))->where('o.assigned_at', '<=', $cutoff)
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_events as e')->whereColumn('e.order_id', 'o.id')->where('e.created_at', '>', $cutoff))
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_notes as n')->whereColumn('n.order_id', 'o.id')->whereColumn('n.user_id', 'o.moderator_id')->where('n.created_at', '>', $cutoff))
+            ->orderBy('o.id')->limit(100)->pluck('o.id');
+        foreach ($ids as $id) {
+            $this->release((int) $id, 'idle');
+        }
+
+        return $ids->count();
+    }
+
+    /** The person holding the order opened it: the first time in this turn is kept. */
+    public function markOpened(int $orderId, int $userId): void
+    {
+        DB::table('order_assignments')->where('order_id', $orderId)->where('user_id', $userId)->whereNull('ended_at')->whereNull('first_opened_at')
+            ->update(['first_opened_at' => now()]);
     }
 
     /** Cron safety net: start the timer for everyone whose waiting order has sat untouched too long. */
@@ -496,7 +525,10 @@ class DeskService
         }
         $delays = array_values(array_filter(array_map('intval', explode(',', (string) settings('desk.no_response_returns')))));
         $try = (int) $order->no_response_count + 1;
-        $this->orders->note($order, 'call', trim(__('Called: no response (try :n)', ['n' => $try]).($note ? ' · '.$note : '')), $user, ['outcome' => 'no_answer']);
+        // When it comes back: kept on the call note too, so the wait until then is known to be the customer's (OrderTimeline).
+        $returnAt = $try > count($delays) ? null : $this->calendar->nextWorkingMoment($user->id, now()->addMinutes($delays[$try - 1]));
+        $this->orders->note($order, 'call', trim(__('Called: no response (try :n)', ['n' => $try]).($note ? ' · '.$note : '')), $user,
+            ['outcome' => 'no_answer'] + ($returnAt ? ['returns_at' => $returnAt->toDateTimeString()] : []));
 
         if ($try > count($delays)) {
             $reason = DB::table('status_reasons')->where('reason_type', 'cancel')->where('system_key', 'unreachable')->value('id');
@@ -507,7 +539,6 @@ class DeskService
         }
 
         // Return time first: the status change below restarts timers and must see it.
-        $returnAt = $this->calendar->nextWorkingMoment($user->id, now()->addMinutes($delays[$try - 1]));
         DB::table('orders')->where('id', $order->id)->update(['no_response_count' => $try, 'next_call_at' => $returnAt]);
         $this->machine->transition($order, 'no_answer', $user);
 
@@ -808,6 +839,11 @@ class DeskService
 
     public function onTransition(Order $order, array $from, array $to, ?User $actor): void
     {
+        if ($actor) {
+            // The first thing they did in this turn (the first open is kept by the desk).
+            DB::table('order_assignments')->where('order_id', $order->id)->where('user_id', $actor->id)->whereNull('ended_at')->whereNull('first_action_at')
+                ->update(['first_action_at' => now(), 'first_opened_at' => DB::raw("COALESCE(first_opened_at, '".now()->toDateTimeString()."')")]);
+        }
         $set = [];
         if ($order->action_due_at !== null || $order->timer_overran_at !== null) {
             $set += ['action_due_at' => null, 'timer_overran_at' => null]; // an action was taken: this timer is done

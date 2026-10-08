@@ -73,7 +73,7 @@
             <x-slot:head>
                 <th>{{ __('Person') }}</th><th>{{ __('Now') }}</th><th class="text-right">{{ __('Holding') }}</th><th class="text-right">{{ __('Oldest') }}</th>
                 <th class="text-right">{{ __('No response') }}</th><th class="text-right">{{ __('On hold') }}</th><th class="text-right">{{ __('Booking failed') }}</th>
-                <th class="text-right">{{ __('Timed out today') }}</th><th class="text-right">{{ __('Breaks today') }}</th>
+                <th class="text-right">{{ __('Given back today') }}</th><th class="text-right">{{ __('Breaks today') }}</th>
             </x-slot:head>
             @foreach ($rows as $r)
                 <tr>
@@ -85,7 +85,7 @@
                     <td class="text-right"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('No response')), { box: 'no_response', user: {{ $r->id }} })">{{ $r->no_response }}</button></td>
                     <td class="text-right"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('On hold')), { box: 'on_hold', user: {{ $r->id }} })">{{ $r->on_hold }}</button></td>
                     <td class="text-right"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Booking failed')), { box: 'to_send', user: {{ $r->id }} })">{{ $r->to_send }}</button></td>
-                    <td class="text-right {{ $r->released ? 'font-semibold text-red-600' : '' }}"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Timed out today')), { box: 'timed_out', user: {{ $r->id }} })">{{ $r->released }}</button></td>
+                    <td class="text-right {{ $r->released ? 'font-semibold text-red-600' : '' }}"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Given back today')), { box: 'timed_out', user: {{ $r->id }} })">{{ $r->released }}</button></td>
                     <td class="text-right {{ $r->over ? 'font-semibold text-red-600' : '' }}"><button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Breaks today')), { box: 'breaks', user: {{ $r->id }} })">{{ $r->break_minutes }} {{ __('min') }} <span class="text-xs text-gray-400">({{ $r->breaks }})</span></button></td>
                 </tr>
             @endforeach
@@ -102,7 +102,7 @@
                         <span>{{ __('Oldest') }}: <b>{{ $ago($r->oldest) }}</b></span>
                         <span>{{ __('No response') }}: <button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('No response')), { box: 'no_response', user: {{ $r->id }} })"><b>{{ $r->no_response }}</b></button></span>
                         <span>{{ __('On hold') }}: <button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('On hold')), { box: 'on_hold', user: {{ $r->id }} })"><b>{{ $r->on_hold }}</b></button></span>
-                        <span class="{{ $r->released ? 'text-red-600' : '' }}">{{ __('Timed out') }}: <button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Timed out today')), { box: 'timed_out', user: {{ $r->id }} })"><b>{{ $r->released }}</b></button></span>
+                        <span class="{{ $r->released ? 'text-red-600' : '' }}">{{ __('Given back') }}: <button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Given back today')), { box: 'timed_out', user: {{ $r->id }} })"><b>{{ $r->released }}</b></button></span>
                         <span class="{{ $r->over ? 'text-red-600' : '' }}">{{ __('Breaks') }}: <button type="button" class="tabular-nums underline decoration-dotted underline-offset-4 hover:text-primary" @click="show(@js($r->name.' · '.__('Breaks today')), { box: 'breaks', user: {{ $r->id }} })"><b>{{ $r->break_minutes }}m</b></button></span>
                     </div>
                 </div>

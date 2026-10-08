@@ -58,7 +58,7 @@ class KpiScorecard
         }
 
         $work = DB::table('order_assignments')->whereBetween('started_at', $range)->groupBy('user_id')
-            ->selectRaw("user_id, COUNT(DISTINCT order_id) as taken, SUM(CASE WHEN ended_reason = 'timeout' THEN 1 ELSE 0 END) as released")->get()->keyBy('user_id');
+            ->selectRaw("user_id, COUNT(DISTINCT order_id) as taken, SUM(CASE WHEN ended_reason IN ('timeout', 'idle') THEN 1 ELSE 0 END) as released")->get()->keyBy('user_id');
         $pending = DB::table('orders')->where('status_id', $s('no_answer'))->whereNotNull('moderator_id')
             ->groupBy('moderator_id')->selectRaw('moderator_id, COUNT(*) as n')->pluck('n', 'moderator_id');
 

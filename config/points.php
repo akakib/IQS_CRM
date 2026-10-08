@@ -27,7 +27,7 @@ return [
     // Condition fields shown in the rule editor.
     'fields' => [
         'minutes_waiting' => 'Minutes the order waited before being taken',
-        'minutes_since_claim' => 'Minutes from taking to confirming',
+        'minutes_since_claim' => 'Minutes from taking to confirming (time the customer made us wait is not counted)',
         'minutes_since_release' => 'Minutes from batch release to packed',
         'channel' => 'Order channel (web, messenger, whatsapp, phone)',
         'saved' => 'Saved order: had No response or Hold, then delivered (true/false)',

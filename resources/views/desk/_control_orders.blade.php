@@ -15,7 +15,7 @@
                     <span class="block text-sm font-medium text-gray-900">{{ $o->ship_name }} <span class="font-normal text-gray-500">· {{ $o->ship_phone }}</span></span>
                     <span class="block text-xs text-gray-500">{{ $o->order_no }} · ৳{{ number_format((float) $o->grand_total) }}
                         @if ($st) · <span style="color: {{ $st['color'] }}">{{ __($st['name']) }}</span>@endif
-                        · @if ($box === 'timed_out'){{ __('timed out at :t', ['t' => Carbon::parse($o->timed_out_at)->format('g:i A')]) }}@elseif ($box === 'stage'){{ __('untouched :t', ['t' => $ago($o->updated_at)]) }}@else{{ __('waiting :t', ['t' => $ago($o->queue_since ?? $o->assigned_at ?? $o->created_at)]) }}@endif
+                        · @if ($box === 'timed_out'){{ __('given back at :t', ['t' => Carbon::parse($o->timed_out_at)->format('g:i A')]) }}@elseif ($box === 'stage'){{ __('untouched :t', ['t' => $ago($o->updated_at)]) }}@else{{ __('waiting :t', ['t' => $ago($o->queue_since ?? $o->assigned_at ?? $o->created_at)]) }}@endif
                     </span>
                 </span>
                 <span class="flex shrink-0 items-center gap-1.5 text-xs text-gray-600">

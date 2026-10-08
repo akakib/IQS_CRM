@@ -99,6 +99,9 @@ class DeskController extends Controller
             $order = null;
         }
 
+        if ($order && $order->moderator_id === $user->id) {
+            $this->desk->markOpened($order->id, $user->id);
+        }
         // No timer running: it starts on the order now open in front of them (never on one they cannot see),
         // or, as a safety net, on an order that has sat untouched too long.
         if (! $timed) {
@@ -177,6 +180,7 @@ class DeskController extends Controller
         }
         if (! $user->current_break_id) {
             if (Cache::add('desk:auto-assign', 1, 60)) {
+                $this->desk->returnIdle(); // no cron yet: orders left untouched go back to New from here too
                 $this->desk->autoAssign();
             }
             if (! DB::table('orders')->where('moderator_id', $user->id)->where('channel', 'web')->whereNotNull('action_due_at')->exists()) {

@@ -53,7 +53,7 @@ class TeamController extends Controller
                  SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as to_send,
                  MIN(CASE WHEN status_id IN (?, ?) THEN assigned_at END) as oldest",
                 [$s('new'), $s('record_verified'), $s('no_answer'), $s('hold'), $s('confirmed'), $s('new'), $s('record_verified')])->get()->keyBy('moderator_id');
-        $released = DB::table('order_assignments')->where('ended_reason', 'timeout')->where('ended_at', '>=', $now->copy()->startOfDay())
+        $released = DB::table('order_assignments')->whereIn('ended_reason', ['timeout', 'idle'])->where('ended_at', '>=', $now->copy()->startOfDay())
             ->groupBy('user_id')->selectRaw('user_id, COUNT(*) as n')->pluck('n', 'user_id');
         $breaks = DB::table('staff_breaks')->where('started_at', '>=', $now->copy()->startOfDay())->where('counts_as_break', true)
             ->groupBy('user_id')->selectRaw('user_id, SUM(COALESCE(minutes, 0)) as minutes, COUNT(*) as n')->get()->keyBy('user_id');
@@ -118,7 +118,7 @@ class TeamController extends Controller
             'on_hold' => $orders->where('o.moderator_id', $user)->where('o.status_id', $s('hold')),
             'to_send' => $orders->where('o.moderator_id', $user)->where('o.status_id', $s('confirmed')),
             'timed_out' => $orders->join('order_assignments as a', 'a.order_id', '=', 'o.id')->where('a.user_id', $user)
-                ->where('a.ended_reason', 'timeout')->where('a.ended_at', '>=', $now->copy()->startOfDay()),
+                ->whereIn('a.ended_reason', ['timeout', 'idle'])->where('a.ended_at', '>=', $now->copy()->startOfDay()),
         };
         $rows = $orders->orderByRaw($box === 'stage' ? 'o.updated_at' : $since)->orderBy('o.id')
             ->select(['o.id', 'o.order_no', 'o.ship_name', 'o.ship_phone', 'o.grand_total', 'o.status_id', 'o.created_at', 'o.updated_at', 'o.queue_since', 'o.assigned_at',

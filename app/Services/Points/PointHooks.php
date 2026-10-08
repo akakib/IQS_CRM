@@ -149,7 +149,8 @@ class PointHooks
         $claimedAt = DB::table('order_assignments')->where('order_id', $order->id)->where('user_id', $order->moderator_id)->orderByDesc('id')->value('started_at');
         $confirmedAt = DB::table('order_events')->where('order_id', $order->id)->where('to_status_id', OrderStatus::idFor('confirmed'))->orderByDesc('id')->value('created_at');
 
-        return $claimedAt ? round(\Illuminate\Support\Carbon::parse($claimedAt)->diffInSeconds($confirmedAt ? \Illuminate\Support\Carbon::parse($confirmedAt) : now(), true) / 60, 1) : null;
+        // Net: time the customer made us wait (No answer, On hold) is not counted against the moderator.
+        return $claimedAt ? round(app(\App\Services\Orders\OrderTimeline::class)->netSeconds($order->id, \Illuminate\Support\Carbon::parse($claimedAt), $confirmedAt ? \Illuminate\Support\Carbon::parse($confirmedAt) : now()) / 60, 1) : null;
     }
 
     private function confirmedByRule(Order $order): bool

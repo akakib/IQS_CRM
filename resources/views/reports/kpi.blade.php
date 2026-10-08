@@ -4,7 +4,7 @@
     $query = fn (array $extra) => route('kpi.index', array_filter(['from' => $from, 'to' => $to] + $extra));
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     // Client-side sort for the (short) team table: click a heading.
-    $cols = ['delivered' => __('Delivered'), 'delivery_rate' => __('Delivery %'), 'cancel_rate' => __('Cancel %'), 'return_rate' => __('Return %'), 'saved' => __('Saved'), 'pending' => __('No response now'), 'released' => __('Timed out')];
+    $cols = ['delivered' => __('Delivered'), 'delivery_rate' => __('Delivery %'), 'cancel_rate' => __('Cancel %'), 'return_rate' => __('Return %'), 'saved' => __('Saved'), 'pending' => __('No response now'), 'released' => __('Given back')];
 @endphp
 
 <x-layouts.app :heading="__('KPI')">
@@ -93,7 +93,7 @@
                         <span>{{ __('Return') }}: <b>{{ $pct($r['return_rate']) }}</b></span>
                         <span>{{ __('Saved') }}: <b>{{ $r['saved'] }}</b></span>
                         <span>{{ __('No response') }}: <b>{{ $r['pending'] }}</b></span>
-                        <span>{{ __('Timed out') }}: <b>{{ $r['released'] }}</b></span>
+                        <span>{{ __('Given back') }}: <b>{{ $r['released'] }}</b></span>
                     </div>
                     @if ($r['target_count'] !== null || $r['target_rate'] !== null)
                         <p class="mt-2 text-[11px] text-gray-500">{{ __('Target') }}: {{ $r['target_count'] !== null ? $num($r['target_count']).' / '.__('month') : '' }} {{ $r['target_rate'] !== null ? $num($r['target_rate']).'%' : '' }}</p>

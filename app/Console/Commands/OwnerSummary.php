@@ -38,7 +38,7 @@ class OwnerSummary extends Command
             $text .= "\n⚠️ ".__('Open delivery issues: :i · Points flags to review: :f', ['i' => $issues, 'f' => $flags]);
         }
 
-        // Per moderator: delivered count and rate, orders that timed out, break minutes.
+        // Per moderator: delivered count and rate, orders given back with nothing done, break minutes.
         $kpi = app(\App\Services\Reports\KpiScorecard::class)->build($day, $day)['rows'];
         $breaks = DB::table('staff_breaks')->whereBetween('started_at', $range)->where('counts_as_break', true)
             ->groupBy('user_id')->selectRaw('user_id, SUM(COALESCE(minutes, 0)) as minutes')->pluck('minutes', 'user_id');
@@ -49,7 +49,7 @@ class OwnerSummary extends Command
                 $text .= "\n".__(':n: :d delivered:rate:t', [
                     'n' => $r['name'], 'd' => $r['delivered'],
                     'rate' => $r['delivery_rate'] !== null ? ' ('.$r['delivery_rate'].'%)' : '',
-                    't' => $r['released'] ? ' · '.__(':k timed out', ['k' => $r['released']]) : '',
+                    't' => $r['released'] ? ' · '.__(':k given back (nothing done)', ['k' => $r['released']]) : '',
                 ]);
             }
         }

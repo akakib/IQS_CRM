@@ -44,7 +44,8 @@ class DeskTest extends TestCase
         (new PointsSeeder)->run();
         Artisan::call('notifications:sync');
         OrderStatus::forget();
-        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1]); // a batch of one: each Take next gives exactly the oldest order
+        // A batch of one: each Take next gives exactly the oldest order. The countdown is off by default; most tests here cover it switched on.
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1, 'desk.timer_enabled' => true]);
 
         $role = $this->role(['orders.view' => 'own', 'orders.create', 'orders.edit', 'orders.take'], [], 'Moderator');
         $this->mahim = User::factory()->create(['name' => 'Mahim']);
@@ -857,22 +858,29 @@ class DeskTest extends TestCase
         $this->assertSame($web->id, $this->desk()->takeNext($this->mahim)->id); // the chat order did not use up the limit
     }
 
-    public function test_break_locks_the_screen_returns_uncalled_orders_and_is_recorded(): void
+    public function test_no_break_with_an_order_in_hand_and_a_break_locks_the_screen_and_is_recorded(): void
     {
         $a = $this->web();
+        $b = $this->web();
         $this->actingAs($this->mahim)->post('/desk/next');
         $lunch = DB::table('status_reasons')->where('reason_type', 'break')->where('system_key', 'lunch')->value('id');
 
+        // An order in hand: no break until it is done (or marked No answer), so no customer is left halfway.
+        $this->post('/breaks', ['reason_id' => $lunch])->assertSessionHasErrors(['reason_id' => 'Finish '.$a->order_no.' first (or mark No answer), then take the break.']);
+        $this->assertNull($this->mahim->fresh()->current_break_id);
+        if ($this->key($a) === 'new') {
+            app(\App\Services\Orders\OrderStateMachine::class)->transition($a->fresh(), 'record_verified', $this->mahim);
+        }
+        $this->desk()->noResponse($a->fresh(), $this->mahim);
+
         $this->post('/breaks', ['reason_id' => $lunch]);
         $this->assertNotNull($this->mahim->fresh()->current_break_id);
-        $this->assertNull($a->fresh()->moderator_id); // back in New, and no penalty
         $this->assertSame(0, DB::table('point_ledger')->count());
-        $this->assertDatabaseHas('order_assignments', ['order_id' => $a->id, 'ended_reason' => 'break']);
 
         // Every page shows the break screen; nothing can be done until Start work.
         $this->get('/dashboard')->assertOk()->assertSee('On a break')->assertSee('Start work')->assertSee('ID #'.$this->mahim->id);
         $this->post('/desk/next')->assertSessionHas('error');
-        $this->assertNull($a->fresh()->moderator_id);
+        $this->assertNull($b->fresh()->moderator_id);
 
         $this->travel(25)->minutes();
         $this->post('/breaks/end')->assertSessionHas('success');
@@ -945,8 +953,8 @@ class DeskTest extends TestCase
         // user + permissions (2), counts, list, waiting, reasons, order, customer, items, notes, duplicates
         // + expired-timer check (2), extra-time count (1), the due-booking check (1), the Steadfast snapshot (1)
         // the advance-hold reason id (1: advance holds are counted in the Call tab), the advance holds waiting (1)
-        // and the orders in hand (2: active + uncalled advance holds)
-        $this->assertLessThanOrEqual(21, count(DB::getQueryLog()));
+        // and the orders in hand (2: active + uncalled advance holds), the first-open mark (1)
+        $this->assertLessThanOrEqual(22, count(DB::getQueryLog()));
         DB::disableQueryLog();
 
         $this->get('/desk/control')->assertForbidden();

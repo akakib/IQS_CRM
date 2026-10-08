@@ -30,6 +30,17 @@ class BreakService
             throw ValidationException::withMessages(['reason_id' => __('Choose a reason.')]);
         }
 
+        // A break never leaves a customer waiting halfway: finish (or mark No answer) what is in hand first.
+        $inHand = DB::table('orders')->where('moderator_id', $user->id)->where('channel', 'web')
+            ->where(fn ($q) => $q->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))
+                ->orWhere(fn ($q) => $q->where('status_id', OrderStatus::idFor('no_answer'))->where('next_call_at', '<=', now())))
+            ->orderBy('id')->limit(4)->pluck('order_no');
+        if ($inHand->isNotEmpty() || $this->desk->inHand($user->id) > 0) {
+            throw ValidationException::withMessages(['reason_id' => $inHand->isNotEmpty()
+                ? __('Finish :list first (or mark No answer), then take the break.', ['list' => $inHand->take(3)->join(', ').($inHand->count() > 3 ? '…' : '')])
+                : __('Call the advance order you hold first, then take the break.')]);
+        }
+
         DB::transaction(function () use ($user, $reason) {
             $id = DB::table('staff_breaks')->insertGetId([
                 'user_id' => $user->id, 'reason_id' => $reason->id, 'counts_as_break' => (bool) $reason->counts_as_break, 'started_at' => now(),

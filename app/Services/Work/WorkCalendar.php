@@ -80,14 +80,23 @@ class WorkCalendar
     public function isWorking(?int $userId, ?Carbon $at = null): bool
     {
         $at ??= now();
-        $shift = $this->shift($userId, $at);
+        // Today's shift, or last night's one that runs past midnight (8 PM to 9 AM is still on at 1 AM).
+        foreach ([$at->copy()->startOfDay(), $at->copy()->subDay()->startOfDay()] as $day) {
+            $shift = $this->shift($userId, $day);
+            if ($shift !== null && $at->betweenIncluded($shift[0], $shift[1])) {
+                return true;
+            }
+        }
 
-        return $shift !== null && $at->betweenIncluded($shift[0], $shift[1]);
+        return false;
     }
 
     /** $at itself when inside a shift, otherwise the start of the next one. */
     public function nextWorkingMoment(?int $userId, Carbon $at): Carbon
     {
+        if ($this->isWorking($userId, $at)) {
+            return $at->copy();
+        }
         for ($i = 0; $i < 9; $i++) {
             $shift = $this->shift($userId, $at->copy()->addDays($i)->startOfDay());
             if (! $shift) {

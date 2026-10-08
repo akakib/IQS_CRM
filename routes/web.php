@@ -124,6 +124,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/calls-report', [\App\Http\Controllers\CustomerCallController::class, 'report'])->middleware('can:orders.reassign')->name('calls-report.index');
     Route::post('/customer-calls',[\App\Http\Controllers\CustomerCallController::class, 'start'])->middleware('can:orders.edit')->name('customer-calls.start');
     Route::patch('/customer-calls/{call}', [\App\Http\Controllers\CustomerCallController::class, 'finish'])->whereNumber('call')->middleware('can:orders.edit')->name('customer-calls.finish');
+    Route::get('/returns-report', [\App\Http\Controllers\ReturnReportController::class, 'index'])->middleware('can:orders.reassign')->name('returns-report.index');
+    Route::post('/returns/{order}/reason', [\App\Http\Controllers\ReturnReportController::class, 'reason'])->middleware('can:orders.edit')->name('returns.reason');
     Route::get('/packers-report', [\App\Http\Controllers\PackerReportController::class, 'index'])->middleware('can:packaging.manage')->name('packers-report.index');
     Route::get('/scorecard', [\App\Http\Controllers\ScorecardController::class, 'index'])->middleware('can:orders.reassign')->name('scorecard.index');
     Route::post('/scorecard/{user}/bonus', [\App\Http\Controllers\ScorecardController::class, 'bonus'])->whereNumber('user')->middleware('can:staff.edit')->name('scorecard.bonus');

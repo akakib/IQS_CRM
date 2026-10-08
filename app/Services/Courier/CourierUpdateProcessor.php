@@ -117,6 +117,8 @@ class CourierUpdateProcessor
                 $target === 'returned' ? ['returned_count' => DB::raw('returned_count + 1')] : ['delivered_count' => DB::raw('delivered_count + 1')]
             );
             if ($target === 'returned') {
+                // The courier's charge for a return, as set today (Settings, Returns); kept on the order for the loss.
+                DB::table('orders')->where('id', $order->id)->update(['return_charge' => (float) settings('returns.courier_charge')]);
                 $this->openIssue($order, $shipment, 'cancel', __('Parcel returned: set the return reason.'));
             }
             app(NotificationService::class)->markActed('order', $order->id, 'delivery_issue');

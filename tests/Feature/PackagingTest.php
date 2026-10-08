@@ -435,5 +435,16 @@ class PackagingTest extends TestCase
         // Still not back after the setting's days: red, ask the courier.
         $this->returned($b, '-8 days');
         $this->get('/returns')->assertSee('Not back after 8 days');
+
+        // The real reason is set from the Returns page; the report counts it, the loss and the damaged item.
+        DB::table('order_items')->where('order_id', $a->id)->where('variant_id', $this->nuts->id)->update(['cost_price_snapshot' => 250]);
+        DB::table('orders')->where('id', $a->id)->update(['return_charge' => 60]);
+        $refused = (int) DB::table('status_reasons')->where('reason_type', 'return')->where('system_key', 'refused')->value('id');
+        $this->actingAs($this->desk)->post("/returns/{$a->id}/reason", ['reason_id' => $refused])->assertSessionHas('success');
+        $this->get('/returns-report')->assertOk()
+            ->assertSee('Customer refused at door')->assertSee('Nuts')->assertSee($a->order_no)
+            ->assertSee('৳310', false) // loss: courier ৳60 + damaged nuts ৳250
+            ->assertSee('1 damaged');
+        $this->actingAs($this->packer)->get('/returns-report')->assertForbidden();
     }
 }

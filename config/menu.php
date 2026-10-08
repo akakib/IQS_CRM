@@ -35,6 +35,7 @@ return [
         ['KPI', 'kpi.index', 'kpi.*', null, 'chart'],
         ['Scorecard', 'scorecard.index', 'scorecard.*', 'orders.reassign', 'star'],
         ['Communication', 'chat-report.index', ['chat-report.*', 'calls-report.*', 'riders-report.*'], 'orders.reassign', 'chart'],
+        ['Return report', 'returns-report.index', 'returns-report.*', 'orders.reassign', 'refresh'],
         ['Packers', 'packers-report.index', 'packers-report.*', 'packaging.manage', 'box'],
         ['Team Activity', 'work-time.index', 'work-time.*', 'orders.reassign', 'clock'],
         ['Order P&L', 'analysis.index', 'analysis.*', 'analysis.view', 'calculator'],

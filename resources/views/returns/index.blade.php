@@ -83,6 +83,15 @@
                         <p class="text-xs text-gray-500">@if ($o->consignment_id)CN <span class="font-mono">{{ $o->consignment_id }}</span> · @endif{{ $at ? __('returned :d', ['d' => $at->format('d M')]) : '' }}
                             @if ($tab === 'received') · {{ __('received :d by :n', ['d' => \Illuminate\Support\Carbon::parse($o->return_received_at)->format('d M, g:i A'), 'n' => $o->receiver ?? '-']) }}@endif</p>
                     </div>
+                    {{-- Why it came back: set by the person who knows (it comes from the courier as not set). --}}
+                    @can('orders.edit')
+                        @php $rid = (int) ($reasonOf[$o->id] ?? 0); @endphp
+                        <form method="POST" action="{{ route('returns.reason', $o->id) }}" class="flex items-center gap-1.5" x-data>
+                            @csrf
+                            <x-simple-select name="reason_id" :options="$reasons" :value="$rid && $rid !== $unclassified ? $rid : null" :placeholder="__('Why did it come back?')" size="sm"
+                                @select-change="$nextTick(() => $el.closest('form').requestSubmit())" />
+                        </form>
+                    @endcan
                     @if ($late)
                         <span class="text-sm font-semibold text-red-700">{{ __('Not back after :n days: ask the courier', ['n' => (int) $at->diffInDays(now())]) }}</span>
                     @elseif ($tab === 'received')

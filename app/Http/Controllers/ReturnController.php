@@ -41,8 +41,15 @@ class ReturnController extends Controller
         $received = $tab === 'received' ? DB::table('return_items')->whereIn('order_id', $rows->pluck('id'))->groupBy('order_id', 'condition')
             ->selectRaw('order_id, `condition` as c, COUNT(*) as n')->get()->groupBy('order_id') : collect();
 
+        // The reason each one came back with (from the courier: "not set yet" until someone sets it).
+        $reasonOf = DB::table('order_events')->whereIn('order_id', $rows->pluck('id'))->whereIn('to_status_id', $states)
+            ->orderBy('id')->pluck('reason_id', 'order_id');
+
         return view('returns.index', [
-            'list' => $list, 'tab' => $tab, 'rows' => $rows, 'returnedAt' => $returnedAt, 'received' => $received,
+            'list' => $list, 'tab' => $tab, 'rows' => $rows, 'returnedAt' => $returnedAt, 'received' => $received, 'reasonOf' => $reasonOf,
+            'reasons' => \App\Models\StatusReason::where('reason_type', 'return')->where('is_active', true)->where('system_key', '!=', 'unclassified')
+                ->orderBy('sort_order')->pluck('label_en', 'id')->map(fn ($l) => __($l))->all(),
+            'unclassified' => (int) DB::table('status_reasons')->where('reason_type', 'return')->where('system_key', 'unclassified')->value('id'),
             'waitingCount' => (clone $base)->whereNull('o.return_received_at')->count(),
             'alertDays' => (int) settings('returns.alert_days'), 'statuses' => OrderStatus::map(),
         ]);

@@ -101,7 +101,7 @@ class OrderTimelineTest extends TestCase
         $this->actingAs($boss)->get('/work-time?date=2026-10-05')->assertOk()
             ->assertSeeInOrder(['Mahim', '1', '1', '0', '5 min', '8 min', '18 min']);
         $this->get('/work-time?date=2026-10-05&person='.$this->mahim->id)->assertOk()
-            ->assertSee('Mahim, order by order')->assertSee($o->order_no)->assertSeeInOrder(['10:02 AM', '10:07 AM', '+5 min', '10:10 AM', '+8 min', '10:50 AM', 'Confirmed', '18 min']);
+            ->assertSee('Order by order')->assertSee($o->order_no)->assertSeeInOrder(['10:02 AM', '10:07 AM', '+5 min', '10:10 AM', '+8 min', '10:50 AM', 'Confirmed', '18 min']);
         $this->get('/orders/'.$o->id)->assertOk()->assertSee('Time taken')->assertSee('10:07 AM (+5 min)')->assertSee('18 min');
     }
 
@@ -178,13 +178,13 @@ class OrderTimelineTest extends TestCase
         $this->actingAs($boss)->get('/work-time')->assertOk()
             ->assertSeeInOrder(['Mahim', '20 min', '1 h 10 min', 'Rima', '20 min', '1 h 40 min']);
         $this->get('/work-time?person='.$this->mahim->id)->assertOk()
-            ->assertSee('Mahim, activity')->assertSee('No answer on '.$o->order_no.' just before the break')->assertSee('Free 9 min · nothing was waiting');
+            ->assertSee('href="#activity"', false)->assertSee('No answer on '.$o->order_no.' just before the break')->assertSee('Free 9 min · nothing was waiting');
 
         // A range: the same numbers added up over the days (here only today has any); Activity asks for one day.
         $this->get('/work-time?from=2026-09-29&to=2026-10-05')->assertOk()
             ->assertSee('Orders given to each person from 29 Sep to 05 Oct')->assertSeeInOrder(['Mahim', '20 min', '1 h 10 min']);
         $this->get('/work-time?from=2026-09-29&to=2026-10-05&person='.$this->mahim->id)->assertOk()
-            ->assertSee('Activity shows one day at a time')->assertDontSee('Mahim, activity')->assertSee('Mahim, order by order')->assertSee('05 Oct, 10:20 AM');
+            ->assertSee('Activity shows one day at a time')->assertDontSee('href="#activity"', false)->assertSee('05 Oct, 10:20 AM');
     }
 
     public function test_a_night_shift_past_midnight_is_still_working_time(): void

@@ -78,19 +78,24 @@
             @endforeach
         </x-list.cards>
 
-        @if ($person && ! $single)
-            <p class="mt-6 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-600">{{ __('Activity shows one day at a time:') }}
+        @if ($person)
+        <x-modal id="person" :title="$person['name'].' · '.($single ? $from->format('d M Y') : $from->format('d M').' to '.$to->format('d M Y'))" width="max-w-5xl" persistent show>
+        @if (! $single)
+            <p class="mb-4 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-600">{{ __('Activity shows one day at a time:') }}
                 @foreach (\Carbon\CarbonPeriod::create($from, $to) as $d)
                     <a href="{{ $rangeUrl($d, $d, $person['id']) }}" class="ml-1 text-primary hover:underline">{{ $d->format('d M') }}</a>@if (! $loop->last),@endif
                 @endforeach
             </p>
         @endif
-        @if ($person && $activity)
+        {{-- Closing: the address drops the person, so a reload shows just the table. --}}
+        <div x-data="tabs(@js($activity ? 'activity' : 'orders'))" x-on:modal-closed.window="if ($event.detail === 'person') history.replaceState(null, '', @js($personUrl(null)))">
+        @if ($activity)
+            <x-tabs :tabs="['activity' => [__('Activity'), '#activity', count($activity['entries'])], 'orders' => [__('Order by order'), '#orders', $turns->count()]]" active="activity" />
             {{-- Activity: everything they did that day, in time order. --}}
-            <h2 class="mb-2 mt-6 text-sm font-semibold text-gray-800">{{ __(':n, activity', ['n' => $person['name']]) }}</h2>
+            <section x-show="tab === 'activity'" x-data="{ page: 1, per: 25, total: {{ count($activity['entries']) }} }">
             <div class="rounded-xl border border-gray-200 bg-white">
                 @forelse ($activity['entries'] as $e)
-                    <div @class(['flex gap-3 border-b border-gray-100 px-4 py-2 text-sm last:border-0', 'bg-red-50/60' => $e['flag'] === 'red' || ($e['flag'] && $e['flag'] !== 'red'), 'bg-gray-50' => $e['kind'] === 'free' && ! $e['flag']])>
+                    <div x-show="Math.ceil({{ $loop->iteration }} / per) === page" @class(['flex gap-3 border-b border-gray-100 px-4 py-2 text-sm last:border-0', 'bg-red-50/60' => $e['flag'] === 'red' || ($e['flag'] && $e['flag'] !== 'red'), 'bg-gray-50' => $e['kind'] === 'free' && ! $e['flag']])>
                         <span class="w-24 shrink-0 tabular-nums text-gray-500">{{ $e['at']->format('g:i A') }}@if ($e['until'])<span class="block text-xs">{{ __('to :t', ['t' => $e['until']->format('g:i A')]) }}</span>@endif</span>
                         <span class="min-w-0 flex-1">
                             @if ($e['order_id'])<a href="{{ route('orders.show', $e['order_id']) }}" class="text-gray-800 hover:text-primary hover:underline">{{ $e['text'] }}</a>@else<span @class(['text-gray-800', 'font-medium text-red-700' => $e['kind'] === 'free' && $e['flag'], 'text-gray-500' => $e['kind'] === 'free' && ! $e['flag']])>{{ $e['text'] }}</span>@endif
@@ -101,10 +106,11 @@
                     <p class="px-4 py-6 text-center text-sm text-gray-500">{{ __('Nothing recorded on this day.') }}</p>
                 @endforelse
             </div>
+            <x-list.pager />
+            </section>
 
         @endif
-        @if ($person)
-            <h2 class="mb-2 mt-6 text-sm font-semibold text-gray-800">{{ __(':n, order by order', ['n' => $person['name']]) }}</h2>
+            <section x-show="tab === 'orders'" x-cloak x-data="{ page: 1, per: 20, total: {{ $turns->count() }} }">
             <x-list.table>
                 <x-slot:head>
                     <th>{{ __('Order') }}</th>
@@ -115,7 +121,7 @@
                     <th class="text-right">{{ __('Net time') }}</th>
                 </x-slot:head>
                 @foreach ($turns as $t)
-                    <tr class="cursor-pointer" onclick="location.href='{{ route('orders.show', $t['order_id']) }}'">
+                    <tr x-show="Math.ceil({{ $loop->iteration }} / per) === page" class="cursor-pointer" onclick="location.href='{{ route('orders.show', $t['order_id']) }}'">
                         <td><span class="font-mono font-medium text-gray-800">{{ $t['order_no'] }}</span><span class="block text-xs text-gray-500">{{ $t['customer'] }}</span></td>
                         <td class="tabular-nums">{{ $at($t['given']) }}<span class="block text-xs text-gray-500">{{ $t['how'] === 'auto' ? __('given by the system') : ($t['how'] === 'reassigned' ? __('handed over') : __('took it')) }}</span></td>
                         <td class="tabular-nums">{{ $at($t['opened']) }}@if ($t['opened'])<span class="block text-xs text-gray-500">+{{ $span($t['open_seconds']) }}</span>@endif</td>
@@ -136,7 +142,7 @@
 
             <x-list.cards>
                 @foreach ($turns as $t)
-                    <a href="{{ route('orders.show', $t['order_id']) }}" class="block">
+                    <a href="{{ route('orders.show', $t['order_id']) }}" x-show="Math.ceil({{ $loop->iteration }} / per) === page" class="block">
                         <x-record-card :title="$t['order_no'].' · '.$t['customer']" :subtitle="__('Given :a · opened :b · first action :c', ['a' => $at($t['given']), 'b' => $at($t['opened']), 'c' => $at($t['acted'])])">
                             <x-slot:footer>
                                 @if ($t['sent']){{ ($t['sent_to'] === 'confirmed' ? __('Confirmed') : __('Cancelled')).' '.$at($t['sent']) }}@elseif ($ended[$t['ended_reason']] ?? null){{ $ended[$t['ended_reason']] }}@else{{ __('Still with them') }} · {{ $t['status'] }}@endif
@@ -146,6 +152,10 @@
                     </a>
                 @endforeach
             </x-list.cards>
+            <x-list.pager />
+            </section>
+        </div>
+        </x-modal>
         @endif
     @endif
 </x-layouts.app>

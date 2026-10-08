@@ -335,6 +335,41 @@ class DeskTest extends TestCase
         $this->assertSame('2026-10-06 09:00:00', $a->fresh()->next_call_at->toDateTimeString());
     }
 
+    public function test_a_hold_needs_a_follow_up_date_and_a_moderator_may_keep_only_so_many(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['desk.hold_limit' => 2, 'desk.timer_enabled' => false]);
+        $reason = DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'customer_wait')->value('id');
+        $orders = collect(range(1, 3))->map(function () {
+            $o = $this->web();
+            $this->desk()->assign($o->id, $this->mahim->id, 'claimed');
+            if ($this->key($o) === 'new') {
+                app(\App\Services\Orders\OrderStateMachine::class)->transition($o->fresh(), 'record_verified', $this->mahim);
+            }
+
+            return $o->fresh();
+        });
+        $this->actingAs($this->mahim);
+
+        // No date: refused. With a date: held, the date kept.
+        $this->act($orders[0], 'hold', ['reason_id' => $reason])->assertSessionHasErrors('hold_expected_date');
+        $this->assertSame('record_verified', $this->key($orders[0]));
+        $this->act($orders[0], 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDays(2)->toDateString()])->assertSessionHasNoErrors();
+        $this->assertSame(today()->addDays(2)->toDateString(), $orders[0]->fresh()->hold_expected_date->toDateString());
+        $this->act($orders[1], 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()]);
+
+        // The limit (2): the third is refused, so Hold cannot empty the hands for the next batch.
+        $this->act($orders[2], 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])
+            ->assertSessionHasErrors(['reason_id' => 'You already hold 2 orders on hold. Settle one of them first (call, confirm or cancel).']);
+        $this->assertSame('record_verified', $this->key($orders[2]));
+
+        // A manager is not limited (the order page), but still gives a date.
+        $boss = $this->manager();
+        $this->actingAs($boss)->post("/orders/{$orders[2]->id}/transition", ['to' => 'hold', 'reason_id' => $reason, 'lock_version' => $orders[2]->fresh()->lock_version])
+            ->assertSessionHasErrors('hold_expected_date');
+        $this->post("/orders/{$orders[2]->id}/transition", ['to' => 'hold', 'reason_id' => $reason, 'lock_version' => $orders[2]->fresh()->lock_version, 'hold_expected_date' => today()->addDay()->toDateString()]);
+        $this->assertSame('hold', $this->key($orders[2]));
+    }
+
     public function test_on_arrival_an_order_goes_to_whoever_was_free_longest_with_chat_and_shift_rules(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.assign_on_arrival' => true, 'desk.assign_to_chat' => false, 'desk.chat_fallback_minutes' => 5]);

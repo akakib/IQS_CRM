@@ -75,7 +75,7 @@
                                 <x-simple-select :options="['' => __('Choose a reason')] + $reasons[$type]" value="" full-width class="w-full" />
                             </div>
                         @endforeach
-                        <div x-show="to === 'hold'"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Expected date')" full-width /></div>
+                        <div x-show="to === 'hold'"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Follow-up date')" full-width /></div>
                         <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="{{ $input }}">
                         @error('reason_id')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
                         @error('status')<p class="text-sm text-red-600">{{ $message }}</p>@enderror

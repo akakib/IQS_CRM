@@ -198,6 +198,9 @@ class OrderController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages(['status' => __('Log the call first (Order management, or add a Call note below).')]);
         }
 
+        if ($data['to'] === 'hold') {
+            app(\App\Services\Orders\DeskService::class)->checkHold($user, $order, $data['hold_expected_date'] ?? null);
+        }
         $this->machine->transition($order, $data['to'], $user, 'user', $data['reason_id'] ?? null, $data['note'] ?? null, (int) $data['lock_version']);
         if ($data['to'] === 'hold' && ! empty($data['hold_expected_date'])) {
             $order->forceFill(['hold_expected_date' => $data['hold_expected_date']])->save();

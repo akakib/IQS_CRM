@@ -505,7 +505,7 @@
                                 @endforeach
                             </div>
                             @if ($mode === 'hold')
-                                <div class="mt-3"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Expected date (optional)')" full-width /></div>
+                                <div class="mt-3"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Follow-up date')" full-width /></div>
                             @endif
                             <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="{{ $input }} mt-3">
                             <div class="mt-4 flex gap-2">

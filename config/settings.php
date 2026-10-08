@@ -38,6 +38,7 @@ return [
     'desk.untouched_start_minutes' => ['int', 15, 'An order its moderator never opens starts its timer by itself after (minutes)', 'Order desk', ['required', 'integer', 'min:1', 'max:240']],
     'desk.extend_minutes' => ['int', 5, 'Extra minutes a moderator can add to the timer, once per order', 'Order desk', ['required', 'integer', 'min:1', 'max:60']],
     'desk.extend_daily_limit' => ['int', 5, 'Times a day one moderator can add extra time (0 = not allowed)', 'Order desk', ['required', 'integer', 'min:0', 'max:100']],
+    'desk.hold_limit' => ['int', 5, 'Orders one moderator may keep on hold at once (holds for an advance and by packers not counted; 0 = no limit). Every hold needs a reason and a follow-up date', 'Order desk', ['required', 'integer', 'min:0', 'max:100']],
     'desk.assign_on_arrival' => ['bool', true, 'Give website orders as soon as they come in, to a free person (empty hands, not on a break; the one free the longest first)', 'Order desk', ['boolean']],
     'desk.assign_to_chat' => ['bool', true, 'People in Chat mode get website orders too', 'Order desk', ['boolean']],
     'desk.chat_fallback_minutes' => ['int', 5, 'When people in Chat mode do not get orders: if nobody else is free, someone in chat gets it after (minutes)', 'Order desk', ['required', 'integer', 'min:0', 'max:120']],

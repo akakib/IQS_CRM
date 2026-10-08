@@ -342,10 +342,9 @@ class DeskController extends Controller
                     : __('No response saved. It will come back to your Call tab.');
                 break;
             case 'hold':
+                $this->desk->checkHold($user, $order, $data['hold_expected_date'] ?? null);
                 $this->machine->transition($order, 'hold', $user, 'user', $reason, $note);
-                if (! empty($data['hold_expected_date'])) {
-                    $order->forceFill(['hold_expected_date' => $data['hold_expected_date']])->save();
-                }
+                $order->forceFill(['hold_expected_date' => $data['hold_expected_date']])->save();
                 $message = __(':no is on hold.', ['no' => $order->order_no]);
                 break;
             case 'cancel':

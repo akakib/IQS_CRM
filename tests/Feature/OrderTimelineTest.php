@@ -136,6 +136,51 @@ class OrderTimelineTest extends TestCase
         $this->assertSame(10 * 60, $turns[1]['net_seconds']);
     }
 
+    public function test_activity_shows_the_day_in_order_and_free_time_says_whether_orders_were_waiting(): void
+    {
+        // Shift 9:00 to 22:00. An order comes in at 10:00; Mahim takes it at 10:20.
+        $o = $this->web();
+        $this->travel(20)->minutes();
+        $this->actingAs($this->mahim)->post('/desk/next');
+        $this->travel(1)->minutes();
+        $this->get('/desk?tab=verify&order='.$o->id);                                      // 10:21 opened
+        $this->travel(1)->minutes();
+        if (OrderStatus::map()[$o->fresh()->status_id]['key'] === 'new') {
+            app(OrderStateMachine::class)->transition($o->fresh(), 'record_verified', $this->mahim); // 10:22
+        }
+        $this->travel(3)->minutes();
+        app(DeskService::class)->noResponse($o->fresh(), $this->mahim);                   // 10:25, back at 10:55
+        $this->travel(1)->minutes();
+        $lunch = DB::table('status_reasons')->where('reason_type', 'break')->where('system_key', 'lunch')->value('id');
+        $this->post('/breaks', ['reason_id' => $lunch]);                                  // 10:26: right after a No answer
+        $this->travel(20)->minutes();
+        $this->post('/breaks/end');                                                       // 10:46
+        $this->travel(14)->minutes();
+        app(OrderStateMachine::class)->transition($o->fresh(), 'confirmed', $this->mahim); // 11:00 (back at 10:55)
+
+        // Free: 9:00 to 10:20 (orders waiting 10:00 to 10:20), 10:25 to 10:26 and 10:46 to 10:55 (nothing waiting).
+        $activity = app(\App\Services\Reports\PersonActivity::class)->day($this->mahim->id, today());
+        $this->assertSame(20 * 60, $activity['free']['waiting']);
+        $this->assertSame(70 * 60, $activity['free']['nothing']);
+        $texts = array_map(fn ($e) => $e['at']->format('H:i').' '.$e['text'], $activity['entries']);
+        $this->assertSame('09:00 Free 1 h 20 min · orders were waiting for 20 min of it', $texts[0]);
+        $this->assertContains('10:20 Took '.$o->order_no, $texts);
+        $this->assertContains('10:21 Opened '.$o->order_no, $texts);
+        $this->assertContains('10:46 Free 9 min · nothing was waiting', $texts);
+        $this->assertContains('11:00 '.$o->order_no.': No answer → Confirmed', $texts);
+        $break = collect($activity['entries'])->firstWhere('kind', 'break');
+        $this->assertSame('No answer on '.$o->order_no.' just before the break', $break['flag']);
+
+        // The report: Mahim, and Rima who was on shift with nothing in hand all morning.
+        $boss = User::factory()->create(['name' => 'Boss']);
+        $boss->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'orders.reassign'], [], 'Manager')->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->actingAs($boss)->get('/work-time')->assertOk()
+            ->assertSeeInOrder(['Mahim', '20 min', '1 h 10 min', 'Rima', '20 min', '1 h 40 min']);
+        $this->get('/work-time?person='.$this->mahim->id)->assertOk()
+            ->assertSee('Mahim, activity')->assertSee('No answer on '.$o->order_no.' just before the break')->assertSee('Free 9 min · nothing was waiting');
+    }
+
     public function test_a_night_shift_past_midnight_is_still_working_time(): void
     {
         foreach (range(0, 6) as $day) {

@@ -21,7 +21,8 @@ class WorkTimeController extends Controller
             'day' => $day,
             'people' => $result['people'],
             'person' => $person,
-            'turns' => $person ? $result['turns'][$person['id']] : collect(),
+            'turns' => $person ? $result['turns']->get($person['id'], collect()) : collect(),
+            'activity' => $person ? app(\App\Services\Reports\PersonActivity::class)->day($person['id'], $day) : null,
         ]);
     }
 }

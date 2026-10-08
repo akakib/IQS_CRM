@@ -32,6 +32,8 @@
                 <th class="text-right">{{ __('To packaging (net)') }}</th>
                 <th class="text-right">{{ __('Given back') }}</th>
                 <th class="text-right">{{ __('Break') }}</th>
+                <th class="text-right">{{ __('Free, orders waiting') }}</th>
+                <th class="text-right">{{ __('Free, nothing waiting') }}</th>
             </x-slot:head>
             @foreach ($people as $p)
                 <tr @class(['cursor-pointer', 'bg-primary-soft' => $person && $person['id'] === $p['id']]) onclick="location.href='{{ $dayUrl($day, $p['id']) }}'">
@@ -44,6 +46,8 @@
                     <td class="text-right font-medium tabular-nums">{{ $span($p['net']) }}</td>
                     <td @class(['text-right tabular-nums', 'font-semibold text-red-600' => $p['given_back']])>{{ $p['given_back'] }}</td>
                     <td class="text-right tabular-nums">{{ $p['break_minutes'] }} {{ __('min') }}</td>
+                    <td @class(['text-right tabular-nums', 'font-semibold text-red-600' => $p['free_waiting'] >= 600])>{{ $span($p['free_waiting'] ?: null) }}</td>
+                    <td class="text-right tabular-nums text-gray-500">{{ $span($p['free_nothing'] ?: null) }}</td>
                 </tr>
             @endforeach
         </x-list.table>
@@ -52,7 +56,8 @@
             @foreach ($people as $p)
                 <a href="{{ $dayUrl($day, $p['id']) }}" class="block">
                     <x-record-card :title="$p['name']" :subtitle="__(':n orders · :c confirmed · :x cancelled', ['n' => $p['turns'], 'c' => $p['confirmed'], 'x' => $p['cancelled']])">
-                        <x-slot:footer>{{ __('Opened in :a · first action in :b · break :m min', ['a' => $span($p['open']), 'b' => $span($p['start']), 'm' => $p['break_minutes']]) }}@if ($p['given_back']) · <span class="text-red-600">{{ __(':n given back', ['n' => $p['given_back']]) }}</span>@endif</x-slot:footer>
+                        <x-slot:footer>{{ __('Opened in :a · first action in :b · break :m min', ['a' => $span($p['open']), 'b' => $span($p['start']), 'm' => $p['break_minutes']]) }}@if ($p['given_back']) · <span class="text-red-600">{{ __(':n given back', ['n' => $p['given_back']]) }}</span>@endif
+                            <span @class(['block', 'font-medium text-red-600' => $p['free_waiting'] >= 600])>{{ __('Free while orders waited: :w', ['w' => $span($p['free_waiting'] ?: null)]) }}</span></x-slot:footer>
                         <x-slot:actions><span class="text-right"><span class="block text-xs text-gray-500">{{ __('Net') }}</span><span class="font-semibold tabular-nums">{{ $span($p['net']) }}</span></span></x-slot:actions>
                     </x-record-card>
                 </a>
@@ -60,6 +65,22 @@
         </x-list.cards>
 
         @if ($person)
+            {{-- Activity: everything they did that day, in time order. --}}
+            <h2 class="mb-2 mt-6 text-sm font-semibold text-gray-800">{{ __(':n, activity', ['n' => $person['name']]) }}</h2>
+            <div class="rounded-xl border border-gray-200 bg-white">
+                @forelse ($activity['entries'] as $e)
+                    <div @class(['flex gap-3 border-b border-gray-100 px-4 py-2 text-sm last:border-0', 'bg-red-50/60' => $e['flag'] === 'red' || ($e['flag'] && $e['flag'] !== 'red'), 'bg-gray-50' => $e['kind'] === 'free' && ! $e['flag']])>
+                        <span class="w-24 shrink-0 tabular-nums text-gray-500">{{ $e['at']->format('g:i A') }}@if ($e['until'])<span class="block text-xs">{{ __('to :t', ['t' => $e['until']->format('g:i A')]) }}</span>@endif</span>
+                        <span class="min-w-0 flex-1">
+                            @if ($e['order_id'])<a href="{{ route('orders.show', $e['order_id']) }}" class="text-gray-800 hover:text-primary hover:underline">{{ $e['text'] }}</a>@else<span @class(['text-gray-800', 'font-medium text-red-700' => $e['kind'] === 'free' && $e['flag'], 'text-gray-500' => $e['kind'] === 'free' && ! $e['flag']])>{{ $e['text'] }}</span>@endif
+                            @if ($e['flag'] && $e['flag'] !== 'red')<span class="mt-0.5 block text-xs font-medium text-red-600">⚠ {{ $e['flag'] }}</span>@endif
+                        </span>
+                    </div>
+                @empty
+                    <p class="px-4 py-6 text-center text-sm text-gray-500">{{ __('Nothing recorded on this day.') }}</p>
+                @endforelse
+            </div>
+
             <h2 class="mb-2 mt-6 text-sm font-semibold text-gray-800">{{ __(':n, order by order', ['n' => $person['name']]) }}</h2>
             <x-list.table>
                 <x-slot:head>

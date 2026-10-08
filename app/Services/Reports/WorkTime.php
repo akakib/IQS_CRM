@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  */
 class WorkTime
 {
-    public function __construct(private OrderTimeline $timeline) {}
+    public function __construct(private OrderTimeline $timeline, private FreeTime $free, private \App\Services\Work\WorkCalendar $calendar) {}
 
     /**
      * @return array{people: Collection<int, array<string, mixed>>, turns: Collection<int, Collection<int, array<string, mixed>>>}
@@ -57,14 +57,32 @@ class WorkTime
             ];
         })->groupBy('user_id');
 
-        $breaks = DB::table('staff_breaks')->whereBetween('started_at', [$from, $to])->where('counts_as_break', true)
-            ->groupBy('user_id')->selectRaw('user_id, SUM(COALESCE(minutes, 0)) as minutes')->pluck('minutes', 'user_id');
+        $breakRows = DB::table('staff_breaks')->where('started_at', '<=', $to)->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))
+            ->get(['user_id', 'started_at', 'ended_at', 'minutes', 'counts_as_break'])->groupBy('user_id');
+        $breaks = $breakRows->map(fn ($b) => (int) $b->where('counts_as_break', true)->filter(fn ($x) => Carbon::parse($x->started_at)->between($from, $to))->sum('minutes'));
 
-        $people = $rows->unique('user_id')->map(function ($a) use ($turns, $breaks) {
-            $mine = $turns[$a->user_id];
+        // Everyone who works orders and was on shift that day, even with no order at all (free all day is worth seeing).
+        $staff = \App\Models\User::where('is_active', true)->get(['id', 'name', 'photo_path'])
+            ->filter(fn ($u) => $u->can('orders.take') && ! $u->isOwner());
+        $this->calendar->preload($staff->pluck('id')->all());
+        $staff = $staff->filter(fn ($u) => $turns->has($u->id) || ($day->lte(today()) && $this->calendar->shift($u->id, $from)));
+
+        // Free time: turns that touch the day (also ones given before it), their history, breaks, orders waiting.
+        $open = DB::table('order_assignments')->where('role', 'moderator')->whereIn('user_id', $staff->pluck('id'))->where('started_at', '<=', $to)
+            ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))->get(['user_id', 'order_id', 'started_at', 'ended_at'])->groupBy('user_id');
+        $allIds = $open->flatten(1)->pluck('order_id')->unique()->values()->all();
+        $allEvents = $this->timeline->events($allIds);
+        $allReturns = $this->timeline->returns($allIds);
+        $waitingSpans = $this->free->waiting($from, $to);
+        $freeOf = fn (int $id) => $this->free->forPerson($id, $day, $this->free->busy($open->get($id, collect()), $allEvents, $allReturns, $breakRows->get($id, collect())), $waitingSpans);
+
+        $people = $staff->map(function ($u) use ($turns, $breaks, $freeOf) {
+            $mine = $turns->get($u->id, collect());
+            $free = $freeOf($u->id);
 
             return [
-                'id' => $a->user_id, 'name' => $a->name, 'photo' => $a->photo_path,
+                'id' => $u->id, 'name' => $u->name, 'photo' => $u->photo_path,
+                'free_waiting' => $free['waiting'], 'free_nothing' => $free['nothing'],
                 'turns' => $mine->count(),
                 'confirmed' => $mine->where('sent_to', 'confirmed')->count(),
                 'cancelled' => $mine->where('sent_to', 'cancelled')->count(),
@@ -72,7 +90,7 @@ class WorkTime
                 'open' => $this->median($mine->pluck('open_seconds')),
                 'start' => $this->median($mine->pluck('start_seconds')),
                 'net' => $this->median($mine->where('sent_to', 'confirmed')->pluck('net_seconds')),
-                'break_minutes' => (int) ($breaks[$a->user_id] ?? 0),
+                'break_minutes' => (int) ($breaks[$u->id] ?? 0),
             ];
         })->sortBy('name')->values();
 

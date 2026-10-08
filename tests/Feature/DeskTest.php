@@ -866,7 +866,7 @@ class DeskTest extends TestCase
         $lunch = DB::table('status_reasons')->where('reason_type', 'break')->where('system_key', 'lunch')->value('id');
 
         // An order in hand: no break until it is done (or marked No answer), so no customer is left halfway.
-        $this->post('/breaks', ['reason_id' => $lunch])->assertSessionHasErrors(['reason_id' => 'Finish '.$a->order_no.' first (or mark No answer), then take the break.']);
+        $this->post('/breaks', ['reason_id' => $lunch])->assertSessionHasErrors(['reason_id' => 'Finish '.$a->order_no.' first, then take the break.']);
         $this->assertNull($this->mahim->fresh()->current_break_id);
         if ($this->key($a) === 'new') {
             app(\App\Services\Orders\OrderStateMachine::class)->transition($a->fresh(), 'record_verified', $this->mahim);

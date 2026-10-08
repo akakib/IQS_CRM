@@ -37,7 +37,7 @@ class BreakService
             ->orderBy('id')->limit(4)->pluck('order_no');
         if ($inHand->isNotEmpty() || $this->desk->inHand($user->id) > 0) {
             throw ValidationException::withMessages(['reason_id' => $inHand->isNotEmpty()
-                ? __('Finish :list first (or mark No answer), then take the break.', ['list' => $inHand->take(3)->join(', ').($inHand->count() > 3 ? '…' : '')])
+                ? __('Finish :list first, then take the break.', ['list' => $inHand->take(3)->join(', ').($inHand->count() > 3 ? '…' : '')])
                 : __('Call the advance order you hold first, then take the break.')]);
         }
 

@@ -5,10 +5,10 @@
      <x-scan-input @scan="handle($event.detail)" />        camera stays open (many parcels)
      <x-scan-input once @scan="handle($event.detail)" />   camera closes after one read
      quiet = the page shows the result itself, so no message under the box. --}}
-@props(['placeholder' => __('Scan a label or type the code + Enter'), 'once' => false, 'quiet' => false])
+@props(['placeholder' => __('Scan a label or type the code + Enter'), 'once' => false, 'quiet' => false, 'remember' => null, 'left' => null, 'doneMessage' => null])
 
 <div {{ $attributes->merge(['class' => 'w-full']) }}
-    x-data="scanInput({ once: {{ $once ? 'true' : 'false' }} })"
+    x-data="scanInput({ once: {{ $once ? 'true' : 'false' }}, remember: {{ Illuminate\Support\Js::from($remember) }}, left: {{ Illuminate\Support\Js::from($left) }}, doneMessage: {{ Illuminate\Support\Js::from($doneMessage) }} })"
     @scan-result.window="result($event.detail)">
     <div class="flex items-stretch gap-2">
         <input type="text" x-model="code" @keydown.enter.prevent="submit()" autofocus autocomplete="off" inputmode="none"
@@ -20,16 +20,18 @@
             <span class="text-[10px] font-medium">{{ __('Camera') }}</span>
         </button>
     </div>
+    {{-- Camera mode, when the phone did not let the camera open by itself: one tap for the next label. --}}
+    <button type="button" x-show="needsTap" x-cloak @click="startCamera()" class="mt-3 w-full rounded-xl bg-primary px-4 py-4 text-base font-semibold text-white hover:bg-primary-dark">{{ __('Scan next with the camera') }}</button>
     <p x-show="message && !camera && {{ $quiet ? 'false' : 'true' }}" x-text="message" class="mt-2 text-center text-sm font-medium" :class="good ? 'text-green-800' : 'text-red-700'"></p>
 
     {{-- Camera: full screen, so the label is easy to aim at on a phone. --}}
     <template x-teleport="body">
-        <div x-show="camera" x-cloak class="fixed inset-0 z-[150] flex flex-col bg-black" @keydown.escape.window="camera && stopCamera()">
+        <div x-show="camera" x-cloak class="fixed inset-0 z-[150] flex flex-col bg-black" @keydown.escape.window="camera && closeCamera()">
             <div class="flex items-center justify-between px-4 py-3 text-white">
                 <p class="text-sm font-medium">{{ __('Point the camera at the barcode') }}</p>
                 <div class="flex items-center gap-2">
                     <button type="button" x-show="torchOk" @click="toggleTorch()" class="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-medium" :class="torch && 'bg-white text-black'" x-text="torch ? @js(__('Light on')) : @js(__('Light'))"></button>
-                    <button type="button" @click="stopCamera()" class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black">{{ __('Close') }}</button>
+                    <button type="button" @click="closeCamera()" class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black">{{ __('Close') }}</button>
                 </div>
             </div>
 

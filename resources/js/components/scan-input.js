@@ -7,8 +7,35 @@
 // Camera: Android Chrome reads barcodes natively (BarcodeDetector). iPhones
 // do not, so the ZXing reader is loaded on first use and decodes the video
 // frames in the browser. Nothing is sent anywhere.
-export default function scanInput({ once = false } = {}) {
+/*
+ * remember: a name for "camera mode" (e.g. 'packaging'). Once the camera is
+ * opened by hand it comes back by itself after each piece of work (the page
+ * reloads), until the person presses Close or nothing is left (left = 0).
+ * With remember, a read closes the camera only when the page says so (the
+ * result has no keep: true), so a refused label lets the next one be scanned.
+ */
+export default function scanInput({ once = false, remember = null, left = null, doneMessage = '' } = {}) {
+    const key = remember ? 'scan-camera:' + remember : null;
+    const store = {
+        get: () => { try { return key && sessionStorage.getItem(key) === '1' } catch (e) { return false } },
+        set: (on) => { try { if (key) on ? sessionStorage.setItem(key, '1') : sessionStorage.removeItem(key) } catch (e) {} },
+    };
+
     return {
+        cameraMode: false,
+        needsTap: false,
+
+        init() {
+            if (!store.get()) return;
+            if (left !== null && left <= 0) {
+                // The last parcel is done: camera mode ends by itself.
+                store.set(false);
+                if (doneMessage) setTimeout(() => window.toast?.(doneMessage), 300);
+                return;
+            }
+            this.cameraMode = true;
+            setTimeout(() => this.startCamera(true), 250);
+        },
         code: '',
         state: null, // 'ok' | 'bad' flash after the page answers
         message: '',
@@ -38,6 +65,8 @@ export default function scanInput({ once = false } = {}) {
             this.state = this.good ? 'ok' : 'bad';
             this.message = detail.message || '';
             this.level = detail.level || (this.good ? 'ok' : 'red');
+            // Camera mode: close only to show the page's work (a checklist); a refused label keeps it open for the next.
+            if (remember && once && this.camera && !detail.keep) this.stopCamera();
             this.beep(this.good);
             setTimeout(() => (this.state = null), 2500);
         },
@@ -72,8 +101,13 @@ export default function scanInput({ once = false } = {}) {
             navigator.vibrate?.(ok ? 60 : [120, 80, 220]);
         },
 
-        async startCamera() {
+        async startCamera(auto = false) {
             if (this.starting) return;
+            if (!auto && remember) {
+                store.set(true); // opened by hand: camera mode on
+                this.cameraMode = true;
+            }
+            this.needsTap = false;
             this.camera = true;
             this.cameraError = null;
             this.starting = true;
@@ -91,8 +125,14 @@ export default function scanInput({ once = false } = {}) {
                     video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
                 });
             } catch (e) {
-                this.cameraError = e?.name === 'NotAllowedError' ? 'denied' : 'unavailable';
                 this.starting = false;
+                if (auto) {
+                    // Opening by itself was not allowed (some phones want a tap): offer one big button instead.
+                    this.camera = false;
+                    this.needsTap = true;
+                    return;
+                }
+                this.cameraError = e?.name === 'NotAllowedError' ? 'denied' : 'unavailable';
                 return;
             }
             video.srcObject = this.stream;
@@ -149,7 +189,14 @@ export default function scanInput({ once = false } = {}) {
             this.lastCode = code;
             this.lastAt = now;
             this.$dispatch('scan', code);
-            if (once) this.stopCamera();
+            if (once && !remember) this.stopCamera();
+        },
+
+        // The Close button: the person stops, so camera mode ends too.
+        closeCamera() {
+            store.set(false);
+            this.cameraMode = false;
+            this.stopCamera();
         },
 
         stopCamera() {

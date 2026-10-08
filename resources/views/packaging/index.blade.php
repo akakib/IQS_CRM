@@ -29,7 +29,8 @@
             try { this.last = await this.post(@js(route('packaging.scan.post')), { code }) }
             catch (e) { this.last = { ok: false, level: 'red', message: e.message } }
             this.list = this.last.checklist ?? null; this.ticked = []; this.holding = false;
-            $dispatch('scan-result', { ok: this.last.ok, message: this.last.message, level: this.last.level });
+            // keep: no checklist to show (refused, already packed), so the camera stays on for the next label.
+            $dispatch('scan-result', { ok: this.last.ok, message: this.last.message, level: this.last.level, keep: !this.list });
         },
         tick(id) { this.ticked = this.ticked.includes(id) ? this.ticked.filter(i => i !== id) : [...this.ticked, id] },
         get allTicked() { return this.list && this.ticked.length === this.list.items.length },
@@ -83,7 +84,9 @@
     @endunless
 
     @if ($canPack)
-        <x-scan-input once quiet :placeholder="__('Scan a label')" />
+        {{-- Camera mode: after Packed the camera comes back by itself for the next label; it ends when nothing is left to pack. --}}
+        <x-scan-input once quiet remember="packaging" :left="$counts['waiting'] + $counts['red'] + $counts['mine']"
+            :done-message="__('All parcels packed. Camera off.')" :placeholder="__('Scan a label')" />
 
         {{-- Scan result that is not a checklist (blocked, already packed…) --}}
         <div x-show="last && !list" x-cloak class="mt-3 rounded-xl border-2 p-4"

@@ -251,6 +251,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/settings/tracking/{event}', [TrackingSettingsController::class, 'update'])->whereNumber('event')->middleware('can:settings.edit')->name('settings.tracking.update');
 
     Route::get('/settings/chat-channels', [\App\Http\Controllers\ChatController::class, 'index'])->middleware('can:settings.view')->name('settings.chat-channels');
+    Route::post('/settings/chat-channels/{channel}/people', [\App\Http\Controllers\ChatController::class, 'people'])->whereNumber('channel')->middleware('can:staff.edit')->name('settings.chat-channels.people');
     Route::post('/settings/chat-channels/{channel?}', [\App\Http\Controllers\ChatController::class, 'save'])->whereNumber('channel')->middleware('can:settings.edit')->name('settings.chat-channels.save');
     Route::get('/settings/charges', [OrderSettingsController::class, 'charges'])->middleware('can:settings.view')->name('settings.charges');
     Route::get('/settings/reasons', [OrderSettingsController::class, 'reasons'])->middleware('can:settings.view')->name('settings.reasons');

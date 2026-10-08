@@ -58,6 +58,16 @@ class ChatModeTest extends TestCase
         $this->put('/users/'.$this->mahim->id, ['name' => 'Mahim', 'email' => $this->mahim->email, 'chat_channels_shown' => 1, 'chat_channels' => [$wa->id]])->assertRedirect();
         $this->assertSame([$wa->id], $this->mahim->chatChannels()->pluck('chat_channels.id')->all());
 
+        // Or from the channel itself: Access shows who has it; the popup sets many people at once (inactive staff are skipped).
+        $this->get('/settings/chat-channels')->assertOk()->assertSee('Access')->assertSeeInOrder(['WhatsApp 2', 'Mahim']);
+        $gone = User::factory()->create(['is_active' => false]);
+        $this->post('/settings/chat-channels/'.$comments->id.'/people', ['users' => [$this->mahim->id, $this->boss->id, $gone->id]])->assertRedirect('/settings/chat-channels');
+        $this->assertEqualsCanonicalizing([$this->mahim->id, $this->boss->id], $comments->users()->pluck('users.id')->all());
+        $this->post('/settings/chat-channels/'.$comments->id.'/people', [])->assertRedirect();
+        $this->assertSame(0, $comments->users()->count());
+        $this->actingAs($this->mahim)->post('/settings/chat-channels/'.$comments->id.'/people', ['users' => [$this->mahim->id]])->assertForbidden();
+        $this->actingAs($this->boss);
+
         // Mahim sees Chat beside Break, and only his channel in it.
         $this->actingAs($this->mahim)->get('/dashboard')->assertSee('Communication off', false);
         $this->getJson('/chat')->assertOk()->assertJsonCount(1, 'channels')->assertJsonPath('channels.0.name', 'WhatsApp 2')->assertJsonPath('on', false);

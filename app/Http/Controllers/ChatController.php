@@ -71,9 +71,19 @@ class ChatController extends Controller
     public function index(): View
     {
         return view('settings.chat-channels', [
-            'channels' => ChatChannel::withCount('users')->orderBy('sort_order')->orderBy('name')->get(),
+            'channels' => ChatChannel::with(['users' => fn ($q) => $q->orderBy('name')->select('users.id', 'users.name')])->orderBy('sort_order')->orderBy('name')->get(),
             'types' => ChatChannel::TYPES,
+            'staff' => request()->user()->can('staff.edit') ? \App\Models\User::where('is_active', true)->orderBy('name')->get(['id', 'name']) : collect(),
         ]);
+    }
+
+    /** Who handles this channel: the same list as the ticks on each person's Staff page. */
+    public function people(Request $request, ChatChannel $channel): RedirectResponse
+    {
+        $data = $request->validate(['users' => ['nullable', 'array'], 'users.*' => ['integer']]);
+        $channel->users()->sync(\App\Models\User::where('is_active', true)->whereIn('id', $data['users'] ?? [])->pluck('id'));
+
+        return redirect()->route('settings.chat-channels')->with('success', __('Access saved for :c.', ['c' => $channel->name]));
     }
 
     public function save(Request $request, ?ChatChannel $channel = null): RedirectResponse

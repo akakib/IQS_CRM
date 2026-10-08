@@ -22,7 +22,7 @@ class ChatChannel extends Model
     public const RIDER = 'rider';
 
     /** The order channel an order made from this chat gets (the exact chat stays on chat_channel_id). */
-    public const ORDER_CHANNEL = ['whatsapp' => 'whatsapp', 'call' => 'phone'];
+    public const ORDER_CHANNEL = ['whatsapp' => 'whatsapp', 'call' => 'phone', 'other' => 'other'];
 
     protected $fillable = ['name', 'type', 'is_active', 'sort_order'];
 

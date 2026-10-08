@@ -34,7 +34,7 @@ class OrderController extends Controller
         $list = ListState::from($request, ['id', 'grand_total'], [
             'tab' => ['take', 'mine', 'all'],
             'status' => $statusKeys,
-            'channel' => ['web', 'messenger', 'whatsapp', 'phone', 'b2b'],
+            'channel' => ['web', 'messenger', 'whatsapp', 'phone', 'b2b', 'other'],
             'moderator' => 'int',
             'from' => 'date',
             'to' => 'date',
@@ -106,7 +106,7 @@ class OrderController extends Controller
     public function store(Request $request): RedirectResponse|\Illuminate\Http\Response
     {
         $data = $request->validate([
-            'channel' => ['required', Rule::in(['messenger', 'whatsapp', 'phone', 'b2b'])],
+            'channel' => ['required', Rule::in(['messenger', 'whatsapp', 'phone', 'b2b', 'other'])],
             'phone' => ['required', 'string', 'max:20'],
             'alt_phone' => ['nullable', 'string', 'max:20'],
             'name' => ['required', 'string', 'max:150'],

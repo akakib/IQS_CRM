@@ -66,6 +66,12 @@ class OrderHttpTest extends TestCase
         // Taken in a chat or call = confirmed in that talk: straight to Confirmed, booked, and on to packaging.
         $this->assertSame('ready_for_packaging', \App\Models\OrderStatus::map()[$order->status_id]['key']);
         $this->assertTrue(DB::table('order_notes')->where('order_id', $order->id)->where('body', 'like', '%Confirmed in the chat or call it was taken in%')->exists());
+
+        // From somewhere that is none of the listed channels: Other. No channel at all is refused.
+        $line = ['phone' => '01812345670', 'name' => 'Karim', 'address_line' => 'House 2', 'items' => [['variant_id' => $this->variant->id, 'qty' => 1]]];
+        $this->post('/orders', $line)->assertSessionHasErrors('channel');
+        $this->post('/orders', $line + ['channel' => 'other'])->assertRedirect();
+        $this->assertSame('other', Order::latest('id')->first()->channel);
     }
 
     public function test_a_number_in_bangla_digits_or_with_880_becomes_one_shape_and_shows_its_steadfast_record(): void

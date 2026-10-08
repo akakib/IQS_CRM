@@ -19,7 +19,7 @@
         <input type="hidden" name="group" value="{{ $group }}">
         <x-date-range :from="$from" :to="$to" />
         <div class="flex items-center gap-2 md:ml-auto">
-            <x-simple-select name="channel" :options="['' => __('All channels'), 'web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone'), 'b2b' => 'B2B']" :value="$channel ?? ''" />
+            <x-simple-select name="channel" :options="['' => __('All channels'), 'web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone'), 'b2b' => 'B2B', 'other' => __('Other')]" :value="$channel ?? ''" />
             <x-simple-select name="per_page" :options="[25 => __(':n / page', ['n' => 25]), 50 => __(':n / page', ['n' => 50]), 100 => __(':n / page', ['n' => 100])]" :value="$perPage" />
             <x-button size="sm">{{ __('Show') }}</x-button>
             @if (request()->hasAny(['from', 'to', 'channel']))

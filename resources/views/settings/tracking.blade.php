@@ -1,7 +1,7 @@
 @php
     $stages = ['order_created' => __('Order created'), 'record_verified' => __('Record verified'), 'confirmed' => __('Confirmed'), 'delivered' => __('Delivered')];
     $bases = ['order_total' => __('Order total'), 'product_subtotal' => __('Products after discount'), 'delivered_amount' => __('Amount collected')];
-    $channels = ['web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone'), 'b2b' => 'B2B'];
+    $channels = ['web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone'), 'b2b' => 'B2B', 'other' => __('Other')];
 @endphp
 
 <x-layouts.app :heading="__('Ad tracking')">

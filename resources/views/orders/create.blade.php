@@ -12,7 +12,7 @@
 
     <form method="POST" action="{{ route('orders.store') }}" x-ref="form"
         x-data="{
-            channel: @js(old('channel', $chatChannel?->orderChannel() ?? 'messenger')),
+            channel: @js(old('channel', $chatChannel?->orderChannel() ?? (in_array(request('channel'), ['messenger', 'whatsapp', 'phone', 'b2b'], true) ? request('channel') : 'messenger'))),
             chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
             phone: @js(old('phone', '')), name: @js(old('name', '')),
             customer: null, looking: false,

@@ -85,6 +85,9 @@ class ChatModeTest extends TestCase
 
         // An order from that chat: the shortcut opens the form on that channel; the order keeps it.
         // It opens in a popup (no sidebar); after Create the popup tells the page to go to Order management.
+        // Order management has + New order: first "where from?" (their channels, a customer call, somewhere else).
+        $this->get('/desk')->assertOk()->assertSee('New order')->assertSee('Where did it come from?')->assertSee('WhatsApp 2')->assertSee('Customer called');
+        $this->get('/orders/create?channel=phone&embed=1')->assertOk()->assertSee("channel: 'phone'", false);
         $this->get('/orders/create?chat_channel='.$wa->id.'&embed=1')->assertOk()->assertSee('From which chat')->assertSee('name="embed"', false)->assertDontSee('Communication channels');
         $this->post('/orders', [
             'channel' => 'whatsapp', 'chat_channel_id' => $wa->id, 'phone' => '01812345678', 'name' => 'Rahim', 'address_line' => 'House 9',

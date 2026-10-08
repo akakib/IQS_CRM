@@ -16,12 +16,25 @@ use Illuminate\Validation\ValidationException;
  */
 class ChatService
 {
-    /** Channels this person answers (admins and owners: all active ones). */
+    /** Channels this person answers (admins and owners: all active ones). Chats only, not the rider line. */
     public function channelsFor(User $user): Collection
     {
-        $q = ChatChannel::where('is_active', true)->where('type', '!=', ChatChannel::RIDER)->orderBy('sort_order')->orderBy('name');
+        return $this->allFor($user)->where('type', '!=', ChatChannel::RIDER)->values();
+    }
 
-        return $user->isOwner() ? $q->get() : $q->whereHas('users', fn ($u) => $u->whereKey($user->id))->get();
+    /**
+     * Every active channel of this person, the rider line too (owners: all). One query per request,
+     * shared by the Communication button, Order management and the order form.
+     */
+    public function allFor(User $user): Collection
+    {
+        $key = 'iqs.channels.'.$user->id;
+        if (! request()->attributes->has($key)) {
+            $q = ChatChannel::where('is_active', true)->orderBy('sort_order')->orderBy('name');
+            request()->attributes->set($key, $user->isOwner() ? $q->get() : $q->whereHas('users', fn ($u) => $u->whereKey($user->id))->get());
+        }
+
+        return request()->attributes->get($key);
     }
 
     public function openSession(int $userId): ?object

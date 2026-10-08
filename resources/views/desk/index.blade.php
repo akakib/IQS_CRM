@@ -86,6 +86,32 @@
         </div>
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
         <x-website-sync />
+        @can('orders.create')
+            {{-- New order: first "where from?", so every order counts for its number or page. --}}
+            @php $myChannels = app(\App\Services\Work\ChatService::class)->channelsFor(auth()->user()); @endphp
+            <div class="relative" x-data="{ pick: false, go(url) { this.pick = false; window.dispatchEvent(new CustomEvent('order-new', { detail: url })) } }" @click.outside="pick = false" @keydown.escape.window="pick = false">
+                <x-button type="button" variant="secondary" class="w-full sm:w-auto" data-key="o"
+                    @click="{{ $myChannels->isEmpty() ? 'go('.\Illuminate\Support\Js::from(route('orders.create', ['embed' => 1])).')' : 'pick = ! pick' }}">
+                    + {{ __('New order') }} <kbd class="rounded bg-gray-100 px-1.5 text-[11px] text-gray-500">⇧O</kbd>
+                </x-button>
+                @if ($myChannels->isNotEmpty())
+                    <div x-show="pick" x-cloak x-transition class="absolute right-0 z-40 mt-2 w-full min-w-[16rem] rounded-xl border border-gray-200 bg-white py-1 shadow-lg sm:w-72">
+                        <p class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ __('Where did it come from?') }}</p>
+                        @foreach ($myChannels as $c)
+                            <button type="button" @click="go(@js(route('orders.create', ['chat_channel' => $c->id, 'embed' => 1])))" class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-gray-50">
+                                <x-channel-icon :type="$c->type" class="!h-7 !w-7" /> <span class="min-w-0 truncate text-gray-800">{{ $c->name }}</span>
+                            </button>
+                        @endforeach
+                        <button type="button" @click="go(@js(route('orders.create', ['channel' => 'phone', 'embed' => 1])))" class="flex w-full items-center gap-3 border-t border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50">
+                            <x-channel-icon type="call" class="!h-7 !w-7" /> <span class="text-gray-800">{{ __('Customer called') }}</span>
+                        </button>
+                        <button type="button" @click="go(@js(route('orders.create', ['embed' => 1])))" class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-gray-50">
+                            <x-channel-icon type="other" class="!h-7 !w-7" /> <span class="text-gray-800">{{ __('Somewhere else') }}</span>
+                        </button>
+                    </div>
+                @endif
+            </div>
+        @endcan
         @if ($canTake)
             <form method="POST" action="{{ route('desk.next') }}" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
                 @csrf
@@ -99,7 +125,7 @@
     </div>
 
     {{-- Nothing to take and nothing in hand: answer chats and comments instead of waiting. Hides as soon as an order waits. --}}
-    @if ($canTake && ! $inHand && ! $embed && app(\App\Services\Work\ChatService::class)->channelsFor(auth()->user())->isNotEmpty()
+    @if ($canTake && ! $inHand && ! $embed && ($myChannels ?? app(\App\Services\Work\ChatService::class)->channelsFor(auth()->user()))->isNotEmpty()
         && ! app(\App\Services\Work\ChatService::class)->openSession(auth()->id()))
         <div x-data="{ n: {{ $waiting + $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting" x-show="n === 0" x-cloak
             class="mb-4 flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">

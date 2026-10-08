@@ -136,6 +136,7 @@ class OrderController extends Controller
 
         $order = $this->orders->create($data, $request->user());
         app(VerificationEngine::class)->run($order);
+        $this->confirmTakenOrder($order->refresh(), $request->user());
 
         $message = __('Order :no created.', ['no' => $order->order_no]);
         // Made from the New order popup (Communication): the page behind it goes to Order management.
@@ -437,6 +438,22 @@ class OrderController extends Controller
         $editor->decide($order, $amendment, $data['decision'] === 'approve', $request->user());
 
         return back()->with('success', $data['decision'] === 'approve' ? __('Change approved and applied.') : __('Change rejected.'));
+    }
+
+    /**
+     * An order taken in a chat or a call was confirmed in that talk: straight to Confirmed (then booking
+     * and packaging), no second call. The checks still ran first: an advance hold (bad courier record) stays.
+     */
+    private function confirmTakenOrder(Order $order, User $user): void
+    {
+        $key = OrderStatus::map()[$order->status_id]['key'];
+        if ($order->channel === 'web' || ! in_array($key, ['new', 'record_verified'], true)) {
+            return;
+        }
+        if ($key === 'new') {
+            $order = $this->machine->transition($order, 'record_verified', $user, 'user', null, __('Taken in a chat or call'));
+        }
+        $this->machine->transition($order, 'confirmed', $user, 'user', null, __('Confirmed in the chat or call it was taken in'));
     }
 
     private function authorizeWork(Order $order, User $user): void

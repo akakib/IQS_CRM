@@ -63,6 +63,9 @@ class OrderHttpTest extends TestCase
         $this->assertSame($this->agent->id, $order->moderator_id);
         $this->assertSame('whatsapp', $order->channel);
         $this->assertSame('130.00', $order->delivery_charge);
+        // Taken in a chat or call = confirmed in that talk: straight to Confirmed, booked, and on to packaging.
+        $this->assertSame('ready_for_packaging', \App\Models\OrderStatus::map()[$order->status_id]['key']);
+        $this->assertTrue(DB::table('order_notes')->where('order_id', $order->id)->where('body', 'like', '%Confirmed in the chat or call it was taken in%')->exists());
     }
 
     public function test_a_number_in_bangla_digits_or_with_880_becomes_one_shape_and_shows_its_steadfast_record(): void

@@ -97,6 +97,9 @@ Route::middleware('auth')->group(function () {
     // Orders
     Route::get('/orders/delivery-charge', [OrderController::class, 'deliveryCharge'])->middleware('can:orders.create')->name('orders.delivery-charge');
     Route::get('/orders', [OrderController::class, 'index'])->middleware('can:orders.view')->name('orders.index');
+    Route::get('/orders/export/count', [\App\Http\Controllers\OrderExportController::class, 'count'])->middleware('can:orders.export')->name('orders.export.count');
+    Route::get('/orders/export/excel', [\App\Http\Controllers\OrderExportController::class, 'excel'])->middleware('can:orders.export')->name('orders.export.excel');
+    Route::get('/orders/export/print', [\App\Http\Controllers\OrderExportController::class, 'print'])->middleware('can:orders.export')->name('orders.export.print');
     Route::post('/orders/sync-website', [OrderController::class, 'syncWebsite'])->middleware('can:orders.reassign')->name('orders.sync-website');
     // Order management desk (moderators). New orders are only ever given by Take next.
     Route::get('/desk', [DeskController::class, 'index'])->middleware('can:orders.edit')->name('desk.index');

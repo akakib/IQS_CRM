@@ -26,8 +26,10 @@
             }" @scan="handle($event.detail)">
             <div>
                 <x-scan-input quiet :placeholder="__('Scan each parcel')" />
+                {{-- COD not updated at the courier has its own amber: the parcel is right, only the cash amount is waiting. --}}
                 <div x-show="last" x-cloak class="mt-4 rounded-xl border-2 p-4"
-                    :class="{ 'border-green-600 bg-green-50': last?.level === 'ok', 'border-purple-600 bg-purple-50': last?.level === 'edited', 'border-orange-500 bg-orange-50': ['orange', 'warn'].includes(last?.level), 'border-red-600 bg-red-50': last?.level === 'red' }">
+                    :class="{ 'border-green-600 bg-green-50': last?.level === 'ok', 'border-purple-600 bg-purple-50': last?.level === 'edited', 'border-orange-500 bg-orange-50': ['orange', 'warn'].includes(last?.level), 'border-red-600 bg-red-50': last?.level === 'red', 'border-amber-500 bg-amber-100 text-amber-950': last?.level === 'cod' }">
+                    <p x-show="last?.level === 'cod'" class="mb-1 inline-block rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white">{{ __('COD not updated') }}</p>
                     <p class="text-lg font-bold" x-text="last?.message"></p>
                     <p class="font-mono text-sm" x-text="last?.order?.order_no"></p>
                 </div>

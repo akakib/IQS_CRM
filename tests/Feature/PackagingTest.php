@@ -154,7 +154,7 @@ class PackagingTest extends TestCase
         $this->post('/handover', ['rider_name' => 'Rafiq']);
         $session = DB::table('handover_sessions')->value('id');
         $this->postJson("/handover/{$session}/scan", ['code' => $this->label($order->fresh())])
-            ->assertJson(['ok' => false, 'result' => 'blocked'])->assertJsonFragment(['message' => 'COD changed to ৳1,800 but not updated at the courier yet. Keep the parcel; ask the moderator or admin to update it, then scan again.']);
+            ->assertJson(['ok' => false, 'result' => 'blocked', 'level' => 'cod'])->assertJsonFragment(['message' => 'COD changed to ৳1,800 but not updated at the courier yet. Keep the parcel; ask the moderator or admin to update it, then scan again.']);
 
         // The stop is in the order's history: when, where, why, who packed it. Scanned again: counted, not repeated; one notice.
         $this->postJson("/handover/{$session}/scan", ['code' => $this->label($order->fresh())]);

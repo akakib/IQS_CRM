@@ -73,7 +73,7 @@
     <template x-teleport="body">
         <div x-show="open" x-cloak @keydown.escape.window="open = false" class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
             <div class="absolute inset-0 bg-black/40" @click="open = false"></div>
-            <div class="relative flex max-h-[90vh] w-full max-w-md flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-xl">
+            <div class="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-xl">
                 <div class="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-3">
                     <div>
                         <h3 class="text-sm font-semibold text-gray-800">{{ __('Communication') }} <span class="font-normal text-gray-500" x-text="data ? '· ' + data.date : ''"></span></h3>

@@ -78,6 +78,9 @@ Route::middleware('auth')->group(function () {
 
     // Catalog. Static paths before the resource so they are not read as {product}.
     Route::get('/products/search', [ProductController::class, 'search'])->middleware('can:products.view')->name('products.search');
+    Route::get('/products/stock', [\App\Http\Controllers\StockController::class, 'index'])->middleware('can:products.view')->name('products.stock');
+    Route::get('/products/stock/{variant}/history', [\App\Http\Controllers\StockController::class, 'history'])->whereNumber('variant')->middleware('can:products.view')->name('products.stock.history');
+    Route::post('/products/stock/{variant}', [\App\Http\Controllers\StockController::class, 'count'])->whereNumber('variant')->middleware('can:products.availability')->name('products.stock.count');
     Route::get('/products/availability', [AvailabilityController::class, 'index'])->middleware('can:products.availability')->name('products.availability');
     Route::post('/products/availability', [AvailabilityController::class, 'update'])->middleware('can:products.availability')->name('products.availability.update');
     Route::middleware('can:products.create')->group(function () {

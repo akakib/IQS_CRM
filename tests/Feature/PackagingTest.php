@@ -358,4 +358,39 @@ class PackagingTest extends TestCase
         $this->postJson('/tg/app/report', ['batch' => $batch, 'variant_id' => $this->dates->id, 'init_data' => $initData])->assertOk();
         $this->assertDatabaseHas('stock_issue_reports', ['reported_by' => $this->packer->id]);
     }
+
+    public function test_counted_stock_goes_down_when_packed_back_up_when_the_box_is_put_back_and_out_at_zero(): void
+    {
+        // Count Dates on the shelf: 3. Nuts are not counted, so they are not tracked.
+        $this->actingAs($this->desk)->get('/products/stock')->assertOk()->assertSee('Stock count')->assertSee('Not counted');
+        $this->postJson('/products/stock/'.$this->dates->id, ['qty' => 3])->assertOk()->assertJson(['qty' => 3]);
+        $this->actingAs($this->packer)->postJson('/products/stock/'.$this->dates->id, ['qty' => 9])->assertForbidden(); // counting is for stock managers
+
+        $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        $b = $this->booked('01822222222', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $this->assertSame(3, $this->dates->fresh()->stock_qty); // confirmed is not off the shelf yet
+
+        $this->actingAs($this->packer);
+        $this->packIt($a);
+        $this->assertSame(1, $this->dates->fresh()->stock_qty);
+        $this->assertNull($this->nuts->fresh()->stock_qty);
+
+        // The last one packed: none left, so it goes Out of stock by itself.
+        $this->packIt($b);
+        $this->assertSame(0, $this->dates->fresh()->stock_qty);
+        $this->assertSame('out_of_stock', $this->dates->fresh()->availability_status);
+
+        // The box is opened and the item put back: on the shelf again, and back In stock (the count had put it out).
+        DB::table('orders')->where('id', $b->id)->update(['unpack_needed_at' => now()]);
+        app(\App\Services\Orders\DeskService::class)->markUnpacked($b->fresh(), $this->packer);
+        $this->assertSame(1, $this->dates->fresh()->stock_qty);
+        $this->assertSame('in_stock', $this->dates->fresh()->availability_status);
+        app(\App\Services\Orders\DeskService::class)->markUnpacked($b->fresh(), $this->packer); // twice changes nothing
+        $this->assertSame(1, $this->dates->fresh()->stock_qty);
+
+        // Every change is listed with why and which order.
+        $this->actingAs($this->desk)->getJson('/products/stock/'.$this->dates->id.'/history')->assertOk()
+            ->assertJsonPath('rows.0.why', 'Box put back')->assertJsonPath('rows.0.order', $b->order_no)
+            ->assertJsonPath('rows.3.why', 'Counted')->assertJsonPath('rows.3.after', 3);
+    }
 }

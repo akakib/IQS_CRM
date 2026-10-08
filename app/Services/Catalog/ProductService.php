@@ -118,11 +118,11 @@ class ProductService
      * @param  list<int>  $variantIds
      * @return int how many changed
      */
-    public function setAvailability(array $variantIds, string $status, ?int $userId, ?string $expectedDate = null, ?string $note = null): int
+    public function setAvailability(array $variantIds, string $status, ?int $userId, ?string $expectedDate = null, ?string $note = null, string $source = 'manual'): int
     {
         $changed = 0;
 
-        DB::transaction(function () use ($variantIds, $status, $userId, $expectedDate, $note, &$changed) {
+        DB::transaction(function () use ($variantIds, $status, $userId, $expectedDate, $note, $source, &$changed) {
             $variants = ProductVariant::whereIn('id', $variantIds)->lockForUpdate()->get();
 
             foreach ($variants as $variant) {
@@ -134,7 +134,7 @@ class ProductService
 
                 $variant->update([
                     'availability_status' => $status,
-                    'availability_source' => 'manual',
+                    'availability_source' => $source, // 'stock': the shelf count put it there
                     'oos_marked_by' => $marking ? $userId : null,
                     'oos_marked_at' => $marking ? now() : null,
                     'expected_restock_date' => $marking ? $expectedDate : null,
@@ -146,7 +146,7 @@ class ProductService
                 if ($from !== $status) {
                     DB::table('availability_events')->insert([
                         'variant_id' => $variant->id, 'from_status' => $from, 'to_status' => $status,
-                        'source' => 'manual', 'user_id' => $userId, 'note' => $note, 'created_at' => now(),
+                        'source' => $source, 'user_id' => $userId, 'note' => $note, 'created_at' => now(),
                     ]);
                     $this->sync->queue($variant->id, ['stock_status']);
                     app(\App\Services\Orders\AvailabilityEffects::class)->changed($variant->id, $from, $status);

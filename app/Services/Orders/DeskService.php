@@ -801,6 +801,7 @@ class DeskService
         $done = DB::table('orders')->where('id', $order->id)->whereNotNull('unpack_needed_at')->update(['unpack_needed_at' => null, 'unpack_packer_id' => null]);
         if ($done) {
             $this->systemNote($order->id, __('Box opened and items put back on the shelf by :n.', ['n' => $by->name]), $by->id);
+            app(\App\Services\Catalog\StockService::class)->settleOrder($order, [], 'unpacked', $by); // back on the shelf
         }
     }
 

@@ -113,11 +113,15 @@ class ScanService
         if ($key === 'ready_for_packaging') {
             $this->machine->transition($order, 'packed', $by, 'scan');
             $order->refresh()->forceFill(['packed_version' => $order->current_version])->save();
+            $stock = app(\App\Services\Catalog\StockService::class);
+            $stock->settleOrder($order, $stock->itemsOf($order), 'unpacked', $by); // off the shelf
 
             return __(':no packed.', ['no' => $order->order_no]);
         }
         if (in_array($key, ['packed', 'ready_for_pickup'], true) && $order->packMark() === 'repack' && (int) $order->label_version === (int) $order->current_version) {
             $order->forceFill(['packed_version' => $order->current_version, 'packed_at' => now()])->save();
+            $stock = app(\App\Services\Catalog\StockService::class);
+            $stock->settleOrder($order, $stock->itemsOf($order), 'unpacked', $by); // only what the edit changed
             $this->orders->note($order, 'system', __('Repacked and new label scanned by :n.', ['n' => $by->name]), $by);
 
             return __(':no repacked.', ['no' => $order->order_no]);

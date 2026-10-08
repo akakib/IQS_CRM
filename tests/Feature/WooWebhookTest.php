@@ -196,6 +196,50 @@ class WooWebhookTest extends TestCase
         $this->assertSame('cancelled', OrderStatus::map()[Order::firstWhere('external_ref', '7002')->status_id]['key']);
     }
 
+    public function test_managers_sync_website_orders_by_hand_and_nothing_comes_in_twice(): void
+    {
+        WebsiteAccount::create(['name' => 'Shop', 'url' => 'https://shop.test', 'consumer_key' => 'ck', 'consumer_secret' => 'cs']);
+        $manager = \App\Models\User::factory()->create();
+        $manager->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'orders.reassign'], [], 'Manager')->id);
+        $staff = \App\Models\User::factory()->create();
+        $staff->roles()->attach($this->role(['orders.view' => 'own', 'orders.edit', 'orders.take'], [], 'Moderator')->id);
+        app(\App\Services\PermissionService::class)->bump();
+
+        // 51 orders changed: two pages of the website API, all read.
+        $page1 = array_map(fn ($i) => $this->payload(['id' => 8000 + $i, 'number' => (string) (8000 + $i), 'billing' => ['phone' => '01712'.str_pad((string) $i, 6, '0', STR_PAD_LEFT)]]), range(1, 50));
+        $page2 = [$this->payload(['id' => 8051, 'number' => '8051', 'billing' => ['phone' => '01712000051']])];
+        $this->send($page1[0])->assertOk(); // one came by webhook already
+        Http::fake(fn ($r) => Http::response(str_contains($r->url(), 'page=2') ? $page2 : $page1));
+
+        // Staff do not see the button and cannot press it.
+        $this->actingAs($staff)->get('/orders')->assertDontSee('Sync website orders');
+        $this->post('/orders/sync-website')->assertForbidden();
+
+        $this->actingAs($manager)->get('/orders')->assertSee('Sync website orders');
+        $this->get('/desk')->assertSee('Sync website orders');
+        $this->from('/orders')->post('/orders/sync-website')->assertRedirect('/orders')->assertSessionHas('success', '50 new orders brought in.');
+        $this->assertSame(51, Order::where('channel', 'web')->count());
+        $this->assertSame(1, Order::where('external_ref', '8001')->count());
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'page=2'));
+
+        // A second press right away does nothing; half a minute later nothing is missing and nothing doubles.
+        $this->post('/orders/sync-website')->assertSessionHas('error');
+        $this->travel(31)->seconds();
+        $this->post('/orders/sync-website')->assertSessionHas('success', 'Nothing missing: 51 website orders of the last 24 hours checked.');
+        $this->assertSame(51, Order::where('channel', 'web')->count());
+
+        // Another sync still running (the 10-minute one): this one waits instead of doubling.
+        $lock = \Illuminate\Support\Facades\Cache::lock('woo:sweep:running', 120);
+        $lock->get();
+        $this->travel(31)->seconds();
+        $this->post('/orders/sync-website')->assertSessionHas('success', 'A sync is already running. New orders appear in a moment.');
+        $lock->release();
+
+        // The last guard: the database refuses a second order with the same website id.
+        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+        DB::table('orders')->insert(collect((array) DB::table('orders')->where('external_ref', '8001')->first())->except(['id', 'order_no'])->all());
+    }
+
     public function test_website_payment_comes_in_with_the_order(): void
     {
         (new \Database\Seeders\ConfirmationSeeder)->run();

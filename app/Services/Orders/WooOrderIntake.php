@@ -57,6 +57,18 @@ class WooOrderIntake
                 app(VerificationEngine::class)->run($order);
 
                 return $order;
+            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+                // Made a moment ago by another path (the per-order lock was lost): the database kept one; update that one.
+                $existing = Order::where('channel', 'web')->where('external_ref', (string) $p['id'])->first();
+                if (! $existing) {
+                    $this->failed($inboxId, $p, $e);
+
+                    return null;
+                }
+                $this->update($existing, $p);
+                $this->finish($inboxId, 'processed', null, $existing->id);
+
+                return $existing;
             } catch (Throwable $e) {
                 $this->failed($inboxId, $p, $e);
 

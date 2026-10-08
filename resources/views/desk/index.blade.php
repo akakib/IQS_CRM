@@ -84,6 +84,8 @@
                 </p>
             </div>
         </div>
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <x-website-sync />
         @if ($canTake)
             <form method="POST" action="{{ route('desk.next') }}" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
                 @csrf
@@ -93,6 +95,7 @@
                 </x-button>
             </form>
         @endif
+        </div>
     </div>
 
     <div @class(['hidden lg:block' => $showDetailOnPhone])>

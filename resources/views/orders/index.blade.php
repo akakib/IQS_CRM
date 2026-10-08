@@ -11,10 +11,12 @@
             'mine' => [__('Mine'), $tabUrl('mine'), $counts['mine']],
             'all' => [__('All'), $tabUrl('all')],
         ]" :active="$tab" />
+        <x-website-sync class="hidden sm:block" />
         @can('orders.create')
             <x-button :href="route('orders.create')" class="shrink-0">+ {{ __('Quick order') }}</x-button>
         @endcan
     </div>
+    <x-website-sync class="mb-3 sm:hidden" />
 
     <x-list.filter-bar :list="$list" :action="route('orders.index')" :placeholder="__('Order no, phone, name or CN')">
         <input type="hidden" name="tab" value="{{ $tab }}">

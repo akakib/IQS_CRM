@@ -426,4 +426,27 @@ class OrderController extends Controller
     {
         return response()->json(['charge' => $charges->for($request->integer('zone_id') ?: null, $request->integer('weight_g'), (float) $request->query('total', 0))]);
     }
+
+    /**
+     * Admins and managers: bring website orders now instead of waiting for the
+     * webhook or the 10-minute sweep. The last 24 hours, through the same
+     * intake, so nothing comes in twice and nothing here is touched without news.
+     */
+    public function syncWebsite(Request $request, \App\Services\Orders\WooOrderSweep $sweep): RedirectResponse
+    {
+        if (! \Illuminate\Support\Facades\Cache::add('woo:sync:manual', 1, 30)) {
+            return back()->with('error', __('Synced a moment ago. Try again in half a minute.'));
+        }
+        $r = $sweep->sync(24);
+        app(\App\Services\ActivityLogger::class)->log('orders.website_sync', null, null, ['new' => $r['new'], 'updated' => $r['updated'], 'checked' => $r['checked']]);
+
+        return match (true) {
+            $r['error'] !== null => back()->with('error', $r['error']),
+            $r['busy'] => back()->with('success', __('A sync is already running. New orders appear in a moment.')),
+            $r['new'] + $r['updated'] === 0 => back()->with('success', __('Nothing missing: :n website orders of the last 24 hours checked.', ['n' => $r['checked']])),
+            default => back()->with('success', trim(
+                trans_choice('{0}|{1} 1 new order brought in.|[2,*] :count new orders brought in.', $r['new']).' '.
+                trans_choice('{0}|{1} 1 order updated.|[2,*] :count orders updated.', $r['updated']))),
+        };
+    }
 }

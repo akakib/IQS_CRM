@@ -97,6 +97,7 @@ Route::middleware('auth')->group(function () {
     // Orders
     Route::get('/orders/delivery-charge', [OrderController::class, 'deliveryCharge'])->middleware('can:orders.create')->name('orders.delivery-charge');
     Route::get('/orders', [OrderController::class, 'index'])->middleware('can:orders.view')->name('orders.index');
+    Route::post('/orders/sync-website', [OrderController::class, 'syncWebsite'])->middleware('can:orders.reassign')->name('orders.sync-website');
     // Order management desk (moderators). New orders are only ever given by Take next.
     Route::get('/desk', [DeskController::class, 'index'])->middleware('can:orders.edit')->name('desk.index');
     Route::post('/desk/next', [DeskController::class, 'takeNext'])->middleware('can:orders.take')->name('desk.next');

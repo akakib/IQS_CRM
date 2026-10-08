@@ -5,18 +5,18 @@
 @endphp
 
 <x-layouts.app :heading="__('Orders')">
-    <div class="mb-3 flex items-center justify-between gap-3">
-        <x-tabs class="mb-0 flex-1" :tabs="[
-            'take' => [__('To take'), $tabUrl('take'), $counts['take']],
-            'mine' => [__('Mine'), $tabUrl('mine'), $counts['mine']],
-            'all' => [__('All'), $tabUrl('all')],
-        ]" :active="$tab" />
-        <x-website-sync class="hidden sm:block" />
+    {{-- Actions sit above the tab line, never on it. --}}
+    <div class="mb-2 flex flex-wrap items-center justify-end gap-2">
+        <x-website-sync size="sm" />
         @can('orders.create')
-            <x-button :href="route('orders.create')" class="shrink-0">+ {{ __('Quick order') }}</x-button>
+            <x-button size="sm" :href="route('orders.create')" class="shrink-0">+ {{ __('Quick order') }}</x-button>
         @endcan
     </div>
-    <x-website-sync class="mb-3 sm:hidden" />
+    <x-tabs class="mb-3" :tabs="[
+        'take' => [__('To take'), $tabUrl('take'), $counts['take']],
+        'mine' => [__('Mine'), $tabUrl('mine'), $counts['mine']],
+        'all' => [__('All'), $tabUrl('all')],
+    ]" :active="$tab" />
 
     <x-list.filter-bar :list="$list" :action="route('orders.index')" :placeholder="__('Order no, phone, name or CN')">
         <input type="hidden" name="tab" value="{{ $tab }}">

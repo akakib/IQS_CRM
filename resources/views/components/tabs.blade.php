@@ -2,7 +2,7 @@
      <x-tabs :tabs="['all' => ['All', url], 'hold' => ['Hold', url, 12]]" active="hold" /> --}}
 @props(['tabs', 'active'])
 
-<nav {{ $attributes->merge(['class' => 'mb-4 flex gap-5 overflow-x-auto border-b border-gray-200']) }}>
+<nav {{ $attributes->merge(['class' => 'mb-4 flex gap-5 overflow-x-auto overflow-y-hidden border-b border-gray-200']) }}>
     @foreach ($tabs as $key => $tab)
         @php([$label, $url, $count] = array_pad($tab, 3, null))
         <a href="{{ $url }}" @class([

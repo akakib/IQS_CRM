@@ -5,7 +5,7 @@
     $why = fn ($row) => $row['reasons']->take(3)->map(fn ($n, $id) => __($reasons[$id] ?? 'Other').' '.$n)->join(' · ') ?: '-';
 @endphp
 
-<x-layouts.app :heading="__('Chats')">
+<x-layouts.app :heading="__('Communication')">
     <div class="mb-4 flex flex-wrap items-center gap-2">
         @foreach ($presets as $label => [$f, $t])
             <a href="{{ $url($f, $t) }}" @class(['rounded-full border px-3 py-1.5 text-sm', 'border-primary bg-primary text-white' => $from->isSameDay($f) && $to->isSameDay($t), 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' => ! ($from->isSameDay($f) && $to->isSameDay($t))])>{{ $label }}</a>
@@ -16,7 +16,7 @@
             <x-date-input name="to" :value="$to->toDateString()" :max="today()->toDateString()" :clearable="false" @date-change="$nextTick(() => $refs.range.requestSubmit())" />
         </form>
     </div>
-    <p class="mb-4 text-xs text-gray-500">{{ __('From what staff count in Chat: messages answered, orders made from a chat, and chats that ended with no order (with the reason they picked). Turned into an order = orders out of all chats that ended (order or no order).') }}</p>
+    <p class="mb-4 text-xs text-gray-500">{{ __('From what staff count in Communication (Chats tab): messages answered, orders made from a chat, and chats that ended with no order (with the reason they picked). Turned into an order = orders out of all chats that ended (order or no order).') }}</p>
 
     <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <x-stat-tile :label="__('Messages answered')" :value="number_format($total['messages'])" />

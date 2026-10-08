@@ -33,7 +33,7 @@ return [
     'analysis' => ['Analysis', [
         ['KPI', 'kpi.index', 'kpi.*', null, 'chart'],
         ['Scorecard', 'scorecard.index', 'scorecard.*', 'orders.reassign', 'star'],
-        ['Chats', 'chat-report.index', 'chat-report.*', 'orders.reassign', 'chart'],
+        ['Communication', 'chat-report.index', 'chat-report.*', 'orders.reassign', 'chart'],
         ['Riders', 'riders-report.index', 'riders-report.*', 'orders.reassign', 'truck'],
         ['Packers', 'packers-report.index', 'packers-report.*', 'packaging.manage', 'box'],
         ['Team Activity', 'work-time.index', 'work-time.*', 'orders.reassign', 'clock'],

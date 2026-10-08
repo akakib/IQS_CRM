@@ -45,7 +45,7 @@ class DeskTest extends TestCase
         Artisan::call('notifications:sync');
         OrderStatus::forget();
         // A batch of one: each Take next gives exactly the oldest order. The countdown is off by default; most tests here cover it switched on.
-        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1, 'desk.timer_enabled' => true]);
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 1, 'desk.timer_enabled' => true, 'desk.assign_on_arrival' => false]);
 
         $role = $this->role(['orders.view' => 'own', 'orders.create', 'orders.edit', 'orders.take'], [], 'Moderator');
         $this->mahim = User::factory()->create(['name' => 'Mahim']);
@@ -333,6 +333,47 @@ class DeskTest extends TestCase
         $this->act($a, 'no_response');
 
         $this->assertSame('2026-10-06 09:00:00', $a->fresh()->next_call_at->toDateTimeString());
+    }
+
+    public function test_on_arrival_an_order_goes_to_whoever_was_free_longest_with_chat_and_shift_rules(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['desk.assign_on_arrival' => true, 'desk.assign_to_chat' => false, 'desk.chat_fallback_minutes' => 5]);
+        DB::table('users')->whereIn('id', [$this->mahim->id, $this->rima->id])->update(['last_seen_at' => now()]);
+        // Mahim had an order a while ago; Rima none today: Rima has been free longer.
+        DB::table('order_assignments')->insert(['order_id' => $this->web()->id, 'user_id' => $this->mahim->id, 'role' => 'moderator', 'how' => 'claimed', 'started_at' => now()->subHour(), 'ended_at' => now()->subMinutes(50), 'ended_reason' => 'finished']);
+        DB::table('orders')->update(['status_id' => OrderStatus::idFor('cancelled')]);
+
+        $a = $this->web();
+        $this->desk()->autoAssign();
+        $this->assertSame($this->rima->id, $a->fresh()->moderator_id); // right away, no 15 minutes
+        $b = $this->web();
+        $this->desk()->autoAssign();
+        $this->assertSame($this->mahim->id, $b->fresh()->moderator_id); // Rima's hands are full
+
+        // Both busy, Rima in Chat mode after finishing hers: chat people do not get orders (setting)...
+        DB::table('orders')->whereIn('id', [$a->id, $b->id])->update(['status_id' => OrderStatus::idFor('confirmed')]);
+        DB::table('chat_sessions')->insert(['user_id' => $this->rima->id, 'started_at' => now()]);
+        DB::table('orders')->where('id', $b->id)->update(['status_id' => OrderStatus::idFor('new')]); // Mahim still holds b
+        $c = $this->web();
+        $this->desk()->autoAssign();
+        $this->assertNull($c->fresh()->moderator_id);
+        // ...until the order has waited the fallback minutes with nobody else free.
+        $this->travel(6)->minutes();
+        DB::table('users')->whereIn('id', [$this->mahim->id, $this->rima->id])->update(['last_seen_at' => now()]);
+        $this->desk()->autoAssign();
+        $this->assertSame($this->rima->id, $c->fresh()->moderator_id);
+
+        // Shifts (9:00 to 22:00): nobody new in the last 10 minutes or after; switched off, anyone online gets them (overtime).
+        DB::table('orders')->update(['status_id' => OrderStatus::idFor('confirmed')]);
+        DB::table('chat_sessions')->update(['ended_at' => now()]);
+        $this->travelTo(Carbon::parse('2026-10-05 21:55:00'));
+        DB::table('users')->whereIn('id', [$this->mahim->id, $this->rima->id])->update(['last_seen_at' => now()]);
+        $d = $this->web();
+        $this->desk()->autoAssign();
+        $this->assertNull($d->fresh()->moderator_id);
+        app(\App\Services\SettingsService::class)->set(['desk.respect_shifts' => false]);
+        $this->desk()->autoAssign();
+        $this->assertNotNull($d->fresh()->moderator_id);
     }
 
     public function test_orders_nobody_took_are_given_to_the_least_busy_active_moderator(): void

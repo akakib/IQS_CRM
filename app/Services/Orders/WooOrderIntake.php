@@ -55,6 +55,10 @@ class WooOrderIntake
                 $order = DB::transaction(fn () => $this->create($p));
                 $this->finish($inboxId, 'processed', null, $order->id);
                 app(VerificationEngine::class)->run($order);
+                // Given to a free person right away (Settings), after the website has its answer.
+                if (settings('desk.assign_on_arrival')) {
+                    app()->terminating(fn () => app(DeskService::class)->autoAssign());
+                }
 
                 return $order;
             } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {

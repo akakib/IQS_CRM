@@ -434,31 +434,40 @@ class DeskService
      */
     public function autoAssign(): int
     {
+        // As soon as they come in (Settings), or once nobody took them for the auto-assign minutes.
+        $onArrival = (bool) settings('desk.assign_on_arrival');
         $due = $this->waitingQuery()->where('channel', 'web')
-            ->where('queue_since', '<=', now()->subMinutes((int) settings('desk.auto_assign_minutes')))
-            ->orderBy('id')->limit(50)->pluck('order_no', 'id');
+            ->where('queue_since', '<=', now()->subMinutes($onArrival ? 0 : (int) settings('desk.auto_assign_minutes')))
+            ->orderBy('id')->limit(50)->get(['id', 'order_no', 'queue_since']);
 
-        // A batch at a time: only people with empty hands, each up to their own batch size.
+        // A batch at a time: only people with empty hands, each up to their own batch size,
+        // the one free the longest first (fair: nobody gets every order, nobody waits for none).
         $load = [];
         $limitOf = [];
-        foreach ($this->activeModerators() as $userId) {
+        $active = $this->activeModerators();
+        $chatting = DB::table('chat_sessions')->whereIn('user_id', $active)->whereNull('ended_at')->pluck('user_id')->map(fn ($id) => (int) $id)->all();
+        $lastGiven = DB::table('order_assignments')->whereIn('user_id', $active)->groupBy('user_id')->selectRaw('user_id, MAX(started_at) as last')->pluck('last', 'user_id');
+        usort($active, fn ($a, $b) => strcmp((string) ($lastGiven[$a] ?? ''), (string) ($lastGiven[$b] ?? '')));
+        foreach ($active as $userId) {
             $limitOf[$userId] = $this->rules->limit($userId);
             if ($limitOf[$userId] > 0 && $this->inHand($userId) === 0) { // an uncalled advance hold fills a hand too
                 $load[$userId] = 0;
             }
         }
+        // People in Chat mode: only if the admin allows it, or once an order has waited the fallback minutes with nobody else free.
+        $toChat = (bool) settings('desk.assign_to_chat');
+        $fallback = now()->subMinutes((int) settings('desk.chat_fallback_minutes'));
 
         $assigned = 0;
-        foreach ($due as $orderId => $orderNo) {
-            if ($load === []) {
-                break;
+        foreach ($due as $o) {
+            $userId = collect(array_keys($load))->first(fn ($id) => $toChat || ! in_array($id, $chatting, true) || \Illuminate\Support\Carbon::parse($o->queue_since)->lte($fallback));
+            if ($userId === null) {
+                continue;
             }
-            asort($load);
-            $userId = array_key_first($load);
-            if ($this->assign($orderId, $userId, 'auto')) {
+            if ($this->assign($o->id, $userId, 'auto')) {
                 $assigned++;
-                $this->notifications->send('order_assigned', __('Order :no was given to you', ['no' => $orderNo]), null, [
-                    'link' => route('desk.index', ['order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId],
+                $this->notifications->send('order_assigned', __('Order :no was given to you', ['no' => $o->order_no]), null, [
+                    'link' => route('desk.index', ['order' => $o->id]), 'subject' => ['order', $o->id], 'user_ids' => [$userId],
                 ]);
                 if (++$load[$userId] >= $limitOf[$userId]) {
                     unset($load[$userId]);
@@ -490,7 +499,9 @@ class DeskService
         }
 
         // Managers are told when orders wait and nobody is free, at most once every 30 minutes (this runs every minute).
-        $left = $due->count() - $assigned + $this->waitingAdvanceQuery()->where('queue_since', '<=', now()->subMinutes(60))->count();
+        // Counted from the auto-assign minutes, so an order given out on arrival a minute later does not alarm anyone.
+        $left = $this->waitingQuery()->where('channel', 'web')->where('queue_since', '<=', now()->subMinutes((int) settings('desk.auto_assign_minutes')))->count()
+            + $this->waitingAdvanceQuery()->where('queue_since', '<=', now()->subMinutes(60))->count();
         if ($left > 0 && Cache::add('desk:unassigned-alert', 1, now()->addMinutes(30))) {
             $this->notifications->send('orders_unassigned', trans_choice('{1} 1 order is waiting and nobody is free to take it|[2,*] :n orders are waiting and nobody is free to take them', $left, ['n' => $left]), null, [
                 'link' => route('orders.activity'), 'user_ids' => $this->managerIds(),
@@ -507,8 +518,13 @@ class DeskService
             ->where('last_seen_at', '>=', now()->subMinutes((int) settings('desk.active_window_minutes')))->get();
         $this->calendar->preload($users->pluck('id')->all());
 
-        return $users->filter(fn (User $u) => ! $u->isOwner() && $u->can('orders.take') && $this->calendar->isWorking($u->id))
-            ->pluck('id')->all();
+        // Shifts can be switched off (overtime): then anyone online and not on a break can get orders.
+        // With shifts on, nobody gets a new order in the last 10 minutes of theirs (it would wait while they leave).
+        $shifts = (bool) settings('desk.respect_shifts');
+
+        return $users->filter(fn (User $u) => ! $u->isOwner() && $u->can('orders.take')
+            && (! $shifts || ($this->calendar->isWorking($u->id) && $this->calendar->isWorking($u->id, now()->addMinutes(10)))))
+            ->pluck('id')->values()->all();
     }
 
     // ── Moderator actions ────────────────────────────────────

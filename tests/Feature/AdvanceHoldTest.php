@@ -52,6 +52,7 @@ class AdvanceHoldTest extends TestCase
         }
         Artisan::call('notifications:sync');
         OrderStatus::forget();
+        app(\App\Services\SettingsService::class)->set(['desk.assign_on_arrival' => false]); // these tests take orders by hand
         $this->mod = User::factory()->create(['name' => 'Mod']);
         $this->mod2 = User::factory()->create(['name' => 'Mod2']);
         $this->admin = User::factory()->create(['name' => 'Boss']);

@@ -59,8 +59,8 @@ class UserController extends Controller
         $this->saveChatChannels($request, $user);
         $this->saveSalary($request, $user);
 
-        return redirect()->route('users.index')
-            ->with('success', __('Staff ":name" added.', ['name' => $user->name]));
+        return ($request->user()->can('access.manage') ? redirect()->route('users.access', $user) : redirect()->route('users.edit', $user))
+            ->with('success', __('Staff ":name" added. Now give a role so they can work.', ['name' => $user->name]));
     }
 
     public function edit(User $user): View
@@ -87,7 +87,7 @@ class UserController extends Controller
             $this->logOutEverywhere($user);
         }
 
-        return redirect()->route('users.index')->with('success', $passwordReset
+        return redirect()->route('users.edit', $user)->with('success', $passwordReset
             ? __('Staff ":name" updated and password reset.', ['name' => $user->name])
             : __('Staff ":name" updated.', ['name' => $user->name]));
     }

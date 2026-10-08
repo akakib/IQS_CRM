@@ -61,9 +61,16 @@ class UserManagementTest extends TestCase
         $this->post('/users', [
             'name' => 'Mahim', 'email' => 'Mahim@Example.com', 'phone' => '01712345678',
             'employment_type' => 'onsite', 'password' => 'mahim-pass', 'password_confirmation' => 'mahim-pass',
-        ])->assertRedirect('/users');
+        ])->assertRedirect(); // to their Access page (owner) or their edit page: a role is the next step
 
         $this->assertDatabaseHas('users', ['email' => 'mahim@example.com', 'is_active' => true, 'employment_type' => 'onsite']);
+        $made = \App\Models\User::firstWhere('email', 'mahim@example.com');
+        $this->post('/users', [
+            'name' => 'Rafi', 'email' => 'rafi@example.com', 'phone' => '01712345679',
+            'employment_type' => 'onsite', 'password' => 'rafi-pass1', 'password_confirmation' => 'rafi-pass1',
+        ])->assertRedirectContains('/users/');
+        $this->put('/users/'.$made->id, ['name' => 'Mahim K', 'email' => 'mahim@example.com', 'employment_type' => 'onsite'])
+            ->assertRedirect(route('users.edit', $made)); // Save keeps you on the person
 
         auth()->logout();
         $this->post('/login', ['email' => 'mahim@example.com', 'password' => 'mahim-pass'])->assertRedirect('/dashboard');

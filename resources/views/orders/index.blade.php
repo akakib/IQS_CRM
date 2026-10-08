@@ -43,7 +43,8 @@
                 <th>{{ __('Placed') }}</th>
             </x-slot:head>
             @foreach ($orders as $o)
-                <tr class="cursor-pointer" onclick="location.href='{{ route('orders.show', $o) }}'">
+                @php $open = $o->moderator_id === auth()->id() ? route('desk.notice', $o) : route('orders.show', $o); @endphp
+                <tr class="cursor-pointer" onclick="location.href='{{ $open }}'">
                     <td><span class="font-mono font-medium text-gray-800">{{ $o->order_no }}</span> <span class="text-xs text-gray-400">{{ \App\Models\Order::channelLabel($o->channel) }}</span></td>
                     <td><p class="text-gray-800">{{ $o->ship_name }}</p><p class="font-mono text-xs text-gray-500">{{ Mask::value($o->ship_phone, 'customer_contact') }}</p></td>
                     <td><x-order-status :order="$o" :statuses="$statuses" /></td>
@@ -56,7 +57,7 @@
 
         <x-list.cards>
             @foreach ($orders as $o)
-                <a href="{{ route('orders.show', $o) }}" class="block">
+                <a href="{{ $o->moderator_id === auth()->id() ? route('desk.notice', $o) : route('orders.show', $o) }}" class="block">
                     <x-record-card :title="$o->order_no.' · '.$o->ship_name" :subtitle="Mask::value($o->ship_phone, 'customer_contact')">
                         <x-slot:badge><x-order-status :order="$o" :statuses="$statuses" /></x-slot:badge>
                         <x-slot:footer>{{ $o->created_at->format('d M, g:i A') }} · {{ $o->moderator?->name ?? __('Not taken') }}</x-slot:footer>

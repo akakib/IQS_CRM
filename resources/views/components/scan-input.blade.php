@@ -11,7 +11,7 @@
     x-data="scanInput({ once: {{ $once ? 'true' : 'false' }}, remember: {{ Illuminate\Support\Js::from($remember) }}, left: {{ Illuminate\Support\Js::from($left) }}, doneMessage: {{ Illuminate\Support\Js::from($doneMessage) }} })"
     @scan-result.window="result($event.detail)">
     <div class="flex items-stretch gap-2">
-        <input type="text" x-model="code" @keydown.enter.prevent="submit()" autofocus autocomplete="off" inputmode="none"
+        <input type="text" x-model="code" @keydown.enter.prevent="submit()" autofocus autocomplete="off" :inputmode="typing ? 'text' : 'none'"
             @blur="setTimeout(() => { if (!camera && document.activeElement === document.body) $el.focus() }, 150)" placeholder="{{ $placeholder }}"
             :class="state === 'ok' ? 'border-green-600 bg-green-50' : (state === 'bad' ? 'border-red-600 bg-red-50' : 'border-gray-300')"
             class="min-w-0 flex-1 rounded-xl border-2 px-4 py-4 text-center font-mono text-lg tracking-wider focus:outline-none">
@@ -20,6 +20,8 @@
             <span class="text-[10px] font-medium">{{ __('Camera') }}</span>
         </button>
     </div>
+    {{-- The keyboard stays hidden for scanners; this brings it up to type a code by hand. --}}
+    <button type="button" x-show="!typing" @click="typing = true; $nextTick(() => { const i = $root.querySelector('input'); i.blur(); i.focus() })" class="mt-1.5 text-xs font-medium text-primary hover:underline">{{ __('Type the code') }}</button>
     {{-- Camera mode, when the phone did not let the camera open by itself: one tap for the next label. --}}
     <div x-show="needsTap" x-cloak class="mt-3 flex gap-2">
         <button type="button" @click="startCamera()" class="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">{{ __('Scan next') }}</button>
@@ -52,7 +54,7 @@
                         <p class="mt-1 text-sm text-white/80" x-show="cameraError === 'denied'">{{ __('Allow the camera in the browser settings for this site, then try again.') }}</p>
                         <p class="text-base font-semibold" x-show="cameraError === 'unsupported'">{{ __('This browser cannot use the camera here.') }}</p>
                         <p class="text-base font-semibold" x-show="cameraError === 'unavailable'">{{ __('The camera could not be started.') }}</p>
-                        <p class="mt-3 text-sm text-white/80">{{ __('You can still type the code, or use the Manual tab.') }}</p>
+                        <p class="mt-3 text-sm text-white/80">{{ __('Close this and tap Type the code to enter it by hand.') }}</p>
                     </div>
                 </div>
             </div>

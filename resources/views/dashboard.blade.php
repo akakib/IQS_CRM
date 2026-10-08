@@ -5,7 +5,7 @@
         <div class="mb-4 rounded-xl border border-green-200 bg-primary-soft p-3 text-sm text-primary">
             {{ __('You are working on:') }}
             @foreach ($myWorking as $o)
-                <a href="{{ route('orders.show', $o->id) }}" class="ml-1 font-mono font-medium underline">{{ $o->order_no }}</a>
+                <a href="{{ route('desk.notice', $o->id) }}" class="ml-1 font-mono font-medium underline">{{ $o->order_no }}</a>
             @endforeach
         </div>
     @endif

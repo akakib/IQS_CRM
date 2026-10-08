@@ -1,4 +1,8 @@
 <x-layouts.app :heading="__('Edit staff')">
+    <div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
+        <a href="{{ route('users.index') }}" class="text-primary hover:underline">{{ __('All staff') }}</a>
+        @can('access.manage')<a href="{{ route('users.access', $user) }}" class="rounded-lg border border-gray-300 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-50">{{ __('Access and roles') }}</a>@endcan
+    </div>
     <form method="POST" action="{{ route('users.update', $user) }}" enctype="multipart/form-data">
         @method('PUT')
         @include('users._form')

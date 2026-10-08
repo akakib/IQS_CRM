@@ -33,7 +33,8 @@
     </div>
 @elseif ($part === 'button' && ! $user->current_break_id)
     <div x-data="{ open: false, reasons: null, reason: null,
-            async show() { this.open = true; if (!this.reasons) { this.reasons = await (await fetch(@js(route('breaks.reasons')), { headers: { Accept: 'application/json' } })).json() } } }">
+            failed: false,
+            async show() { this.open = true; this.failed = false; if (!this.reasons) { try { const r = await fetch(@js(route('breaks.reasons')), { headers: { Accept: 'application/json' } }); if (!r.ok) throw 0; this.reasons = await r.json() } catch (e) { this.failed = true } } } }">
         <button type="button" @click="show()" class="flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-100">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span class="hidden sm:inline">{{ __('Break') }}</span>
@@ -41,15 +42,16 @@
 
         {{-- Teleported to body: the sticky header would otherwise trap it under the sidebar. --}}
         <template x-teleport="body">
-        <div x-show="open" x-cloak @keydown.escape.window="open = false" class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
-            <div class="absolute inset-0 bg-black/40" @click="open = false"></div>
+        <div x-show="open" x-cloak class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
+            <div class="absolute inset-0 bg-black/40"></div>
             <form method="POST" action="{{ route('breaks.start') }}" class="relative w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-xl">
                 @csrf
                 <h3 class="text-sm font-semibold text-gray-800">{{ __('Take a break') }}</h3>
                 <p class="mt-1 text-xs text-gray-500">{{ __('Finish the orders you hold first. The screen stays locked until you press Start work.') }}</p>
                 <input type="hidden" name="reason_id" :value="reason">
                 <div class="mt-4 grid grid-cols-2 gap-2">
-                    <template x-if="!reasons"><p class="col-span-2 text-sm text-gray-400">{{ __('Loading…') }}</p></template>
+                    <template x-if="!reasons && !failed"><p class="col-span-2 text-sm text-gray-400">{{ __('Loading…') }}</p></template>
+                    <template x-if="failed"><button type="button" @click="show()" class="col-span-2 text-left text-sm text-red-600 hover:underline">{{ __('Could not load. Tap to try again.') }}</button></template>
                     <template x-for="r in reasons ?? []" :key="r.id">
                         <button type="button" @click="reason = r.id" x-text="r.label" class="rounded-lg border px-3 py-2.5 text-sm font-medium"
                             :class="reason === r.id ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'"></button>

@@ -36,7 +36,6 @@
         openReason(mode) { this.reasonMode = mode; this.reason = null },
         keys(e) {
             if (e.ctrlKey || e.metaKey || e.altKey || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
-            if (this.reasonMode && e.key === 'Escape') { this.reasonMode = null; return }
             // Every shortcut needs Shift, so a stray key press never acts on an order.
             // e.code, not e.key: Shift turns 1 into ! and the code stays Digit1.
             if (!e.shiftKey) return;
@@ -172,8 +171,10 @@
          reloads by itself (same tab, same page) and the server records the overrun; the order stays. --}}
     @if ($armed && $armedSeconds > 0)
         <div x-data="{
-                start: Date.now(), base: {{ $armedSeconds }}, now: Date.now(), leaving: false,
-                init() { setInterval(() => { this.now = Date.now(); if (this.left === 0 && !this.leaving) { this.leaving = true; setTimeout(() => window.location.reload(), 1200) } }, 1000) },
+                start: Date.now(), base: {{ $armedSeconds }}, now: Date.now(), leaving: false, waiting: false,
+                // Something typed or a reason popup open: do not throw it away; reload once it is saved or cleared.
+                busy() { return [...document.querySelectorAll('main input[type=text], main input:not([type]), main textarea')].some(f => f.offsetParent && f.value.trim()) || !!document.querySelector('[data-reason-popup]:not([style*=none])') },
+                init() { setInterval(() => { this.now = Date.now(); if (this.left === 0 && !this.leaving) { if (this.busy()) { this.waiting = true; return } this.leaving = true; setTimeout(() => window.location.reload(), 1200) } }, 1000) },
                 get left() { return Math.max(0, this.base - Math.floor((this.now - this.start) / 1000)) },
                 get clock() { return Math.floor(this.left / 60) + ':' + String(this.left % 60).padStart(2, '0') },
             }" class="sticky top-[68px] z-20">
@@ -191,7 +192,8 @@
                 :class="left <= 30 ? 'border-red-300 bg-red-600 text-white' : 'border-red-200 bg-red-50 text-red-800'">
                 <p class="min-w-0 flex-1">
                     <template x-if="left > 0"><span><b class="tabular-nums" x-text="clock"></b> {{ __('left on :no. Act now, or it goes back to New.', ['no' => $armed->order_no]) }}</span></template>
-                    <template x-if="left === 0"><span>{{ __('Time is up on :no. Taking it back…', ['no' => $armed->order_no]) }}</span></template>
+                    <template x-if="left === 0 && !waiting"><span>{{ __('Time is up on :no. Taking it back…', ['no' => $armed->order_no]) }}</span></template>
+                    <template x-if="left === 0 && waiting"><span>{{ __('Time is up on :no. Finish what you are typing; the page refreshes after.', ['no' => $armed->order_no]) }}</span></template>
                 </p>
                 <div class="flex shrink-0 items-center gap-2" x-show="left > 0">
                     @unless ($armedIsOpen)
@@ -511,9 +513,9 @@
 
                 {{-- Hold / Cancel: a reason is required. Number keys pick one. --}}
                 @foreach (['hold' => __('Put on hold: why?'), 'cancel' => __('Cancel the order: why?')] as $mode => $title)
-                    <div x-show="reasonMode === '{{ $mode }}'" x-cloak class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
-                        <div class="absolute inset-0 bg-black/40" @click="reasonMode = null"></div>
-                        <form method="POST" action="{{ route('desk.act', $order) }}" class="relative w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-xl">
+                    <div x-show="reasonMode === '{{ $mode }}'" x-cloak data-reason-popup class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
+                        <div class="absolute inset-0 bg-black/40"></div>
+                        <form method="POST" action="{{ route('desk.act', $order) }}" class="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-xl">
                             @csrf
                             <input type="hidden" name="action" value="{{ $mode }}">
                             <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">

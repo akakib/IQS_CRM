@@ -10,7 +10,7 @@
     <div class="divide-y divide-gray-100 rounded-xl border border-gray-200">
         @foreach ($rows as $o)
             @php $st = $statuses[$o->status_id] ?? null; @endphp
-            <a href="{{ route('orders.show', $o->id) }}" target="_blank" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 hover:bg-gray-50">
+            <a href="{{ route('orders.show', $o->id) }}" @click.prevent="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: @js(route('desk.index', ['embed' => 1, 'order' => $o->id])), title: @js($o->order_no) } }))" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 hover:bg-gray-50">
                 <span class="min-w-0">
                     <span class="block text-sm font-medium text-gray-900">{{ $o->ship_name }} <span class="font-normal text-gray-500">· {{ $o->ship_phone }}</span></span>
                     <span class="block text-xs text-gray-500">{{ $o->order_no }} · ৳{{ number_format((float) $o->grand_total) }}

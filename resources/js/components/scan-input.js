@@ -22,6 +22,7 @@ export default function scanInput({ once = false, remember = null, left = null, 
     };
 
     return {
+        typing: false, // the phone keyboard is shown only after Type the code
         cameraMode: false,
         needsTap: false,
 

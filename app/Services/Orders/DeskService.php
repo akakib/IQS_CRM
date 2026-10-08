@@ -65,6 +65,19 @@ class DeskService
             ->where('hold_reason_id', $this->advanceReasonId())->whereNull('advance_waived_at')->whereNotNull('advance_required');
     }
 
+    /**
+     * "Waiting to be taken", the one definition for every screen (Order management, Dashboard, Orders):
+     * nobody holds it and it is New, Record verified, No answer, or an advance hold still to be called.
+     */
+    public function whereWaiting($query)
+    {
+        $advance = $this->advanceReasonId();
+
+        return $query->whereNull('orders.moderator_id')->where(fn ($w) => $w->whereIn('orders.status_id', OrderStatus::idsFor(['new', 'record_verified', 'no_answer']))
+            ->orWhere(fn ($h) => $h->where('orders.status_id', OrderStatus::idFor('hold'))->where('orders.hold_reason_id', $advance)
+                ->whereNull('orders.advance_waived_at')->whereNotNull('orders.advance_required')));
+    }
+
     public function advanceReasonId(): ?int
     {
         // Asked many times per request (tabs, pulse, follow-ups); never changes. Kept for the request.

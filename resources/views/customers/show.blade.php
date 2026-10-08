@@ -72,7 +72,7 @@
     </div>
 
     @can('customers.edit')
-        <x-modal id="merge" :title="__('Merge a duplicate into :name', ['name' => $customer->name])">
+        <x-modal id="merge" :title="__('Merge a duplicate into :name', ['name' => $customer->name])" persistent>
             <form method="POST" action="{{ route('customers.merge', $customer) }}" id="merge-form">
                 @csrf
                 <p class="mb-3 text-sm text-gray-600">{{ __('Enter any phone number of the duplicate customer. Their numbers, addresses, history and orders move here; the duplicate is removed.') }}</p>
@@ -80,8 +80,9 @@
             </form>
             <x-slot:footer>
                 <x-button type="button" variant="secondary" @click="$dispatch('close-modal', 'merge')">{{ __('Cancel') }}</x-button>
-                <x-button type="submit" form="merge-form">{{ __('Merge') }}</x-button>
+                <x-button type="button" @click="document.getElementById('merge-form').reportValidity() && $dispatch('open-confirm', { id: 'merge-confirm', form: 'merge-form', label: document.querySelector('#merge-form [name=duplicate_phone]').value })">{{ __('Merge') }}</x-button>
             </x-slot:footer>
         </x-modal>
+        <x-confirm-modal id="merge-confirm" :verb="__('Merge')" :message="__('The other customer is removed for good; everything moves here.')" />
     @endcan
 </x-layouts.app>

@@ -23,7 +23,7 @@ class ReportController extends Controller
 
         if ($user->can('orders.view')) {
             $tiles[] = [__('Orders today'), DB::table('orders')->where('created_at', '>=', $today)->count(), route('orders.index'), null];
-            $tiles[] = [__('Waiting to be taken'), DB::table('orders')->whereNull('moderator_id')->where('status_id', OrderStatus::idFor('new'))->count(), route('desk.index'), null];
+            $tiles[] = [__('Waiting to be taken'), app(\App\Services\Orders\DeskService::class)->whereWaiting(DB::table('orders'))->count(), route('desk.index'), null];
             $tiles[] = [__('Confirmed today'), $todayCount('confirmed'), null, null];
             $tiles[] = [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null];
         }

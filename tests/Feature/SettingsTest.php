@@ -44,6 +44,11 @@ class SettingsTest extends TestCase
         $this->assertSame('01711111111', settings('store.hotline'));
         $this->assertSame(['12:30', '18:00'], settings('orders.pickup_cutoffs'));
         $this->assertDatabaseHas('activity_log', ['action' => 'settings.updated']);
+
+        // A box left unticked on the page sends nothing: it still turns the setting off.
+        $this->assertTrue((bool) settings('desk.respect_shifts'));
+        $this->put('/settings', array_diff_key($this->payload(), ['desk_respect_shifts' => 1]) + ['settings_page' => 1])->assertSessionHas('success');
+        $this->assertFalse((bool) settings('desk.respect_shifts'));
     }
 
     public function test_settings_cost_one_query_then_none(): void

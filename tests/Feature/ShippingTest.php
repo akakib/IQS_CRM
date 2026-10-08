@@ -68,7 +68,10 @@ class ShippingTest extends TestCase
 
         $this->get('/shipping')->assertOk()->assertSee($a->order_no)->assertSee('Test mode');
         $this->post('/shipping/book', ['ids' => [$a->id, $b->id]])
-            ->assertRedirect(route('shipping.labels', ['orders' => $a->order_no.','.$b->order_no]));
+            // Stays on Courier booking; the labels open in their own tab from the banner.
+            ->assertRedirect(route('shipping.index').'#booked')
+            ->assertSessionHas('print_labels', route('shipping.labels', ['orders' => $a->order_no.','.$b->order_no]));
+        $this->get('/shipping')->assertSee('Labels are ready to print.');
 
         foreach ([$a, $b] as $o) {
             $o->refresh();

@@ -40,7 +40,6 @@ class OrderController extends Controller
             'to' => 'date',
         ], 'desc');
         $tab = $list->filter('tab') ?? 'all';
-        $working = OrderStatus::idsFor(['new', 'record_verified']);
         $finals = array_keys(array_filter(OrderStatus::map(), fn ($s) => $s['final']));
         $q = trim($list->search);
         $digits = preg_replace('/\D/', '', $q);
@@ -50,7 +49,7 @@ class OrderController extends Controller
             ->select(['id', 'order_no', 'channel', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'grand_total', 'cod_amount',
                 'is_duplicate_flag', 'packed_version', 'current_version', 'edited_after_pack', 'created_at'])
             ->with('moderator:id,name')
-            ->when($tab === 'take', fn ($w) => $w->whereNull('moderator_id')->whereIn('status_id', $working))
+            ->when($tab === 'take', fn ($w) => app(\App\Services\Orders\DeskService::class)->whereWaiting($w))
             ->when($tab === 'mine', fn ($w) => $w->where('moderator_id', $user->id)->whereNotIn('status_id', $finals))
             ->when($list->filter('status'), fn ($w, $k) => $w->where('status_id', OrderStatus::idFor($k)))
             ->when($list->filter('channel'), fn ($w, $c) => $w->where('channel', $c))
@@ -72,7 +71,7 @@ class OrderController extends Controller
             ->withQueryString();
 
         $counts = [
-            'take' => Order::visibleTo($user)->whereNull('moderator_id')->whereIn('status_id', $working)->count(),
+            'take' => app(\App\Services\Orders\DeskService::class)->whereWaiting(Order::visibleTo($user))->count(),
             'mine' => Order::where('moderator_id', $user->id)->whereNotIn('status_id', $finals)->count(),
         ];
 

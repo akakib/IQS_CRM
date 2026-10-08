@@ -132,7 +132,7 @@
                             <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-primary">+ {{ __('Add payment') }}</summary>
                             <form method="POST" action="{{ route('orders.payments.store', $order) }}" class="grid gap-2 p-3 sm:grid-cols-2">
                                 @csrf
-                                <x-simple-select name="advance[method_id]" :options="$paymentMethods" :value="old('advance.method_id', array_key_first($paymentMethods))" full-width />
+                                <x-simple-select name="advance[method_id]" :options="$paymentMethods" :value="old('advance.method_id')" :placeholder="__('How did they pay?')" full-width />
                                 <input name="advance[amount]" type="number" step="0.01" min="1" required value="{{ old('advance.amount') }}" placeholder="{{ __('Amount (৳)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
                                 <input name="advance[transaction_id]" maxlength="100" value="{{ old('advance.transaction_id') }}" placeholder="{{ __('TrxID') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none">
                                 <input name="advance[sender_number]" maxlength="20" value="{{ old('advance.sender_number') }}" placeholder="{{ __('Sender number (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none">

@@ -50,9 +50,11 @@ class ShippingController extends Controller
         ];
 
         $message = trans_choice(':count order booked.|:count orders booked.', count($result['booked']), ['count' => count($result['booked'])]);
-        $redirect = $result['booked']
-            ? redirect()->route('shipping.labels', ['orders' => implode(',', $result['booked'])])
-            : back();
+        // Stay on Courier booking (the failures stay visible); the labels open in their own tab from the banner.
+        $redirect = redirect()->to(route('shipping.index').($result['booked'] ? '#booked' : ''));
+        if ($result['booked']) {
+            session()->flash('print_labels', route('shipping.labels', ['orders' => implode(',', $result['booked'])]));
+        }
 
         return $redirect->with($result['failed'] ? 'error' : 'success', $result['failed']
             ? $message.' '.__('Failed: :f', ['f' => collect($result['failed'])->map(fn ($e, $no) => "{$no} ({$e})")->join('; ')])
@@ -88,6 +90,7 @@ class ShippingController extends Controller
         abort_unless($order->active_shipment_id, 422, __('This order is not booked.'));
         $barcode = $booking->issueLabel($order, $order->active_shipment_id, $request->user(), __('Reprinted for version :v', ['v' => $order->current_version]));
 
-        return redirect()->route('shipping.labels', ['orders' => $order->order_no])->with('success', __('New label :b. The old one no longer scans.', ['b' => $barcode]));
+        return redirect()->to(route('shipping.index').'#booked')->with('print_labels', route('shipping.labels', ['orders' => $order->order_no]))
+            ->with('success', __('New label :b. The old one no longer scans.', ['b' => $barcode]));
     }
 }

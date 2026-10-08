@@ -10,7 +10,7 @@
     <div class="grid gap-3 lg:grid-cols-2">
         @foreach ($issues as $i)
             @php($due = \Illuminate\Support\Carbon::parse($i->sla_due_at))
-            <div @class(['rounded-xl border bg-white p-4', 'border-red-300' => $due->isPast(), 'border-gray-200' => ! $due->isPast()]) x-data="{ r: 'delivered' }">
+            <div @class(['rounded-xl border bg-white p-4', 'border-red-300' => $due->isPast(), 'border-gray-200' => ! $due->isPast()]) x-data="{ r: null }">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <a href="{{ route('orders.show', $i->order_id) }}" class="font-mono font-semibold hover:underline">{{ $i->order_no }}</a>
@@ -30,7 +30,8 @@
                         @endforeach
                     </div>
                     <input name="note" maxlength="500" placeholder="{{ __('What was agreed') }}" class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
-                    <x-button size="sm">{{ __('Close issue') }}</x-button>
+                    <p x-show="!r" class="text-xs text-gray-500">{{ __('Pick how it ended to close it.') }}</p>
+                    <x-button size="sm" x-bind:disabled="!r">{{ __('Close issue') }}</x-button>
                 </form>
             </div>
         @endforeach

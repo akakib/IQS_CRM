@@ -14,13 +14,13 @@
     @if ($tab === 'scan')
         <div class="grid gap-6 lg:grid-cols-2"
             x-data="{
-                last: null, count: {{ $handed->count() }}, total: {{ $total }},
+                last: null, count: {{ $handed->count() }}, total: {{ $total }}, missing: @js($missing->pluck('order_no')->values()),
                 async handle(code) {
                     try {
                         const r = await fetch(@js(route('handover.scan', $session->id)), { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: JSON.stringify({ code }) });
                         this.last = await r.json();
                     } catch (e) { this.last = { ok: false, level: 'red', message: @js(__('Connection problem. Scan again.')) }; }
-                    if (this.last.ok) { this.count++; }
+                    if (this.last.ok) { this.count++; this.missing = this.missing.filter(n => n !== this.last.order?.order_no); }
                     $dispatch('scan-result', { ok: this.last.ok, message: this.last.message, level: this.last.level });
                 },
             }" @scan="handle($event.detail)">
@@ -38,17 +38,18 @@
                     <div class="rounded-xl border border-green-200 bg-green-50 p-4"><p class="text-xs uppercase text-green-800">{{ __('Done') }}</p><p class="text-2xl font-semibold tabular-nums text-green-800" x-text="count"></p></div>
                     <div class="rounded-xl border p-4" :class="total - count > 0 ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'"><p class="text-xs uppercase text-gray-500">{{ __('Left') }}</p><p class="text-2xl font-semibold tabular-nums" x-text="Math.max(0, total - count)"></p></div>
                 </div>
-                <form method="POST" action="{{ route('handover.close', $session->id) }}" class="mt-4">@csrf<x-button class="w-full">{{ __('Finish handover') }}</x-button></form>
+                <form method="POST" action="{{ route('handover.close', $session->id) }}" id="handover-finish-scan" class="mt-4">@csrf
+                    <x-button type="button" class="w-full" @click="$dispatch('open-confirm', { id: 'handover-finish', form: 'handover-finish-scan', message: missing.length ? missing.length + ' ' + @js(__('parcels not scanned move to the next pickup.')) : @js(__('Every parcel was handed over.')) })">{{ __('Finish handover') }}</x-button>
+                </form>
                 <p class="mt-1 text-center text-xs text-gray-500">{{ __('Parcels not scanned move to the next pickup.') }}</p>
             </div>
 
             <x-card :title="__('Ready but not handed over yet')">
-                @forelse ($missing as $m)
-                    <div class="border-b border-gray-100 py-1.5 font-mono text-sm last:border-0">{{ $m->order_no }}</div>
-                @empty
-                    <p class="text-sm text-gray-400">{{ __('Everything ready has been handed over.') }}</p>
-                @endforelse
-                <p class="mt-2 text-xs text-gray-400">{{ __('Reload to refresh this list. Scanner not working? Use the Manual tab.') }}</p>
+                <template x-for="n in missing" :key="n">
+                    <div class="border-b border-gray-100 py-1.5 font-mono text-sm last:border-0" x-text="n"></div>
+                </template>
+                <p x-show="!missing.length" class="text-sm text-gray-400">{{ __('Everything ready has been handed over.') }}</p>
+                <p class="mt-2 text-xs text-gray-400">{{ __('A parcel leaves this list as soon as it is scanned. Scanner not working? Use the Manual tab.') }}</p>
             </x-card>
         </div>
     @else
@@ -120,8 +121,11 @@
                 <x-confirm-modal id="manual-handover-confirm" :verb="__('Hand over')" :danger="false" />
             @endif
 
-            <form method="POST" action="{{ route('handover.close', $session->id) }}" class="mt-4">@csrf<x-button variant="secondary" class="w-full">{{ __('Finish handover') }}</x-button></form>
+            <form method="POST" action="{{ route('handover.close', $session->id) }}" id="handover-finish-manual" class="mt-4">@csrf
+                <x-button type="button" variant="secondary" class="w-full" @click="$dispatch('open-confirm', { id: 'handover-finish', form: 'handover-finish-manual', message: @js(trans_choice('{0} Every parcel was handed over.|{1} 1 parcel not handed over moves to the next pickup.|[2,*] :count parcels not handed over move to the next pickup.', $missing->count())) })">{{ __('Finish handover') }}</x-button>
+            </form>
             <p class="mt-1 text-center text-xs text-gray-500">{{ __('Parcels not handed over move to the next pickup.') }}</p>
         </div>
     @endif
+    <x-confirm-modal id="handover-finish" :verb="__('Finish handover')" :danger="false" />
 </x-layouts.app>

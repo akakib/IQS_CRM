@@ -33,7 +33,15 @@ class SettingsController extends Controller
         $rules['orders_pickup_cutoffs.*'] = ['required', 'date_format:H:i'];
         $rules['appearance_font'][] = \Illuminate\Validation\Rule::in(array_keys(config('appearance.fonts')));
 
-        $request->merge(['verification_rerun_on_edit' => $request->boolean('verification_rerun_on_edit')]);
+        // An unticked box sends nothing: on the General page every on/off setting is read as on or off.
+        if ($request->has('settings_page')) {
+            foreach (config('settings') as $key => [$type]) {
+                if ($type === 'bool') {
+                    $field = str_replace('.', '_', $key);
+                    $request->merge([$field => $request->boolean($field)]);
+                }
+            }
+        }
         $data = $request->validate($rules, [
             'store_hotline.regex' => __('Hotline must be 11 digits like 01XXXXXXXXX.'),
         ]);

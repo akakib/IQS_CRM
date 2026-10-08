@@ -45,7 +45,7 @@
         <form x-show="panel === 'pay'" x-cloak method="POST" action="{{ route('orders.payments.store', $order) }}" class="mt-2 grid gap-2 sm:grid-cols-2">
             @csrf
             <input type="hidden" name="called" value="1">
-            <x-simple-select name="advance[method_id]" :options="$methods" :value="old('advance.method_id', array_key_first($methods))" full-width />
+            <x-simple-select name="advance[method_id]" :options="$methods" :value="old('advance.method_id')" :placeholder="__('How did they pay?')" full-width />
             <input name="advance[amount]" type="number" step="0.01" min="1" required value="{{ old('advance.amount', $remaining ?: $order->advance_required) }}" class="{{ $input }}">
             <input name="advance[transaction_id]" maxlength="100" required placeholder="{{ __('TrxID') }}" class="{{ $input }} font-mono">
             <input name="advance[sender_number]" maxlength="20" placeholder="{{ __('Sender number (optional)') }}" class="{{ $input }} font-mono">

@@ -46,10 +46,10 @@
                                 {{ $targetLabels[$rule->target] }}@if ($rule->role_name): <b>{{ $rule->role_name }}</b>@endif @if ($rule->user_name): <b>{{ $rule->user_name }}</b>@endif
                                 <span class="ml-2 text-xs text-gray-500">{{ collect(['In-app' => $rule->channel_in_app, 'Telegram' => $rule->channel_telegram, 'SMS' => $rule->channel_sms])->filter()->keys()->join(' · ') }}</span>
                             </span>
-                            <form method="POST" action="{{ route('settings.notifications.rules.destroy', $rule->id) }}">
+                            <form method="POST" action="{{ route('settings.notifications.rules.destroy', $rule->id) }}" id="notif-rule-{{ $rule->id }}">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="text-xs text-red-600 hover:underline">{{ __('Remove') }}</button>
+                                <button type="button" @click="$dispatch('open-confirm', { id: 'notif-rule-delete', form: 'notif-rule-{{ $rule->id }}', label: @js($targetLabels[$rule->target].($rule->role_name ? ': '.$rule->role_name : '').($rule->user_name ? ': '.$rule->user_name : '')) })" class="text-xs text-red-600 hover:underline">{{ __('Remove') }}</button>
                             </form>
                         </div>
                     @empty
@@ -77,4 +77,5 @@
             </div>
         @endforeach
     </div>
+    <x-confirm-modal id="notif-rule-delete" :verb="__('Remove')" :message="__('They stop getting this notice.')" />
 </x-layouts.app>

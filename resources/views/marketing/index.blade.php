@@ -111,7 +111,7 @@
             <x-card :title="__('Add a day by hand')" :subtitle="__('Overwrites that account and day.')">
                 <form method="POST" action="{{ route('marketing.spend.store') }}" class="space-y-2">
                     @csrf
-                    <x-simple-select name="ad_account_id" :options="$accountOptions" :value="array_key_first($accountOptions)" full-width class="w-full" />
+                    <x-simple-select name="ad_account_id" :options="$accountOptions" :value="old('ad_account_id')" :placeholder="__('Choose the ad account')" full-width class="w-full" />
                     <x-date-input name="spend_date" :value="today()->toDateString()" :max="today()->toDateString()" :clearable="false" full-width />
                     <input type="number" name="spend_usd" step="0.01" min="0" required placeholder="{{ __('Spend (USD)') }}" class="{{ $input }}">
                     <div class="grid grid-cols-2 gap-2">
@@ -126,7 +126,7 @@
             <x-card :title="__('Import CSV')" :subtitle="__('A daily report from Google Ads or Meta. Needs Date (or Day) and Spend (or Cost) columns.')">
                 <form method="POST" action="{{ route('marketing.import') }}" enctype="multipart/form-data" class="space-y-2">
                     @csrf
-                    <x-simple-select name="ad_account_id" :options="$accountOptions" :value="array_key_first($accountOptions)" full-width class="w-full" />
+                    <x-simple-select name="ad_account_id" :options="$accountOptions" :value="old('ad_account_id')" :placeholder="__('Choose the ad account')" full-width class="w-full" />
                     <input type="file" name="file" accept=".csv,text/csv" required class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm">
                     <x-button size="sm" class="w-full">{{ __('Import') }}</x-button>
                 </form>

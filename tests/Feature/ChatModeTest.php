@@ -94,6 +94,14 @@ class ChatModeTest extends TestCase
         $this->assertSame('10:30', $chat['until']->format('H:i'));
         $this->assertSame(0, collect($activity['entries'])->where('kind', 'free')->filter(fn ($e) => $e['at']->format('H:i') === '10:00')->count());
         $this->actingAs($this->boss)->get('/work-time')->assertOk()->assertSeeInOrder(['Mahim', '30 min', '2 msg · 1 orders']);
+
+        // Chats report: per channel and per person, with the reasons for no order. 1 order + 1 no order = 50%.
+        $this->get('/chat-report')->assertOk()
+            ->assertSeeInOrder(['Why chats ended with no order', 'Price too high', '1 · 100%'])
+            ->assertSeeInOrder(['By channel', 'WhatsApp 2', '2', '1', '৳', '1', '50%', 'Price too high 1'])
+            ->assertSeeInOrder(['By person', 'Mahim', '2', '1'])
+            ->assertDontSee('Page 1 comments'); // nothing counted there
+        $this->actingAs($this->mahim)->get('/chat-report')->assertForbidden();
     }
 
     public function test_with_empty_hands_and_nothing_waiting_the_desk_points_to_chat(): void

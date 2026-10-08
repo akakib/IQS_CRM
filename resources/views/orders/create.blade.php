@@ -13,7 +13,7 @@
     {{-- ?phone= (a customer called in): the number is filled and looked up at once. --}}
     <form method="POST" action="{{ route('orders.store') }}" x-ref="form" x-init="$nextTick(() => { if (phone && !@js(old('phone'))) lookup() })"
         x-data="{
-            channel: @js(old('channel', $chatChannel?->orderChannel() ?? (in_array(request('channel'), ['messenger', 'whatsapp', 'phone', 'b2b', 'other'], true) ? request('channel') : ''))),
+            channel: @js(old('channel', $chatChannel?->orderChannel() ?? (array_key_exists((string) request('channel'), \App\Models\Order::manualChannels()) ? request('channel') : ''))),
             chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
             phone: @js(old('phone', (string) request('phone', ''))), name: @js(old('name', '')),
             customer: null, looking: false,
@@ -96,9 +96,9 @@
             <div class="space-y-6 xl:col-span-2">
                 <x-card :title="__('Customer')">
                     <div class="mb-4 flex flex-wrap gap-2">
-                        @foreach (['messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone call'), 'b2b' => 'B2B', 'other' => __('Other')] as $key => $label)
+                        @foreach (\App\Models\Order::manualChannels() as $key => $label)
                             <button type="button" @click="channel = @js($key)" class="rounded-full border px-3 py-1.5 text-sm"
-                                :class="channel === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
+                                :class="channel === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ __($label) }}</button>
                         @endforeach
                     </div>
                     {{-- Nothing is picked for them: a wrong guess would count the order on the wrong channel. --}}

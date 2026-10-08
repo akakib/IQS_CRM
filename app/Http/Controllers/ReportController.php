@@ -68,7 +68,7 @@ class ReportController extends Controller
     {
         [$from, $to] = $this->range($request);
         $group = in_array($request->query('group'), OrderProfit::GROUPS, true) ? $request->query('group') : 'day';
-        $channel = in_array($request->query('channel'), ['web', 'messenger', 'whatsapp', 'phone', 'b2b', 'other'], true) ? $request->query('channel') : null;
+        $channel = array_key_exists((string) $request->query('channel'), \App\Models\Order::CHANNELS) ? $request->query('channel') : null;
         $perPage = in_array((int) $request->query('per_page'), [25, 50, 100], true) ? (int) $request->query('per_page') : 25;
         $rows = $profit->grouped($group, $from, $to, $channel, $perPage);
 

@@ -13,7 +13,7 @@
             <a href="{{ route('orders.index') }}" class="text-sm text-primary hover:underline">{{ __('Orders') }}</a>
             <span class="text-gray-300">/</span>
             <x-order-status :order="$order" :statuses="$statuses" />
-            <span class="text-xs text-gray-500">{{ $order->channel }} · {{ $order->created_at->format('d M Y, g:i A') }}</span>
+            <span class="text-xs text-gray-500">{{ \App\Models\Order::channelLabel($order->channel) }} · {{ $order->created_at->format('d M Y, g:i A') }}</span>
             @if ($order->holdReason)<x-badge color="amber">{{ $order->holdReason->label_en }}{{ $order->hold_expected_date ? ' · '.$order->hold_expected_date->format('d M') : '' }}</x-badge>@endif
         </div>
         <div class="flex items-center gap-2">

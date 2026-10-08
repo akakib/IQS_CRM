@@ -29,7 +29,7 @@ class TrackingSettingsController extends Controller
             'fire_on' => ['required', Rule::in(['order_created', 'record_verified', 'confirmed', 'delivered'])],
             'value_basis' => ['required', Rule::in(['order_total', 'product_subtotal', 'delivered_amount'])],
             'channels' => ['array'],
-            'channels.*' => [Rule::in(['web', 'messenger', 'whatsapp', 'phone', 'b2b', 'other'])],
+            'channels.*' => [Rule::in(array_keys(\App\Models\Order::CHANNELS))],
         ]);
         $data['channels'] = json_encode(array_values($data['channels'] ?? []));
         $data['is_active'] = $request->boolean('is_active');

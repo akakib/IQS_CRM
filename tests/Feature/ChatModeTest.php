@@ -98,6 +98,15 @@ class ChatModeTest extends TestCase
         $made = Order::first();
         $this->get('/desk/notice/'.$made->id)->assertRedirect(route('desk.index', ['tab' => 'packaging', 'order' => $made->id]));
         $this->assertSame($wa->id, Order::first()->chat_channel_id);
+
+        // Each platform is its own order channel: a TikTok chat makes a TikTok order, a phone line a phone order,
+        // a platform not in the list Other. The order list shows the name.
+        $this->assertSame('tiktok', (new ChatChannel(['type' => 'tiktok']))->orderChannel());
+        $this->assertSame('phone', (new ChatChannel(['type' => 'call']))->orderChannel());
+        $this->assertSame('comments', (new ChatChannel(['type' => 'comments']))->orderChannel());
+        $this->assertSame('other', (new ChatChannel(['type' => 'something_new']))->orderChannel());
+        $this->assertSame('TikTok', Order::channelLabel('tiktok'));
+        $this->get('/orders/create?chat_channel='.$wa->id)->assertSee('TikTok')->assertSee('Facebook comments');
         $this->post('/orders', ['channel' => 'messenger', 'chat_channel_id' => $comments->id, 'phone' => '01812345679', 'name' => 'X', 'address_line' => 'Y',
             'items' => [['variant_id' => $this->variant->id, 'qty' => 1]]])->assertSessionHasErrors('chat_channel_id');
         $this->getJson('/chat')->assertJsonPath('channels.0.orders', 1);

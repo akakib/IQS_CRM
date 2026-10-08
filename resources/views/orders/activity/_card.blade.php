@@ -25,7 +25,7 @@
         </div>
         <p class="shrink-0 text-sm font-semibold tabular-nums text-gray-900">৳{{ number_format((float) $o->grand_total) }}</p>
     </div>
-    <p class="mt-1 text-[11px] text-gray-500">{{ $o->order_no }} · {{ ucfirst($o->channel) }} · <span @class(['text-red-600 font-medium' => $late])>{{ $age }}</span></p>
+    <p class="mt-1 text-[11px] text-gray-500">{{ $o->order_no }} · {{ \App\Models\Order::channelLabel($o->channel) }} · <span @class(['text-red-600 font-medium' => $late])>{{ $age }}</span></p>
 
     {{-- What is happening now --}}
     <div class="mt-2 text-xs">

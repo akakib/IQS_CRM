@@ -283,7 +283,7 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                                     <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-primary hover:underline">{{ $order->order_no }}</a>
-                                    <span>{{ ucfirst($order->channel) }}</span>
+                                    <span>{{ \App\Models\Order::channelLabel($order->channel) }}</span>
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
                                     {{-- Who has it (and who packs it): shown to managers and whenever it is not the viewer's own order. --}}

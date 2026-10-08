@@ -13,6 +13,27 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Order extends Model
 {
+    /**
+     * Where an order came from: the one list for the order form, filters, reports and exports.
+     * A new platform is one line here (the column is a plain string). Chats map onto it by type.
+     */
+    public const CHANNELS = [
+        'web' => 'Website', 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'comments' => 'Facebook comments',
+        'instagram' => 'Instagram', 'tiktok' => 'TikTok', 'telegram' => 'Telegram', 'phone' => 'Phone call',
+        'b2b' => 'B2B', 'other' => 'Other',
+    ];
+
+    /** The ones staff pick when they make an order by hand (Website orders come from the site). */
+    public static function manualChannels(): array
+    {
+        return array_diff_key(self::CHANNELS, ['web' => true]);
+    }
+
+    public static function channelLabel(?string $key): string
+    {
+        return __(self::CHANNELS[$key] ?? ucfirst((string) $key));
+    }
+
     protected $guarded = ['id'];
 
     protected function casts(): array

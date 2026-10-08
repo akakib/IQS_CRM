@@ -23,7 +23,7 @@
     <x-list.filter-bar :list="$list" :action="route('orders.index')" :placeholder="__('Order no, phone, name or CN')">
         <input type="hidden" name="tab" value="{{ $tab }}">
         <x-simple-select name="status" :options="$statusOptions" :value="$list->filter('status') ?? ''" />
-        <x-simple-select name="channel" :options="['' => __('Any channel'), 'web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone')]" :value="$list->filter('channel') ?? ''" />
+        <x-simple-select name="channel" :options="['' => __('Any channel')] + array_map('__', \App\Models\Order::CHANNELS)" :value="$list->filter('channel') ?? ''" />
         @if ($moderatorOptions)
             <x-simple-select name="moderator" :options="['' => __('Anyone')] + $moderatorOptions" :value="$list->filter('moderator') ?? ''" />
         @endif
@@ -44,7 +44,7 @@
             </x-slot:head>
             @foreach ($orders as $o)
                 <tr class="cursor-pointer" onclick="location.href='{{ route('orders.show', $o) }}'">
-                    <td><span class="font-mono font-medium text-gray-800">{{ $o->order_no }}</span> <span class="text-xs text-gray-400">{{ $o->channel }}</span></td>
+                    <td><span class="font-mono font-medium text-gray-800">{{ $o->order_no }}</span> <span class="text-xs text-gray-400">{{ \App\Models\Order::channelLabel($o->channel) }}</span></td>
                     <td><p class="text-gray-800">{{ $o->ship_name }}</p><p class="font-mono text-xs text-gray-500">{{ Mask::value($o->ship_phone, 'customer_contact') }}</p></td>
                     <td><x-order-status :order="$o" :statuses="$statuses" /></td>
                     <td class="text-gray-600">{{ $o->moderator?->name ?? '-' }}</td>

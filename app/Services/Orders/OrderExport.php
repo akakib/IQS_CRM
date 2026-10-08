@@ -93,7 +93,7 @@ class OrderExport
             'order_no' => $o->order_no,
             'placed' => Carbon::parse($o->created_at)->format('d M Y, g:i A'),
             'placed_at' => Carbon::parse($o->created_at)->getTimestamp(),
-            'channel' => ucfirst($o->channel),
+            'channel' => \App\Models\Order::channelLabel($o->channel),
             'customer' => $o->ship_name,
             'phone' => $contact($o->ship_phone),
             'address' => $contact(trim(implode(', ', array_filter([$o->ship_address, $o->ship_thana, $o->ship_district])))),

@@ -21,8 +21,8 @@ class ChatChannel extends Model
     /** Not a chat: access to it means taking rider calls in Communication. */
     public const RIDER = 'rider';
 
-    /** The order channel an order made from this chat gets (the exact chat stays on chat_channel_id). */
-    public const ORDER_CHANNEL = ['whatsapp' => 'whatsapp', 'call' => 'phone', 'other' => 'other'];
+    /** The order channel an order made from this chat gets: its platform (the exact chat stays on chat_channel_id). */
+    public const ORDER_CHANNEL = ['call' => 'phone'];
 
     protected $fillable = ['name', 'type', 'is_active', 'sort_order'];
 
@@ -38,6 +38,8 @@ class ChatChannel extends Model
 
     public function orderChannel(): string
     {
-        return self::ORDER_CHANNEL[$this->type] ?? 'messenger';
+        $channel = self::ORDER_CHANNEL[$this->type] ?? $this->type;
+
+        return isset(Order::CHANNELS[$channel]) ? $channel : 'other';
     }
 }

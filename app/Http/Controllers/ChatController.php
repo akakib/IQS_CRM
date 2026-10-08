@@ -36,6 +36,8 @@ class ChatController extends Controller
                 'order_url' => route('orders.create', ['chat_channel' => $c->id]),
             ] + ($today[$c->id] ?? ['messages' => 0, 'no_order' => 0, 'orders' => 0]))->values(),
             'reasons' => ['lost' => $reasons['chat_lost'] ?? [], 'undo' => $reasons['chat_undo'] ?? []],
+            // Rider calls: known riders, most recent first, for the name box.
+            'riders' => $user->can('hotline.view') ? DB::table('riders')->orderByDesc('last_used_at')->limit(100)->pluck('name') : [],
         ]);
     }
 

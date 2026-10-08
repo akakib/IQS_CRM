@@ -34,6 +34,7 @@ return [
         ['KPI', 'kpi.index', 'kpi.*', null, 'chart'],
         ['Scorecard', 'scorecard.index', 'scorecard.*', 'orders.reassign', 'star'],
         ['Chats', 'chat-report.index', 'chat-report.*', 'orders.reassign', 'chart'],
+        ['Riders', 'riders-report.index', 'riders-report.*', 'orders.reassign', 'truck'],
         ['Team Activity', 'work-time.index', 'work-time.*', 'orders.reassign', 'clock'],
         ['Order P&L', 'analysis.index', 'analysis.*', 'analysis.view', 'calculator'],
     ]],

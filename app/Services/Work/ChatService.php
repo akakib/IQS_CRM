@@ -34,7 +34,7 @@ class ChatService
         if ($user->current_break_id) {
             throw ValidationException::withMessages(['chat' => __('You are on a break. Press Start work first.')]);
         }
-        if ($this->channelsFor($user)->isEmpty()) {
+        if ($this->channelsFor($user)->isEmpty() && ! $user->can('hotline.view')) {
             throw ValidationException::withMessages(['chat' => __('No chat channel is given to you. A manager can add one on the Staff page.')]);
         }
         if (! $this->openSession($user->id)) {

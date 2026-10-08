@@ -80,7 +80,7 @@ class PersonActivity
                 .($e->reason ? ' · '.$e->reason : '')), (int) $e->order_id);
         }
         $notes = DB::table('order_notes as n')->join('orders as o', 'o.id', '=', 'n.order_id')
-            ->where('n.user_id', $userId)->whereIn('n.note_type', ['call', 'amendment', 'manual'])->whereBetween('n.created_at', [$from, $to])->orderBy('n.id')
+            ->where('n.user_id', $userId)->whereIn('n.note_type', ['call', 'amendment', 'manual', 'rider'])->whereBetween('n.created_at', [$from, $to])->orderBy('n.id')
             ->get(['n.order_id', 'n.note_type', 'n.body', 'n.created_at', 'o.order_no']);
         foreach ($notes as $n) {
             $add(Carbon::parse($n->created_at), $n->note_type, $n->order_no.': '.mb_strimwidth($n->body, 0, 140, '…'), (int) $n->order_id);
@@ -114,7 +114,7 @@ class PersonActivity
             $in = $chatEvents->filter(fn ($e) => Carbon::parse($e->created_at)->between($start, $end));
             $lost = $in->where('kind', 'no_order')->countBy(fn ($e) => __($e->reason ?? 'Other'))->map(fn ($n, $r) => $n > 1 ? $r.' ×'.$n : $r)->join(', ');
             $orders = $chatOrders->filter(fn ($t) => Carbon::parse($t)->between($start, $end))->count();
-            $add($start, 'chat', trim(__('Chat mode :t · :m messages answered', [
+            $add($start, 'chat', trim(__('Communication :t · :m messages answered', [
                 't' => WorkTime::span((int) $start->diffInSeconds($end, true)),
                 'm' => $in->where('kind', 'message')->count() - $in->where('kind', 'undo')->count(),
             ]).' · '.trans_choice('{0} 0 orders|{1} 1 order|[2,*] :count orders', $orders).($lost ? ' · '.__('no order: :r', ['r' => $lost]) : '').($c->ended_at ? '' : ' · '.__('still on'))), null, null, $c->ended_at ? $end : null);

@@ -59,7 +59,7 @@ class ChatModeTest extends TestCase
         $this->assertSame([$wa->id], $this->mahim->chatChannels()->pluck('chat_channels.id')->all());
 
         // Mahim sees Chat beside Break, and only his channel in it.
-        $this->actingAs($this->mahim)->get('/dashboard')->assertSee('Chat mode off', false);
+        $this->actingAs($this->mahim)->get('/dashboard')->assertSee('Communication off', false);
         $this->getJson('/chat')->assertOk()->assertJsonCount(1, 'channels')->assertJsonPath('channels.0.name', 'WhatsApp 2')->assertJsonPath('on', false);
 
         // Counting turns chat mode on. Taking one back or "no order" needs a reason; someone else's channel is refused.
@@ -90,7 +90,7 @@ class ChatModeTest extends TestCase
         $this->postJson('/chat/stop')->assertJsonPath('on', false);
         $activity = app(\App\Services\Reports\PersonActivity::class)->day($this->mahim->id, today());
         $chat = collect($activity['entries'])->firstWhere('kind', 'chat');
-        $this->assertSame('Chat mode 30 min · 2 messages answered · 1 order · no order: Price too high', $chat['text']);
+        $this->assertSame('Communication 30 min · 2 messages answered · 1 order · no order: Price too high', $chat['text']);
         $this->assertSame('10:30', $chat['until']->format('H:i'));
         $this->assertSame(0, collect($activity['entries'])->where('kind', 'free')->filter(fn ($e) => $e['at']->format('H:i') === '10:00')->count());
         $this->actingAs($this->boss)->get('/work-time')->assertOk()->assertSeeInOrder(['Mahim', '30 min', '2 msg · 1 orders']);
@@ -116,7 +116,7 @@ class ChatModeTest extends TestCase
         // Without a channel there is no Chat button and no hint.
         $rima = User::factory()->create();
         $rima->roles()->attach($this->mahim->roles()->first()->id);
-        $this->actingAs($rima)->get('/desk')->assertOk()->assertDontSee('No website orders now')->assertDontSee('Chat mode off', false);
+        $this->actingAs($rima)->get('/desk')->assertOk()->assertDontSee('No website orders now')->assertDontSee('Communication off', false);
         $this->postJson('/chat/start')->assertStatus(422);
     }
 }

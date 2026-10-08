@@ -58,5 +58,33 @@ class CustomerCallTest extends TestCase
         $this->actingAs($other)->patchJson('/customer-calls/'.$id, ['outcome' => 'answered'])->assertNotFound();
         $this->actingAs($mod)->postJson('/customer-calls', ['order_id' => $order->id])->assertOk();
         $this->assertSame(2, DB::table('customer_calls')->count());
+
+        // A customer phones in. Only people with Communication (a channel or the hotline) log it.
+        $this->getJson('/customer-calls/find?q=01712345678')->assertForbidden();
+        $wa = \App\Models\ChatChannel::create(['name' => 'WhatsApp 1', 'type' => 'whatsapp', 'is_active' => true]);
+        $wa->users()->attach($mod->id);
+        $this->getJson('/dashboard')->assertOk();
+        $this->getJson('/customer-calls/find?q='.urlencode('+880 1712-345678'))->assertOk()
+            ->assertJson(['phone' => '01712345678', 'name' => 'Rahim'])->assertJsonPath('orders.0.order_no', $order->order_no);
+        $this->postJson('/customer-calls/incoming', ['phone' => '01712345678', 'order_id' => $order->id, 'reason' => 'complaint', 'minutes' => 1, 'seconds' => 0, 'note' => 'Box was wet'])
+            ->assertOk()->assertJson(['today' => 1, 'new_order_url' => null]);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'call', 'body' => 'Customer called (1:00): Complaint · Box was wet']);
+        $this->assertNotNull(app(\App\Services\Work\ChatService::class)->openSession($mod->id)); // counts as work
+
+        // A new number that wants to order: saved on the number; the reply offers the order form with it filled in.
+        $this->postJson('/customer-calls/incoming', ['phone' => '01999999999', 'reason' => 'nope'])->assertStatus(422);
+        $this->postJson('/customer-calls/incoming', ['phone' => '019999', 'reason' => 'new_order'])->assertStatus(422)->assertJsonValidationErrors('phone');
+        $this->postJson('/customer-calls/incoming', ['phone' => '01999999999', 'reason' => 'new_order'])->assertOk()->assertJson(['today' => 2, 'new_order_url' => null]); // no orders.create
+        $this->assertDatabaseHas('customer_calls', ['phone' => '01999999999', 'direction' => 'in', 'order_id' => null, 'outcome' => 'new_order']);
+
+        // The Communication report: Chats, Customer calls and Rider calls as tabs; calls by person and one by one.
+        $boss = User::factory()->create(['name' => 'Boss']);
+        $boss->roles()->attach($this->role(['orders.view' => 'all', 'orders.reassign'], [], 'Manager')->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->actingAs($boss)->get('/calls-report')->assertOk()->assertSee('Customer calls')->assertSee('Rider calls')
+            ->assertSeeInOrder(['Mahim', '2', '1', '2'])->assertSee('Box was wet')->assertSee('01999999999');
+        $this->get('/chat-report')->assertOk()->assertSee('Customer calls');
+        $this->get('/riders-report')->assertOk()->assertSee('Customer calls');
+        $this->actingAs($mod)->get('/calls-report')->assertForbidden();
     }
 }

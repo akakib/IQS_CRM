@@ -18,7 +18,7 @@
 <div x-data="{
         on: @js((bool) $chatSession), since: @js($chatSession ? \Illuminate\Support\Carbon::parse($chatSession->started_at)->format('g:i A') : null),
         open: false, data: null, ask: null, busy: false, error: null,
-        tab: @js($hasChannels ? 'chats' : 'riders'),
+        tab: @js($hasChannels ? 'chats' : 'calls'),
         q: '', found: null, finding: false, rider: '', riderPhone: '', claim: null, verdict: null, action: null, note: '', saved: null,
         headers() { return { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } },
         async call(url, body) {
@@ -78,12 +78,16 @@
                     </div>
                     <button type="button" @click="open = false" class="text-gray-400 hover:text-gray-600" aria-label="{{ __('Close') }}">&times;</button>
                 </div>
-                @if ($hasChannels && $hotline)
-                    <div class="flex gap-5 border-b border-gray-200 px-5">
-                        <button type="button" @click="tab = 'chats'" class="-mb-px border-b-2 pb-2 pt-2 text-sm" :class="tab === 'chats' ? 'border-primary font-medium text-primary' : 'border-transparent text-gray-500'">{{ __('Chats') }}</button>
-                        <button type="button" @click="tab = 'riders'" class="-mb-px border-b-2 pb-2 pt-2 text-sm" :class="tab === 'riders' ? 'border-primary font-medium text-primary' : 'border-transparent text-gray-500'">{{ __('Rider calls') }}</button>
-                    </div>
-                @endif
+                {{-- Chats (their channels), Customer calls (a customer phoned in: everyone here), Rider calls (rider line or hotline). --}}
+                <div class="flex gap-5 overflow-x-auto border-b border-gray-200 px-5">
+                    @if ($hasChannels)
+                        <button type="button" @click="tab = 'chats'" class="-mb-px shrink-0 border-b-2 pb-2 pt-2 text-sm" :class="tab === 'chats' ? 'border-primary font-medium text-primary' : 'border-transparent text-gray-500'">{{ __('Chats') }}</button>
+                    @endif
+                    <button type="button" @click="tab = 'calls'" class="-mb-px shrink-0 border-b-2 pb-2 pt-2 text-sm" :class="tab === 'calls' ? 'border-primary font-medium text-primary' : 'border-transparent text-gray-500'">{{ __('Customer calls') }}</button>
+                    @if ($hotline)
+                        <button type="button" @click="tab = 'riders'" class="-mb-px shrink-0 border-b-2 pb-2 pt-2 text-sm" :class="tab === 'riders' ? 'border-primary font-medium text-primary' : 'border-transparent text-gray-500'">{{ __('Rider calls') }}</button>
+                    @endif
+                </div>
 
                 <div class="overflow-y-auto px-5 py-3">
                     <p x-show="error" x-cloak class="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" x-text="error"></p>
@@ -124,6 +128,77 @@
                         </template>
                     </div>
                     @endif
+
+                    {{-- A customer phoned in: find them by number, pick the order it is about (or none), why they called. --}}
+                    <div x-show="tab === 'calls'" x-cloak class="space-y-3" x-data="{
+                            cq: '', cfound: null, cfinding: false, corder: null, creason: null, cmin: '', csec: '', curl: '', cnote: '', csaved: null, cnew: null, cerror: null, csaving: false,
+                            async cfind() {
+                                if (!this.cq.trim()) return;
+                                this.cfinding = true; this.cfound = null; this.corder = null; this.csaved = null; this.cnew = null; this.cerror = null;
+                                try {
+                                    const r = await fetch(@js(route('customer-calls.find')) + '?q=' + encodeURIComponent(this.cq.trim()), { headers: { Accept: 'application/json' } });
+                                    if (!r.ok) throw new Error();
+                                    this.cfound = await r.json();
+                                } catch (e) { this.cerror = @js(__('No connection. Try again.')) }
+                                this.cfinding = false;
+                            },
+                            async csave() {
+                                this.cerror = null;
+                                if (!this.creason) { this.cerror = @js(__('Pick why they called.')); return }
+                                this.csaving = true;
+                                try {
+                                    const r = await fetch(@js(route('customer-calls.incoming')), { method: 'POST', headers: headers(), body: JSON.stringify({ phone: this.cfound?.phone || this.cq, order_id: this.corder, reason: this.creason, minutes: this.cmin, seconds: this.csec, recording_url: this.curl, note: this.cnote }) });
+                                    const j = await r.json();
+                                    if (!r.ok) { this.cerror = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')); return }
+                                    this.csaved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.cnew = j.new_order_url; on = true;
+                                    this.cq = ''; this.cfound = null; this.corder = null; this.creason = null; this.cmin = ''; this.csec = ''; this.curl = ''; this.cnote = '';
+                                } catch (e) { this.cerror = @js(__('No connection. Try again.')) } finally { this.csaving = false }
+                            },
+                        }">
+                        <div x-show="csaved" x-cloak class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
+                            <span x-text="csaved"></span>
+                            <button type="button" x-show="cnew" @click="open = false; window.dispatchEvent(new CustomEvent('order-new', { detail: cnew }))" class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark">{{ __('Make the order') }}</button>
+                        </div>
+                        <p x-show="cerror" x-cloak class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" x-text="cerror"></p>
+                        <form @submit.prevent="cfind()" class="flex gap-2">
+                            <input x-model="cq" inputmode="tel" placeholder="{{ __('Caller number or order no') }}" class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                            <button class="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-dark" x-text="cfinding ? @js(__('Finding…')) : @js(__('Find'))"></button>
+                        </form>
+                        <template x-if="cfound">
+                            <div class="space-y-3">
+                                <div>
+                                    <p class="mb-1 text-xs font-medium text-gray-500"><span x-text="cfound.name || @js(__('New number'))"></span><span x-show="cfound.phone"> · <span x-text="cfound.phone"></span></span> · {{ __('About which order?') }}</p>
+                                    <div class="space-y-1.5">
+                                        <template x-for="o in cfound.orders" :key="o.id">
+                                            <button type="button" @click="corder = corder === o.id ? null : o.id" class="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm"
+                                                :class="corder === o.id ? 'border-primary bg-primary-soft' : 'border-gray-200 hover:border-gray-300'">
+                                                <span><span class="font-medium text-gray-900" x-text="o.order_no"></span> <span class="text-xs text-gray-500" x-text="'· ' + o.when + ' · ' + o.status"></span></span>
+                                                <span class="tabular-nums text-gray-700" x-text="'৳' + Math.round(o.total).toLocaleString('en-IN')"></span>
+                                            </button>
+                                        </template>
+                                        <p x-show="!cfound.orders.length" class="text-sm text-gray-500">{{ __('No orders on this number. It is saved as a call on the number.') }}</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="mb-1 text-xs font-medium text-gray-500">{{ __('Why they called') }}</p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach (\App\Http\Controllers\CustomerCallController::REASONS_IN as $k => $label)
+                                            <button type="button" @click="creason = @js($k)" class="rounded-lg border px-2.5 py-1 text-xs" :class="creason === @js($k) ? 'border-primary bg-primary-soft font-medium text-primary' : 'border-gray-300 text-gray-700'">{{ __($label) }}</button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2 text-sm">
+                                    <span class="text-xs text-gray-500">{{ __('Duration') }}</span>
+                                    <input type="number" min="0" max="300" x-model="cmin" placeholder="{{ __('min') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
+                                    <span class="text-gray-400">:</span>
+                                    <input type="number" min="0" max="59" x-model="csec" placeholder="{{ __('sec') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
+                                </div>
+                                <input type="url" x-model="curl" placeholder="{{ __('Recording link (Google Drive)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                                <input type="text" x-model="cnote" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                                <button type="button" @click="csave()" :disabled="csaving" class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-60">{{ __('Save call') }}</button>
+                            </div>
+                        </template>
+                    </div>
 
                     @if ($hotline)
                     {{-- A rider is on the phone about a parcel. --}}

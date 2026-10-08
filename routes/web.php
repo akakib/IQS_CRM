@@ -116,7 +116,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/riders-report', [\App\Http\Controllers\RiderCallController::class, 'report'])->middleware('can:orders.reassign')->name('riders-report.index');
     Route::get('/rider-calls/find', [\App\Http\Controllers\RiderCallController::class, 'find'])->middleware('can:rider-calls')->name('rider-calls.find');
     Route::post('/rider-calls', [\App\Http\Controllers\RiderCallController::class, 'store'])->middleware('can:rider-calls')->name('rider-calls.store');
-    Route::post('/customer-calls', [\App\Http\Controllers\CustomerCallController::class, 'start'])->middleware('can:orders.edit')->name('customer-calls.start');
+    Route::get('/customer-calls/find', [\App\Http\Controllers\CustomerCallController::class, 'find'])->name('customer-calls.find');
+    Route::post('/customer-calls/incoming', [\App\Http\Controllers\CustomerCallController::class, 'incoming'])->name('customer-calls.incoming');
+    Route::get('/calls-report', [\App\Http\Controllers\CustomerCallController::class, 'report'])->middleware('can:orders.reassign')->name('calls-report.index');
+    Route::post('/customer-calls',[\App\Http\Controllers\CustomerCallController::class, 'start'])->middleware('can:orders.edit')->name('customer-calls.start');
     Route::patch('/customer-calls/{call}', [\App\Http\Controllers\CustomerCallController::class, 'finish'])->whereNumber('call')->middleware('can:orders.edit')->name('customer-calls.finish');
     Route::get('/packers-report', [\App\Http\Controllers\PackerReportController::class, 'index'])->middleware('can:packaging.manage')->name('packers-report.index');
     Route::get('/scorecard', [\App\Http\Controllers\ScorecardController::class, 'index'])->middleware('can:orders.reassign')->name('scorecard.index');

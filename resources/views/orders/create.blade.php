@@ -10,11 +10,12 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('orders.store') }}" x-ref="form"
+    {{-- ?phone= (a customer called in): the number is filled and looked up at once. --}}
+    <form method="POST" action="{{ route('orders.store') }}" x-ref="form" x-init="$nextTick(() => { if (phone && !@js(old('phone'))) lookup() })"
         x-data="{
             channel: @js(old('channel', $chatChannel?->orderChannel() ?? (in_array(request('channel'), ['messenger', 'whatsapp', 'phone', 'b2b'], true) ? request('channel') : 'messenger'))),
             chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
-            phone: @js(old('phone', '')), name: @js(old('name', '')),
+            phone: @js(old('phone', (string) request('phone', ''))), name: @js(old('name', '')),
             customer: null, looking: false,
             addressId: @js(old('customer_address_id')), zoneId: @js(old('zone_id')),
             items: [], q: '', results: [], searching: false, active: 0, timer: null,

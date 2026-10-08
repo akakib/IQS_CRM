@@ -6,6 +6,8 @@
 @endphp
 
 <x-layouts.app :heading="__('Communication')">
+    @include('reports._communication-tabs', ['active' => 'chats'])
+
     <div class="mb-4 flex flex-wrap items-center gap-2">
         @foreach ($presets as $label => [$f, $t])
             <a href="{{ $url($f, $t) }}" @class(['rounded-full border px-3 py-1.5 text-sm', 'border-primary bg-primary text-white' => $from->isSameDay($f) && $to->isSameDay($t), 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' => ! ($from->isSameDay($f) && $to->isSameDay($t))])>{{ $label }}</a>

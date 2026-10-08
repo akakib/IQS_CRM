@@ -84,12 +84,13 @@ class ChatModeTest extends TestCase
         $this->postJson('/chat/events', ['channel_id' => $comments->id, 'kind' => 'message'])->assertStatus(422)->assertJsonValidationErrors('channel');
 
         // An order from that chat: the shortcut opens the form on that channel; the order keeps it.
-        $this->get('/orders/create?chat_channel='.$wa->id)->assertOk()->assertSee('From which chat');
+        // It opens in a popup (no sidebar); after Create the popup tells the page to go to Order management.
+        $this->get('/orders/create?chat_channel='.$wa->id.'&embed=1')->assertOk()->assertSee('From which chat')->assertSee('name="embed"', false)->assertDontSee('Communication channels');
         $this->post('/orders', [
             'channel' => 'whatsapp', 'chat_channel_id' => $wa->id, 'phone' => '01812345678', 'name' => 'Rahim', 'address_line' => 'House 9',
             'zone_id' => DB::table('delivery_zones')->where('system_key', 'inside_dhaka')->value('id'),
-            'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
-        ])->assertRedirect();
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 1]], 'embed' => 1,
+        ])->assertOk()->assertSee('iqsOrderCreated')->assertSessionHas('success');
         $this->assertSame($wa->id, Order::first()->chat_channel_id);
         $this->post('/orders', ['channel' => 'messenger', 'chat_channel_id' => $comments->id, 'phone' => '01812345679', 'name' => 'X', 'address_line' => 'Y',
             'items' => [['variant_id' => $this->variant->id, 'qty' => 1]]])->assertSessionHasErrors('chat_channel_id');

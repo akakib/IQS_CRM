@@ -103,7 +103,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|\Illuminate\Http\Response
     {
         $data = $request->validate([
             'channel' => ['required', Rule::in(['messenger', 'whatsapp', 'phone', 'b2b'])],
@@ -137,7 +137,15 @@ class OrderController extends Controller
         $order = $this->orders->create($data, $request->user());
         app(VerificationEngine::class)->run($order);
 
-        return redirect()->route('orders.show', $order)->with('success', __('Order :no created.', ['no' => $order->order_no]));
+        $message = __('Order :no created.', ['no' => $order->order_no]);
+        // Made from the New order popup (Communication): the page behind it goes to Order management.
+        if ($request->boolean('embed')) {
+            session()->flash('success', $message);
+
+            return response()->view('orders.create-done');
+        }
+
+        return redirect()->route('orders.show', $order)->with('success', $message);
     }
 
     public function show(Order $order, Request $request): View

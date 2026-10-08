@@ -2,7 +2,8 @@
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
 @endphp
 
-<x-layouts.app :heading="__('Quick order')">
+{{-- embed=1: the form sits in the New order popup from Communication, so no sidebar or header. --}}
+<x-dynamic-component :component="request('embed') ? 'layouts.embed' : 'layouts.app'" :heading="__('Quick order')">
     @if ($errors->any())
         <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             @foreach ($errors->all() as $e)<p>{{ $e }}</p>@endforeach
@@ -86,6 +87,7 @@
             money(n) { return '৳' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); },
         }">
         @csrf
+        @if (request('embed'))<input type="hidden" name="embed" value="1">@endif
         <input type="hidden" name="channel" :value="channel">
         <input type="hidden" name="chat_channel_id" :value="chatChannel">
 
@@ -244,4 +246,4 @@
             </div>
         </div>
     </form>
-</x-layouts.app>
+</x-dynamic-component>

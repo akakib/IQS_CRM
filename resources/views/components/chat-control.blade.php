@@ -22,6 +22,7 @@
         on: @js((bool) $chatSession), since: @js($chatSession ? \Illuminate\Support\Carbon::parse($chatSession->started_at)->format('g:i A') : null),
         open: false, data: null, ask: null, busy: false, error: null,
         tab: @js($hasChannels ? 'chats' : 'riders'),
+        newOrder: '',
         q: '', found: null, finding: false, rider: '', riderPhone: '', claim: null, verdict: null, action: null, note: '', saved: null,
         headers() { return { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } },
         async call(url, body) {
@@ -63,7 +64,8 @@
                 this.q = ''; this.found = null; this.claim = null; this.verdict = null; this.action = null; this.note = '';
             } catch (e) { this.error = @js(__('No connection. Try again.')) } finally { this.busy = false }
         },
-    }" @chat-open.window="show()">
+    }" @chat-open.window="show()"
+    @message.window="if ($event.origin === location.origin && $event.data?.iqsOrderCreated) location.href = @js(route('desk.index'))">
     <button type="button" @click="show()" class="flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium"
         :class="on ? 'border-green-600 bg-green-600 text-white hover:bg-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-100'">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -102,7 +104,7 @@
                                         <p class="truncate text-sm font-medium text-gray-800" x-text="c.name"></p>
                                         <p class="truncate text-xs text-gray-500" x-text="c.type"></p>
                                     </div>
-                                    <a :href="c.order_url" class="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:border-primary hover:text-primary" title="{{ __('New order from this chat') }}" aria-label="{{ __('New order from this chat') }}">
+                                    <a :href="c.order_url" @click.prevent="newOrder = c.order_url + '&embed=1'" class="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:border-primary hover:text-primary" title="{{ __('New order from this chat') }}" aria-label="{{ __('New order from this chat') }}">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                                     </a>
                                     <button type="button" @click="ask = { id: c.id, kind: 'undo' }" :disabled="busy || c.messages < 1" class="h-9 w-9 rounded-lg border border-gray-300 text-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40" aria-label="{{ __('Take one back') }}">−</button>
@@ -187,6 +189,19 @@
                     <p class="text-xs text-gray-500">{{ __('Closing keeps it on. Website orders still come first.') }}</p>
                     <button type="button" x-show="on" @click="stop()" :disabled="busy" class="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Stop') }}</button>
                 </div>
+            </div>
+        </div>
+    </template>
+    {{-- New order from a chat: the Quick order form in a popup over the page. Closes only with Close (typing
+         must not be lost to a stray click); after Create, the page goes to Order management. --}}
+    <template x-teleport="body">
+        <div x-show="newOrder" x-cloak class="fixed inset-0 z-[130] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">
+            <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-[92vh] sm:rounded-2xl">
+                <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-6">
+                    <h3 class="text-base font-semibold text-gray-900">{{ __('New order from chat') }}</h3>
+                    <button type="button" @click="newOrder = ''" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Close') }}</button>
+                </div>
+                <template x-if="newOrder"><iframe :src="newOrder" title="{{ __('New order') }}" class="min-h-0 w-full flex-1 border-0 bg-gray-50"></iframe></template>
             </div>
         </div>
     </template>

@@ -198,8 +198,19 @@ class PackagingTest extends TestCase
         $this->assertSame('handed_over', $this->key($a));
 
         $this->post("/handover/{$session}/close")->assertRedirect("/handover/{$session}/manifest");
-        $this->get("/handover/{$session}/manifest")->assertOk()->assertSee($a->order_no)->assertSee('NOT handed over')->assertSee($b->order_no);
+        $this->get("/handover/{$session}/manifest")->assertOk()->assertSee($a->order_no)->assertSee('NOT handed over')->assertSee($b->order_no)->assertSee('Full list (Excel)');
         $this->assertSame(3, DB::table('scan_logs')->where('handover_session_id', $session)->count());
+
+        // Any time later, from the list: the handed parcels only, same columns as the orders export; contact masked for packers.
+        $this->get('/handover')->assertOk()->assertSee(route('handover.print', $session))->assertSee(route('handover.excel', $session));
+        $print = $this->get("/handover/{$session}/print")->assertOk()->assertSee('Rider: Rafiq 01911111111')->assertSee($a->order_no)->assertDontSee($b->order_no)->assertSee('Orders: <b>1</b>', false);
+        $print->assertDontSee('01712345678');
+        $excel = $this->get("/handover/{$session}/excel")->assertOk();
+        $zip = new \ZipArchive;
+        $zip->open($excel->baseResponse->getFile()->getPathname());
+        $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $this->assertStringContainsString($a->order_no, $sheet);
+        $this->assertStringNotContainsString($b->order_no, $sheet);
     }
 
     public function test_handover_by_hand_runs_the_same_checks_and_is_marked_manual(): void

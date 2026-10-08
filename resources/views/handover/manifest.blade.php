@@ -18,7 +18,10 @@
     </style>
 </head>
 <body>
-    <div class="no-print"><button onclick="window.print()">{{ __('Print') }}</button> <a href="{{ route('handover.index') }}">{{ __('Back') }}</a></div>
+    <div class="no-print"><button onclick="window.print()">{{ __('Print') }}</button>
+        <a href="{{ route('handover.print', $session->id) }}" target="_blank" rel="noopener">{{ __('Full list (print)') }}</a> ·
+        <a href="{{ route('handover.excel', $session->id) }}">{{ __('Full list (Excel)') }}</a> ·
+        <a href="{{ route('handover.index') }}">{{ __('Back') }}</a></div>
     <h1>{{ settings('store.name') }} · {{ __('Pickup manifest') }}</h1>
     <div style="font-size:12px">
         {{ \Illuminate\Support\Carbon::parse($session->started_at)->format('d M Y, g:i A') }} · {{ ucfirst($session->courier) }} ·

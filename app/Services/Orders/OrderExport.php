@@ -26,9 +26,17 @@ class OrderExport
             'moderator' => __('Moderator'), 'area' => __('Area (district, thana)'), 'total' => __('Total (highest first)')];
     }
 
-    /** @param array{from: string, to: string, stages: list<string>, staff: ?string} $f */
+    /**
+     * @param  array{from: string, to: string, stages: list<string>, staff: ?string, handover?: ?int}  $f
+     *                                                                                                      handover: only the parcels handed over in that pickup (dates and visibility do not apply:
+     *                                                                                                      whoever runs the handover may list its parcels; masked fields stay masked)
+     */
     public function query(array $f, User $user)
     {
+        if (! empty($f['handover'])) {
+            return DB::table('orders as o')->whereIn('o.id', DB::table('scan_logs')->select('order_id')
+                ->where('handover_session_id', (int) $f['handover'])->where('result', 'ok'));
+        }
         $stages = OrderStages::all();
         $chosen = array_values(array_intersect_key($stages, array_flip($f['stages'])));
 
@@ -62,7 +70,9 @@ class OrderExport
         $orders = $this->query($f, $user)
             ->leftJoin('users as m', 'm.id', '=', 'o.moderator_id')
             ->leftJoin('shipments as sh', 'sh.id', '=', 'o.active_shipment_id')
-            ->tap(fn ($q) => match ($f['sort'] ?? 'placed') {
+            ->tap(fn ($q) => match (! empty($f['handover']) ? 'handover' : ($f['sort'] ?? 'placed')) {
+                // A pickup list: in the order the parcels were scanned out.
+                'handover' => $q->orderByRaw("(SELECT MIN(l.id) FROM scan_logs l WHERE l.order_id = o.id AND l.result = 'ok' AND l.handover_session_id = ?)", [(int) $f['handover']]),
                 'order_no' => $q->orderBy('o.id'),
                 'status' => $q->orderBy('o.status_id'),
                 'moderator' => $q->orderByRaw('m.name IS NULL')->orderBy('m.name'),

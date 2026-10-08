@@ -43,13 +43,20 @@
                 @endif
             </form>
             @forelse ($sessions as $s)
-                <a href="{{ $s->closed_at ? route('handover.manifest', $s->id) : route('handover.show', $s->id) }}" class="flex items-center justify-between gap-3 border-b border-gray-100 px-2 py-3 text-sm last:border-0 hover:bg-gray-50">
-                    <span class="min-w-0">
+                {{-- The row opens the handover; Print and Excel give its full parcel list (same columns as the orders export), any time. --}}
+                <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-2 py-3 text-sm last:border-0 hover:bg-gray-50">
+                    <a href="{{ $s->closed_at ? route('handover.manifest', $s->id) : route('handover.show', $s->id) }}" class="min-w-0 flex-1">
                         <span class="block font-medium text-gray-900">{{ \Illuminate\Support\Carbon::parse($s->started_at)->format('d M Y, g:i A') }} · {{ $s->rider_name ?? __('Rider') }}</span>
                         <span class="block text-xs text-gray-500">{{ trans_choice(':count parcel|:count parcels', $s->parcels) }}{{ $s->rider_phone ? ' · '.$s->rider_phone : '' }}{{ $s->by ? ' · '.__('by :n', ['n' => $s->by]) : '' }}</span>
+                    </a>
+                    <span class="flex shrink-0 items-center gap-1.5">
+                        @if ($s->parcels)
+                            <a href="{{ route('handover.print', $s->id) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" title="{{ __('Print the full list') }}"><x-icon name="printer" class="h-3.5 w-3.5" /><span class="hidden sm:inline">{{ __('Print') }}</span></a>
+                            <a href="{{ route('handover.excel', $s->id) }}" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" title="{{ __('Download the full list (Excel)') }}"><x-icon name="download" class="h-3.5 w-3.5" /><span class="hidden sm:inline">{{ __('Excel') }}</span></a>
+                        @endif
+                        <x-badge :color="$s->closed_at ? 'green' : 'blue'">{{ $s->closed_at ? __('Manifest') : __('Open') }}</x-badge>
                     </span>
-                    <x-badge :color="$s->closed_at ? 'green' : 'blue'">{{ $s->closed_at ? __('Manifest') : __('Open') }}</x-badge>
-                </a>
+                </div>
             @empty
                 <p class="py-6 text-center text-sm text-gray-400">{{ ($filters['from'] || $filters['to']) ? __('No handover in these dates.') : __('None yet.') }}</p>
             @endforelse

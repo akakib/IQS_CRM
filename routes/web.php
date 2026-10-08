@@ -176,6 +176,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/handover', [HandoverController::class, 'index'])->name('handover.index');
         Route::get('/handover/{session}', [HandoverController::class, 'show'])->whereNumber('session')->name('handover.show');
         Route::get('/handover/{session}/manifest', [HandoverController::class, 'manifest'])->whereNumber('session')->name('handover.manifest');
+        Route::get('/handover/{session}/excel', [\App\Http\Controllers\OrderExportController::class, 'handoverExcel'])->whereNumber('session')->name('handover.excel');
+        Route::get('/handover/{session}/print', [\App\Http\Controllers\OrderExportController::class, 'handoverPrint'])->whereNumber('session')->name('handover.print');
     });
     Route::post('/packaging/shift', [PackagingController::class, 'shift'])->middleware('can:packaging.manage')->name('packaging.shift');
     Route::middleware('can:packaging.create')->group(function () {

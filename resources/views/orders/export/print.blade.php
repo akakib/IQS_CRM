@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ __('Orders') }} {{ $filters['from'] }} {{ __('to') }} {{ $filters['to'] }}</title>
+    <title>{{ $title ?? __('Orders').' '.$filters['from'].' '.__('to').' '.$filters['to'] }}</title>
     {{-- A page made for paper: A4 landscape, no app chrome. Sort by a heading, then Print. --}}
     <style>
         @page { size: A4 landscape; margin: 10mm; }
@@ -38,8 +38,8 @@
         <button type="button" class="go" onclick="window.print()">{{ __('Print') }}</button>
     </div>
     <div class="page">
-        <h1>{{ __('Orders') }} · {{ \Illuminate\Support\Carbon::parse($filters['from'])->format('d M Y') }} {{ __('to') }} {{ \Illuminate\Support\Carbon::parse($filters['to'])->format('d M Y') }}</h1>
-        <div class="meta">{{ __('Stage') }}: {{ $stageNames }} · {{ __('Person') }}: {{ $staffName }} · {{ __('Sorted by') }}: <span id="sorted">{{ $sortName }}</span> · {{ __('Printed :t by :n', ['t' => now()->format('d M Y, g:i A'), 'n' => auth()->user()->name]) }}</div>
+        <h1>{{ $title ?? __('Orders').' · '.\Illuminate\Support\Carbon::parse($filters['from'])->format('d M Y').' '.__('to').' '.\Illuminate\Support\Carbon::parse($filters['to'])->format('d M Y') }}</h1>
+        <div class="meta">@if (isset($subtitle)){{ $subtitle }} · @else{{ __('Stage') }}: {{ $stageNames }} · {{ __('Person') }}: {{ $staffName }} · @endif{{ __('Sorted by') }}: <span id="sorted">{{ $sortName }}</span> · {{ __('Printed :t by :n', ['t' => now()->format('d M Y, g:i A'), 'n' => auth()->user()->name]) }}</div>
         <div class="sum">
             <span>{{ __('Orders') }}: <b>{{ number_format($totals['orders']) }}</b></span>
             <span>{{ __('Total') }}: <b>৳{{ number_format($totals['total']) }}</b></span>

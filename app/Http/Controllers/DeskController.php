@@ -226,7 +226,11 @@ class DeskController extends Controller
     public function fromNotice(Order $order, Request $request): RedirectResponse
     {
         $user = $request->user();
-        $tabFor = fn (Order $o) => match (OrderStatus::map()[$o->status_id]['key']) { 'new' => 'verify', 'record_verified', 'no_answer', 'hold' => 'call', default => 'packaging' };
+        $tabFor = fn (Order $o) => match (OrderStatus::map()[$o->status_id]['key']) {
+            'new' => 'verify', 'record_verified', 'no_answer', 'hold' => 'call',
+            'confirmed' => in_array($o->booking_state, ['none', 'failed'], true) ? 'send' : 'packaging',
+            default => 'packaging',
+        };
         if ($order->moderator_id === $user->id) {
             return redirect()->route('desk.index', ['tab' => $tabFor($order), 'order' => $order->id]);
         }

@@ -94,6 +94,9 @@ class ChatModeTest extends TestCase
             'zone_id' => DB::table('delivery_zones')->where('system_key', 'inside_dhaka')->value('id'),
             'items' => [['variant_id' => $this->variant->id, 'qty' => 1]], 'embed' => 1,
         ])->assertOk()->assertSee('iqsOrderCreated')->assertSessionHas('success');
+        // The page behind goes to Order management on that order, on the tab it is in now.
+        $made = Order::first();
+        $this->get('/desk/notice/'.$made->id)->assertRedirect(route('desk.index', ['tab' => 'packaging', 'order' => $made->id]));
         $this->assertSame($wa->id, Order::first()->chat_channel_id);
         $this->post('/orders', ['channel' => 'messenger', 'chat_channel_id' => $comments->id, 'phone' => '01812345679', 'name' => 'X', 'address_line' => 'Y',
             'items' => [['variant_id' => $this->variant->id, 'qty' => 1]]])->assertSessionHasErrors('chat_channel_id');

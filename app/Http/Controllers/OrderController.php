@@ -143,7 +143,7 @@ class OrderController extends Controller
         if ($request->boolean('embed')) {
             session()->flash('success', $message);
 
-            return response()->view('orders.create-done');
+            return response()->view('orders.create-done', ['order' => $order]);
         }
 
         return redirect()->route('orders.show', $order)->with('success', $message);

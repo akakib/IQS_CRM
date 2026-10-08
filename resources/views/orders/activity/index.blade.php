@@ -75,12 +75,13 @@
 
                 <div class="ml-auto flex items-center gap-2">
                     <span class="hidden text-xs text-gray-500 sm:inline">{{ __('Updated') }} <span x-text="stamp"></span></span>
-                    <x-order-export :from="$filters['from'] ?? today()->subDays(29)->toDateString()" :to="$filters['to'] ?? today()->toDateString()" :staff="$filters['staff']" :people="$staff" />
+                    {{-- Same size as the Export button next to it. --}}
                     <button type="button" @click="refresh()" :disabled="loading"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60">
-                        <svg class="h-4 w-4" :class="loading && 'animate-spin'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+                        <svg class="h-3.5 w-3.5" :class="loading && 'animate-spin'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         {{ __('Refresh') }}
                     </button>
+                    <x-order-export :from="$filters['from'] ?? today()->subDays(29)->toDateString()" :to="$filters['to'] ?? today()->toDateString()" :staff="$filters['staff']" :people="$staff" />
                 </div>
             </div>
 

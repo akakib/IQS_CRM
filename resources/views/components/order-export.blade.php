@@ -9,7 +9,7 @@
     $personOptions = ['' => __('Everyone')] + collect($people)->mapWithKeys(fn ($u) => [(string) $u->id => $u->name])->all() + ['none' => __('Nobody took them')];
 @endphp
 <div x-data="{
-        from: @js($from), to: @js($to), staff: @js((string) ($staff ?? '')), stages: [],
+        from: @js($from), to: @js($to), staff: @js((string) ($staff ?? '')), stages: [], sort: 'placed',
         totals: null, error: null, timer: null,
         open(detail) { this.stages = detail?.stages ?? []; $dispatch('open-modal', 'order-export'); this.count() },
         days(n) { const t = new Date(); const f = new Date(); f.setDate(t.getDate() - n + 1); this.from = this.iso(f); this.to = this.iso(t); this.count() },
@@ -18,6 +18,7 @@
         query() {
             const p = new URLSearchParams({ from: this.from || '', to: this.to || '' });
             if (this.staff) p.set('staff', this.staff);
+            if (this.sort !== 'placed') p.set('sort', this.sort);
             this.stages.forEach(s => p.append('stages[]', s));
             return p.toString();
         },
@@ -68,8 +69,16 @@
             </div>
 
             <div>
-                <p class="mb-2 text-xs font-medium text-gray-500">{{ __('Person') }}</p>
-                <x-simple-select :options="$personOptions" :value="(string) ($staff ?? '')" full-width class="w-full sm:w-64" @select-change="staff = $event.detail; count()" />
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <p class="mb-2 text-xs font-medium text-gray-500">{{ __('Person') }}</p>
+                        <x-simple-select :options="$personOptions" :value="(string) ($staff ?? '')" full-width class="w-full" @select-change="staff = $event.detail; count()" />
+                    </div>
+                    <div>
+                        <p class="mb-2 text-xs font-medium text-gray-500">{{ __('Sort by') }}</p>
+                        <x-simple-select :options="\App\Services\Orders\OrderExport::sorts()" value="placed" full-width class="w-full" @select-change="sort = $event.detail" />
+                    </div>
+                </div>
             </div>
 
             <div class="rounded-lg bg-gray-50 px-3 py-2 text-sm">

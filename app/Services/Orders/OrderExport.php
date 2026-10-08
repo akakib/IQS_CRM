@@ -19,6 +19,13 @@ class OrderExport
     /** One file or page holds at most this many orders. */
     public const MAX_ROWS = 5000;
 
+    /** Sort choices for the panel: key => label. */
+    public static function sorts(): array
+    {
+        return ['placed' => __('Placed (oldest first)'), 'order_no' => __('Order no'), 'status' => __('Status'),
+            'moderator' => __('Moderator'), 'area' => __('Area (district, thana)'), 'total' => __('Total (highest first)')];
+    }
+
     /** @param array{from: string, to: string, stages: list<string>, staff: ?string} $f */
     public function query(array $f, User $user)
     {
@@ -55,6 +62,14 @@ class OrderExport
         $orders = $this->query($f, $user)
             ->leftJoin('users as m', 'm.id', '=', 'o.moderator_id')
             ->leftJoin('shipments as sh', 'sh.id', '=', 'o.active_shipment_id')
+            ->tap(fn ($q) => match ($f['sort'] ?? 'placed') {
+                'order_no' => $q->orderBy('o.id'),
+                'status' => $q->orderBy('o.status_id'),
+                'moderator' => $q->orderByRaw('m.name IS NULL')->orderBy('m.name'),
+                'area' => $q->orderBy('o.ship_district')->orderBy('o.ship_thana'),
+                'total' => $q->orderByDesc('o.grand_total'),
+                default => null,
+            })
             ->orderBy('o.created_at')->orderBy('o.id')->limit(self::MAX_ROWS)
             ->get(['o.id', 'o.order_no', 'o.created_at', 'o.channel', 'o.ship_name', 'o.ship_phone', 'o.ship_address', 'o.ship_thana', 'o.ship_district',
                 'o.grand_total', 'o.cod_amount', 'o.status_id', 'm.name as moderator', 'sh.consignment_id']);
@@ -67,11 +82,12 @@ class OrderExport
         return $orders->map(fn ($o) => [
             'order_no' => $o->order_no,
             'placed' => Carbon::parse($o->created_at)->format('d M Y, g:i A'),
+            'placed_at' => Carbon::parse($o->created_at)->getTimestamp(),
             'channel' => ucfirst($o->channel),
             'customer' => $o->ship_name,
             'phone' => $contact($o->ship_phone),
             'address' => $contact(trim(implode(', ', array_filter([$o->ship_address, $o->ship_thana, $o->ship_district])))),
-            'items' => ($items[$o->id] ?? collect())->map(fn ($i) => $i->name_snapshot.' × '.\App\Support\Units::qty($i->qty, $i->unit))->join('; '),
+            'items' => ($items[$o->id] ?? collect())->map(fn ($i) => html_entity_decode($i->name_snapshot, ENT_QUOTES | ENT_HTML5, 'UTF-8').' '.\App\Support\Units::qty($i->qty, $i->unit))->join('; '), // website names can carry &amp;
             'total' => (float) $o->grand_total,
             'cod' => (float) $o->cod_amount,
             'status' => $statuses[$o->status_id]['name'] ?? '',

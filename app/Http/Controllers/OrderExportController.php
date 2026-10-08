@@ -39,7 +39,7 @@ class OrderExportController extends Controller
         $path = Xlsx::write(__('Orders'), [
             __('Order'), __('Placed'), __('Channel'), __('Customer'), __('Phone'), __('Address'), __('Items'),
             __('Total'), __('COD'), __('Status'), __('Moderator'), __('CN'),
-        ], $rows->map(fn ($r) => array_values($r)), [10, 20, 10, 20, 14, 40, 50, 10, 10, 16, 14, 12]);
+        ], $rows->map(fn ($r) => array_values(\Illuminate\Support\Arr::except($r, ['placed_at']))), [10, 20, 10, 20, 14, 40, 50, 10, 10, 16, 14, 12]);
 
         return response()->download($path, $this->fileName($f), [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -60,24 +60,26 @@ class OrderExportController extends Controller
             'totals' => $this->export->totals($f, $request->user()),
             'filters' => $f,
             'stageNames' => $this->export->stageNames($f['stages']),
+            'sortName' => OrderExport::sorts()[$f['sort']],
             'staffName' => $this->staffName($f['staff']),
             'max' => OrderExport::MAX_ROWS,
         ]);
     }
 
-    /** @return array{from: string, to: string, stages: list<string>, staff: ?string} */
+    /** @return array{from: string, to: string, stages: list<string>, staff: ?string, sort: string} */
     private function filters(Request $request): array
     {
         $data = $request->validate([
             'from' => ['required', 'date'], 'to' => ['required', 'date', 'after_or_equal:from'],
             'stages' => ['nullable', 'array'], 'stages.*' => ['string', Rule::in(array_keys(OrderStages::all()))],
             'staff' => ['nullable', 'regex:/^(none|\d+)$/'],
+            'sort' => ['nullable', Rule::in(array_keys(OrderExport::sorts()))],
         ]);
         if (Carbon::parse($data['from'])->diffInDays(Carbon::parse($data['to'])) > 92) {
             throw ValidationException::withMessages(['to' => __('Pick at most 3 months at a time.')]);
         }
 
-        return ['from' => $data['from'], 'to' => $data['to'], 'stages' => array_values(array_unique($data['stages'] ?? [])), 'staff' => $data['staff'] ?? null];
+        return ['from' => $data['from'], 'to' => $data['to'], 'stages' => array_values(array_unique($data['stages'] ?? [])), 'staff' => $data['staff'] ?? null, 'sort' => $data['sort'] ?? 'placed'];
     }
 
     private function staffName(?string $staff): string

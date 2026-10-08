@@ -99,6 +99,28 @@ class OrderExportTest extends TestCase
         $this->assertSame(2, DB::table('activity_log')->where('action', 'orders.exported')->count());
     }
 
+    public function test_the_list_is_sorted_as_chosen_and_item_names_read_cleanly(): void
+    {
+        $small = $this->order();
+        $big = $this->order();
+        DB::table('orders')->where('id', $big->id)->update(['grand_total' => 99999]);
+        DB::table('order_items')->where('order_id', $small->id)->update(['name_snapshot' => 'Kunafa &amp; Cream']); // as the website sends it
+        $this->actingAs($this->manager);
+
+        // Default: oldest first. Total: the biggest first.
+        $placed = $this->get('/orders/export/print?'.$this->range())->assertOk()->getContent();
+        $this->assertLessThan(strpos($placed, $big->order_no), strpos($placed, $small->order_no));
+        $byTotal = $this->get('/orders/export/print?'.$this->range().'&sort=total')->assertSee('Sorted by: <span id="sorted">Total (highest first)', false)->getContent();
+        $this->assertLessThan(strpos($byTotal, $small->order_no), strpos($byTotal, $big->order_no));
+        $this->getJson('/orders/export/count?'.$this->range().'&sort=nonsense')->assertStatus(422);
+
+        // One "×" before the quantity, and the website's &amp; shown as "&" (escaped once, not twice).
+        $this->assertStringContainsString('Kunafa &amp; Cream ×2', $placed);
+        $this->assertStringNotContainsString('&amp;amp;', $placed);
+        $this->assertStringContainsString('খেজুর ×2', $placed);
+        $this->assertStringNotContainsString('× ×', $placed);
+    }
+
     public function test_a_role_that_hides_customer_contact_exports_without_it(): void
     {
         $o = $this->order();

@@ -9,9 +9,10 @@
         @endcan
     </div>
 
+    <div x-data="tabs('book')">
     <x-tabs :tabs="['book' => [__('Ready to book'), '#book', $orders->count()], 'booked' => [__('Booked, waiting for packaging'), '#booked', $booked->count()]]" active="book" />
 
-    <section id="book" class="mb-8">
+    <section id="book" x-show="tab === 'book'">
         @if ($orders->isEmpty())
             <x-empty-state :message="__('No confirmed orders waiting for booking.')" />
         @else
@@ -48,8 +49,7 @@
         @endif
     </section>
 
-    <section id="booked">
-        <h2 class="mb-2 text-sm font-semibold text-gray-800">{{ __('Booked, waiting for packaging') }}</h2>
+    <section id="booked" x-show="tab === 'booked'" x-cloak>
         @if ($booked->isEmpty())
             <p class="text-sm text-gray-400">{{ __('Nothing booked yet.') }}</p>
         @else
@@ -83,4 +83,5 @@
             </x-list.selectable>
         @endif
     </section>
+    </div>
 </x-layouts.app>

@@ -5,6 +5,7 @@ import phoneDial from './components/phone-dial';
 import scanInput from './components/scan-input';
 import voiceAlerts from './components/voice-alerts';
 import orderPresence from './components/order-presence';
+import pageTabs from './components/page-tabs';
 
 window.Alpine = Alpine;
 Alpine.data('dateInput', dateInput);
@@ -12,6 +13,7 @@ Alpine.data('phoneDial', phoneDial);
 Alpine.data('scanInput', scanInput);
 Alpine.data('voiceAlerts', voiceAlerts);
 Alpine.data('orderPresence', orderPresence);
+Alpine.data('tabs', pageTabs);
 Alpine.start();
 
 // One click, one action. Once a form is on its way to the server, a second

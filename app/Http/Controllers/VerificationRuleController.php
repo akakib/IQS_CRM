@@ -100,10 +100,13 @@ class VerificationRuleController extends Controller
     }
 
     /** Order page: run the checks again (e.g. after a phone or amount change). */
-    public function rerun(Order $order, Request $request, VerificationEngine $engine): RedirectResponse
+    public function rerun(Order $order, Request $request, VerificationEngine $engine): RedirectResponse|\Illuminate\Http\JsonResponse
     {
-        $outcome = $engine->run($order, $request->user());
+        $wasNew = \App\Models\OrderStatus::map()[$order->status_id]['key'] === 'new';
+        $outcome = $engine->run($order, $request->user(), true); // pressed by hand: ask Steadfast again, not yesterday's answer
+        $message = $wasNew ? __('Checks run again: :o.', ['o' => str_replace('_', ' ', $outcome)]) : __('Checks run again. Status unchanged.');
 
-        return back()->with('success', __('Checks run again: :o.', ['o' => str_replace('_', ' ', $outcome)]));
+        // From the order page: the button updates the box in place, no reload.
+        return $request->expectsJson() ? response()->json(['message' => $message]) : back()->with('success', $message);
     }
 }

@@ -160,7 +160,7 @@
                     <input name="body" required maxlength="2000" placeholder="{{ __('What happened? e.g. called, customer will confirm tonight') }}" class="{{ $input }}">
                     <x-button class="shrink-0">{{ __('Add') }}</x-button>
                 </form>
-                <x-timeline :entries="$notes" with-year />
+                <div id="order-timeline"><x-timeline :entries="$notes" with-year /></div>
             </x-card>
         </div>
 
@@ -178,6 +178,7 @@
             </x-card>
 
             <x-card :title="__('Automatic checks')">
+                <div id="order-checks">
                 @if ($verification)
                     @php($in = json_decode($verification->inputs_snapshot, true))
                     <p class="text-sm text-gray-800">{{ ucfirst(str_replace('_', ' ', $verification->outcome)) }}</p>
@@ -193,8 +194,25 @@
                 @else
                     <p class="text-sm text-gray-400">{{ __('Not run yet.') }}</p>
                 @endif
+                </div>
                 @can('orders.approve')
-                    <form method="POST" action="{{ route('orders.verify', $order) }}" class="mt-3">@csrf<x-button size="sm" variant="secondary">{{ __('Run checks again') }}</x-button></form>
+                    {{-- Runs the checks and swaps in the new box and timeline from the page itself: no reload, the scroll stays. --}}
+                    <form method="POST" action="{{ route('orders.verify', $order) }}" class="mt-3" x-data="{ busy: false, error: null }"
+                        @submit.prevent="busy = true; error = null;
+                            fetch($el.action, { method: 'POST', body: new FormData($el), headers: { Accept: 'application/json' } })
+                                .then(r => r.json().then(j => ({ ok: r.ok, j })))
+                                .then(({ ok, j }) => { if (!ok) throw new Error(j.message); window.toast && window.toast(j.message); return fetch(location.href, { headers: { Accept: 'text/html' } }) })
+                                .then(r => r.text())
+                                .then(html => { const doc = new DOMParser().parseFromString(html, 'text/html'); ['order-checks', 'order-timeline'].forEach(id => { const n = doc.getElementById(id); if (n) document.getElementById(id).innerHTML = n.innerHTML }) })
+                                .catch(e => error = e.message || @js(__('Could not run the checks. Try again.')))
+                                .finally(() => busy = false)">
+                        @csrf
+                        <x-button size="sm" variant="secondary" x-bind:disabled="busy">
+                            <x-icon name="refresh" class="h-3.5 w-3.5" x-bind:class="busy && 'animate-spin'" />
+                            <span x-text="busy ? @js(__('Checking…')) : @js(__('Run checks again'))">{{ __('Run checks again') }}</span>
+                        </x-button>
+                        <p x-show="error" x-cloak class="mt-2 text-xs text-red-600" x-text="error"></p>
+                    </form>
                 @endcan
             </x-card>
 

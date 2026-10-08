@@ -41,9 +41,10 @@ class VerificationEngine
     public function __construct(private FraudCheckService $fraud, private OrderStateMachine $machine, private OrderService $orders) {}
 
     /** @return array{inputs: array, rule: ?object, outcome: string} decision without changing anything */
-    public function evaluate(Order $order): array
+    /** $fresh: ask the providers again instead of using a recent saved answer (a person pressed Run checks again). */
+    public function evaluate(Order $order, bool $fresh = false): array
     {
-        $inputs = $this->inputs($order);
+        $inputs = $this->inputs($order, $fresh);
         $rules = DB::table('verification_rules')->where('is_active', true)
             ->whereIn('applies_to_channel', ['all', $order->channel])->orderBy('priority')->orderBy('id')->get();
         $conditions = DB::table('verification_rule_conditions')->whereIn('rule_id', $rules->pluck('id'))->get()->groupBy('rule_id');
@@ -68,9 +69,9 @@ class VerificationEngine
     }
 
     /** Run and apply (only while the order is still New). */
-    public function run(Order $order, ?User $by = null): string
+    public function run(Order $order, ?User $by = null, bool $fresh = false): string
     {
-        $decision = $this->evaluate($order);
+        $decision = $this->evaluate($order, $fresh);
         DB::table('verification_runs')->insert([
             'order_id' => $order->id,
             'matched_rule_id' => $decision['rule']?->id,
@@ -83,11 +84,15 @@ class VerificationEngine
         $order->forceFill(['verification_rule_id' => $decision['rule']?->id])->save();
 
         $ruleName = $decision['rule']->name ?? __('no rule matched');
-        $this->orders->note($order, 'verification', __('Checks: :o (:r).', ['o' => str_replace('_', ' ', $decision['outcome']), 'r' => $ruleName]), $by, [
-            'rule_id' => $decision['rule']?->id,
-        ]);
+        $status = OrderStatus::map()[$order->status_id];
+        // Past New the checks only inform: say so, so "record verified" on a confirmed order is not read as a step back.
+        $this->orders->note($order, 'verification', $status['key'] === 'new'
+            ? __('Checks: :o (:r).', ['o' => str_replace('_', ' ', $decision['outcome']), 'r' => $ruleName])
+            : __('Checks: :r (order already :s, status unchanged).', ['r' => $ruleName, 's' => $status['name']]), $by, [
+                'rule_id' => $decision['rule']?->id,
+            ]);
 
-        if (OrderStatus::map()[$order->status_id]['key'] !== 'new') {
+        if ($status['key'] !== 'new') {
             return $decision['outcome'];
         }
 
@@ -110,10 +115,10 @@ class VerificationEngine
         return $decision['outcome'];
     }
 
-    private function inputs(Order $order): array
+    private function inputs(Order $order, bool $fresh = false): array
     {
         $customer = Customer::find($order->customer_id);
-        $checks = $customer ? $this->fraud->check($customer) : collect();
+        $checks = $customer ? $this->fraud->check($customer, $fresh) : collect();
         $providers = DB::table('fraud_check_providers')->where('is_active', true)->get()->keyBy('system_key');
 
         $byProvider = [];

@@ -148,7 +148,7 @@ class OrderController extends Controller
         $order->load(['items', 'moderator:id,name', 'zone:id,name', 'customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en']);
         $notes = DB::table('order_notes as n')->leftJoin('users as u', 'u.id', '=', 'n.user_id')
             ->where('n.order_id', $order->id)->orderByDesc('n.id')->limit(200)
-            ->get(['n.id', 'n.note_type', 'n.body', 'n.created_at', 'n.status_at_time_id', 'u.name as user']);
+            ->get(['n.id', 'n.note_type', 'n.body', 'n.created_at', 'n.status_at_time_id', 'n.meta', 'u.name as user']);
         $payments = DB::table('order_payments as p')->join('payment_methods as m', 'm.id', '=', 'p.method_id')
             ->where('p.order_id', $order->id)->orderBy('p.id')
             ->get(['p.id', 'p.payment_type', 'p.amount', 'p.transaction_id', 'p.status', 'p.counts_now', 'p.received_at', 'm.name as method']);

@@ -34,6 +34,8 @@
             <span class="relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center rounded-full {{ $dot }}"><x-icon :name="$mark" class="h-3.5 w-3.5" /></span>
             <div class="min-w-0 flex-1 pt-0.5">
                 <p class="break-words text-sm text-gray-800">{{ $entry->body }}</p>
+                @php $recording = ! empty($entry->meta) ? (json_decode($entry->meta, true)['recording_url'] ?? null) : null; @endphp
+                @if ($recording)<a href="{{ $recording }}" target="_blank" rel="noopener" class="text-xs font-medium text-primary hover:underline">{{ __('Call recording') }}</a>@endif
                 <p class="mt-0.5 text-xs text-gray-400">{{ $entry->user ?? __('System') }} · {{ \Illuminate\Support\Carbon::parse($entry->created_at)->format($withYear ? 'd M Y, g:i A' : 'd M, g:i A') }}</p>
             </div>
         </li>

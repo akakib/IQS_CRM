@@ -307,7 +307,7 @@
                         <div class="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                             <div class="min-w-0 rounded-lg border border-gray-200 p-4 sm:col-span-2 2xl:col-span-1">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Phone') }}</p>
-                                <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" />
+                                <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" :order-id="$order->id" />
                             </div>
                             <div class="rounded-lg border border-gray-200 p-4">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Customer history') }}</p>

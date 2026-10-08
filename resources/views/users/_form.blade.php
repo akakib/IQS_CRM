@@ -75,6 +75,19 @@
         </div>
     </div>
 
+    {{-- Pay for the Scorecard. Hidden from roles that may not see salaries. --}}
+    @if (auth()->user()->canSeeField('salary'))
+        @php($salaryNow = $user->exists ? \Illuminate\Support\Facades\DB::table('staff_salaries')->where('user_id', $user->id)->orderByDesc('from_month')->first(['monthly_salary', 'from_month']) : null)
+        <div class="mt-2 border-t border-gray-100 pt-4">
+            <p class="text-sm font-semibold text-gray-800">{{ __('Pay') }}</p>
+            <p class="mb-3 text-xs text-gray-500">{{ __('Fixed monthly salary. A change counts from this month; earlier months keep their amount. The month-end bonus is set on the Scorecard.') }}</p>
+            <div class="md:w-1/2">
+                <x-form.input name="monthly_salary" type="number" min="0" step="1" :label="__('Monthly salary (৳)')" :value="$salaryNow ? $salaryNow->monthly_salary + 0 : null" />
+                @if ($salaryNow)<p class="-mt-2 text-xs text-gray-500">{{ __('Since :m', ['m' => \Illuminate\Support\Carbon::parse($salaryNow->from_month)->format('F Y')]) }}</p>@endif
+            </div>
+        </div>
+    @endif
+
     {{-- Which chats this person answers: only these show in their Chat window. --}}
     @php($chatChannels = \App\Models\ChatChannel::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'type']))
     @if ($chatChannels->isNotEmpty())

@@ -54,9 +54,10 @@ class UserController extends Controller
 
     public function store(UserRequest $request): RedirectResponse
     {
-        $user = User::create([...collect($request->validated())->except(['photo', 'remove_photo', 'chat_channels'])->all(), 'is_active' => true, 'email_verified_at' => now()]);
+        $user = User::create([...collect($request->validated())->except(['photo', 'remove_photo', 'chat_channels', 'monthly_salary'])->all(), 'is_active' => true, 'email_verified_at' => now()]);
         $this->savePhoto($request, $user);
         $this->saveChatChannels($request, $user);
+        $this->saveSalary($request, $user);
 
         return redirect()->route('users.index')
             ->with('success', __('Staff ":name" added.', ['name' => $user->name]));
@@ -69,10 +70,11 @@ class UserController extends Controller
 
     public function update(UserRequest $request, User $user): RedirectResponse
     {
-        $data = collect($request->validated())->except(['photo', 'remove_photo', 'chat_channels'])->all();
+        $data = collect($request->validated())->except(['photo', 'remove_photo', 'chat_channels', 'monthly_salary'])->all();
         $passwordReset = filled($data['password'] ?? null);
         $this->savePhoto($request, $user);
         $this->saveChatChannels($request, $user);
+        $this->saveSalary($request, $user);
 
         if (! $passwordReset) {
             unset($data['password']);
@@ -88,6 +90,25 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', $passwordReset
             ? __('Staff ":name" updated and password reset.', ['name' => $user->name])
             : __('Staff ":name" updated.', ['name' => $user->name]));
+    }
+
+    /**
+     * Monthly salary: a change applies from this month, so earlier months keep what they had (Scorecard).
+     * Only someone who may see salaries can set it.
+     */
+    private function saveSalary(Request $request, User $user): void
+    {
+        if (! $request->has('monthly_salary') || ! $request->user()->canSeeField('salary')) {
+            return;
+        }
+        $amount = $request->input('monthly_salary');
+        $current = \Illuminate\Support\Facades\DB::table('staff_salaries')->where('user_id', $user->id)->orderByDesc('from_month')->value('monthly_salary');
+        if ($amount === null || $amount === '' || ($current !== null && (float) $current === (float) $amount)) {
+            return;
+        }
+        \Illuminate\Support\Facades\DB::table('staff_salaries')->updateOrInsert(['user_id' => $user->id, 'from_month' => today()->startOfMonth()->toDateString()],
+            ['monthly_salary' => (float) $amount, 'set_by' => $request->user()->id, 'updated_at' => now(), 'created_at' => now()]);
+        app(\App\Services\ActivityLogger::class)->log('staff.salary_set', $user, ['monthly_salary' => $current], ['monthly_salary' => (float) $amount]);
     }
 
     /** The chat channels this person answers (only when the form showed them). */

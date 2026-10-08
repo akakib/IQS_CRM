@@ -31,6 +31,7 @@ class UserRequest extends FormRequest
             'desk_extend_minutes' => ['nullable', 'integer', 'min:1', 'max:60'],
             'desk_extend_daily_limit' => ['nullable', 'integer', 'min:0', 'max:100'],
             'desk_voice' => ['nullable', 'boolean'],
+            'monthly_salary' => ['nullable', 'numeric', 'min:0', 'max:10000000'],
             'chat_channels' => ['nullable', 'array'],
             'chat_channels.*' => ['integer'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],

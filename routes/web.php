@@ -113,6 +113,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/desk/control/list', [TeamController::class, 'controlList'])->middleware('can:orders.reassign')->name('desk.control.list');
     Route::get('/orders/activity', [\App\Http\Controllers\OrderActivityController::class, 'index'])->middleware('can:orders.reassign')->name('orders.activity');
     Route::get('/chat-report', [\App\Http\Controllers\ChatReportController::class, 'index'])->middleware('can:orders.reassign')->name('chat-report.index');
+    Route::get('/scorecard', [\App\Http\Controllers\ScorecardController::class, 'index'])->middleware('can:orders.reassign')->name('scorecard.index');
+    Route::post('/scorecard/{user}/bonus', [\App\Http\Controllers\ScorecardController::class, 'bonus'])->whereNumber('user')->middleware('can:staff.edit')->name('scorecard.bonus');
     Route::get('/work-time', [\App\Http\Controllers\WorkTimeController::class, 'index'])->middleware('can:orders.reassign')->name('work-time.index');
     Route::get('/attendance', [TeamController::class, 'attendance'])->middleware('can:attendance.view')->name('attendance.index');
     Route::middleware('can:attendance.edit')->group(function () {

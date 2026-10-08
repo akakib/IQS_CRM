@@ -116,6 +116,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/riders-report', [\App\Http\Controllers\RiderCallController::class, 'report'])->middleware('can:orders.reassign')->name('riders-report.index');
     Route::get('/rider-calls/find', [\App\Http\Controllers\RiderCallController::class, 'find'])->middleware('can:hotline.view')->name('rider-calls.find');
     Route::post('/rider-calls', [\App\Http\Controllers\RiderCallController::class, 'store'])->middleware('can:hotline.view')->name('rider-calls.store');
+    Route::get('/packers-report', [\App\Http\Controllers\PackerReportController::class, 'index'])->middleware('can:packaging.manage')->name('packers-report.index');
     Route::get('/scorecard', [\App\Http\Controllers\ScorecardController::class, 'index'])->middleware('can:orders.reassign')->name('scorecard.index');
     Route::post('/scorecard/{user}/bonus', [\App\Http\Controllers\ScorecardController::class, 'bonus'])->whereNumber('user')->middleware('can:staff.edit')->name('scorecard.bonus');
     Route::get('/work-time', [\App\Http\Controllers\WorkTimeController::class, 'index'])->middleware('can:orders.reassign')->name('work-time.index');

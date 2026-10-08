@@ -70,6 +70,7 @@ class PackagingController extends Controller
         return view('packaging.index', [
             'working' => $working,
             'onDuty' => $onDuty,
+            'helpersToday' => DB::table('packer_shifts')->where('work_date', $today)->pluck('helpers', 'user_id'),
             'canManage' => $canManage,
             'staff' => $canManage ? User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
             'counts' => $counts,
@@ -102,17 +103,24 @@ class PackagingController extends Controller
     /** Today's on-duty packers (replaces the list). */
     public function shift(Request $request, ActivityLogger $logger): RedirectResponse
     {
-        $data = $request->validate(['user_ids' => ['array', 'max:50'], 'user_ids.*' => ['integer', Rule::exists('users', 'id')->where('is_active', true)]]);
+        $data = $request->validate([
+            'user_ids' => ['array', 'max:50'], 'user_ids.*' => ['integer', Rule::exists('users', 'id')->where('is_active', true)],
+            'helpers' => ['array'], 'helpers.*' => ['nullable', 'string', 'max:255'],
+        ]);
         $ids = array_values(array_unique(array_map('intval', $data['user_ids'] ?? [])));
         $today = today()->toDateString();
+        // Helpers: names, comma separated, per packer (no login). The count is what the report uses.
+        $helpers = collect($data['helpers'] ?? [])->map(fn ($v) => collect(explode(',', (string) $v))->map(fn ($n) => trim($n))->filter()->unique()->take(20)->values());
 
-        DB::transaction(function () use ($ids, $today, $request) {
+        DB::transaction(function () use ($ids, $today, $request, $helpers) {
             DB::table('packer_shifts')->where('work_date', $today)->whereNotIn('user_id', $ids ?: [0])->delete();
             foreach ($ids as $id) {
-                DB::table('packer_shifts')->insertOrIgnore(['work_date' => $today, 'user_id' => $id, 'set_by' => $request->user()->id, 'created_at' => now()]);
+                $names = $helpers->get($id, collect());
+                DB::table('packer_shifts')->updateOrInsert(['work_date' => $today, 'user_id' => $id],
+                    ['helpers' => $names->join(', ') ?: null, 'helper_count' => $names->count(), 'set_by' => $request->user()->id, 'created_at' => now()]);
             }
         });
-        $logger->log('packer_shift.set', ['packer_shift', 0], null, ['date' => $today, 'user_ids' => $ids]);
+        $logger->log('packer_shift.set', ['packer_shift', 0], null, ['date' => $today, 'user_ids' => $ids, 'helpers' => $helpers->map->all()->all()]);
 
         return back()->with('success', __('On-duty packers saved for today.'));
     }

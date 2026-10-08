@@ -54,7 +54,7 @@
 
     <div class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
         <span class="text-gray-600">{{ __('On duty today') }}:
-            <b class="text-gray-800">{{ $onDuty->isEmpty() ? __('not set (everyone with packaging access)') : $onDuty->join(', ') }}</b></span>
+            <b class="text-gray-800">{{ $onDuty->isEmpty() ? __('not set (everyone with packaging access)') : $onDuty->map(fn ($name, $id) => $name.(($helpersToday[$id] ?? null) ? ' + '.$helpersToday[$id] : ''))->join(', ') }}</b></span>
         <span class="flex items-center gap-3">
             @if ($newLabels)<a href="{{ route('packaging.labels') }}" target="_blank" class="font-medium text-primary hover:underline">{{ __('Print new labels (:n)', ['n' => $newLabels]) }}</a>@endif
             <a href="{{ route('handover.index') }}" class="font-medium text-primary hover:underline">{{ __('Handover') }}</a>
@@ -67,11 +67,15 @@
             <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700">{{ __('Set today\'s packers') }}</summary>
             <form method="POST" action="{{ route('packaging.shift') }}" class="border-t border-gray-100 p-4">
                 @csrf
-                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {{-- Helpers: names only (no login), comma separated, so the Packers report can count packs per head. --}}
+                <p class="mb-2 text-xs text-gray-500">{{ __('Tick the packers on duty today. Helpers working with a packer: their names, separated by commas (they need no login).') }}</p>
+                <div class="grid gap-2 sm:grid-cols-2">
                     @foreach ($staff as $id => $name)
-                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                            <input type="checkbox" name="user_ids[]" value="{{ $id }}" @checked($onDuty->has($id)) class="rounded border-gray-300 text-primary"> {{ $name }}
-                        </label>
+                        <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm" x-data="{ on: @js($onDuty->has($id)) }">
+                            <label class="flex items-center gap-2"><input type="checkbox" name="user_ids[]" value="{{ $id }}" x-model="on" class="rounded border-gray-300 text-primary"> {{ $name }}</label>
+                            <input x-show="on" x-cloak name="helpers[{{ $id }}]" value="{{ $helpersToday[$id] ?? '' }}" maxlength="255" placeholder="{{ __('Helpers, e.g. Karim, Sohel') }}"
+                                class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none">
+                        </div>
                     @endforeach
                 </div>
                 <x-button size="sm" class="mt-3">{{ __('Save for today') }}</x-button>

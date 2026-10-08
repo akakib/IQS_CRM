@@ -213,6 +213,25 @@ class PackagingTest extends TestCase
         $this->assertStringNotContainsString($b->order_no, $sheet);
     }
 
+    public function test_helpers_are_set_with_the_packers_and_the_packers_report_counts_per_head(): void
+    {
+        // The day's packer and two helpers (names only, no login).
+        $this->actingAs($this->desk)->post('/packaging/shift', ['user_ids' => [$this->packer->id], 'helpers' => [$this->packer->id => 'Karim, Sohel, Karim']])->assertSessionHas('success');
+        $this->assertDatabaseHas('packer_shifts', ['user_id' => $this->packer->id, 'helpers' => 'Karim, Sohel', 'helper_count' => 2]);
+        $this->get('/packaging')->assertSee('Packer + Karim, Sohel');
+
+        $this->actingAs($this->packer);
+        foreach (['01712345678', '01812345678', '01912345678'] as $phone) {
+            $this->packIt($this->booked($phone, [['variant_id' => $this->dates->id, 'qty' => 1]]));
+        }
+        $this->postJson('/packaging/scan', ['code' => 'NOPE-1']); // a scan error
+
+        // 3 packed by 1 packer + 2 helpers on 1 day = 1 per head.
+        $this->actingAs($this->desk)->get('/packers-report')->assertOk()
+            ->assertSeeInOrder(['Packer', '3', '1', '2', '3', '1'])->assertSeeInOrder(['Scan errors', 'Packer']);
+        $this->actingAs($this->packer)->get('/packers-report')->assertForbidden();
+    }
+
     public function test_handover_by_hand_runs_the_same_checks_and_is_marked_manual(): void
     {
         $good = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);

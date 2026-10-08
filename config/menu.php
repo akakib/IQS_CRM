@@ -32,6 +32,7 @@ return [
     ]],
     'analysis' => ['Analysis', [
         ['KPI', 'kpi.index', 'kpi.*', null, 'chart'],
+        ['Work time', 'work-time.index', 'work-time.*', 'orders.reassign', 'clock'],
         ['Order P&L', 'analysis.index', 'analysis.*', 'analysis.view', 'calculator'],
     ]],
     'marketing' => ['Marketing', [

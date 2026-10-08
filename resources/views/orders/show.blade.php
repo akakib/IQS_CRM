@@ -209,6 +209,34 @@
                     </form>
                 @endif
             </x-card>
+
+            {{-- Who held it and how long it took, from the history of the order (admins and managers). --}}
+            @can('orders.reassign')
+                @php($story = app(\App\Services\Orders\OrderTimeline::class)->forOrder($order->id))
+                @php($span = fn ($s) => \App\Services\Reports\WorkTime::span($s))
+                @php($plus = fn ($from, $to) => $to ? $to->format('g:i A').' (+'.$span((int) $from->diffInSeconds($to, true)).')' : '-')
+                <x-card :title="__('Time taken')">
+                    <p class="text-xs text-gray-500">{{ __('Came in :t', ['t' => $story['came']->format('d M, g:i A')]) }}</p>
+                    @forelse ($story['turns'] as $t)
+                        <div class="mt-3 border-t border-gray-100 pt-3 text-sm">
+                            <p class="font-medium text-gray-800">{{ $t['name'] }} <span class="font-normal text-gray-500">· {{ __('given :t', ['t' => $t['given']->format('d M, g:i A')]) }}</span></p>
+                            <dl class="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+                                <dt class="text-gray-500">{{ __('Opened') }}</dt><dd class="tabular-nums text-gray-800">{{ $plus($t['given'], $t['opened']) }}</dd>
+                                <dt class="text-gray-500">{{ __('First action') }}</dt><dd class="tabular-nums text-gray-800">{{ $plus($t['given'], $t['acted']) }}</dd>
+                                @if ($t['sent'])
+                                    <dt class="text-gray-500">{{ $t['sent_to'] === 'confirmed' ? __('Confirmed') : __('Cancelled') }}</dt><dd class="tabular-nums text-gray-800">{{ $t['sent']->format('g:i A') }}</dd>
+                                    <dt class="text-gray-500">{{ __('Net time') }}</dt><dd class="font-semibold tabular-nums text-gray-900">{{ $span($t['net_seconds']) }}</dd>
+                                @elseif ($t['ended_reason'] && $t['ended_reason'] !== 'finished')
+                                    <dt class="text-gray-500">{{ __('Ended') }}</dt><dd @class(['text-gray-800', 'font-medium text-red-600' => in_array($t['ended_reason'], ['idle', 'timeout'], true)])>{{ match ($t['ended_reason']) { 'idle' => __('Given back: nothing done'), 'break' => __('Back to New: break'), 'reassigned' => __('Handed to someone else'), default => $t['ended_reason'] } }}</dd>
+                                @endif
+                            </dl>
+                        </div>
+                    @empty
+                        <p class="mt-2 text-sm text-gray-500">{{ __('Not given to anyone yet.') }}</p>
+                    @endforelse
+                    <p class="mt-3 text-[11px] text-gray-400">{{ __('Net time leaves out No answer until the order came back, and On hold.') }}</p>
+                </x-card>
+            @endcan
         </div>
     </div>
 </x-layouts.app>

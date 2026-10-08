@@ -112,6 +112,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/desk/control', [TeamController::class, 'control'])->middleware('can:orders.reassign')->name('desk.control');
     Route::get('/desk/control/list', [TeamController::class, 'controlList'])->middleware('can:orders.reassign')->name('desk.control.list');
     Route::get('/orders/activity', [\App\Http\Controllers\OrderActivityController::class, 'index'])->middleware('can:orders.reassign')->name('orders.activity');
+    Route::get('/work-time', [\App\Http\Controllers\WorkTimeController::class, 'index'])->middleware('can:orders.reassign')->name('work-time.index');
     Route::get('/attendance', [TeamController::class, 'attendance'])->middleware('can:attendance.view')->name('attendance.index');
     Route::middleware('can:attendance.edit')->group(function () {
         Route::post('/attendance/breaks/{break}', [TeamController::class, 'correctBreak'])->whereNumber('break')->name('attendance.breaks.correct');

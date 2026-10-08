@@ -92,6 +92,17 @@ class OrderTimelineTest extends TestCase
         $this->assertSame('confirmed', $t['sent_to']);
         $this->assertSame(18 * 60, $t['net_seconds']);
         $this->assertSame('2026-10-05 10:50:00', $t['sent']->toDateTimeString());
+
+        // Work time report and the order page show it; staff do not see the report.
+        $this->get('/work-time')->assertForbidden();
+        $boss = User::factory()->create(['name' => 'Boss']);
+        $boss->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'orders.reassign'], [], 'Manager')->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->actingAs($boss)->get('/work-time?date=2026-10-05')->assertOk()
+            ->assertSeeInOrder(['Mahim', '1', '1', '0', '5 min', '8 min', '18 min']);
+        $this->get('/work-time?date=2026-10-05&person='.$this->mahim->id)->assertOk()
+            ->assertSee('Mahim, order by order')->assertSee($o->order_no)->assertSeeInOrder(['10:02 AM', '10:07 AM', '+5 min', '10:10 AM', '+8 min', '10:50 AM', 'Confirmed', '18 min']);
+        $this->get('/orders/'.$o->id)->assertOk()->assertSee('Time taken')->assertSee('10:07 AM (+5 min)')->assertSee('18 min');
     }
 
     public function test_an_order_left_untouched_for_an_hour_goes_back_and_a_worked_one_stays(): void

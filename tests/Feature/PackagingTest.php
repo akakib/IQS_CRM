@@ -393,4 +393,47 @@ class PackagingTest extends TestCase
             ->assertJsonPath('rows.0.why', 'Box put back')->assertJsonPath('rows.0.order', $b->order_no)
             ->assertJsonPath('rows.3.why', 'Counted')->assertJsonPath('rows.3.after', 3);
     }
+
+    /** The courier sent it back: status Returned, as the webhook leaves it. */
+    private function returned(Order $o, string $when = 'now'): void
+    {
+        DB::table('orders')->where('id', $o->id)->update(['status_id' => OrderStatus::idFor('returned')]);
+        DB::table('order_events')->insert(['order_id' => $o->id, 'to_status_id' => OrderStatus::idFor('returned'), 'source' => 'webhook', 'created_at' => \Illuminate\Support\Carbon::parse($when)]);
+    }
+
+    public function test_a_returned_parcel_is_received_item_by_item_and_good_items_go_back_on_the_shelf(): void
+    {
+        $this->actingAs($this->desk)->postJson('/products/stock/'.$this->dates->id, ['qty' => 3]);
+        $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        $this->actingAs($this->packer);
+        $this->packIt($a);
+        $this->assertSame(1, $this->dates->fresh()->stock_qty);
+        $this->returned($a);
+
+        // To receive lists it; a scan of its label finds it with its items.
+        $this->get('/returns')->assertOk()->assertSee($a->order_no);
+        $items = DB::table('order_items')->where('order_id', $a->id)->pluck('id', 'variant_id');
+        $this->postJson('/returns/find', ['code' => $this->label($a)])->assertJson(['ok' => true])->assertJsonCount(2, 'order.items');
+
+        // Every item must be marked; then Good goes back on the shelf, Damaged does not, and the managers hear of it.
+        $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => 'good']])->assertStatus(422);
+        $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => 'good', $items[$this->nuts->id] => 'damaged']])
+            ->assertOk()->assertJson(['ok' => true]);
+        $this->assertSame(3, $this->dates->fresh()->stock_qty);
+        $this->assertNotNull($a->fresh()->return_received_at);
+        $this->assertDatabaseHas('return_items', ['order_id' => $a->id, 'variant_id' => $this->nuts->id, 'condition' => 'damaged']);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $a->id, 'body' => 'Return received at the shop by Packer: 1 good, 1 damaged, 0 not in the parcel.']);
+
+        // Twice is refused; an order that was not returned is not taken in.
+        $this->postJson('/returns/find', ['code' => $a->order_no])->assertJson(['ok' => false, 'level' => 'orange']);
+        $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => 'good', $items[$this->nuts->id] => 'good']])->assertStatus(422);
+        $this->assertSame(3, $this->dates->fresh()->stock_qty);
+        $b = $this->booked('01822222222', [['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        $this->postJson('/returns/find', ['code' => $b->order_no])->assertJson(['ok' => false, 'level' => 'red']);
+        $this->get('/returns?tab=received')->assertSee($a->order_no)->assertSee('1 damaged');
+
+        // Still not back after the setting's days: red, ask the courier.
+        $this->returned($b, '-8 days');
+        $this->get('/returns')->assertSee('Not back after 8 days');
+    }
 }

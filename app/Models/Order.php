@@ -70,6 +70,7 @@ class Order extends Model
             'hold_date_notified_at' => 'datetime',
             'external_paid_at' => 'datetime',
             'unpack_needed_at' => 'datetime',
+            'return_received_at' => 'datetime',
             'booking_claimed_at' => 'datetime',
             'packaging_started_at' => 'datetime',
             'packed_at' => 'datetime',

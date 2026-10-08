@@ -190,6 +190,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/packaging/batches/{batch}', [PackagingController::class, 'batch'])->whereNumber('batch')->name('packaging.batch');
         Route::post('/packaging/report', [PackagingController::class, 'report'])->name('packaging.report');
         Route::get('/packaging/issues', [PackagingController::class, 'issues'])->name('packaging.issues');
+        Route::get('/returns', [\App\Http\Controllers\ReturnController::class, 'index'])->name('returns.index');
         Route::post('/packaging/issues/{report}', [PackagingController::class, 'resolve'])->whereNumber('report')->name('packaging.issues.resolve');
         Route::get('/handover', [HandoverController::class, 'index'])->name('handover.index');
         Route::get('/handover/{session}', [HandoverController::class, 'show'])->whereNumber('session')->name('handover.show');
@@ -200,6 +201,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/packaging/shift', [PackagingController::class, 'shift'])->middleware('can:packaging.manage')->name('packaging.shift');
     Route::middleware('can:packaging.create')->group(function () {
         Route::post('/packaging/scan', [PackagingController::class, 'scan'])->name('packaging.scan.post');
+        Route::post('/returns/find', [\App\Http\Controllers\ReturnController::class, 'find'])->name('returns.find');
+        Route::post('/returns/{order}', [\App\Http\Controllers\ReturnController::class, 'receive'])->name('returns.receive');
         Route::post('/packaging/orders/{order}/pack', [PackagingController::class, 'pack'])->name('packaging.pack');
         Route::post('/packaging/orders/{order}/hold', [PackagingController::class, 'hold'])->name('packaging.hold');
         Route::post('/packaging/orders/{order}/unpacked', [PackagingController::class, 'unpacked'])->name('packaging.unpacked');

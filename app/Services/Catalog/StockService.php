@@ -70,6 +70,25 @@ class StockService
         });
     }
 
+    /** A return received: good items back on the shelf. @param array<int, int> $good variant => qty */
+    public function returnGood(Order $order, array $good, ?User $by): void
+    {
+        $counted = DB::table('product_variants')->whereIn('id', array_keys($good))->whereNotNull('stock_qty')->lockForUpdate()->get(['id', 'stock_qty']);
+        foreach ($counted as $v) {
+            $add = (int) $good[$v->id];
+            if ($add <= 0) {
+                continue;
+            }
+            $after = (int) $v->stock_qty + $add;
+            DB::table('product_variants')->where('id', $v->id)->update(['stock_qty' => $after]);
+            DB::table('stock_movements')->insert([
+                'variant_id' => $v->id, 'qty_change' => $add, 'qty_after' => $after, 'reason' => 'return_good',
+                'order_id' => $order->id, 'user_id' => $by?->id, 'created_at' => now(),
+            ]);
+            $this->followAvailability($v->id, $after, $by);
+        }
+    }
+
     /** What the order's items are now, as variant => qty. */
     public function itemsOf(Order $order): array
     {

@@ -15,6 +15,8 @@ return [
 
     'orders.pickup_cutoffs' => ['json', ['15:00'], 'Courier pickup cut-off times', 'Orders', ['array', 'min:1', 'max:6']],
     'orders.packaging_cost' => ['decimal', 0, 'Packaging cost per order (৳)', 'Orders', ['required', 'numeric', 'min:0', 'max:100000']],
+    'returns.alert_days' => ['int', 7, 'A returned parcel not back at the shop after this many days shows red (days)', 'Returns', ['required', 'integer', 'min:1', 'max:60']],
+    'returns.courier_charge' => ['decimal', 0, 'What the courier charges for a returned parcel (৳). Counted as a loss on each return', 'Returns', ['required', 'numeric', 'min:0', 'max:10000']],
     'orders.duplicate_window_hours' => ['int', 24, 'Same phone counts as duplicate within (hours)', 'Orders', ['required', 'integer', 'min:0', 'max:720']],
     'orders.freeze_minutes_before_pickup' => ['int', 30, 'Freeze content edits before pickup (minutes)', 'Orders', ['required', 'integer', 'min:0', 'max:600']],
     'orders.issue_sla_minutes' => ['int', 60, 'Minutes the assigned moderator has to handle a delivery issue', 'Orders', ['required', 'integer', 'min:5', 'max:1440']],

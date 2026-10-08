@@ -20,6 +20,7 @@ return [
         ['Courier booking', 'shipping.index', 'shipping.*', 'shipping.view', 'truck'],
         ['Packaging', 'packaging.index', 'packaging.*', 'packaging.view', 'box'],
         ['Handover', 'handover.index', 'handover.*', 'packaging.view', 'swap'],
+        ['Returns', 'returns.index', 'returns.*', 'packaging.view', 'refresh'],
         ['Hotline', 'hotline.index', 'hotline.*', 'hotline.view', 'phone'],
         ['Delivery issues', 'issues.index', 'issues.*', 'orders.view', 'alert'],
         ['Payments to check', 'payments.index', 'payments.*', 'payments.verify', 'cash'],

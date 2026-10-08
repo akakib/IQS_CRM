@@ -43,6 +43,7 @@
             </div>
 
             <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+            <x-chat-control />
             <x-break-control part="button" />
             <x-voice-alerts />
             <x-theme-toggle />

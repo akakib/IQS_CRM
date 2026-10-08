@@ -75,6 +75,25 @@
         </div>
     </div>
 
+    {{-- Which chats this person answers: only these show in their Chat window. --}}
+    @php($chatChannels = \App\Models\ChatChannel::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'type']))
+    @if ($chatChannels->isNotEmpty())
+        @php($mine = old('chat_channels', $user->exists ? $user->chatChannels()->pluck('chat_channels.id')->all() : []))
+        <div class="mt-2 border-t border-gray-100 pt-4">
+            <p class="text-sm font-semibold text-gray-800">{{ __('Chat channels') }}</p>
+            <p class="mb-3 text-xs text-gray-500">{{ __('The chats this person answers. Only these show in their Chat window.') }}</p>
+            <input type="hidden" name="chat_channels_shown" value="1">
+            <div class="flex flex-wrap gap-2">
+                @foreach ($chatChannels as $c)
+                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:checked]:text-primary">
+                        <input type="checkbox" name="chat_channels[]" value="{{ $c->id }}" @checked(in_array($c->id, array_map('intval', (array) $mine), true)) class="rounded border-gray-300 text-primary focus:ring-primary">
+                        {{ $c->name }}
+                    </label>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <div class="mt-2 border-t border-gray-100 pt-4">
         <p class="mb-3 text-sm font-semibold text-gray-800">{{ $user->exists ? __('Reset password') : __('Password') }}</p>
         @if ($user->exists)

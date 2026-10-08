@@ -46,7 +46,7 @@
             <form method="POST" action="{{ route('breaks.start') }}" class="relative w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-xl">
                 @csrf
                 <h3 class="text-sm font-semibold text-gray-800">{{ __('Take a break') }}</h3>
-                <p class="mt-1 text-xs text-gray-500">{{ __('Orders you have not called yet go back to New. The screen stays locked until you press Start work.') }}</p>
+                <p class="mt-1 text-xs text-gray-500">{{ __('Finish the orders you hold first. The screen stays locked until you press Start work.') }}</p>
                 <input type="hidden" name="reason_id" :value="reason">
                 <div class="mt-4 grid grid-cols-2 gap-2">
                     <template x-if="!reasons"><p class="col-span-2 text-sm text-gray-400">{{ __('Loading…') }}</p></template>

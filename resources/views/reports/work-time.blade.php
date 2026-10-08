@@ -16,7 +16,7 @@
             <x-date-input name="date" :value="$day->toDateString()" :max="today()->toDateString()" :clearable="false" @date-change="$nextTick(() => $refs.day.requestSubmit())" />
         </form>
     </div>
-    <p class="mb-4 text-xs text-gray-500">{{ __('Orders given to each person on this day. Times are the middle value (median). Net time leaves out the time the customer made us wait: No answer until the order came back, and On hold.') }}</p>
+    <p class="mb-4 text-xs text-gray-500">{{ __('Orders given to each person on this day. Times are the middle value (median). Net time leaves out the time the customer made us wait: No answer until the order came back, and On hold. Chat mode counts as work, not free time.') }}</p>
 
     @if ($people->isEmpty())
         <x-empty-state :message="__('No orders were given to anyone on this day.')" />
@@ -32,6 +32,7 @@
                 <th class="text-right">{{ __('To packaging (net)') }}</th>
                 <th class="text-right">{{ __('Given back') }}</th>
                 <th class="text-right">{{ __('Break') }}</th>
+                <th class="text-right">{{ __('Chat') }}</th>
                 <th class="text-right">{{ __('Free, orders waiting') }}</th>
                 <th class="text-right">{{ __('Free, nothing waiting') }}</th>
             </x-slot:head>
@@ -46,6 +47,7 @@
                     <td class="text-right font-medium tabular-nums">{{ $span($p['net']) }}</td>
                     <td @class(['text-right tabular-nums', 'font-semibold text-red-600' => $p['given_back']])>{{ $p['given_back'] }}</td>
                     <td class="text-right tabular-nums">{{ $p['break_minutes'] }} {{ __('min') }}</td>
+                    <td class="text-right tabular-nums">{{ $span($p['chat_seconds'] ?: null) }}@if ($p['chat_messages'] || $p['chat_orders'])<span class="block text-xs text-gray-500">{{ __(':m msg · :o orders', ['m' => $p['chat_messages'], 'o' => $p['chat_orders']]) }}</span>@endif</td>
                     <td @class(['text-right tabular-nums', 'font-semibold text-red-600' => $p['free_waiting'] >= 600])>{{ $span($p['free_waiting'] ?: null) }}</td>
                     <td class="text-right tabular-nums text-gray-500">{{ $span($p['free_nothing'] ?: null) }}</td>
                 </tr>
@@ -57,6 +59,7 @@
                 <a href="{{ $dayUrl($day, $p['id']) }}" class="block">
                     <x-record-card :title="$p['name']" :subtitle="__(':n orders · :c confirmed · :x cancelled', ['n' => $p['turns'], 'c' => $p['confirmed'], 'x' => $p['cancelled']])">
                         <x-slot:footer>{{ __('Opened in :a · first action in :b · break :m min', ['a' => $span($p['open']), 'b' => $span($p['start']), 'm' => $p['break_minutes']]) }}@if ($p['given_back']) · <span class="text-red-600">{{ __(':n given back', ['n' => $p['given_back']]) }}</span>@endif
+                            <span class="block">{{ __('Chat :t · :m msg · :o orders', ['t' => $span($p['chat_seconds'] ?: null), 'm' => $p['chat_messages'], 'o' => $p['chat_orders']]) }}</span>
                             <span @class(['block', 'font-medium text-red-600' => $p['free_waiting'] >= 600])>{{ __('Free while orders waited: :w', ['w' => $span($p['free_waiting'] ?: null)]) }}</span></x-slot:footer>
                         <x-slot:actions><span class="text-right"><span class="block text-xs text-gray-500">{{ __('Net') }}</span><span class="font-semibold tabular-nums">{{ $span($p['net']) }}</span></span></x-slot:actions>
                     </x-record-card>

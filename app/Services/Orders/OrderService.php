@@ -69,6 +69,7 @@ class OrderService
 
             $order = Order::create([
                 'channel' => $data['channel'],
+                'chat_channel_id' => $data['chat_channel_id'] ?? null,
                 'external_ref' => $data['external_ref'] ?? null,
                 'customer_id' => $customer->id,
                 'status_id' => OrderStatus::idFor('new'),

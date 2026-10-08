@@ -86,9 +86,15 @@ class OrderController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        // From the Chat window: the order starts on that chat's channel (only one of the person's own).
+        $chatChannels = app(\App\Services\Work\ChatService::class)->channelsFor($request->user());
+        $chatChannel = $chatChannels->firstWhere('id', $request->integer('chat_channel'));
+
         return view('orders.create', [
+            'chatChannels' => $chatChannels,
+            'chatChannel' => $chatChannel,
             'zones' => DeliveryZone::where('is_active', true)->orderBy('sort_order')->pluck('name', 'id')->all(),
             'methods' => PaymentMethod::where('is_active', true)->get(['id', 'name', 'requires_trx_id']),
             'districts' => config('bd.districts'),
@@ -119,7 +125,14 @@ class OrderController extends Controller
             'advance.amount' => ['nullable', 'numeric', 'min:0'],
             'advance.transaction_id' => ['nullable', 'string', 'max:100'],
             'advance.sender_number' => ['nullable', 'string', 'max:20'],
+            'chat_channel_id' => ['nullable', 'integer'],
         ]);
+        if (! empty($data['chat_channel_id'])) {
+            $chat = app(\App\Services\Work\ChatService::class)->channelsFor($request->user())->firstWhere('id', (int) $data['chat_channel_id']);
+            if (! $chat) {
+                throw ValidationException::withMessages(['chat_channel_id' => __('This chat channel is not yours.')]);
+            }
+        }
 
         $order = $this->orders->create($data, $request->user());
         app(VerificationEngine::class)->run($order);

@@ -49,7 +49,7 @@ class FreeTime
      * @param  Collection<int, Collection<int, array{at: Carbon, back: Carbon}>>  $returns  No answer due-back times by order
      * @param  Collection<int, object>  $breaks  their breaks (started_at, ended_at)
      */
-    public function busy(Collection $assignments, Collection $events, Collection $returns, Collection $breaks): array
+    public function busy(Collection $assignments, Collection $events, Collection $returns, Collection $breaks, ?Collection $chats = null): array
     {
         $todo = OrderStatus::idsFor(['new', 'record_verified']);
         $now = now()->getTimestamp();
@@ -72,6 +72,10 @@ class FreeTime
         }
         foreach ($breaks as $b) {
             $spans[] = [Carbon::parse($b->started_at)->getTimestamp(), $b->ended_at ? Carbon::parse($b->ended_at)->getTimestamp() : $now];
+        }
+        // Chat mode is work: answering messages and comments.
+        foreach ($chats ?? [] as $c) {
+            $spans[] = [Carbon::parse($c->started_at)->getTimestamp(), $c->ended_at ? Carbon::parse($c->ended_at)->getTimestamp() : $now];
         }
 
         return self::union($spans);

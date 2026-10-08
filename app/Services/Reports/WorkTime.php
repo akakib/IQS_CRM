@@ -74,15 +74,28 @@ class WorkTime
         $allEvents = $this->timeline->events($allIds);
         $allReturns = $this->timeline->returns($allIds);
         $waitingSpans = $this->free->waiting($from, $to);
-        $freeOf = fn (int $id) => $this->free->forPerson($id, $day, $this->free->busy($open->get($id, collect()), $allEvents, $allReturns, $breakRows->get($id, collect())), $waitingSpans);
+        $chats = DB::table('chat_sessions')->whereIn('user_id', $staff->pluck('id'))->where('started_at', '<=', $to)
+            ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))->get(['user_id', 'started_at', 'ended_at'])->groupBy('user_id');
+        $chatCounts = DB::table('chat_events')->whereIn('user_id', $staff->pluck('id'))->whereBetween('created_at', [$from, $to])
+            ->groupBy('user_id', 'kind')->selectRaw('user_id, kind, COUNT(*) as n')->get()->groupBy('user_id');
+        $chatOrders = DB::table('orders')->whereIn('created_by', $staff->pluck('id'))->whereNotNull('chat_channel_id')->whereBetween('created_at', [$from, $to])
+            ->groupBy('created_by')->selectRaw('created_by, COUNT(*) as n')->pluck('n', 'created_by');
+        $freeOf = fn (int $id) => $this->free->forPerson($id, $day, $this->free->busy($open->get($id, collect()), $allEvents, $allReturns, $breakRows->get($id, collect()), $chats->get($id, collect())), $waitingSpans);
+        $nowTs = now()->getTimestamp();
 
-        $people = $staff->map(function ($u) use ($turns, $breaks, $freeOf) {
+        $people = $staff->map(function ($u) use ($turns, $breaks, $freeOf, $chats, $chatCounts, $chatOrders, $from, $to, $nowTs) {
             $mine = $turns->get($u->id, collect());
             $free = $freeOf($u->id);
+            $kinds = $chatCounts->get($u->id, collect())->pluck('n', 'kind');
+            $chatSpans = $chats->get($u->id, collect())->map(fn ($c) => [Carbon::parse($c->started_at)->getTimestamp(), $c->ended_at ? Carbon::parse($c->ended_at)->getTimestamp() : $nowTs])->all();
 
             return [
                 'id' => $u->id, 'name' => $u->name, 'photo' => $u->photo_path,
                 'free_waiting' => $free['waiting'], 'free_nothing' => $free['nothing'],
+                'chat_seconds' => FreeTime::length(FreeTime::clip(FreeTime::union($chatSpans), $from->getTimestamp(), min($to->getTimestamp(), $nowTs))),
+                'chat_messages' => (int) ($kinds['message'] ?? 0) - (int) ($kinds['undo'] ?? 0),
+                'chat_no_order' => (int) ($kinds['no_order'] ?? 0),
+                'chat_orders' => (int) ($chatOrders[$u->id] ?? 0),
                 'turns' => $mine->count(),
                 'confirmed' => $mine->where('sent_to', 'confirmed')->count(),
                 'cancelled' => $mine->where('sent_to', 'cancelled')->count(),

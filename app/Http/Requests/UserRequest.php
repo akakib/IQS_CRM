@@ -31,6 +31,8 @@ class UserRequest extends FormRequest
             'desk_extend_minutes' => ['nullable', 'integer', 'min:1', 'max:60'],
             'desk_extend_daily_limit' => ['nullable', 'integer', 'min:0', 'max:100'],
             'desk_voice' => ['nullable', 'boolean'],
+            'chat_channels' => ['nullable', 'array'],
+            'chat_channels.*' => ['integer'],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_photo' => ['nullable', 'boolean'],
             // Required when creating; optional on edit (filled = Owner resets it).

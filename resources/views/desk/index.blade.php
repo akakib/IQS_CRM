@@ -98,6 +98,16 @@
         </div>
     </div>
 
+    {{-- Nothing to take and nothing in hand: answer chats and comments instead of waiting. Hides as soon as an order waits. --}}
+    @if ($canTake && ! $inHand && ! $embed && app(\App\Services\Work\ChatService::class)->channelsFor(auth()->user())->isNotEmpty()
+        && ! app(\App\Services\Work\ChatService::class)->openSession(auth()->id()))
+        <div x-data="{ n: {{ $waiting + $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting" x-show="n === 0" x-cloak
+            class="mb-4 flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm text-green-900">{{ __('No website orders now. Answer chats and comments meanwhile: it counts as work.') }}</p>
+            <button type="button" @click="window.dispatchEvent(new CustomEvent('chat-open'))" class="shrink-0 rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">{{ __('Open Chat') }}</button>
+        </div>
+    @endif
+
     <div @class(['hidden lg:block' => $showDetailOnPhone])>
         <x-tabs :tabs="collect($tabLabels)->reject(fn ($label, $t) => $t === 'send' && ! $counts['send'] && $tab !== 'send')->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
     </div>

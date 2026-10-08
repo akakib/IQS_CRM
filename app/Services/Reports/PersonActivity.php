@@ -102,9 +102,27 @@ class PersonActivity
                 $b->ended_at ? Carbon::parse($b->ended_at) : null);
         }
 
+        // Chat mode: one line per stretch, with what was counted in it.
+        $chats = DB::table('chat_sessions')->where('user_id', $userId)->where('started_at', '<=', $to)
+            ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))->orderBy('started_at')->get(['started_at', 'ended_at']);
+        $chatEvents = DB::table('chat_events as e')->leftJoin('status_reasons as r', 'r.id', '=', 'e.reason_id')
+            ->where('e.user_id', $userId)->whereBetween('e.created_at', [$from, $to])->get(['e.kind', 'e.created_at', 'r.label_en as reason']);
+        $chatOrders = DB::table('orders')->where('created_by', $userId)->whereNotNull('chat_channel_id')->whereBetween('created_at', [$from, $to])->pluck('created_at');
+        foreach ($chats as $c) {
+            $start = Carbon::parse($c->started_at);
+            $end = $c->ended_at ? Carbon::parse($c->ended_at) : now();
+            $in = $chatEvents->filter(fn ($e) => Carbon::parse($e->created_at)->between($start, $end));
+            $lost = $in->where('kind', 'no_order')->countBy(fn ($e) => __($e->reason ?? 'Other'))->map(fn ($n, $r) => $n > 1 ? $r.' ×'.$n : $r)->join(', ');
+            $orders = $chatOrders->filter(fn ($t) => Carbon::parse($t)->between($start, $end))->count();
+            $add($start, 'chat', trim(__('Chat mode :t · :m messages answered', [
+                't' => WorkTime::span((int) $start->diffInSeconds($end, true)),
+                'm' => $in->where('kind', 'message')->count() - $in->where('kind', 'undo')->count(),
+            ]).' · '.trans_choice('{0} 0 orders|{1} 1 order|[2,*] :count orders', $orders).($lost ? ' · '.__('no order: :r', ['r' => $lost]) : '').($c->ended_at ? '' : ' · '.__('still on'))), null, null, $c->ended_at ? $end : null);
+        }
+
         // Free stretches between all of that.
         $orderIds = $turns->pluck('order_id')->unique()->values()->all();
-        $busy = $this->free->busy($turns, $this->timeline->events($orderIds), $this->timeline->returns($orderIds), $breaks);
+        $busy = $this->free->busy($turns, $this->timeline->events($orderIds), $this->timeline->returns($orderIds), $breaks, $chats);
         $free = $this->free->forPerson($userId, $day, $busy, $this->free->waiting($from, $to));
         foreach ($free['segments'] as $s) {
             $add($s['from'], 'free', $s['waiting']

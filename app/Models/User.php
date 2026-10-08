@@ -66,6 +66,12 @@ class User extends Authenticatable
         ];
     }
 
+    /** Chat channels this person answers (Chat mode). */
+    public function chatChannels(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(ChatChannel::class);
+    }
+
     public function workLocation(): BelongsTo
     {
         return $this->belongsTo(Location::class, 'work_location_id');

@@ -54,8 +54,9 @@ class UserController extends Controller
 
     public function store(UserRequest $request): RedirectResponse
     {
-        $user = User::create([...collect($request->validated())->except(['photo', 'remove_photo'])->all(), 'is_active' => true, 'email_verified_at' => now()]);
+        $user = User::create([...collect($request->validated())->except(['photo', 'remove_photo', 'chat_channels'])->all(), 'is_active' => true, 'email_verified_at' => now()]);
         $this->savePhoto($request, $user);
+        $this->saveChatChannels($request, $user);
 
         return redirect()->route('users.index')
             ->with('success', __('Staff ":name" added.', ['name' => $user->name]));
@@ -68,9 +69,10 @@ class UserController extends Controller
 
     public function update(UserRequest $request, User $user): RedirectResponse
     {
-        $data = collect($request->validated())->except(['photo', 'remove_photo'])->all();
+        $data = collect($request->validated())->except(['photo', 'remove_photo', 'chat_channels'])->all();
         $passwordReset = filled($data['password'] ?? null);
         $this->savePhoto($request, $user);
+        $this->saveChatChannels($request, $user);
 
         if (! $passwordReset) {
             unset($data['password']);
@@ -86,6 +88,14 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', $passwordReset
             ? __('Staff ":name" updated and password reset.', ['name' => $user->name])
             : __('Staff ":name" updated.', ['name' => $user->name]));
+    }
+
+    /** The chat channels this person answers (only when the form showed them). */
+    private function saveChatChannels(Request $request, User $user): void
+    {
+        if ($request->has('chat_channels_shown')) {
+            $user->chatChannels()->sync(\App\Models\ChatChannel::whereIn('id', (array) $request->input('chat_channels', []))->pluck('id'));
+        }
     }
 
     /**

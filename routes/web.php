@@ -125,6 +125,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/breaks/reasons', [BreakController::class, 'reasons'])->name('breaks.reasons');
     Route::post('/breaks', [BreakController::class, 'start'])->name('breaks.start');
     Route::post('/breaks/end', [BreakController::class, 'end'])->name('breaks.end');
+    // Chat mode: everyone with a chat channel (checked in ChatService).
+    Route::get('/chat', [\App\Http\Controllers\ChatController::class, 'state'])->name('chat.state');
+    Route::post('/chat/start', [\App\Http\Controllers\ChatController::class, 'start'])->name('chat.start');
+    Route::post('/chat/stop', [\App\Http\Controllers\ChatController::class, 'stop'])->name('chat.stop');
+    Route::post('/chat/events', [\App\Http\Controllers\ChatController::class, 'record'])->name('chat.record');
 
     Route::get('/orders/create', [OrderController::class, 'create'])->middleware('can:orders.create')->name('orders.create');
     Route::post('/orders', [OrderController::class, 'store'])->middleware('can:orders.create')->name('orders.store');
@@ -233,6 +238,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/tracking', [TrackingSettingsController::class, 'index'])->middleware('can:settings.view')->name('settings.tracking');
     Route::put('/settings/tracking/{event}', [TrackingSettingsController::class, 'update'])->whereNumber('event')->middleware('can:settings.edit')->name('settings.tracking.update');
 
+    Route::get('/settings/chat-channels', [\App\Http\Controllers\ChatController::class, 'index'])->middleware('can:settings.view')->name('settings.chat-channels');
+    Route::post('/settings/chat-channels/{channel?}', [\App\Http\Controllers\ChatController::class, 'save'])->whereNumber('channel')->middleware('can:settings.edit')->name('settings.chat-channels.save');
     Route::get('/settings/charges', [OrderSettingsController::class, 'charges'])->middleware('can:settings.view')->name('settings.charges');
     Route::get('/settings/reasons', [OrderSettingsController::class, 'reasons'])->middleware('can:settings.view')->name('settings.reasons');
     Route::middleware('can:settings.edit')->group(function () {

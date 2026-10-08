@@ -11,7 +11,8 @@
 
     <form method="POST" action="{{ route('orders.store') }}" x-ref="form"
         x-data="{
-            channel: @js(old('channel', 'messenger')),
+            channel: @js(old('channel', $chatChannel?->orderChannel() ?? 'messenger')),
+            chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
             phone: @js(old('phone', '')), name: @js(old('name', '')),
             customer: null, looking: false,
             addressId: @js(old('customer_address_id')), zoneId: @js(old('zone_id')),
@@ -67,6 +68,7 @@
         }">
         @csrf
         <input type="hidden" name="channel" :value="channel">
+        <input type="hidden" name="chat_channel_id" :value="chatChannel">
 
         <div class="grid gap-6 xl:grid-cols-3">
             <div class="space-y-6 xl:col-span-2">
@@ -77,6 +79,16 @@
                                 :class="channel === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
                         @endforeach
                     </div>
+                    {{-- Which number or page the customer wrote to: counted per channel in reports. --}}
+                    @if ($chatChannels->isNotEmpty())
+                        <div class="mb-4">
+                            <p class="mb-1 text-sm font-medium text-gray-700">{{ __('From which chat') }}</p>
+                            <x-simple-select :options="['' => __('Not from a chat')] + $chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->name])->all()"
+                                :value="(string) old('chat_channel_id', $chatChannel?->id ?? '')" full-width class="w-full sm:w-72"
+                                @select-change="chatChannel = $event.detail; const t = @js($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all())[$event.detail]; if (t) channel = t" />
+                            @error('chat_channel_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                    @endif
                     <div class="grid gap-3 md:grid-cols-2">
                         <label class="text-sm font-medium text-gray-700">{{ __('Phone') }}
                             <input name="phone" x-model="phone" @input.debounce.400ms="lookup()" required inputmode="tel" placeholder="01XXXXXXXXX" class="{{ $input }} mt-1" autofocus>

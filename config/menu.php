@@ -53,6 +53,7 @@ return [
         ['General', 'settings.edit', 'settings.edit', 'settings.view', 'cog'],
         ['Notifications', 'settings.notifications', 'settings.notifications*', 'settings.view', 'bell'],
         ['Verification rules', 'settings.verification', 'settings.verification*', 'settings.view', 'check'],
+        ['Chat channels', 'settings.chat-channels', 'settings.chat-channels*', 'settings.view', 'phone'],
         ['Delivery charges', 'settings.charges', 'settings.charges*', 'settings.view', 'cash'],
         ['Ad tracking', 'settings.tracking', 'settings.tracking*', 'settings.view', 'cursor'],
         ['Points rules', 'settings.points', 'settings.points*', 'points.manage', 'star'],

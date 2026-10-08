@@ -156,6 +156,19 @@ class PackagingTest extends TestCase
         $this->postJson("/handover/{$session}/scan", ['code' => $this->label($order->fresh())])
             ->assertJson(['ok' => false, 'result' => 'blocked'])->assertJsonFragment(['message' => 'COD changed to ৳1,800 but not updated at the courier yet. Keep the parcel; ask the moderator or admin to update it, then scan again.']);
 
+        // The stop is in the order's history: when, where, why, who packed it. Scanned again: counted, not repeated; one notice.
+        $this->postJson("/handover/{$session}/scan", ['code' => $this->label($order->fresh())]);
+        $stops = DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'scan')->get();
+        $this->assertCount(1, $stops);
+        $this->assertSame($this->packer->id, (int) $stops[0]->user_id);
+        $this->assertStringStartsWith('Stopped at handover: COD changed to ৳1,800', $stops[0]->body);
+        $this->assertStringContainsString('Handover of '.now()->format('d M').', rider Rafiq', $stops[0]->body);
+        $this->assertStringContainsString('Packed by '.$this->packer->name.' at ', $stops[0]->body);
+        $this->assertStringEndsWith('Scanned 2 times', $stops[0]->body);
+        $this->assertSame(1, DB::table('app_notifications')->where('title', $order->order_no.' stopped at handover')->distinct()->count('title'));
+        $this->actingAs($this->desk)->get("/orders/{$order->id}")->assertSee('Stopped at handover');
+        $this->actingAs($this->packer);
+
         // The packer cannot confirm it (no button, and the server refuses).
         $this->actingAs($this->packer)->post("/orders/{$order->id}/cod-updated")->assertForbidden();
         $this->assertNotNull(app(\App\Services\Orders\OrderService::class)->pendingCodUpdate($order->fresh()));

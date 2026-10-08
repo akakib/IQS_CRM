@@ -239,6 +239,47 @@ class ScanService
         return implode(', ', $parts);
     }
 
+    /**
+     * A scan refused this order: say so in the order's history (when, where,
+     * why, who packed it), once per handover and reason; scanning it again
+     * only counts up. The first stop at a handover also tells the person
+     * responsible for the order and the managers, while the rider is there.
+     */
+    public function noteStop(string $station, ?int $sessionId, int $orderId, string $message, ?int $byId, \Illuminate\Support\Carbon $at, bool $notify = true): void
+    {
+        $key = $station.':'.($sessionId ?? $at->toDateString()).':'.md5($message);
+        $note = DB::table('order_notes')->where('order_id', $orderId)->where('note_type', 'scan')->where('meta->key', $key)->first(['id', 'meta']);
+        if ($note) {
+            $meta = json_decode((string) $note->meta, true) ?: [];
+            $meta['times'] = ($meta['times'] ?? 1) + 1;
+            DB::table('order_notes')->where('id', $note->id)->update([
+                'body' => $meta['text'].' · '.__('Scanned :n times', ['n' => $meta['times']]), 'meta' => json_encode($meta),
+            ]);
+
+            return;
+        }
+
+        $order = DB::table('orders')->where('id', $orderId)->first(['id', 'order_no', 'moderator_id', 'packer_id', 'packed_at']);
+        $session = $sessionId ? DB::table('handover_sessions')->where('id', $sessionId)->first(['pickup_date', 'rider_name']) : null;
+        $packer = $order->packer_id ? DB::table('users')->where('id', $order->packer_id)->value('name') : null;
+        $text = implode(' · ', array_filter([
+            ($station === 'handover' ? __('Stopped at handover') : __('Stopped at packaging')).': '.$message,
+            $session ? trim(__('Handover of :d', ['d' => \Illuminate\Support\Carbon::parse($session->pickup_date)->format('d M')]).($session->rider_name ? ', '.__('rider :r', ['r' => $session->rider_name]) : '')) : null,
+            $packer && $order->packed_at ? __('Packed by :p at :t', ['p' => $packer, 't' => \Illuminate\Support\Carbon::parse($order->packed_at)->format('g:i A')]) : ($packer ? __('Packer: :p', ['p' => $packer]) : null),
+        ]));
+        DB::table('order_notes')->insert([
+            'order_id' => $orderId, 'note_type' => 'scan', 'body' => $text, 'user_id' => $byId, 'created_at' => $at,
+            'meta' => json_encode(['key' => $key, 'text' => $text, 'times' => 1, 'station' => $station, 'handover_session_id' => $sessionId]),
+        ]);
+
+        if ($notify && $station === 'handover') {
+            app(\App\Services\NotificationService::class)->send('scan_stopped', __(':no stopped at handover', ['no' => $order->order_no]), $message, [
+                'link' => route('orders.show', $orderId), 'subject' => ['order', $orderId],
+                'user_ids' => array_values(array_unique(array_filter([$order->moderator_id, ...app(\App\Services\Orders\DeskService::class)->managerIds()]))),
+            ]);
+        }
+    }
+
     private function fail(string $result, string $message, string $level = 'red'): array
     {
         return ['ok' => false, 'level' => $level, 'result' => $result, 'message' => $message];
@@ -251,6 +292,9 @@ class ScanService
             'order_id' => $order?->id, 'label_id' => $label?->id, 'result' => $r['result'], 'message' => mb_substr($r['message'], 0, 255),
             'user_id' => $by->id, 'manual' => $this->byHand, 'created_at' => now(),
         ]);
+        if ($order && $r['result'] === 'blocked') {
+            $this->noteStop($station, $sessionId, $order->id, $r['message'], $by->id, now());
+        }
 
         if ($order) {
             $r['order'] = [

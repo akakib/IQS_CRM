@@ -17,6 +17,7 @@
         'payment' => ['bg-amber-500 text-white', 'cash'],
         'amendment' => ['bg-orange-500 text-white', 'tag'],
         'manual' => ['bg-gray-500 text-white', 'document'],
+        'scan' => ['bg-red-600 text-white', 'box'],
     ];
     $default = ['bg-gray-400 text-white', 'dot'];
     $count = count($entries);

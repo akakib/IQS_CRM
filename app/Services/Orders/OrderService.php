@@ -117,6 +117,7 @@ class OrderService
             if (! empty($data['advance']['amount'])) {
                 $this->addPayment($order, $data['advance'] + ['payment_type' => 'advance'], $by);
             }
+            app(RefundService::class)->useCredit($order, $by); // money kept from an earlier order
 
             app(\App\Services\Tracking\TrackingService::class)->handle($order, 'order_created');
 

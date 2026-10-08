@@ -98,6 +98,13 @@ class AppServiceProvider extends ServiceProvider
 
         \App\Services\Orders\OrderStateMachine::listen(fn ($order, $from, $to, $user = null) => app(\App\Services\Orders\DeskService::class)->onTransition($order, $from, $to, $user));
 
+        // Cancelled or returned with money paid: it is owed back (Payments, Refunds).
+        \App\Services\Orders\OrderStateMachine::listen(function ($order, $from, $to) {
+            if (in_array($to['key'], \App\Services\Orders\RefundService::CLOSED, true) && (float) $order->advance_verified > 0) {
+                app(\App\Services\Orders\RefundService::class)->closed($order);
+            }
+        });
+
         // Rider calls: the hotline permission or the Rider line channel.
         Gate::define('rider-calls', fn (User $user) => $user->handlesRiders());
 

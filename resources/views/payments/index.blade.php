@@ -8,6 +8,8 @@
 @endphp
 
 <x-layouts.app :heading="__('Payments to check')">
+    @include('payments._tabs', ['active' => 'check'])
+
     <p class="mb-4 text-sm text-gray-500">{{ __('Compare each TrxID and amount with the bKash / Nagad statement, tick the ones that match and verify them together. A small advance (up to ৳:l) already lowered the COD; a bigger one holds its order until it is checked.', ['l' => number_format((int) settings('payments.trust_up_to'))]) }}</p>
 
     <x-list.filter-bar :list="$list" :action="route('payments.index')" :placeholder="__('TrxID, order no or phone')">

@@ -50,11 +50,14 @@ class OrderCalculator
             ->where('status', 'verified')->where('payment_type', 'refund')->sum('amount');
 
         $grand = (float) $order->grand_total;
+        // Cancelled or returned: nothing was sold, so all that was paid is owed back.
+        $closed = in_array(\App\Models\OrderStatus::map()[$order->status_id]['key'] ?? null, ['cancelled', 'returned'], true);
         $order->advance_verified = round($advance, 2);
         $order->cod_amount = round(max(0, $grand - $advance), 2);
-        $order->refund_due = round(max(0, $advance - $grand - $refunded), 2);
+        $order->refund_due = round(max(0, $advance - ($closed ? 0 : $grand) - $refunded), 2);
         $order->payment_status = match (true) {
             $order->refund_due > 0 => 'refund_due',
+            $closed && $refunded > 0 => 'refunded',
             $advance > 0 && $advance >= $grand => 'fully_prepaid',
             $advance > 0 => 'partial_advance',
             default => $order->payment_status === 'cod_collected' ? 'cod_collected' : 'unpaid',

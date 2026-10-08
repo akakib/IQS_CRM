@@ -166,6 +166,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/advance-waiver/decide', [OrderController::class, 'decideWaiver'])->middleware('can:orders.approve')->name('orders.advance-waiver.decide');
     Route::get('/payments', [\App\Http\Controllers\PaymentController::class, 'index'])->name('payments.index');
     Route::post('/payments/decide', [\App\Http\Controllers\PaymentController::class, 'decide'])->name('payments.decide');
+    Route::get('/payments/refunds', [\App\Http\Controllers\RefundController::class, 'index'])->name('refunds.index');
+    Route::post('/payments/refunds/{order}/refund', [\App\Http\Controllers\RefundController::class, 'refund'])->name('refunds.refund');
+    Route::post('/payments/refunds/{order}/credit', [\App\Http\Controllers\RefundController::class, 'credit'])->name('refunds.credit');
 
     // Courier desk
     Route::get('/shipping', [ShippingController::class, 'index'])->middleware('can:shipping.view')->name('shipping.index');

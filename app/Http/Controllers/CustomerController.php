@@ -124,6 +124,7 @@ class CustomerController extends Controller
             'name' => $customer->name,
             'phone' => Mask::value($customer->primary_phone, 'customer_contact'),
             'risk_level' => $customer->risk_level,
+            'credit' => (float) $customer->credit_balance, // kept from an earlier order: used by itself on this one
             'orders' => $customer->orders_count,
             'delivered' => $customer->delivered_count,
             'returned' => $customer->returned_count,

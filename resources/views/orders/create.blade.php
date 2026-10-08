@@ -139,6 +139,7 @@
                         <p><span class="font-medium" x-text="customer?.name"></span>
                             <span class="ml-2 text-xs text-gray-500" x-text="`${customer?.orders} orders · ${customer?.delivered} delivered · ${customer?.returned} returned`"></span>
                             <span x-show="customer?.risk_level !== 'normal'" class="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700" x-text="customer?.risk_level"></span>
+                            <span x-show="customer?.credit > 0" class="ml-2 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800" x-text="@js(__('Credit')) + ' ৳' + Math.round(customer?.credit || 0).toLocaleString('en-IN') + ' ' + @js(__('is used on this order'))"></span>
                         </p>
                     </div>
                 </x-card>

@@ -310,4 +310,45 @@ class AdvanceHoldTest extends TestCase
         $this->assertSame('record_verified', $this->key($order)); // not booked by itself: the moderator confirms in the chat
         $this->assertSame($this->mod->id, $order->fresh()->moderator_id);
     }
+
+    public function test_paid_then_cancelled_is_owed_back_given_back_or_kept_as_credit_for_the_next_order(): void
+    {
+        $sm = app(OrderStateMachine::class);
+        $cancel = (int) DB::table('status_reasons')->where('reason_type', 'cancel')->value('id');
+
+        // Paid ৳130 in advance, then cancelled: all of it is owed back.
+        $a = $this->web(9);
+        app(OrderService::class)->addPayment($a, ['method_id' => $this->bkash(), 'amount' => 130, 'transaction_id' => 'RF1', 'status' => 'verified', 'payment_type' => 'advance'], $this->admin);
+        $sm->transition($a->fresh(), 'cancelled', $this->admin, 'user', $cancel);
+        $this->assertSame('130.00', $a->fresh()->refund_due);
+        $this->assertSame('refund_due', $a->fresh()->payment_status);
+        $this->actingAs($this->admin)->get('/payments/refunds')->assertOk()->assertSee($a->order_no)->assertSee('Keep as credit');
+        $this->actingAs($this->mod)->get('/payments/refunds')->assertForbidden();
+
+        // Kept as credit: the order is settled, the customer has ৳130 for next time.
+        $this->actingAs($this->admin)->post("/payments/refunds/{$a->id}/credit", ['amount' => 500])->assertSessionHasErrors('amount'); // more than owed
+        $this->post("/payments/refunds/{$a->id}/credit", ['amount' => 130])->assertSessionHas('success');
+        $this->assertSame('0.00', $a->fresh()->refund_due);
+        $this->assertSame('refunded', $a->fresh()->payment_status);
+        $this->assertEquals(130, (float) DB::table('customers')->where('id', $a->customer_id)->value('credit_balance'));
+
+        // Their next order uses it by itself: COD is lower by the credit, and the credit is spent.
+        $b = app(OrderService::class)->create([
+            'channel' => 'messenger', 'phone' => $a->ship_phone, 'name' => 'Buyer', 'address_line' => 'Road 1',
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
+        ], $this->admin);
+        $this->assertSame('130.00', $b->fresh()->advance_verified);
+        $this->assertSame(round((float) $b->grand_total - 130, 2), (float) $b->fresh()->cod_amount);
+        $this->assertEquals(0, (float) DB::table('customers')->where('id', $a->customer_id)->value('credit_balance'));
+        $this->assertSame(2, DB::table('customer_credits')->where('customer_id', $a->customer_id)->count());
+
+        // Or given back: part now, the rest stays owed; Done lists it.
+        $c = $this->web(9);
+        app(OrderService::class)->addPayment($c, ['method_id' => $this->bkash(), 'amount' => 200, 'transaction_id' => 'RF2', 'status' => 'verified', 'payment_type' => 'advance'], $this->admin);
+        $sm->transition($c->fresh(), 'cancelled', $this->admin, 'user', $cancel);
+        $this->post("/payments/refunds/{$c->id}/refund", ['amount' => 50])->assertSessionHasErrors('method_id'); // how it was sent is required
+        $this->post("/payments/refunds/{$c->id}/refund", ['amount' => 50, 'method_id' => $this->bkash(), 'transaction_id' => 'BACK1'])->assertSessionHas('success');
+        $this->assertSame('150.00', $c->fresh()->refund_due);
+        $this->get('/payments/refunds?tab=done')->assertSee('BACK1')->assertSee('Kept as credit');
+    }
 }

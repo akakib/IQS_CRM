@@ -69,5 +69,15 @@ class RiderCallTest extends TestCase
         $this->actingAs($boss)->get('/riders-report')->assertOk()->assertSeeInOrder(['Rafiq', '01911111111', '2', '1', '1', '50%'])->assertSee('Nishan');
         // Without the hotline: no rider calls.
         $this->actingAs($mod)->getJson('/rider-calls/find?q=305555858')->assertForbidden();
+
+        // Or access to the Rider line channel: rider calls in Communication, but it is not a chat.
+        $line = \App\Models\ChatChannel::create(['name' => 'Rider line 01700', 'type' => 'rider', 'is_active' => true]);
+        $line->users()->attach($mod->id);
+        $mod = \App\Models\User::find($mod->id); // a fresh request
+        $this->actingAs($mod)->getJson('/rider-calls/find?q=305555858')->assertOk()->assertJson(['found' => true]);
+        $this->get('/dashboard')->assertSee('Communication')->assertSee('Rider name');
+        $this->assertTrue(app(\App\Services\Work\ChatService::class)->channelsFor($mod)->isEmpty());
+        $line->update(['is_active' => false]);
+        $this->actingAs(\App\Models\User::find($mod->id))->getJson('/rider-calls/find?q=305555858')->assertForbidden();
     }
 }

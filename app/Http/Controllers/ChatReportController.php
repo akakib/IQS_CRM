@@ -30,7 +30,7 @@ class ChatReportController extends Controller
             ->selectRaw('user_id, chat_channel_id, kind, reason_id, COUNT(*) as n')->get();
         $orders = DB::table('orders')->whereNotNull('chat_channel_id')->whereBetween('created_at', $range)
             ->groupBy('created_by', 'chat_channel_id')->selectRaw('created_by, chat_channel_id, COUNT(*) as n, SUM(grand_total) as total')->get();
-        $channels = ChatChannel::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'type'])->keyBy('id');
+        $channels = ChatChannel::where('type', '!=', ChatChannel::RIDER)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'type'])->keyBy('id');
         $reasons = DB::table('status_reasons')->where('reason_type', 'chat_lost')->orderBy('sort_order')->pluck('label_en', 'id');
         $people = DB::table('users')->whereIn('id', $events->pluck('user_id')->merge($orders->pluck('created_by'))->unique())->pluck('name', 'id');
 

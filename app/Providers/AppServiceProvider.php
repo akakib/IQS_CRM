@@ -98,6 +98,9 @@ class AppServiceProvider extends ServiceProvider
 
         \App\Services\Orders\OrderStateMachine::listen(fn ($order, $from, $to, $user = null) => app(\App\Services\Orders\DeskService::class)->onTransition($order, $from, $to, $user));
 
+        // Rider calls: the hotline permission or the Rider line channel.
+        Gate::define('rider-calls', fn (User $user) => $user->handlesRiders());
+
         // Roles and access assignments: Owner only.
         Gate::define('access.manage', fn (User $user) => $user->isOwner());
 

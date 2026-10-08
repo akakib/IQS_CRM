@@ -66,7 +66,16 @@ class User extends Authenticatable
         ];
     }
 
-    /** Chat channels this person answers (Chat mode). */
+    /** Rider calls: the hotline permission, or access to an active Rider line channel. Once per request. */
+    public function handlesRiders(): bool
+    {
+        return $this->handlesRidersCache ??= $this->can('hotline.view')
+            || $this->chatChannels()->where('chat_channels.is_active', true)->where('chat_channels.type', ChatChannel::RIDER)->exists();
+    }
+
+    private ?bool $handlesRidersCache = null;
+
+    /** Communication channels this person handles (chats, and the rider line). */
     public function chatChannels(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(ChatChannel::class);

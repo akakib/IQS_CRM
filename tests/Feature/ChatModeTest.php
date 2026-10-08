@@ -54,7 +54,7 @@ class ChatModeTest extends TestCase
         $this->actingAs($this->boss)->post('/settings/chat-channels', ['name' => 'WhatsApp 2', 'type' => 'whatsapp'])->assertRedirect();
         $this->post('/settings/chat-channels', ['name' => 'Page 1 comments', 'type' => 'comments']);
         [$wa, $comments] = ChatChannel::orderBy('id')->get()->all();
-        $this->get('/users/'.$this->mahim->id.'/edit')->assertSee('Chat channels')->assertSee('Page 1 comments');
+        $this->get('/users/'.$this->mahim->id.'/edit')->assertSee('Communication channels')->assertSee('Page 1 comments');
         $this->put('/users/'.$this->mahim->id, ['name' => 'Mahim', 'email' => $this->mahim->email, 'chat_channels_shown' => 1, 'chat_channels' => [$wa->id]])->assertRedirect();
         $this->assertSame([$wa->id], $this->mahim->chatChannels()->pluck('chat_channels.id')->all());
 

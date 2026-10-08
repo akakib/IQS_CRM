@@ -1,7 +1,7 @@
 @php($input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none')
 
-<x-layouts.app :heading="__('Chat channels')">
-    <p class="mb-4 text-sm text-gray-500">{{ __('Every place customers write to, one row each: each WhatsApp number, each page (Messenger and comments as two channels), Instagram and so on. Give each channel to people with Access (or on the Staff page); they see only theirs in Chat. Orders made from a chat remember the channel, so you can see which number or page brings orders.') }}</p>
+<x-layouts.app :heading="__('Communication channels')">
+    <p class="mb-4 text-sm text-gray-500">{{ __('Every place customers write to, one row each: each WhatsApp number, each page (Messenger and comments as two channels), Instagram and so on. Add the number delivery men call as a Rider line. Give each channel to people with Access (or on the Staff page); they see only theirs in Communication. Rider line access gives the Rider calls tab. Orders made from a chat remember the channel, so you can see which number or page brings orders.') }}</p>
 
     @can('settings.edit')
         <x-card :title="__('Add a channel')" class="mb-6">
@@ -55,7 +55,7 @@
                                 name(id) { return (this.staff.find(u => u.id === id) || {}).name },
                                 toggle(id) { this.picked.includes(id) ? this.picked = this.picked.filter(x => x !== id) : this.picked.push(id) } }">
                             @csrf
-                            <p class="mb-3 text-sm text-gray-500">{{ __('They see this channel in Communication and get its chat orders. Same as the ticks on the Staff page.') }}</p>
+                            <p class="mb-3 text-sm text-gray-500">{{ __('They see this channel in Communication (a Rider line gives Rider calls). Same as the ticks on the Staff page.') }}</p>
                             <template x-for="id in picked" :key="id"><input type="hidden" name="users[]" :value="id"></template>
                             {{-- Chosen people as chips. --}}
                             <div class="mb-2 flex min-h-[2.25rem] flex-wrap gap-1.5">

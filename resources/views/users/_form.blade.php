@@ -93,7 +93,7 @@
     @if ($chatChannels->isNotEmpty())
         @php($mine = old('chat_channels', $user->exists ? $user->chatChannels()->pluck('chat_channels.id')->all() : []))
         <div class="mt-2 border-t border-gray-100 pt-4">
-            <p class="text-sm font-semibold text-gray-800">{{ __('Chat channels') }}</p>
+            <p class="text-sm font-semibold text-gray-800">{{ __('Communication channels') }}</p>
             <p class="mb-3 text-xs text-gray-500">{{ __('The chats this person answers. Only these show in their Chat window.') }}</p>
             <input type="hidden" name="chat_channels_shown" value="1">
             <div class="flex flex-wrap gap-2">

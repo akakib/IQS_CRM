@@ -19,7 +19,7 @@ class ChatService
     /** Channels this person answers (admins and owners: all active ones). */
     public function channelsFor(User $user): Collection
     {
-        $q = ChatChannel::where('is_active', true)->orderBy('sort_order')->orderBy('name');
+        $q = ChatChannel::where('is_active', true)->where('type', '!=', ChatChannel::RIDER)->orderBy('sort_order')->orderBy('name');
 
         return $user->isOwner() ? $q->get() : $q->whereHas('users', fn ($u) => $u->whereKey($user->id))->get();
     }
@@ -34,7 +34,7 @@ class ChatService
         if ($user->current_break_id) {
             throw ValidationException::withMessages(['chat' => __('You are on a break. Press Start work first.')]);
         }
-        if ($this->channelsFor($user)->isEmpty() && ! $user->can('hotline.view')) {
+        if ($this->channelsFor($user)->isEmpty() && ! $user->handlesRiders()) {
             throw ValidationException::withMessages(['chat' => __('No chat channel is given to you. A manager can add one on the Staff page.')]);
         }
         if (! $this->openSession($user->id)) {

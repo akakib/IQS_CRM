@@ -26,7 +26,7 @@
     </div>
 
     @if ($byChannel->isEmpty())
-        <x-empty-state :message="__('No chats counted in these dates. Channels are set in Settings > Chat channels; staff count in Chat beside Break.')" />
+        <x-empty-state :message="__('No chats counted in these dates. Channels are set in Settings > Communication channels; staff count in Communication beside Break.')" />
     @else
         {{-- Why chats are lost: the reasons, most first, for all channels together. --}}
         @if ($total['lost'])

@@ -5,10 +5,15 @@
      Closing keeps the mode on; Stop ends it. Other pages open it with window.dispatchEvent(new CustomEvent('chat-open')). --}}
 @php
     $chatUser = auth()->user();
-    // One query for someone with neither (most pages, most people); the open session only when it matters.
-    $hasChannels = ! $chatUser->current_break_id && ($chatUser->isOwner() ? \App\Models\ChatChannel::where('is_active', true)->exists() : \Illuminate\Support\Facades\DB::table('chat_channel_user as cu')->join('chat_channels as c', 'c.id', '=', 'cu.chat_channel_id')
-        ->where('cu.user_id', $chatUser->id)->where('c.is_active', true)->exists());
-    $hotline = ! $chatUser->current_break_id && ! $chatUser->isOwner() && $chatUser->can('hotline.view'); // owners watch, they do not take rider calls
+    // One query for someone with neither (most pages, most people): the types of their active channels. The open session only when it matters.
+    $rider = \App\Models\ChatChannel::RIDER;
+    $myTypes = $chatUser->current_break_id ? collect() : ($chatUser->isOwner()
+        ? \App\Models\ChatChannel::where('is_active', true)->where('type', '!=', $rider)->limit(1)->pluck('type')
+        : \Illuminate\Support\Facades\DB::table('chat_channel_user as cu')->join('chat_channels as c', 'c.id', '=', 'cu.chat_channel_id')
+            ->where('cu.user_id', $chatUser->id)->where('c.is_active', true)->distinct()->pluck('c.type'));
+    $hasChannels = $myTypes->contains(fn ($t) => $t !== $rider);
+    // Rider calls: the Rider line channel or the hotline permission. Owners watch, they do not take rider calls.
+    $hotline = ! $chatUser->current_break_id && ! $chatUser->isOwner() && ($myTypes->contains($rider) || $chatUser->can('hotline.view'));
     $chatSession = $hasChannels || $hotline ? app(\App\Services\Work\ChatService::class)->openSession($chatUser->id) : null;
 @endphp
 

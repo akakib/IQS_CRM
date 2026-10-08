@@ -60,11 +60,19 @@ class PaymentController extends Controller
         $this->authorizeCheck($request);
         $data = $request->validate(['ids' => ['required', 'array', 'max:200'], 'ids.*' => ['integer'], 'decision' => ['required', 'in:approve,reject']]);
         $rows = DB::table('order_payments')->whereIn('id', $data['ids'])->where('status', 'pending_verification')->get(['id', 'order_id']);
+        $done = 0;
+        $skipped = 0;
         foreach ($rows as $row) {
-            $this->orders->verifyPayment(Order::findOrFail($row->order_id), $row->id, $data['decision'] === 'approve', $request->user());
+            try {
+                $this->orders->verifyPayment(Order::findOrFail($row->order_id), $row->id, $data['decision'] === 'approve', $request->user());
+                $done++;
+            } catch (\Illuminate\Validation\ValidationException) {
+                $skipped++; // someone else checked it meanwhile: counted once, by them
+            }
         }
 
-        return back()->with('success', trans_choice($data['decision'] === 'approve' ? ':count payment verified.|:count payments verified.' : ':count payment rejected.|:count payments rejected.', $rows->count(), ['count' => $rows->count()]));
+        return back()->with('success', trans_choice($data['decision'] === 'approve' ? ':count payment verified.|:count payments verified.' : ':count payment rejected.|:count payments rejected.', $done, ['count' => $done])
+            .($skipped ? ' '.__(':n already checked by someone else.', ['n' => $skipped]) : ''));
     }
 
     private function authorizeCheck(Request $request): void

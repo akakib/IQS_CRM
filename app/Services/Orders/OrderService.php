@@ -256,13 +256,18 @@ class OrderService
         $countsNow = $type === 'advance' && $amount > 0 && $counted + $amount <= (int) settings('payments.trust_up_to');
         $paidOnline = ($p['status'] ?? null) === 'verified'; // the website's payment gateway already confirmed it
         $oldCod = (float) $order->cod_amount;
-        DB::table('order_payments')->insert([
-            'order_id' => $order->id, 'payment_type' => $p['payment_type'] ?? 'advance', 'method_id' => $method->id,
-            'amount' => round((float) $p['amount'], 2), 'transaction_id' => ($p['transaction_id'] ?? null) ? trim($p['transaction_id']) : null,
-            'sender_number' => Phone::normalize($p['sender_number'] ?? null), 'status' => $paidOnline ? 'verified' : 'pending_verification', 'counts_now' => $countsNow,
-            'verified_at' => $paidOnline ? now() : null, 'note' => $p['note'] ?? null,
-            'received_at' => now(), 'note' => $p['note'] ?? null, 'created_by' => $by?->id, 'created_at' => now(), 'updated_at' => now(),
-        ]);
+        try {
+            DB::table('order_payments')->insert([
+                'order_id' => $order->id, 'payment_type' => $p['payment_type'] ?? 'advance', 'method_id' => $method->id,
+                'amount' => round((float) $p['amount'], 2), 'transaction_id' => ($p['transaction_id'] ?? null) ? trim($p['transaction_id']) : null,
+                'sender_number' => Phone::normalize($p['sender_number'] ?? null), 'status' => $paidOnline ? 'verified' : 'pending_verification', 'counts_now' => $countsNow,
+                'verified_at' => $paidOnline ? now() : null, 'note' => $p['note'] ?? null,
+                'received_at' => now(), 'note' => $p['note'] ?? null, 'created_by' => $by?->id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+            // Two people typed the same TrxID at the same moment: the database keeps one; the other is told.
+            throw ValidationException::withMessages(['advance.transaction_id' => __('This transaction ID was already used on another order.')]);
+        }
         if ($order->exists && $order->grand_total !== null) {
             $this->calculator->applyPayments($order->refresh());
             $this->afterPayment($order, $oldCod, $by);
@@ -281,10 +286,16 @@ class OrderService
     public function verifyPayment(Order $order, int $paymentId, bool $approve, User $by): void
     {
         DB::transaction(function () use ($order, $paymentId, $approve, $by) {
-            $payment = DB::table('order_payments')->where('id', $paymentId)->where('order_id', $order->id)->where('status', 'pending_verification')->first();
+            // Two people pressing Verify at once: the row is locked, the second one waits, then finds it already checked.
+            $payment = DB::table('order_payments')->where('id', $paymentId)->where('order_id', $order->id)->lockForUpdate()->first();
             abort_unless($payment, 404);
+            if ($payment->status !== 'pending_verification') {
+                throw ValidationException::withMessages(['payment' => __('This payment was already checked by :n.', [
+                    'n' => DB::table('users')->where('id', $payment->verified_by)->value('name') ?? __('someone else'),
+                ])]);
+            }
             $oldCod = (float) $order->fresh()->cod_amount;
-            DB::table('order_payments')->where('id', $paymentId)->update([
+            DB::table('order_payments')->where('id', $paymentId)->where('status', 'pending_verification')->update([
                 'status' => $approve ? 'verified' : 'rejected', 'verified_by' => $by->id, 'verified_at' => now(), 'updated_at' => now(),
             ]);
             $this->calculator->applyPayments($order->refresh());

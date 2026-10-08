@@ -240,6 +240,15 @@ class AdvanceHoldTest extends TestCase
         $this->assertSame('hold', $this->key($other));
         $this->assertSame($this->mod->id, $other->fresh()->moderator_id);
         $this->assertSame('none', $other->fresh()->booking_state);
+
+        // Checked twice (two people at once, or a stale page): counted once; the second is told who did it.
+        $this->actingAs($this->admin)->post("/orders/{$other->id}/payments/{$pay2}", ['decision' => 'approve'])->assertSessionHasErrors('payment');
+        $this->assertSame('rejected', DB::table('order_payments')->where('id', $pay2)->value('status'));
+        $this->assertSame(1, DB::table('order_notes')->where('order_id', $other->id)->where('body', 'like', 'Payment%rejected%')->count());
+
+        // The same TrxID again on another order is refused, not a crash.
+        $this->actingAs($this->mod)->post("/orders/{$other->id}/payments", ['advance' => ['method_id' => $this->bkash(), 'amount' => 50, 'transaction_id' => 'FAKE1']])
+            ->assertSessionHasErrors('advance.transaction_id');
     }
 
     public function test_no_advance_in_time_reminds_at_half_and_cancels_at_the_end(): void

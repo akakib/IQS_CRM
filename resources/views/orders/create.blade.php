@@ -13,7 +13,7 @@
     {{-- ?phone= (a customer called in): the number is filled and looked up at once. --}}
     <form method="POST" action="{{ route('orders.store') }}" x-ref="form" x-init="$nextTick(() => { if (phone && !@js(old('phone'))) lookup() })"
         x-data="{
-            channel: @js(old('channel', $chatChannel?->orderChannel() ?? (in_array(request('channel'), ['messenger', 'whatsapp', 'phone', 'b2b'], true) ? request('channel') : 'messenger'))),
+            channel: @js(old('channel', $chatChannel?->orderChannel() ?? (in_array(request('channel'), ['messenger', 'whatsapp', 'phone', 'b2b'], true) ? request('channel') : ''))),
             chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
             phone: @js(old('phone', (string) request('phone', ''))), name: @js(old('name', '')),
             customer: null, looking: false,
@@ -101,6 +101,9 @@
                                 :class="channel === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
                         @endforeach
                     </div>
+                    {{-- Nothing is picked for them: a wrong guess would count the order on the wrong channel. --}}
+                    <p x-show="!channel" class="-mt-2 mb-4 text-sm font-medium text-amber-700">{{ __('Pick where the order came from.') }}</p>
+                    @error('channel')<p class="-mt-2 mb-4 text-sm text-red-600">{{ $message }}</p>@enderror
                     {{-- Which number or page the customer wrote to: counted per channel in reports. --}}
                     @if ($chatChannels->isNotEmpty())
                         <div class="mb-4">
@@ -243,7 +246,7 @@
                     <textarea name="customer_note" rows="2" maxlength="500" class="{{ $input }}">{{ old('customer_note') }}</textarea>
                 </x-card>
 
-                <x-button class="w-full" ::disabled="!items.length">{{ __('Create order') }}</x-button>
+                <x-button class="w-full" ::disabled="!items.length || !channel">{{ __('Create order') }}</x-button>
             </div>
         </div>
     </form>

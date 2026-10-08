@@ -23,8 +23,21 @@ class WorkTime
      */
     public function day(Carbon $day): array
     {
-        $from = $day->copy()->startOfDay();
-        $to = $day->copy()->endOfDay();
+        return $this->period($day, $day);
+    }
+
+    /**
+     * The same for several days together (7 days, 30 days, a chosen range): orders given in the range,
+     * medians over all of them, free time and breaks added up day by day.
+     *
+     * @return array{people: Collection<int, array<string, mixed>>, turns: Collection<int, Collection<int, array<string, mixed>>>}
+     */
+    public function period(Carbon $start, Carbon $end): array
+    {
+        $from = $start->copy()->startOfDay();
+        $to = $end->copy()->endOfDay();
+        // The days that can have free time: not in the future.
+        $days = collect(\Carbon\CarbonPeriod::create($from, min($to, now())->copy()->startOfDay()))->map(fn ($d) => Carbon::parse($d));
         $rows = DB::table('order_assignments as a')->join('users as u', 'u.id', '=', 'a.user_id')->join('orders as o', 'o.id', '=', 'a.order_id')
             ->where('a.role', 'moderator')->whereBetween('a.started_at', [$from, $to])->orderBy('a.started_at')
             ->get(['a.id', 'a.order_id', 'a.user_id', 'a.how', 'a.started_at', 'a.first_opened_at', 'a.first_action_at', 'a.ended_at', 'a.ended_reason',
@@ -62,10 +75,12 @@ class WorkTime
         $breaks = $breakRows->map(fn ($b) => (int) $b->where('counts_as_break', true)->filter(fn ($x) => Carbon::parse($x->started_at)->between($from, $to))->sum('minutes'));
 
         // Everyone who works orders and was on shift that day, even with no order at all (free all day is worth seeing).
-        $staff = \App\Models\User::where('is_active', true)->get(['id', 'name', 'photo_path'])
+        $staff = \App\Models\User::where('is_active', true)->get(['id', 'name', 'photo_path', 'created_at'])
             ->filter(fn ($u) => $u->can('orders.take') && ! $u->isOwner());
         $this->calendar->preload($staff->pluck('id')->all());
-        $staff = $staff->filter(fn ($u) => $turns->has($u->id) || ($day->lte(today()) && $this->calendar->shift($u->id, $from)));
+        // Days before someone joined are not their free time.
+        $joined = fn ($u, $d) => ! $u->created_at || $d->gte($u->created_at->copy()->startOfDay());
+        $staff = $staff->filter(fn ($u) => $turns->has($u->id) || $days->contains(fn ($d) => $joined($u, $d) && $this->calendar->shift($u->id, $d)));
 
         // Free time: turns that touch the day (also ones given before it), their history, breaks, orders waiting.
         $open = DB::table('order_assignments')->where('role', 'moderator')->whereIn('user_id', $staff->pluck('id'))->where('started_at', '<=', $to)
@@ -80,12 +95,23 @@ class WorkTime
             ->groupBy('user_id', 'kind')->selectRaw('user_id, kind, COUNT(*) as n')->get()->groupBy('user_id');
         $chatOrders = DB::table('orders')->whereIn('created_by', $staff->pluck('id'))->whereNotNull('chat_channel_id')->whereBetween('created_at', [$from, $to])
             ->groupBy('created_by')->selectRaw('created_by, COUNT(*) as n')->pluck('n', 'created_by');
-        $freeOf = fn (int $id) => $this->free->forPerson($id, $day, $this->free->busy($open->get($id, collect()), $allEvents, $allReturns, $breakRows->get($id, collect()), $chats->get($id, collect())), $waitingSpans);
+        $freeOf = function ($u) use ($days, $open, $allEvents, $allReturns, $breakRows, $chats, $waitingSpans, $joined) {
+            $id = $u->id;
+            $busy = $this->free->busy($open->get($id, collect()), $allEvents, $allReturns, $breakRows->get($id, collect()), $chats->get($id, collect()));
+            $sum = ['waiting' => 0, 'nothing' => 0];
+            foreach ($days->filter(fn ($d) => $joined($u, $d)) as $d) {
+                $f = $this->free->forPerson($id, $d, $busy, $waitingSpans);
+                $sum['waiting'] += $f['waiting'];
+                $sum['nothing'] += $f['nothing'];
+            }
+
+            return $sum;
+        };
         $nowTs = now()->getTimestamp();
 
         $people = $staff->map(function ($u) use ($turns, $breaks, $freeOf, $chats, $chatCounts, $chatOrders, $from, $to, $nowTs) {
             $mine = $turns->get($u->id, collect());
-            $free = $freeOf($u->id);
+            $free = $freeOf($u);
             $kinds = $chatCounts->get($u->id, collect())->pluck('n', 'kind');
             $chatSpans = $chats->get($u->id, collect())->map(fn ($c) => [Carbon::parse($c->started_at)->getTimestamp(), $c->ended_at ? Carbon::parse($c->ended_at)->getTimestamp() : $nowTs])->all();
 

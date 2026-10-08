@@ -23,17 +23,20 @@ class FreeTime
     /** Website orders waiting for someone (nobody had taken them yet), merged, within [$from, $to]. One query. */
     public function waiting(Carbon $from, Carbon $to): array
     {
-        $cancelled = OrderStatus::idFor('cancelled');
+        // Waiting = nobody has it yet AND it still needs a person (New or Record verified). It stops at whichever
+        // comes first: someone gets it, or it moves on without anyone (an admin confirmed it, the website cancelled it...).
+        $todo = implode(',', array_map('intval', OrderStatus::idsFor(['new', 'record_verified'])));
         $rows = DB::table('orders as o')->where('o.channel', 'web')->where('o.created_at', '<=', $to)
-            ->selectRaw('o.created_at, o.status_id, o.updated_at, (SELECT MIN(a.started_at) FROM order_assignments a WHERE a.order_id = o.id) as first_taken')
-            ->whereRaw('NOT EXISTS (SELECT 1 FROM order_assignments a2 WHERE a2.order_id = o.id AND a2.started_at < ?)', [$from])->get();
+            ->selectRaw("o.created_at, (SELECT MIN(a.started_at) FROM order_assignments a WHERE a.order_id = o.id) as first_taken,
+                (SELECT MIN(e.created_at) FROM order_events e WHERE e.order_id = o.id AND e.to_status_id NOT IN ($todo)) as moved_on")
+            ->whereRaw('NOT EXISTS (SELECT 1 FROM order_assignments a2 WHERE a2.order_id = o.id AND a2.started_at < ?)', [$from])
+            ->whereRaw("NOT EXISTS (SELECT 1 FROM order_events e2 WHERE e2.order_id = o.id AND e2.created_at < ? AND e2.to_status_id NOT IN ($todo))", [$from])->get();
         $now = now()->getTimestamp();
-        $spans = $rows->map(function ($r) use ($cancelled, $now) {
-            $start = Carbon::parse($r->created_at)->getTimestamp();
-            $end = $r->first_taken ? Carbon::parse($r->first_taken)->getTimestamp()
-                : ((int) $r->status_id === $cancelled ? Carbon::parse($r->updated_at)->getTimestamp() : $now); // cancelled on the website before anyone took it
+        $spans = $rows->map(function ($r) use ($now) {
+            $ends = array_filter([$r->first_taken, $r->moved_on]);
+            $end = $ends ? min(array_map(fn ($t) => Carbon::parse($t)->getTimestamp(), $ends)) : $now;
 
-            return [$start, $end];
+            return [Carbon::parse($r->created_at)->getTimestamp(), $end];
         })->all();
 
         return self::clip(self::union($spans), $from->getTimestamp(), $to->getTimestamp());

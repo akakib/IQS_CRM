@@ -1,25 +1,36 @@
 @php
     use App\Services\Reports\WorkTime;
     $span = fn ($s) => WorkTime::span($s);
-    $at = fn ($t) => $t ? $t->format('g:i A') : '-';
-    $dayUrl = fn ($d, $p = null) => route('work-time.index', array_filter(['date' => $d->toDateString(), 'person' => $p]));
-    $isToday = $day->isToday();
-    $isYesterday = $day->isYesterday();
+    // Over several days a time needs its date too.
+    $at = fn ($t) => $t ? $t->format($single ? 'g:i A' : 'd M, g:i A') : '-';
+    $rangeUrl = fn ($f, $t, $p = null) => route('work-time.index', array_filter(['from' => $f->toDateString(), 'to' => $t->toDateString(), 'person' => $p]));
+    $personUrl = fn ($p) => $rangeUrl($from, $to, $p);
+    $presets = [
+        __('Today') => [today(), today()],
+        __('Yesterday') => [today()->subDay(), today()->subDay()],
+        __('7 days') => [today()->subDays(6), today()],
+        __('30 days') => [today()->subDays(29), today()],
+    ];
     $ended = ['idle' => __('Given back: nothing done'), 'timeout' => __('Given back: timer'), 'break' => __('Back to New: break'), 'reassigned' => __('Handed to someone else'), 'finished' => null];
 @endphp
 
 <x-layouts.app :heading="__('Team Activity')">
     <div class="mb-4 flex flex-wrap items-center gap-2">
-        <a href="{{ $dayUrl(today()) }}" @class(['rounded-full border px-3 py-1.5 text-sm', 'border-primary bg-primary text-white' => $isToday, 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' => ! $isToday])>{{ __('Today') }}</a>
-        <a href="{{ $dayUrl(today()->subDay()) }}" @class(['rounded-full border px-3 py-1.5 text-sm', 'border-primary bg-primary text-white' => $isYesterday, 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' => ! $isYesterday])>{{ __('Yesterday') }}</a>
-        <form method="GET" x-ref="day" x-data>
-            <x-date-input name="date" :value="$day->toDateString()" :max="today()->toDateString()" :clearable="false" @date-change="$nextTick(() => $refs.day.requestSubmit())" />
+        @foreach ($presets as $label => [$f, $t])
+            <a href="{{ $rangeUrl($f, $t, $person['id'] ?? null) }}" @class(['rounded-full border px-3 py-1.5 text-sm', 'border-primary bg-primary text-white' => $from->isSameDay($f) && $to->isSameDay($t), 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' => ! ($from->isSameDay($f) && $to->isSameDay($t))])>{{ $label }}</a>
+        @endforeach
+        {{-- Any range: picking either date reloads. --}}
+        <form method="GET" x-ref="range" x-data class="flex flex-wrap items-center gap-2">
+            @if ($person)<input type="hidden" name="person" value="{{ $person['id'] }}">@endif
+            <x-date-input name="from" :value="$from->toDateString()" :max="today()->toDateString()" :clearable="false" @date-change="$nextTick(() => $refs.range.requestSubmit())" />
+            <span class="text-sm text-gray-400">{{ __('to') }}</span>
+            <x-date-input name="to" :value="$to->toDateString()" :max="today()->toDateString()" :clearable="false" @date-change="$nextTick(() => $refs.range.requestSubmit())" />
         </form>
     </div>
-    <p class="mb-4 text-xs text-gray-500">{{ __('Orders given to each person on this day. Times are the middle value (median). Net time leaves out the time the customer made us wait: No answer until the order came back, and On hold. Chat mode counts as work, not free time.') }}</p>
+    <p class="mb-4 text-xs text-gray-500">{{ $single ? __('Orders given to each person on this day.') : __('Orders given to each person from :a to :b. Free time and breaks are added up over the days.', ['a' => $from->format('d M'), 'b' => $to->format('d M')]) }} {{ __('Times are the middle value (median). Net time leaves out the time the customer made us wait: No answer until the order came back, and On hold. Chat mode counts as work, not free time.') }}</p>
 
     @if ($people->isEmpty())
-        <x-empty-state :message="__('No orders were given to anyone on this day.')" />
+        <x-empty-state :message="__('Nobody had orders or a shift in these dates.')" />
     @else
         <x-list.table>
             <x-slot:head>
@@ -37,7 +48,7 @@
                 <th class="text-right">{{ __('Free, nothing waiting') }}</th>
             </x-slot:head>
             @foreach ($people as $p)
-                <tr @class(['cursor-pointer', 'bg-primary-soft' => $person && $person['id'] === $p['id']]) onclick="location.href='{{ $dayUrl($day, $p['id']) }}'">
+                <tr @class(['cursor-pointer', 'bg-primary-soft' => $person && $person['id'] === $p['id']]) onclick="location.href='{{ $personUrl($p['id']) }}'">
                     <td><span class="flex items-center gap-2"><x-avatar :name="$p['name']" :photo="$p['photo']" size="sm" /><span class="font-medium text-gray-800">{{ $p['name'] }}</span></span></td>
                     <td class="text-right tabular-nums">{{ $p['turns'] }}</td>
                     <td class="text-right tabular-nums">{{ $p['confirmed'] }}</td>
@@ -56,7 +67,7 @@
 
         <x-list.cards>
             @foreach ($people as $p)
-                <a href="{{ $dayUrl($day, $p['id']) }}" class="block">
+                <a href="{{ $personUrl($p['id']) }}" class="block">
                     <x-record-card :title="$p['name']" :subtitle="__(':n orders · :c confirmed · :x cancelled', ['n' => $p['turns'], 'c' => $p['confirmed'], 'x' => $p['cancelled']])">
                         <x-slot:footer>{{ __('Opened in :a · first action in :b · break :m min', ['a' => $span($p['open']), 'b' => $span($p['start']), 'm' => $p['break_minutes']]) }}@if ($p['given_back']) · <span class="text-red-600">{{ __(':n given back', ['n' => $p['given_back']]) }}</span>@endif
                             <span class="block">{{ __('Chat :t · :m msg · :o orders', ['t' => $span($p['chat_seconds'] ?: null), 'm' => $p['chat_messages'], 'o' => $p['chat_orders']]) }}</span>
@@ -67,7 +78,14 @@
             @endforeach
         </x-list.cards>
 
-        @if ($person)
+        @if ($person && ! $single)
+            <p class="mt-6 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-600">{{ __('Activity shows one day at a time:') }}
+                @foreach (\Carbon\CarbonPeriod::create($from, $to) as $d)
+                    <a href="{{ $rangeUrl($d, $d, $person['id']) }}" class="ml-1 text-primary hover:underline">{{ $d->format('d M') }}</a>@if (! $loop->last),@endif
+                @endforeach
+            </p>
+        @endif
+        @if ($person && $activity)
             {{-- Activity: everything they did that day, in time order. --}}
             <h2 class="mb-2 mt-6 text-sm font-semibold text-gray-800">{{ __(':n, activity', ['n' => $person['name']]) }}</h2>
             <div class="rounded-xl border border-gray-200 bg-white">
@@ -84,6 +102,8 @@
                 @endforelse
             </div>
 
+        @endif
+        @if ($person)
             <h2 class="mb-2 mt-6 text-sm font-semibold text-gray-800">{{ __(':n, order by order', ['n' => $person['name']]) }}</h2>
             <x-list.table>
                 <x-slot:head>

@@ -32,7 +32,7 @@ class ChatController extends Controller
             'on' => (bool) $session,
             'since' => $session ? \Illuminate\Support\Carbon::parse($session->started_at)->format('g:i A') : null,
             'channels' => $channels->map(fn ($c) => [
-                'id' => $c->id, 'name' => $c->name, 'type' => ChatChannel::TYPES[$c->type] ?? $c->type,
+                'id' => $c->id, 'name' => $c->name, 'type' => ChatChannel::TYPES[$c->type] ?? $c->type, 'kind' => $c->type,
                 'order_url' => route('orders.create', ['chat_channel' => $c->id]),
             ] + ($today[$c->id] ?? ['messages' => 0, 'no_order' => 0, 'orders' => 0]))->values(),
             'reasons' => ['lost' => $reasons['chat_lost'] ?? [], 'undo' => $reasons['chat_undo'] ?? []],

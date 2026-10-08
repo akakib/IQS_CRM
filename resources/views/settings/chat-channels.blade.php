@@ -27,7 +27,10 @@
             @foreach ($channels as $c)
                 <form method="POST" action="{{ route('settings.chat-channels.save', $c) }}" class="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-2 sm:items-center lg:grid-cols-[1fr_13rem_5rem_auto_14rem_auto]">
                     @csrf
-                    <input name="name" required maxlength="80" value="{{ $c->name }}" class="{{ $input }}" aria-label="{{ __('Name') }}" @cannot('settings.edit') disabled @endcannot>
+                    <div class="flex items-center gap-2">
+                        <x-channel-icon :type="$c->type" />
+                        <input name="name" required maxlength="80" value="{{ $c->name }}" class="{{ $input }}" aria-label="{{ __('Name') }}" @cannot('settings.edit') disabled @endcannot>
+                    </div>
                     <x-simple-select name="type" :options="$types" :value="$c->type" full-width class="w-full" />
                     <input name="sort_order" type="number" min="0" max="999" value="{{ $c->sort_order }}" class="{{ $input }} tabular-nums" aria-label="{{ __('Order in the list') }}" title="{{ __('Order in the list') }}">
                     <label class="flex items-center gap-2 text-sm text-gray-700">

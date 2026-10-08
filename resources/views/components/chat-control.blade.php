@@ -34,6 +34,15 @@
             } catch (e) { this.error = @js(__('No connection. Try again.')) } finally { this.busy = false }
         },
         async show() { this.open = true; this.ask = null; await this.call(@js(route('chat.start')), {}) },
+        // + counts at once however fast it is tapped: the number goes up now and each tap is sent on its own.
+        async tap(c) {
+            c.messages++; this.error = null;
+            if (!this.on) { this.on = true; this.since = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }
+            try {
+                const r = await fetch(@js(route('chat.record')), { method: 'POST', headers: this.headers(), body: JSON.stringify({ channel_id: c.id, kind: 'message' }) });
+                if (!r.ok) { c.messages--; const j = await r.json().catch(() => ({})); this.error = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')) }
+            } catch (e) { c.messages--; this.error = @js(__('No connection. Try again.')) }
+        },
         count(channel, kind, reason = null) { this.ask = null; this.call(@js(route('chat.record')), { channel_id: channel, kind: kind, reason_id: reason }) },
         async stop() { await this.call(@js(route('chat.stop')), {}); this.open = false },
         async find() {
@@ -88,18 +97,19 @@
                         <template x-for="c in data?.channels ?? []" :key="c.id">
                             <div class="border-b border-gray-100 py-3 last:border-0">
                                 <div class="flex items-center gap-3">
+                                    <x-channel-icon expr="c.kind" />
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium text-gray-800" x-text="c.name"></p>
-                                        <p class="text-xs text-gray-500"><span x-text="c.type"></span> · <span x-text="c.orders"></span> {{ __('orders') }} · <span x-text="c.no_order"></span> {{ __('no order') }}</p>
+                                        <p class="truncate text-xs text-gray-500" :title="c.type"><span class="hidden sm:inline"><span x-text="c.type"></span> · </span><span x-text="c.orders"></span> {{ __('orders') }} · <span x-text="c.no_order"></span> {{ __('no order') }}</p>
                                     </div>
                                     <a :href="c.order_url" class="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:border-primary hover:text-primary" title="{{ __('New order from this chat') }}" aria-label="{{ __('New order from this chat') }}">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                                     </a>
                                     <button type="button" @click="ask = { id: c.id, kind: 'undo' }" :disabled="busy || c.messages < 1" class="h-9 w-9 rounded-lg border border-gray-300 text-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40" aria-label="{{ __('Take one back') }}">−</button>
                                     <span class="w-8 text-center text-lg font-semibold tabular-nums text-gray-900" x-text="c.messages"></span>
-                                    <button type="button" @click="count(c.id, 'message')" :disabled="busy" class="h-9 w-9 rounded-lg bg-primary text-lg font-semibold text-white hover:bg-primary-dark disabled:opacity-60" aria-label="{{ __('One more message answered') }}">+</button>
+                                    <button type="button" @click="tap(c)" class="h-9 w-9 rounded-lg bg-primary active:scale-95 text-lg font-semibold text-white hover:bg-primary-dark disabled:opacity-60" aria-label="{{ __('One more message answered') }}">+</button>
                                 </div>
-                                <button type="button" @click="ask = { id: c.id, kind: 'no_order' }" class="mt-2 text-xs font-medium text-red-600 hover:underline">{{ __('Chat ended with no order') }}</button>
+                                <button type="button" @click="ask = { id: c.id, kind: 'no_order' }" class="mt-2 ml-12 text-xs font-medium text-gray-500 hover:text-red-600 hover:underline">{{ __('Chat ended with no order') }}</button>
                                 <div x-show="ask && ask.id === c.id" x-cloak class="mt-2 rounded-lg bg-gray-50 p-2">
                                     <p class="mb-2 text-xs text-gray-600" x-text="ask?.kind === 'undo' ? @js(__('Why take one back?')) : @js(__('Why no order?'))"></p>
                                     <div class="flex flex-wrap gap-1.5">

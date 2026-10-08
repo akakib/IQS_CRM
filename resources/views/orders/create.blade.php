@@ -19,21 +19,40 @@
             items: [], q: '', results: [], searching: false, active: 0, timer: null,
             orderDiscount: @js((float) old('order_discount', 0)), delivery: 0, chargeTimer: null,
             payMethod: @js(old('advance.method_id')), payAmount: @js(old('advance.amount')),
+            sf: null, sfLoading: false, nameAuto: false, addrAuto: false,
+            {{-- Bangla digits, +880 / 880, spaces and dashes: one shape, 01XXXXXXXXX. --}}
+            normalizePhone(v) {
+                let d = String(v || '').replace(/[০-৯]/g, c => String('০১২৩৪৫৬৭৮৯'.indexOf(c))).replace(/\D/g, '');
+                if (d.length === 13 && d.startsWith('880')) d = d.slice(2);
+                if (d.length === 10 && d.startsWith('1')) d = '0' + d;
+                return d;
+            },
             async lookup() {
-                const digits = this.phone.replace(/\D/g, '');
-                if (digits.length < 10) { this.customer = null; return; }
+                const phone = this.normalizePhone(this.phone);
+                if (!/^01[3-9]\d{8}$/.test(phone)) { this.customer = null; this.sf = null; return; }
+                if (this.phone !== phone) this.phone = phone;
                 this.looking = true;
                 try {
-                    const r = await fetch(@js(route('customers.lookup')) + '?phone=' + encodeURIComponent(this.phone), { headers: { Accept: 'application/json' } });
+                    const r = await fetch(@js(route('customers.lookup')) + '?phone=' + phone, { headers: { Accept: 'application/json' } });
                     const d = await r.json();
                     this.customer = d.found ? d : null;
+                    {{-- The saved name and address fill in (still editable); another number replaces what was filled, never what was typed. --}}
                     if (d.found) {
-                        if (!this.name) this.name = d.name;
+                        if (!this.name || this.nameAuto) { this.name = d.name; this.nameAuto = true; }
                         const def = d.addresses.find(a => a.is_default) || d.addresses[0];
-                        if (def && !this.addressId) { this.addressId = def.id; this.zoneId = def.zone_id; }
+                        if (def && (!this.addressId || this.addrAuto)) { this.addressId = def.id; this.zoneId = def.zone_id; this.addrAuto = true; }
+                    } else {
+                        if (this.nameAuto) { this.name = ''; this.nameAuto = false; }
+                        if (this.addrAuto) { this.addressId = null; this.addrAuto = false; }
                     }
                 } catch (e) {}
                 this.looking = false; this.recharge();
+                this.steadfast(phone);
+            },
+            async steadfast(phone) {
+                this.sfLoading = true; this.sf = null;
+                try { this.sf = await (await fetch(@js(route('customers.steadfast')) + '?phone=' + phone, { headers: { Accept: 'application/json' } })).json() } catch (e) {}
+                this.sfLoading = false;
             },
             search() {
                 clearTimeout(this.timer);
@@ -94,10 +113,22 @@
                             <input name="phone" x-model="phone" @input.debounce.400ms="lookup()" required inputmode="tel" placeholder="01XXXXXXXXX" class="{{ $input }} mt-1" autofocus>
                         </label>
                         <label class="text-sm font-medium text-gray-700">{{ __('Name') }}
-                            <input name="name" x-model="name" required maxlength="150" class="{{ $input }} mt-1">
+                            <input name="name" x-model="name" @input="nameAuto = false" required maxlength="150" class="{{ $input }} mt-1">
                         </label>
                     </div>
                     <p x-show="looking" class="mt-2 text-xs text-gray-400">{{ __('Looking up…') }}</p>
+                    {{-- Steadfast record of this number (new customers too): D delivered in green, C cancelled in red. --}}
+                    <p x-show="sfLoading || sf" x-cloak class="mt-2 text-sm">
+                        <span class="text-gray-500">Steadfast:</span>
+                        <span x-show="sfLoading" class="text-gray-400">{{ __('checking…') }}</span>
+                        <template x-if="sf && !sfLoading">
+                            <span class="tabular-nums">
+                                <template x-if="sf.found && sf.has_history"><span><b class="text-green-700" x-text="'D ' + sf.delivered + '%'"></b><template x-if="sf.cancelled !== null"><span> · <b class="text-red-600" x-text="'C ' + sf.cancelled + '%'"></b></span></template> · <span x-text="sf.parcels + ' ' + @js(__('parcels'))"></span></span></template>
+                                <template x-if="sf.found && !sf.has_history"><span class="text-gray-600">{{ __('no history (new to couriers)') }}</span></template>
+                                <template x-if="!sf.found"><span class="text-gray-400" x-text="sf.error || @js(__('not available'))"></span></template>
+                            </span>
+                        </template>
+                    </p>
                     <div x-show="customer" x-cloak class="mt-3 rounded-lg bg-gray-50 p-3 text-sm">
                         <p><span class="font-medium" x-text="customer?.name"></span>
                             <span class="ml-2 text-xs text-gray-500" x-text="`${customer?.orders} orders · ${customer?.delivered} delivered · ${customer?.returned} returned`"></span>
@@ -111,12 +142,12 @@
                         <div class="mb-3 space-y-2">
                             <template x-for="a in customer.addresses" :key="a.id">
                                 <label class="flex cursor-pointer items-start gap-2 rounded-lg border p-2 text-sm" :class="addressId == a.id ? 'border-primary bg-primary-soft' : 'border-gray-200'">
-                                    <input type="radio" :value="a.id" x-model="addressId" @change="zoneId = a.zone_id; recharge()" class="mt-0.5 text-primary">
+                                    <input type="radio" :value="a.id" x-model="addressId" @change="zoneId = a.zone_id; addrAuto = false; recharge()" class="mt-0.5 text-primary">
                                     <span x-text="a.line"></span>
                                 </label>
                             </template>
                             <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 p-2 text-sm">
-                                <input type="radio" value="" x-model="addressId" class="text-primary"> {{ __('New address') }}
+                                <input type="radio" value="" x-model="addressId" @change="addrAuto = false" class="text-primary"> {{ __('New address') }}
                             </label>
                         </div>
                     </template>

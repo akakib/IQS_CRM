@@ -65,6 +65,30 @@ class OrderHttpTest extends TestCase
         $this->assertSame('130.00', $order->delivery_charge);
     }
 
+    public function test_a_number_in_bangla_digits_or_with_880_becomes_one_shape_and_shows_its_steadfast_record(): void
+    {
+        $this->assertSame('01822005133', \App\Support\Phone::normalize('০১৮২২০০৫১৩৩'));
+        $this->assertSame('01822005133', \App\Support\Phone::normalize('+880 1822-005133'));
+        $this->assertSame('01822005133', \App\Support\Phone::normalize('৮৮০১৮২২০০৫১৩৩'));
+        $this->assertNull(\App\Support\Phone::normalize('০১৮২২'));
+
+        // Steadfast record for a number nobody has ordered with yet (the test courier: last digit 3 = 7 of 8 delivered).
+        $this->actingAs($this->agent)->getJson('/customers/steadfast?phone='.urlencode('০১৮১২৩৪৫৬৭৩'))->assertOk()
+            ->assertJson(['found' => true, 'has_history' => true, 'delivered' => 87.5, 'parcels' => 8]);
+        $this->getJson('/customers/steadfast?phone=01812345679')->assertJson(['found' => true, 'has_history' => false]); // new to couriers
+        $this->getJson('/customers/steadfast?phone=12')->assertJson(['found' => false]);
+
+        // An order typed with Bangla digits is saved with the normal number, and the next lookup finds that customer.
+        $this->get('/orders/create')->assertSee('Steadfast:');
+        $this->post('/orders', [
+            'channel' => 'whatsapp', 'phone' => '০১৮১২৩৪৫৬৭৩', 'name' => 'Rahim', 'address_line' => 'House 9',
+            'zone_id' => DB::table('delivery_zones')->where('system_key', 'inside_dhaka')->value('id'),
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
+        ])->assertRedirect();
+        $this->assertSame('01812345673', Order::first()->ship_phone);
+        $this->getJson('/customers/lookup?phone='.urlencode('+880 1812-345673'))->assertJson(['found' => true, 'name' => 'Rahim'])->assertJsonPath('addresses.0.line', fn ($l) => str_contains($l, 'House 9'));
+    }
+
     public function test_new_website_order_notifies_moderators_and_is_given_by_take_next(): void
     {
         DB::table('notification_rules')->insert([

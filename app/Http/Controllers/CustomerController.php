@@ -133,6 +133,44 @@ class CustomerController extends Controller
         ]);
     }
 
+    /**
+     * The Steadfast record for a phone typed in the order form, loaded after the name and address so those
+     * are never slowed down. A known customer uses the saved check (24 hours); a new number is kept as long.
+     */
+    public function steadfast(Request $request): JsonResponse
+    {
+        $phone = Phone::normalize($request->query('phone'));
+        if (! $phone) {
+            return response()->json(['found' => false]);
+        }
+        $customer = $this->customers->findByPhone($phone);
+        try {
+            if ($customer) {
+                $check = app(\App\Services\Customers\FraudCheckService::class)->check($customer)->get('steadfast');
+                $r = $check ? ['parcels' => (int) $check->total_parcels, 'rate' => $check->success_rate, 'raw' => (array) $check->raw_response] : null;
+            } else {
+                $r = \Illuminate\Support\Facades\Cache::remember('steadfast:phone:'.$phone, now()->addHours(24), function () use ($phone) {
+                    $x = app(\App\Services\Courier\CourierManager::class)->scoreDriver()->fraudCheck($phone);
+
+                    return ['parcels' => $x->totalParcels, 'rate' => $x->successRate, 'raw' => $x->raw];
+                });
+            }
+        } catch (\Throwable $e) {
+            return response()->json(['found' => false, 'error' => __('Steadfast did not answer.')]);
+        }
+        if (! $r) {
+            return response()->json(['found' => false]);
+        }
+
+        return response()->json([
+            'found' => true,
+            'parcels' => $r['raw']['volume_range'] ?? $r['parcels'],
+            'has_history' => $r['parcels'] > 0 || $r['rate'] !== null,
+            'delivered' => $r['rate'] === null ? null : (float) $r['rate'] + 0,
+            'cancelled' => isset($r['raw']['cancellation_ratio']) ? (float) $r['raw']['cancellation_ratio'] + 0 : null,
+        ]);
+    }
+
     private function validated(Request $request): array
     {
         $request->merge(['marketing_consent' => $request->boolean('marketing_consent')]);

@@ -21,7 +21,10 @@
         </button>
     </div>
     {{-- Camera mode, when the phone did not let the camera open by itself: one tap for the next label. --}}
-    <button type="button" x-show="needsTap" x-cloak @click="startCamera()" class="mt-3 w-full rounded-xl bg-primary px-4 py-4 text-base font-semibold text-white hover:bg-primary-dark">{{ __('Scan next with the camera') }}</button>
+    <div x-show="needsTap" x-cloak class="mt-3 flex gap-2">
+        <button type="button" @click="startCamera()" class="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">{{ __('Scan next') }}</button>
+        <button type="button" @click="needsTap = false; closeCamera()" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Close') }}</button>
+    </div>
     <p x-show="message && !camera && {{ $quiet ? 'false' : 'true' }}" x-text="message" class="mt-2 text-center text-sm font-medium" :class="good ? 'text-green-800' : 'text-red-700'"></p>
 
     {{-- Camera: full screen, so the label is easy to aim at on a phone. --}}

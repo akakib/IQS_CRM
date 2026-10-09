@@ -95,10 +95,12 @@ class RiderCallService
             'order_id' => $order->id, 'consignment_id' => DB::table('shipments')->where('id', $order->active_shipment_id)->value('consignment_id'),
             'rider_id' => $riderId, 'rider_phone' => $phone, 'claim' => $d['claim'], 'verdict' => $d['verdict'], 'action' => $d['action'],
             'note' => $d['note'] ?? null, 'delivery_issue_id' => $issueId, 'handled_by' => $by->id, 'created_at' => now(),
+            'duration_seconds' => ($d['minutes'] ?? null) !== null || ($d['seconds'] ?? null) !== null ? (int) ($d['minutes'] ?? 0) * 60 + (int) ($d['seconds'] ?? 0) : null,
+            'recording_url' => $d['recording_url'] ?? null,
         ]);
         $this->orders->note($order, 'rider', __('Rider call:rider: :c · checked with the customer: :v · :a', [
             'rider' => $name !== '' ? ' '.$name : '', 'c' => __(self::CLAIMS[$d['claim']]), 'v' => __(self::VERDICTS[$d['verdict']]), 'a' => __(self::ACTIONS[$d['action']]),
-        ]).(! empty($d['note']) ? ' · '.$d['note'] : ''), $by, ['rider_call_id' => $id]);
+        ]).(! empty($d['note']) ? ' · '.$d['note'] : ''), $by, ['rider_call_id' => $id, 'recording_url' => $d['recording_url'] ?? null]);
         // Hotline work counts as work, like chats.
         $this->chat->start($by);
 

@@ -51,8 +51,12 @@ class RiderCallTest extends TestCase
         // Rider Rafiq says the customer does not answer; the customer did answer Nishan: not true. Rider tries again.
         $this->postJson('/rider-calls', ['order_id' => $order->id, 'rider_name' => 'Rafiq', 'rider_phone' => '01911111111', 'claim' => 'no_answer', 'action' => 'retry'])
             ->assertStatus(422)->assertJsonValidationErrors('verdict');
-        $this->postJson('/rider-calls', ['order_id' => $order->id, 'rider_name' => 'Rafiq', 'rider_phone' => '01911111111', 'claim' => 'no_answer', 'verdict' => 'false', 'action' => 'retry'])
+        $this->postJson('/rider-calls', ['order_id' => $order->id, 'rider_name' => 'Rafiq', 'rider_phone' => '01911111111', 'claim' => 'no_answer', 'verdict' => 'false', 'action' => 'retry',
+            'minutes' => 1, 'seconds' => 30, 'recording_url' => 'https://drive.google.com/file/d/rider1/view'])
             ->assertOk()->assertJson(['today' => 1]);
+        // How long, and the recording: on the call, and as a link on the order's history.
+        $this->assertDatabaseHas('rider_calls', ['order_id' => $order->id, 'duration_seconds' => 90, 'recording_url' => 'https://drive.google.com/file/d/rider1/view']);
+        $this->assertStringContainsString('rider1', (string) DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'rider')->value('meta'));
         $this->assertDatabaseHas('riders', ['name' => 'Rafiq', 'phone' => '01911111111']);
         $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'rider', 'body' => 'Rider call Rafiq: Customer not answering · checked with the customer: Not true · Rider tries again']);
         $this->assertNotNull(app(\App\Services\Work\ChatService::class)->openSession($nishan->id)); // counts as work

@@ -26,6 +26,8 @@ class RiderCallController extends Controller
         $data = $request->validate([
             'order_id' => ['required', 'integer'], 'rider_name' => ['nullable', 'string', 'max:100'], 'rider_phone' => ['nullable', 'string', 'max:20'],
             'claim' => ['required', 'string'], 'verdict' => ['nullable', 'string'], 'action' => ['nullable', 'string'], 'note' => ['nullable', 'string', 'max:500'],
+            'minutes' => ['nullable', 'integer', 'min:0', 'max:300'], 'seconds' => ['nullable', 'integer', 'min:0', 'max:59'],
+            'recording_url' => ['nullable', 'url:http,https', 'max:500'],
         ]);
         $this->calls->record($request->user(), $data);
 

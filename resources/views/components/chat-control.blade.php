@@ -19,7 +19,7 @@
         on: @js((bool) $chatSession), since: @js($chatSession ? \Illuminate\Support\Carbon::parse($chatSession->started_at)->format('g:i A') : null),
         open: false, data: null, ask: null, busy: false, error: null,
         tab: @js($hasChannels ? 'chats' : 'calls'),
-        q: '', found: null, finding: false, rider: '', riderPhone: '', claim: null, verdict: null, action: null, note: '', saved: null,
+        q: '', found: null, finding: false, rider: '', riderPhone: '', claim: null, verdict: null, action: null, note: '', rmin: '', rsec: '', rurl: '', saved: null,
         headers() { return { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } },
         async call(url, body) {
             this.busy = true; this.error = null;
@@ -53,11 +53,11 @@
             if (!this.found?.found) return;
             this.busy = true; this.error = null;
             try {
-                const r = await fetch(@js(route('rider-calls.store')), { method: 'POST', headers: this.headers(), body: JSON.stringify({ order_id: this.found.id, rider_name: this.rider, rider_phone: this.riderPhone, claim: this.claim, verdict: this.verdict, action: this.action, note: this.note }) });
+                const r = await fetch(@js(route('rider-calls.store')), { method: 'POST', headers: this.headers(), body: JSON.stringify({ order_id: this.found.id, rider_name: this.rider, rider_phone: this.riderPhone, claim: this.claim, verdict: this.verdict, action: this.action, note: this.note, minutes: this.rmin, seconds: this.rsec, recording_url: this.rurl }) });
                 const j = await r.json();
                 if (!r.ok) { this.error = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')); return }
                 this.saved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.on = true;
-                this.q = ''; this.found = null; this.claim = null; this.verdict = null; this.action = null; this.note = '';
+                this.q = ''; this.found = null; this.claim = null; this.verdict = null; this.action = null; this.note = ''; this.rmin = ''; this.rsec = ''; this.rurl = '';
             } catch (e) { this.error = @js(__('No connection. Try again.')) } finally { this.busy = false }
         },
     }" @chat-open.window="show()">
@@ -247,6 +247,14 @@
                                         @endforeach
                                     </div>
                                 </div>
+                                {{-- Same as a customer call: how long, and the recording's Drive link. --}}
+                                <div class="flex flex-wrap items-center gap-2 text-sm">
+                                    <span class="text-xs text-gray-500">{{ __('Duration') }}</span>
+                                    <input type="number" min="0" max="300" x-model="rmin" placeholder="{{ __('min') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
+                                    <span class="text-gray-400">:</span>
+                                    <input type="number" min="0" max="59" x-model="rsec" placeholder="{{ __('sec') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
+                                </div>
+                                <input type="url" x-model="rurl" placeholder="{{ __('Recording link (Google Drive)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
                                 <input x-model="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
                                 <button type="button" @click="saveCall()" :disabled="busy || !claim || !verdict || !action" class="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50">{{ __('Save rider call') }}</button>
                             </div>

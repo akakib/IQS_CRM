@@ -8,17 +8,19 @@ use App\Models\OrderStatus;
 use App\Models\PaymentMethod;
 use App\Models\StatusReason;
 use App\Models\User;
+use App\Services\Complaints\RefundService;
 use App\Services\Orders\DeliveryCharges;
 use App\Services\Orders\OrderEditor;
-use App\Services\Orders\VerificationEngine;
 use App\Services\Orders\OrderService;
 use App\Services\Orders\OrderStateMachine;
+use App\Services\Orders\VerificationEngine;
 use App\Support\Lists\ListState;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class OrderController extends Controller
@@ -136,6 +138,11 @@ class OrderController extends Controller
             ->where('a.order_id', $order->id)->where('a.approval_status', 'pending')
             ->get(['a.id', 'a.changes', 'a.amount_diff', 'a.created_at', 'u.name as by', 'r.label_en as reason']);
 
+        $complaints = $user->can('complaints.view') ? DB::table('complaints as c')->join('status_reasons as r', 'r.id', '=', 'c.category_id')
+            ->where('c.order_id', $order->id)->orderByDesc('c.id')->limit(20)->get(['c.id', 'c.status', 'c.resolution', 'c.sla_due_at', 'c.created_at', 'r.label_en as category']) : collect();
+        $refunds = $user->can('refunds.view') || $user->can('refunds.create') ? DB::table('refunds as f')->join('payment_methods as m', 'm.id', '=', 'f.method_id')
+            ->where('f.order_id', $order->id)->orderByDesc('f.id')->get(['f.id', 'f.amount', 'f.status', 'f.transaction_id', 'f.complaint_id', 'm.name as method']) : collect();
+
         $verification = DB::table('verification_runs as v')->leftJoin('verification_rules as r', 'r.id', '=', 'v.matched_rule_id')
             ->where('v.order_id', $order->id)->orderByDesc('v.id')->first(['v.outcome', 'v.inputs_snapshot', 'v.created_at', 'r.name as rule']);
 
@@ -147,6 +154,12 @@ class OrderController extends Controller
                 && ($order->moderator_id === $user->id || $user->permissionScope('orders.view') === 'all') && $user->can('orders.edit'),
             'notes' => $notes,
             'payments' => $payments,
+            'complaints' => $complaints,
+            'refunds' => $refunds,
+            'canRefund' => $user->can('refunds.create'),
+            'maxRefund' => $user->can('refunds.create') ? app(RefundService::class)->maxRefundable($order) : 0,
+            'methods' => $user->can('refunds.create') ? DB::table('payment_methods')->where('is_active', true)->orderBy('id')->pluck('name', 'id')->all() : [],
+            'refundReasons' => $user->can('refunds.create') ? StatusReason::options('refund') : [],
             'statuses' => OrderStatus::map(),
             'targets' => $this->machine->allowedTargets($order, $user),
             'reasons' => ['cancel' => StatusReason::options('cancel'), 'hold' => StatusReason::options('hold'), 'status' => StatusReason::options('status'), 'return' => StatusReason::options('return'), 'reassign' => StatusReason::options('reassign')],
@@ -172,7 +185,7 @@ class OrderController extends Controller
         // Proof of a real call: a website order is confirmed by hand only after a logged call.
         if ($data['to'] === 'confirmed' && $order->channel === 'web'
             && ! DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'call')->exists()) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['status' => __('Log the call first (Order management, or add a Call note below).')]);
+            throw ValidationException::withMessages(['status' => __('Log the call first (Order management, or add a Call note below).')]);
         }
 
         $this->machine->transition($order, $data['to'], $user, 'user', $data['reason_id'] ?? null, $data['note'] ?? null, (int) $data['lock_version']);

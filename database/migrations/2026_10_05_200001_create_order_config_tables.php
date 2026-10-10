@@ -45,7 +45,7 @@ return new class extends Migration
         Schema::create('status_reasons', function (Blueprint $table) {
             $table->id();
             $table->foreignId('status_id')->nullable()->constrained('order_statuses')->nullOnDelete();
-            $table->enum('reason_type', ['status', 'amendment', 'return', 'cancel', 'hold', 'refund', 'reassign', 'break']);
+            $table->enum('reason_type', ['status', 'amendment', 'return', 'cancel', 'hold', 'refund', 'reassign', 'break', 'complaint']);
             $table->string('label_en', 150);
             $table->string('label_bn', 150)->nullable();
             $table->enum('blame_stage', ['none', 'sales', 'verification', 'packing', 'dispatch', 'courier', 'customer'])->default('none');

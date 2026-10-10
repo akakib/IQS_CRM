@@ -73,7 +73,7 @@ class OrderSettingsController extends Controller
     public function storeReason(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'reason_type' => ['required', Rule::in(['cancel', 'hold', 'amendment', 'return', 'reassign', 'break', 'status'])],
+            'reason_type' => ['required', Rule::in(['cancel', 'hold', 'amendment', 'return', 'reassign', 'break', 'complaint', 'refund', 'status'])],
             'label_en' => ['required', 'string', 'max:150'],
             'blame_stage' => ['required', Rule::in(['none', 'sales', 'verification', 'packing', 'dispatch', 'courier', 'customer'])],
             'counts_as_break' => ['boolean'],

@@ -122,6 +122,34 @@
                 </x-card>
             @endif
 
+            @if ($refunds->isNotEmpty() || ($canRefund && $maxRefund > 0))
+                <x-card :title="__('Refunds')" :subtitle="__('Approved by a second person; paid refunds show above as payments.')">
+                    @php($refundStatus = ['pending' => ['amber', __('Waiting for approval')], 'approved' => ['blue', __('Approved, not paid yet')], 'paid' => ['green', __('Paid')], 'rejected' => ['red', __('Rejected')]])
+                    @foreach ($refunds as $r)
+                        @php([$color, $label] = $refundStatus[$r->status])
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-50 py-2 text-sm last:border-0">
+                            <span>৳{{ number_format((float) $r->amount, 2) }} · {{ $r->method }}@if ($r->transaction_id) · <span class="font-mono">{{ $r->transaction_id }}</span>@endif @if ($r->complaint_id)· <a href="{{ route('complaints.show', $r->complaint_id) }}" class="text-green-900 hover:underline">{{ __('complaint #:id', ['id' => $r->complaint_id]) }}</a>@endif</span>
+                            <x-badge :color="$color">{{ $label }}</x-badge>
+                        </div>
+                    @endforeach
+                    @if ($canRefund && $maxRefund > 0)
+                        <details class="mt-3 rounded-lg border border-gray-200 p-3" @if ($errors->hasAny(['amount', 'method_id', 'recipient_number'])) open @endif>
+                            <summary class="cursor-pointer text-sm font-medium text-green-900">{{ __('Request a refund') }} <span class="font-normal text-gray-500">({{ __('up to ৳:m', ['m' => number_format($maxRefund, 2)]) }})</span></summary>
+                            <form method="POST" action="{{ route('refunds.store') }}" class="mt-3 grid gap-2 md:grid-cols-2">
+                                @csrf
+                                <input type="hidden" name="order_id" value="{{ $order->id }}">
+                                <div><input name="amount" type="number" step="0.01" min="1" max="{{ $maxRefund }}" required value="{{ old('amount') }}" placeholder="{{ __('Amount (৳)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none">@error('amount')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror</div>
+                                <x-simple-select name="method_id" :options="$methods" :value="old('method_id', array_key_first($methods))" full-width class="w-full" />
+                                <div><input name="recipient_number" value="{{ old('recipient_number', $order->ship_phone) }}" maxlength="20" inputmode="tel" placeholder="{{ __('Send to number (bKash / Nagad)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-green-800 focus:outline-none">@error('recipient_number')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror</div>
+                                <x-simple-select name="reason_id" :options="['' => __('Reason…')] + $refundReasons" :value="old('reason_id', '')" full-width class="w-full" />
+                                <input name="note" maxlength="255" placeholder="{{ __('Note for the approver') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-800 focus:outline-none md:col-span-2">
+                                <div class="md:col-span-2"><x-button size="sm">{{ __('Send for approval') }}</x-button></div>
+                            </form>
+                        </details>
+                    @endif
+                </x-card>
+            @endif
+
             {{-- One timeline: status changes, edits, calls, payments, all with person and time. --}}
             <x-card :title="__('Timeline')">
                 <form method="POST" action="{{ route('orders.notes', $order) }}" class="mb-4 flex flex-col gap-2 md:flex-row" x-data="{ type: 'call' }">
@@ -171,6 +199,24 @@
                     <form method="POST" action="{{ route('orders.verify', $order) }}" class="mt-3">@csrf<x-button size="sm" variant="secondary">{{ __('Run checks again') }}</x-button></form>
                 @endcan
             </x-card>
+
+            @can('complaints.view')
+                <x-card :title="__('Complaints')">
+                    <x-slot:actions>
+                        @can('complaints.create')<a href="{{ route('complaints.create', ['order' => $order->id]) }}" class="text-sm font-medium text-green-900 hover:underline">+ {{ __('New') }}</a>@endcan
+                    </x-slot:actions>
+                    @forelse ($complaints as $c)
+                        <a href="{{ route('complaints.show', $c->id) }}" class="flex items-center justify-between gap-2 border-b border-gray-50 py-2 text-sm last:border-0 hover:bg-gray-50">
+                            <span>#{{ $c->id }} · {{ $c->category }} <span class="text-xs text-gray-400">{{ \Illuminate\Support\Carbon::parse($c->created_at)->format('d M') }}</span></span>
+                            @if ($c->status === 'resolved')<x-badge color="green">{{ __(ucfirst($c->resolution ?? 'resolved')) }}</x-badge>
+                            @elseif ($c->sla_due_at && \Illuminate\Support\Carbon::parse($c->sla_due_at)->isPast())<x-badge color="red">{{ __('Overdue') }}</x-badge>
+                            @else<x-badge color="amber">{{ __('Open') }}</x-badge>@endif
+                        </a>
+                    @empty
+                        <p class="text-sm text-gray-500">{{ __('No complaint on this order.') }}</p>
+                    @endforelse
+                </x-card>
+            @endcan
 
             <x-card :title="__('Assigned to')">
                 <p class="text-sm text-gray-800">{{ $order->moderator?->name ?? __('Not taken yet') }}</p>

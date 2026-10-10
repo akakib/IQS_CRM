@@ -684,6 +684,46 @@ payment_methods.requires_trx_id
 + unique TrxID
 Same bKash screenshot cannot be reused for two
 orders
+5C. Complaints and refunds (added 2026-10-10)
+complaints
+  id                 bigint PK
+  order_id           FK orders NULL          -- a complaint can be about no order
+  customer_id        FK customers NULL
+  customer_name      varchar(150)
+  customer_phone     varchar(15)
+  category_id        FK status_reasons (reason_type = 'complaint', carries blame_stage)
+  source             enum('phone','messenger','whatsapp','website','rider','other')
+  description        text
+  blame_stage        enum(none, sales, verification, packing, dispatch, courier, customer)
+  blamed_user_id     FK users NULL           -- defaulted from the stage at resolve time
+  assigned_to        FK users NULL           -- default: the order's moderator
+  opened_by          FK users NULL
+  status             enum('open','resolved')
+  resolution         enum('solved','refunded','replacement','rejected') NULL
+  resolution_note    varchar(500) NULL
+  resolved_by, resolved_at
+  sla_due_at, escalated_at
+  INDEX (status, sla_due_at), (assigned_to, status), order_id, customer_id, created_at
+complaint_photos   id, complaint_id, path (private disk), original_name, size_bytes, uploaded_by, created_at
+complaint_events   id, complaint_id, action (opened|note|assigned|resolved|reopened|escalated|photo_added|refund_*), body, user_id, created_at
+                   -- append-only timeline; INDEX (complaint_id, id)
+refunds
+  id                 bigint PK
+  order_id           FK orders
+  complaint_id       FK complaints NULL
+  amount             decimal(12,2)           -- <= paid by the customer − refunds approved/paid
+  method_id          FK payment_methods
+  recipient_number   varchar(15) NULL        -- bKash/Nagad number to send to
+  reason_id          FK status_reasons NULL (reason_type = 'refund')
+  note               varchar(255) NULL
+  status             enum('pending','approved','rejected','paid')
+  requested_by, decided_by (never the requester), decided_at, decision_note
+  paid_by, paid_at, transaction_id, payment_id FK order_payments (the verified 'refund' row)
+  INDEX (status, id), order_id, complaint_id, created_at
+Rules: request -> approve/reject by a second person -> paid writes order_payments
+(type refund, verified) so orders.refund_due / payment_status follow; a fully
+refunded prepaid order becomes payment_status = 'refunded'. Nothing is deleted.
+
 6. Admin screens this design needs (Owner / Manager)
 1. Statuses & transitions — add custom status, choose stage group, colour,
 edit policy, allowed transitions and who can do them.

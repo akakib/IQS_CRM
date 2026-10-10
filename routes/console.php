@@ -24,6 +24,9 @@ Schedule::command('telegram:shop-summary')->dailyAt('21:00');
 // Delivery issues past their SLA go to managers.
 Schedule::command('issues:escalate')->everyFiveMinutes();
 
+// Complaints past their SLA go to managers.
+Schedule::command('complaints:escalate')->everyFifteenMinutes();
+
 // Webhook fallback for parcels still on the way.
 Schedule::command('courier:resync')->everyThirtyMinutes()->withoutOverlapping(20);
 

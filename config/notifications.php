@@ -26,6 +26,10 @@ return [
         'order_held_by_packer' => ['Packer put an order on hold', 'urgent'],
         'break_not_closed' => ['Someone went on break and did not come back', 'normal'],
         'points_review' => ['Points: flag or dispute to review', 'normal'],
+        'complaint_opened' => ['Customer complaint opened', 'normal'],
+        'complaint_overdue' => ['Complaint not handled in time', 'urgent'],
+        'refund_pending_approval' => ['Refund waiting for approval', 'normal'],
+        'refund_decided' => ['Refund approved, rejected or paid', 'normal'],
         'system_test' => ['Test notification', 'info'],
     ],
 

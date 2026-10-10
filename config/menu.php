@@ -20,6 +20,7 @@ return [
         ['Handover', 'handover.index', 'handover.*', 'packing.view'],
         ['Hotline', 'hotline.index', 'hotline.*', 'hotline.view'],
         ['Delivery issues', 'issues.index', 'issues.*', 'orders.view'],
+        ['Complaints', 'complaints.index', 'complaints.*', 'complaints.view'],
         ['Control room', 'desk.control', 'desk.control', 'orders.reassign'],
     ]],
     'catalog' => ['Catalog', [
@@ -27,6 +28,7 @@ return [
         ['Customers', 'customers.index', 'customers.*', 'customers.view'],
     ]],
     'analysis' => ['Analysis', [
+        ['Sales', 'reports.sales', 'reports.sales', 'reports.view'],
         ['KPI', 'kpi.index', 'kpi.*', null],
         ['Order P&L', 'analysis.index', 'analysis.*', 'analysis.view'],
     ]],
@@ -37,7 +39,9 @@ return [
     'stock' => ['Stock', [
         ['Locations', 'locations.index', 'locations.*', 'locations.view'],
     ]],
-    'accounting' => ['Accounting', []],
+    'accounting' => ['Accounting', [
+        ['Refunds', 'refunds.index', 'refunds.*', 'refunds.view'],
+    ]],
     'team' => ['Team', [
         ['Staff', 'users.index', 'users.*', 'staff.view'],
         ['Roles', 'roles.index', 'roles.*', 'roles.view'],

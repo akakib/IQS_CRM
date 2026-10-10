@@ -2,40 +2,44 @@
 
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\BreakController;
-use App\Http\Controllers\DeskController;
-use App\Http\Controllers\AvailabilityController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\OrderController;
-use App\Http\Controllers\OrderSettingsController;
-use App\Http\Controllers\PackingController;
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\AvailabilityController;
+use App\Http\Controllers\BreakController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ComplaintController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DeskController;
 use App\Http\Controllers\HandoverController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HotlineController;
 use App\Http\Controllers\IntegrationController;
-use App\Http\Controllers\Webhooks\SteadfastWebhookController;
-use App\Http\Controllers\Webhooks\WooCommerceWebhookController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MarketingController;
-use App\Http\Controllers\UsdLotController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationRuleController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OrderSettingsController;
+use App\Http\Controllers\PackingController;
 use App\Http\Controllers\PointsController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RefundController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShippingController;
-use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TelegramController;
 use App\Http\Controllers\TrackingSettingsController;
+use App\Http\Controllers\UsdLotController;
+use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VerificationRuleController;
+use App\Http\Controllers\Webhooks\SteadfastWebhookController;
+use App\Http\Controllers\Webhooks\WooCommerceWebhookController;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Called by other systems (no login; each verifies its own signature).
@@ -167,6 +171,29 @@ Route::middleware('auth')->group(function () {
     Route::get('/issues', [HotlineController::class, 'issues'])->middleware('can:orders.view')->name('issues.index');
     Route::post('/issues/{issue}/resolve', [HotlineController::class, 'resolve'])->whereNumber('issue')->middleware('can:orders.view')->name('issues.resolve');
 
+    // Customer complaints (photos are private: served through a permission check).
+    Route::get('/complaints', [ComplaintController::class, 'index'])->middleware('can:complaints.view')->name('complaints.index');
+    Route::get('/complaints/create', [ComplaintController::class, 'create'])->middleware('can:complaints.create')->name('complaints.create');
+    Route::post('/complaints', [ComplaintController::class, 'store'])->middleware('can:complaints.create')->name('complaints.store');
+    Route::get('/complaints/{complaint}', [ComplaintController::class, 'show'])->whereNumber('complaint')->middleware('can:complaints.view')->name('complaints.show');
+    Route::get('/complaints/{complaint}/photos/{photo}', [ComplaintController::class, 'photo'])->whereNumber('complaint')->whereNumber('photo')->middleware('can:complaints.view')->name('complaints.photo');
+    Route::post('/complaints/{complaint}/notes', [ComplaintController::class, 'note'])->whereNumber('complaint')->middleware('can:complaints.view')->name('complaints.notes');
+    Route::post('/complaints/{complaint}/photos', [ComplaintController::class, 'addPhotos'])->whereNumber('complaint')->middleware('can:complaints.view')->name('complaints.photos');
+    Route::middleware('can:complaints.edit')->group(function () {
+        Route::post('/complaints/{complaint}/assign', [ComplaintController::class, 'assign'])->whereNumber('complaint')->name('complaints.assign');
+        Route::post('/complaints/{complaint}/resolve', [ComplaintController::class, 'resolve'])->whereNumber('complaint')->name('complaints.resolve');
+        Route::post('/complaints/{complaint}/reopen', [ComplaintController::class, 'reopen'])->whereNumber('complaint')->name('complaints.reopen');
+    });
+
+    // Refunds: request (refunds.create) -> approve by a second person (refunds.approve) -> paid (refunds.create).
+    Route::get('/refunds', [RefundController::class, 'index'])->middleware('can:refunds.view')->name('refunds.index');
+    Route::post('/refunds', [RefundController::class, 'store'])->middleware('can:refunds.create')->name('refunds.store');
+    Route::post('/refunds/{refund}/decide', [RefundController::class, 'decide'])->whereNumber('refund')->middleware('can:refunds.approve')->name('refunds.decide');
+    Route::post('/refunds/{refund}/paid', [RefundController::class, 'paid'])->whereNumber('refund')->middleware('can:refunds.create')->name('refunds.paid');
+
+    // Sales report: orders placed, completed and cancelled per day.
+    Route::get('/reports/sales', [ReportController::class, 'sales'])->middleware('can:reports.view')->name('reports.sales');
+
     // Customers
     Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');
     Route::post('/customers/{customer}/merge', [CustomerController::class, 'merge'])->middleware('can:customers.edit')->name('customers.merge');
@@ -228,7 +255,7 @@ Route::middleware('auth')->group(function () {
     // Component library: local development only.
     if (app()->environment('local', 'testing')) {
         Route::view('/dev/components', 'dev.components')->name('dev.components');
-        Route::get('/dev/search-demo', fn (\Illuminate\Http\Request $r) => \App\Models\User::query()
+        Route::get('/dev/search-demo', fn (Request $r) => User::query()
             ->where('name', 'like', $r->query('q', '').'%')->orderBy('name')->limit(20)
             ->get(['id', 'name', 'email'])->map(fn ($u) => ['value' => $u->id, 'label' => $u->name, 'sub' => $u->email]))
             ->name('dev.search-demo');

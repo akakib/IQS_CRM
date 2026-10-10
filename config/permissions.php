@@ -27,6 +27,11 @@ return [
         'marketing' => ['view', 'create'],
         'activity' => ['view'],
         'settings' => ['view', 'edit'],
+        // Customer complaints: own = complaints assigned to me.
+        'complaints' => ['view', 'create', 'edit'],
+        // Refunds: create = request, approve = second person (never the requester).
+        'refunds' => ['view', 'create', 'approve'],
+        'reports' => ['view'],
     ],
 
     // Display names where the plain action word would mislead.
@@ -40,6 +45,10 @@ return [
         'orders.reassign' => 'Reassign and control room',
         'orders.take' => 'Take orders from the queue (moderator)',
         'marketing.create' => 'Add spend and USD lots',
+        'complaints.edit' => 'Assign, resolve, reopen',
+        'refunds.create' => 'Request a refund, mark as paid',
+        'refunds.approve' => 'Approve or reject refunds',
+        'reports.view' => 'Sales report and graphs',
     ],
 
     // Fields a role can have hidden (masked).

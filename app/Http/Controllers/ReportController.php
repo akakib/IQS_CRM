@@ -6,6 +6,7 @@ use App\Models\OrderStatus;
 use App\Models\User;
 use App\Services\Reports\KpiScorecard;
 use App\Services\Reports\OrderProfit;
+use App\Services\Reports\SalesReport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -13,8 +14,8 @@ use Illuminate\View\View;
 /** Dashboard tiles, KPI scorecard and order P&L. */
 class ReportController extends Controller
 {
-    /** About 8 small counted queries, each skipped without its permission. */
-    public function dashboard(Request $request): View
+    /** About 10 small counted queries, each skipped without its permission. */
+    public function dashboard(Request $request, SalesReport $sales): View
     {
         $user = $request->user();
         $today = today()->toDateString();
@@ -33,13 +34,24 @@ class ReportController extends Controller
         if ($user->can('orders.view')) {
             $tiles[] = [__('Delivered today'), $todayCount('delivered'), null, null];
         }
+        if ($user->can('complaints.view')) {
+            $open = DB::table('complaints')->where('status', 'open')->when($user->permissionScope('complaints.view') !== 'all', fn ($q) => $q->where('assigned_to', $user->id))->count();
+            $tiles[] = [__('Open complaints'), $open, route('complaints.index'), null];
+        }
+        if ($user->can('refunds.approve')) {
+            $pending = DB::table('refunds')->where('status', 'pending')->count();
+            $tiles[] = [__('Refunds to approve'), $pending, route('refunds.index', ['tab' => 'pending']), $pending ? 'down' : null];
+        }
         if ($user->can('points.manage')) {
             $open = DB::table('integrity_flags')->where('status', 'open')->count() + DB::table('point_ledger')->where('dispute_status', 'open')->count();
             $tiles[] = [__('Points to review'), $open, route('points.review'), $open ? 'down' : null];
         }
         $myPoints = (float) DB::table('point_ledger')->where('user_id', $user->id)->where('status', 'final')->where('created_at', '>=', now()->startOfMonth())->sum('points');
 
-        return view('dashboard', ['tiles' => $tiles, 'myPoints' => $myPoints, 'myWorking' => DB::table('orders')->where('moderator_id', $user->id)
+        // Last 14 days of orders placed / completed / cancelled (two grouped queries).
+        $chart = $user->can('reports.view') ? $sales->build(today()->subDays(13)->toDateString(), today()->toDateString()) : null;
+
+        return view('dashboard', ['tiles' => $tiles, 'myPoints' => $myPoints, 'chart' => $chart, 'myWorking' => DB::table('orders')->where('moderator_id', $user->id)
             ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->get(['id', 'order_no', 'ship_name'])]);
     }
 
@@ -80,6 +92,23 @@ class ReportController extends Controller
             'seeProfit' => $request->user()->canSeeField('profit'),
             'seeCost' => $request->user()->canSeeField('cost_price'),
         ]);
+    }
+
+    public function sales(Request $request, SalesReport $sales): View
+    {
+        $from = $request->query('from');
+        $to = $request->query('to');
+        if (! $request->hasAny(['from', 'to'])) {
+            [$from, $to] = [today()->subDays(29)->toDateString(), today()->toDateString()];
+        }
+        $valid = fn ($d) => is_string($d) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d);
+        $from = $valid($from) ? $from : today()->subDays(29)->toDateString();
+        $to = $valid($to) ? $to : today()->toDateString();
+        if ($from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        return view('reports.sales', ['report' => $sales->build($from, $to), 'from' => $from, 'to' => $to]);
     }
 
     /** @return array{0: string, 1: string} default: this month */

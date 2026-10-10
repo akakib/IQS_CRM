@@ -16,4 +16,11 @@
         @endforeach
         <x-stat-tile :label="__('My points this month')" :value="($myPoints > 0 ? '+' : '').rtrim(rtrim(number_format($myPoints, 2), '0'), '.')" :href="route('points.mine')" :trend="$myPoints < 0 ? 'down' : null" />
     </div>
+
+    @if ($chart)
+        <x-card :title="__('Last 14 days')" :subtitle="__('Orders placed, completed and cancelled per day')" class="mt-4">
+            <x-slot:actions><a href="{{ route('reports.sales') }}" class="text-sm font-medium text-green-900 hover:underline">{{ __('Sales report') }} →</a></x-slot:actions>
+            <x-line-chart :rows="$chart['rows']" :series="['placed' => [__('Placed'), '#1f6f43'], 'completed' => [__('Completed'), '#2563eb'], 'cancelled' => [__('Cancelled'), '#dc2626']]" :height="180" />
+        </x-card>
+    @endif
 </x-layouts.app>

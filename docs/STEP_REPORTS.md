@@ -377,3 +377,54 @@ Tests: 198 passing.
 8. Control room: check waiting orders, stages and the moderator table.
 9. Attendance & breaks: today's break is listed; open Month.
 10. KPI: set a target for one person and see it under their delivered count.
+
+## Complaints, refunds and the sales graph (done 2026-10-10)
+
+### Built
+- **Complaints** (Orders menu): opened against an order (type the order number) or just a phone number, with a type, where it came from (phone / Messenger / WhatsApp / website / rider), the customer's words and up to 6 photos.
+  - Photos are stored privately and served only to people with complaints access.
+  - Assigned to the order's moderator by default; managers can give it to anyone.
+  - **SLA**: 24 hours (Settings, General, "complaints.sla_hours"). Overdue complaints turn red, are sent to managers once (`complaints:escalate`, every 15 minutes) and get an in-app alert.
+  - **Resolve** = how it ended (solved / replacement / refunded / not valid) + **whose stage caused it** (sales, verification, packing, dispatch, courier, customer, nobody) + the person at fault (automatic: the order's moderator for sales, the packer for packing). "Refunded" needs an approved refund first.
+  - Everything is a timeline row (opened, note, given to, photo added, refund events, resolved, reopened, escalated); nothing is edited in place. A note also lands on the order's timeline.
+  - Complaint types are **reasons** (Settings, Statuses & reasons, "Complaint categories"), each with a default blame stage. Eight are seeded.
+  - List: Open / Mine / All tabs, filters by type, stage, person, dates; search by order no, phone, name or #id. Moderators see only complaints assigned to them (own scope).
+  - Order page: a Complaints card with a "+ New" link.
+- **Refunds** (Accounting menu): request from a complaint or from the order page (amount, bKash/Nagad/… method, number to send to, reason, note).
+  - **Two people**: the requester can never approve; approve/reject needs `refunds.approve` (Manager). Then whoever sends the money presses "Money sent" with the transaction ID (required for bKash/Nagad/Rocket/bank/card).
+  - Paid = a verified `refund` row in order_payments, so the order's refund due and payment status update automatically; a fully refunded prepaid order shows "refunded". The same TrxID cannot be used twice.
+  - The amount is capped at what the customer actually paid (verified advance + COD collected on delivered orders) minus refunds already approved or paid.
+  - Tabs: Waiting / To pay / Paid / Rejected / All. Dashboard tile "Refunds to approve" for managers.
+  - Refund reasons are reasons too (Settings, "Refund reasons").
+- **Sales report** (Analysis menu, `reports.view`): pick any date range (presets: today, yesterday, 7 days, this month; default last 30 days).
+  - Tiles: orders placed (+ ৳), completed (+ ৳ delivered), cancelled, returned, completion rate (completed ÷ ended), average per day.
+  - Line graph (plain SVG, no JS library): placed / completed / cancelled / returned per day; tap or hover a day to read its numbers. Ranges over 3 months are shown per week; at most one year.
+  - Table (desktop) / cards (phone) per day with the same numbers.
+  - Completed and cancelled count on the day the courier/agent ended them, placed counts on the day the order came in.
+  - Dashboard: the same graph for the last 14 days, with a link to the report.
+- Permissions: `complaints` (view / create / edit), `refunds` (view / create / approve), `reports.view`. Default grants: Moderator gets complaints (own) and can request refunds; Manager gets everything; Dollar Keeper sees and pays refunds.
+- Notifications: complaint opened (moderator + managers), complaint overdue (managers, urgent), refund waiting for approval (managers), refund decided/paid (the requester). Types added later now receive their default rules even on an existing install.
+
+Tests: 213 passing (15 new).
+
+### Assumptions made (say if any should change)
+- A complaint does not take points away yet. The blame stage and person are stored, so a points rule can be added later (e.g. "complaint, packing at fault: −2").
+- Photos go to `storage/app/private/complaints/<id>/`; keep that folder in the backups.
+- Refund money goes out by hand (bKash app); the system only records it.
+- Cash refunds need no transaction ID.
+
+### Needs you
+- Give the roles that should see the Sales graph `reports.view` (Manager has it; Owner always has it).
+- The cron (same line as before) is needed for complaint escalation.
+
+### 10-line manual test checklist
+1. Complaints, + New complaint: type an order number, pick "Damaged or leaking", add a photo, Open. The order's moderator gets a bell alert.
+2. Open the complaint: the photo shows, Stage at fault says Packing, Due in 24 hours.
+3. Add a note; it appears in the timeline and on the order page.
+4. Request a refund (amount above what was paid is refused).
+5. Log in as a Manager: Refunds, Waiting: Approve. Log in as the requester: approving your own is refused.
+6. Refunds, To pay: enter a TrxID, Money sent. The order page shows the refund as a verified payment.
+7. Back on the complaint: Resolve as Refunded, stage Packing, person automatic. It closes and the order's timeline notes it.
+8. Settings, General: set complaints.sla_hours to 1; open another complaint; after an hour `php artisan complaints:escalate` marks it Overdue and alerts managers.
+9. Analysis, Sales: choose This month; hover the graph; check the table totals against All orders.
+10. Dashboard: Open complaints, Refunds to approve tiles and the 14-day graph.

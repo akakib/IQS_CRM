@@ -67,6 +67,13 @@ class RoleSeeder extends Seeder
         'marketing.create' => ['dollar_keeper'],
         'activity.view' => ['manager'],
         'settings.view' => ['manager'],
+        'complaints.view' => ['moderator:own', 'manager'],
+        'complaints.create' => ['moderator', 'manager'],
+        'complaints.edit' => ['moderator', 'manager'],
+        'refunds.view' => ['manager', 'dollar_keeper'],
+        'refunds.create' => ['moderator', 'manager', 'dollar_keeper'],
+        'refunds.approve' => ['manager'],
+        'reports.view' => ['manager'],
     ];
 
     public function run(): void

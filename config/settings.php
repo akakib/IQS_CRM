@@ -16,6 +16,7 @@ return [
     'orders.duplicate_window_hours' => ['int', 24, 'Same phone counts as duplicate within (hours)', 'Orders', ['required', 'integer', 'min:0', 'max:720']],
     'orders.freeze_minutes_before_pickup' => ['int', 30, 'Freeze content edits before pickup (minutes)', 'Orders', ['required', 'integer', 'min:0', 'max:600']],
     'orders.issue_sla_minutes' => ['int', 60, 'Minutes the assigned moderator has to handle a delivery issue', 'Orders', ['required', 'integer', 'min:5', 'max:1440']],
+    'complaints.sla_hours' => ['int', 24, 'Hours the assigned person has to resolve a complaint before managers are alerted', 'Orders', ['required', 'integer', 'min:1', 'max:720']],
     'orders.discount_limit' => ['decimal', 200, 'Largest discount (৳) without manager approval', 'Orders', ['required', 'numeric', 'min:0', 'max:1000000']],
     'tracking.web_event_id' => ['string', 'wc_purchase_{external_ref}', 'Purchase event ID used by the website pixel ({external_ref} = website order id)', 'Tracking', ['required', 'string', 'max:100']],
     'verification.rerun_on_edit' => ['bool', true, 'Re-run verification when phone or amount changes', 'Orders', ['boolean']],

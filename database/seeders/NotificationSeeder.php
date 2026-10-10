@@ -21,21 +21,25 @@ class NotificationSeeder extends Seeder
         'sync_failed' => [['role', 'manager', true, false]],
         'oos_review_due' => [['role', 'owner', true, false]],
         'vendor_payment_due' => [['role', 'dollar_keeper', true, false], ['role', 'owner', true, false]],
+        'complaint_opened' => [['order_moderator', null, true, false], ['role', 'manager', true, false]],
+        'complaint_overdue' => [['role', 'manager', true, true]],
+        'refund_pending_approval' => [['role', 'manager', true, false]],
     ];
 
     public function run(): void
     {
         Artisan::call('notifications:sync');
 
-        if (DB::table('notification_rules')->exists()) {
-            return; // the admin owns the matrix after the first install
-        }
-
         $types = DB::table('notification_types')->pluck('id', 'system_key');
         $roles = DB::table('roles')->whereNotNull('system_key')->pluck('id', 'system_key');
         $now = now();
 
         foreach (self::DEFAULT_RULES as $type => $rules) {
+            // The admin owns the matrix once a type has any rule; only event
+            // types added later (with no rule yet) get their defaults.
+            if (DB::table('notification_rules')->where('type_id', $types[$type])->exists()) {
+                continue;
+            }
             foreach ($rules as [$target, $roleKey, $inApp, $telegram]) {
                 if ($roleKey && ! isset($roles[$roleKey])) {
                     continue;

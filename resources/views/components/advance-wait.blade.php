@@ -59,7 +59,7 @@
 
         <form x-show="panel === 'date'" x-cloak method="POST" action="{{ route('orders.advance-date', $order) }}" class="mt-2 flex flex-wrap items-end gap-2">
             @csrf
-            <label class="text-xs">{{ __('Customer will send it by') }}<input type="date" name="date" required min="{{ today()->toDateString() }}" value="{{ $order->hold_expected_date?->toDateString() }}" class="{{ $input }} mt-1"></label>
+            <label class="text-xs">{{ __('Customer will send it by') }}<x-date-input name="date" :min="today()->toDateString()" :value="$order->hold_expected_date?->toDateString()" :clearable="false" full-width class="mt-1" /></label>
             <x-button size="sm">{{ __('Save') }}</x-button>
             @error('date')<p class="w-full text-xs text-red-600">{{ $message }}</p>@enderror
         </form>

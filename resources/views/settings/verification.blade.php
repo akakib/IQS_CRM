@@ -32,7 +32,7 @@
                         <div class="flex items-center gap-2">
                             <x-badge :color="$outcomeColor[$r->outcome]">{{ $outcomes[$r->outcome] }}</x-badge>
                             @can('settings.edit')
-                                <form method="POST" action="{{ route('settings.verification.toggle', $r->id) }}">@csrf<button class="text-xs text-primary hover:underline">{{ $r->is_active ? __('Off') : __('On') }}</button></form>
+                                <form method="POST" action="{{ route('settings.verification.toggle', $r->id) }}" class="flex items-center gap-2">@csrf<x-badge :color="$r->is_active ? 'green' : 'gray'">{{ $r->is_active ? __('On') : __('Off') }}</x-badge><button class="text-xs text-primary hover:underline">{{ $r->is_active ? __('Turn off') : __('Turn on') }}</button></form>
                                 <form method="POST" action="{{ route('settings.verification.destroy', $r->id) }}" id="rule-del-{{ $r->id }}">@csrf @method('DELETE')<button type="button" @click="$dispatch('open-confirm', { id: 'rule-delete', form: 'rule-del-{{ $r->id }}', label: @js($r->name) })" class="text-xs text-red-600 hover:underline">{{ __('Delete') }}</button></form>
                             @endcan
                         </div>

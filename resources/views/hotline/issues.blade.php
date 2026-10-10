@@ -1,5 +1,5 @@
 @php
-    $resolutions = ['delivered' => __('Delivered'), 'rescheduled' => __('New date agreed'), 'partial' => __('Partial delivery'), 'returned' => __('Will be returned'), 'exchange_created' => __('Exchange order made'), 'solved' => __('Solved')];
+    $resolutions = array_map('__', \App\Support\Labels::RESOLUTION);
 @endphp
 
 <x-layouts.app :heading="$all ? __('Delivery issues') : __('My delivery issues')">

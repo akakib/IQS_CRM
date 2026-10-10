@@ -14,7 +14,7 @@
                 }">
                 @csrf
                 <div class="relative w-full min-w-0 md:flex-1" @click.outside="open = false" @keydown.escape="open = false">
-                    <input name="rider_name" maxlength="100" autocomplete="off" x-model="name" @focus="open = true" @input="open = true"
+                    <input name="rider_name" maxlength="100" required autocomplete="off" x-model="name" @focus="open = true" @input="open = true"
                         placeholder="{{ __('Rider name') }}" class="w-full rounded-lg border border-gray-300 py-2 pl-3 pr-9 text-sm focus:border-primary focus:outline-none">
                     <button type="button" tabindex="-1" @click="open = !open" class="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-gray-400" aria-label="{{ __('Show riders') }}">
                         <svg class="h-4 w-4 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
@@ -32,6 +32,7 @@
                 <input name="rider_phone" inputmode="tel" x-model="phone" placeholder="{{ __('Rider phone') }}" class="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none md:flex-1">
                 <x-button class="shrink-0 whitespace-nowrap">{{ __('Start scanning') }}</x-button>
             </form>
+            @error('rider_name')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
         </x-card>
         <x-card :title="__('Recent handovers')">
             {{-- Pick a day or a range; newest first. --}}

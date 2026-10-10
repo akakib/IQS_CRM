@@ -151,6 +151,7 @@ class PackagingTest extends TestCase
         $this->assertDatabaseHas('app_notifications', ['title' => 'Update the COD of '.$order->order_no.' at the courier']);
         $this->packIt($order->fresh(), $this->label($order->fresh())); // repacked with the new label
 
+        $this->post('/handover', ['rider_name' => ''])->assertSessionHasErrors('rider_name'); // a handover names its rider
         $this->post('/handover', ['rider_name' => 'Rafiq']);
         $session = DB::table('handover_sessions')->value('id');
         $this->postJson("/handover/{$session}/scan", ['code' => $this->label($order->fresh())])

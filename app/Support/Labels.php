@@ -13,6 +13,8 @@ class Labels
         'address' => 'Address problem', 'hold' => 'Deliver later', 'other' => 'Other',
     ];
 
+    public const RESOLUTION = ['delivered' => 'Delivered', 'rescheduled' => 'New date agreed', 'partial' => 'Partial delivery', 'returned' => 'Will be returned', 'exchange_created' => 'Exchange order made', 'solved' => 'Solved'];
+
     public const RISK = ['normal' => 'Normal', 'watch' => 'Watch closely', 'blocked' => 'Blocked'];
 
     public const ENDED = ['idle' => 'Given back: nothing done', 'timeout' => 'Given back: timer', 'break' => 'Back to New: break', 'reassigned' => 'Handed to someone else', 'finished' => 'Finished'];

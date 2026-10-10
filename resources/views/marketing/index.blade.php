@@ -92,7 +92,7 @@
                             <button class="text-xs font-medium text-primary hover:underline">{{ __('Save') }}</button><button type="button" @click="edit = false" class="text-xs text-gray-500">{{ __('Cancel') }}</button></form>@endcan
                         <span x-show="! edit">@can('marketing.create')<button type="button" @click="edit = true" class="mr-1 text-xs text-primary hover:underline">{{ __('Edit') }}</button>@endcan{{ $a->name }} <span class="text-xs text-gray-400">{{ ucfirst($a->platform) }} · {{ $a->external_id ?: __('no id') }} · {{ $a->timezone }}</span></span>
                         @can('marketing.create')
-                            <form method="POST" action="{{ route('marketing.accounts.toggle', $a->id) }}">@csrf<button class="text-xs text-primary hover:underline">{{ $a->is_active ? __('Off') : __('On') }}</button></form>
+                            <form method="POST" action="{{ route('marketing.accounts.toggle', $a->id) }}">@csrf<span class="inline-flex items-center gap-2"><x-badge :color="$a->is_active ? 'green' : 'gray'">{{ $a->is_active ? __('On') : __('Off') }}</x-badge><button class="text-xs text-primary hover:underline">{{ $a->is_active ? __('Turn off') : __('Turn on') }}</button></span></form>
                         @endcan
                     </div>
                 @empty

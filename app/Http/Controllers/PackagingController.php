@@ -185,7 +185,7 @@ class PackagingController extends Controller
         ]);
         $scans->hold($order, (int) $data['reason_id'], $data['note'] ?? null, $request->user());
 
-        return redirect()->route('packaging.index')->with('success', __(':no is on hold. The moderator and admin were told.', ['no' => $order->order_no]));
+        return back()->with('success', __(':no is on hold. The moderator and admin were told.', ['no' => $order->order_no]));
     }
 
     /** Print every label in the queue that has not been printed yet. */

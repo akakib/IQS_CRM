@@ -52,7 +52,7 @@
             @foreach ($orders as $o)
                 @php $open = $o->moderator_id === auth()->id() ? route('desk.notice', $o) : route('orders.show', $o); @endphp
                 <tr class="cursor-pointer" onclick="location.href='{{ $open }}'">
-                    <td><span class="font-mono font-medium text-gray-800">{{ $o->order_no }}</span> <span class="text-xs text-gray-400">{{ \App\Models\Order::channelLabel($o->channel) }}</span></td>
+                    <td><a href="{{ $open }}" onclick="event.stopPropagation()" class="font-mono font-medium text-gray-800 hover:text-primary hover:underline">{{ $o->order_no }}</a> <span class="text-xs text-gray-400">{{ \App\Models\Order::channelLabel($o->channel) }}</span></td>
                     <td><p class="text-gray-800">{{ $o->ship_name }}</p><p class="font-mono text-xs text-gray-500">{{ Mask::value($o->ship_phone, 'customer_contact') }}</p></td>
                     <td><x-order-status :order="$o" :statuses="$statuses" /></td>
                     <td class="text-gray-600">{{ $o->moderator?->name ?? '-' }}</td>

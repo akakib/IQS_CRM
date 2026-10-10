@@ -88,8 +88,10 @@ class ShippingController extends Controller
     public function resync(): RedirectResponse
     {
         \Illuminate\Support\Facades\Artisan::call('courier:resync');
+        // The command prints "Checked N parcels, M changed."; the toast says it in plain words.
+        preg_match('/Checked (\d+) parcels, (\d+) changed/', \Illuminate\Support\Facades\Artisan::output(), $m);
 
-        return back()->with('success', trim(\Illuminate\Support\Facades\Artisan::output()));
+        return back()->with('success', $m ? __(':n parcels checked, :c updated.', ['n' => $m[1], 'c' => $m[2]]) : __('Courier status checked.'));
     }
 
     /** New label for the current version (after an address/COD change); voids the old one. */

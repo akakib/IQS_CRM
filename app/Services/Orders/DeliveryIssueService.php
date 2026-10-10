@@ -61,7 +61,7 @@ class DeliveryIssueService
             'resolution' => $resolution, 'resolution_note' => $note, 'resolved_by' => $by->id, 'resolved_at' => now(), 'updated_at' => now(),
         ]);
         $order = Order::find($issue->order_id);
-        $this->orders->note($order, 'rider', __('Issue handled: :r:n', ['r' => str_replace('_', ' ', $resolution), 'n' => $note ? ' · '.$note : '']), $by);
+        $this->orders->note($order, 'rider', __('Issue handled: :r:n', ['r' => mb_strtolower(__(\App\Support\Labels::RESOLUTION[$resolution] ?? str_replace('_', ' ', $resolution))), 'n' => $note ? ' · '.$note : '']), $by);
 
         if (! DB::table('delivery_issues')->where('order_id', $order->id)->whereNull('resolved_at')->exists()) {
             $this->notifications->markActed('order', $order->id, 'delivery_issue');

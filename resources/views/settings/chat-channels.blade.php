@@ -54,7 +54,7 @@
                 @can('staff.edit')
                     <x-modal :id="'access-'.$c->id" :title="__('Access: :c', ['c' => $c->name])" persistent>
                         <form method="POST" action="{{ route('settings.chat-channels.people', $c) }}"
-                            x-data="{ picked: @js($c->users->pluck('id')->all()), staff: @js($staff->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values()), q: '', panel: true,
+                            x-data="{ picked: @js($c->users->pluck('id')->all()), saved: @js($c->users->pluck('id')->all()), staff: @js($staff->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values()), q: '', panel: true,
                                 name(id) { return (this.staff.find(u => u.id === id) || {}).name },
                                 toggle(id) { this.picked.includes(id) ? this.picked = this.picked.filter(x => x !== id) : this.picked.push(id) } }">
                             @csrf
@@ -91,7 +91,7 @@
                                 </div>
                             </div>
                             <div class="mt-4 flex justify-end gap-2">
-                                <x-button type="button" variant="secondary" size="sm" @click="close()">{{ __('Cancel') }}</x-button>
+                                <x-button type="button" variant="secondary" size="sm" @click="picked = [...saved]; q = ''; close()">{{ __('Cancel') }}</x-button>
                                 <x-button size="sm">{{ __('Save') }}</x-button>
                             </div>
                         </form>

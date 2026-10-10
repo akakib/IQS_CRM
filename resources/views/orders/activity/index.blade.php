@@ -57,7 +57,8 @@
                 } catch (e) {}
                 button.disabled = false;
             },
-        }" @open-order.window="open = $event.detail">
+            openNo: '',
+        }" @open-order.window="open = $event.detail" @order-no.window="openNo = $event.detail">
 
         {{-- Filters: dates (when the order came in) and who holds it. --}}
         <div class="mb-4 space-y-3">
@@ -107,7 +108,7 @@
             <div x-show="open" x-cloak class="fixed inset-0 z-[120] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">
                 <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-[92vh] sm:rounded-2xl">
                     <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-6">
-                        <h3 class="text-base font-semibold text-gray-900">{{ __('Order') }}</h3>
+                        <h3 class="text-base font-semibold text-gray-900">{{ __('Order') }} <span class="font-mono" x-text="openNo"></span></h3>
                         <button type="button" @click="open = null; refresh()" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Close') }}</button>
                     </div>
                     <template x-if="open">

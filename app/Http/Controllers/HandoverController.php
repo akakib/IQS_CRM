@@ -40,7 +40,7 @@ class HandoverController extends Controller
 
     public function start(Request $request): RedirectResponse
     {
-        $data = $request->validate(['rider_name' => ['nullable', 'string', 'max:100'], 'rider_phone' => ['nullable', 'string', 'max:20']]);
+        $data = $request->validate(['rider_name' => ['required', 'string', 'max:100'], 'rider_phone' => ['nullable', 'string', 'max:20']]);
         // Remember the rider (new name = new rider; a changed phone replaces the old one).
         $name = trim((string) ($data['rider_name'] ?? ''));
         $phone = Phone::normalize($data['rider_phone'] ?? null);

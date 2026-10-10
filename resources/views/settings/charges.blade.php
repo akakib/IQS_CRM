@@ -81,12 +81,12 @@
                     @csrf
                     <x-simple-select name="zone_id" :options="['' => __('Any zone')] + $zones->pluck('name', 'id')->all()" value="" full-width class="w-full" />
                     <div class="grid grid-cols-2 gap-2">
-                        <input name="min_weight_g" type="number" min="0" value="0" placeholder="{{ __('From g') }}" class="{{ $input }}" required>
-                        <input name="max_weight_g" type="number" min="0" placeholder="{{ __('To g (empty = no limit)') }}" class="{{ $input }}">
-                        <input name="min_order_total" type="number" min="0" step="0.01" value="0" placeholder="{{ __('Order total from') }}" class="{{ $input }}" required>
-                        <input name="charge" type="number" min="0" step="0.01" placeholder="{{ __('Charge (0 = free)') }}" class="{{ $input }}" required>
+                        <label class="text-xs font-medium text-gray-600">{{ __('From weight (g)') }}<input name="min_weight_g" type="number" min="0" value="0" class="mt-1 w-full {{ $input }}" required></label>
+                        <label class="text-xs font-medium text-gray-600">{{ __('Up to weight (g)') }}<input name="max_weight_g" type="number" min="0" placeholder="{{ __('No limit') }}" class="mt-1 w-full {{ $input }}"></label>
+                        <label class="text-xs font-medium text-gray-600">{{ __('From order total (৳)') }}<input name="min_order_total" type="number" min="0" step="0.01" value="0" class="mt-1 w-full {{ $input }}" required></label>
+                        <label class="text-xs font-medium text-gray-600">{{ __('Charge (৳), 0 = free') }}<input name="charge" type="number" min="0" step="0.01" class="mt-1 w-full {{ $input }}" required></label>
                     </div>
-                    <input name="priority" type="number" min="1" max="999" value="100" class="{{ $input }}" required aria-label="{{ __('Priority') }}">
+                    <label class="block text-xs font-medium text-gray-600">{{ __('Priority (lower wins)') }}<input name="priority" type="number" min="1" max="999" value="100" class="mt-1 w-full {{ $input }}" required></label>
                     @if ($errors->any())<p class="text-sm text-red-600">{{ $errors->first() }}</p>@endif
                     <x-button>{{ __('Add rule') }}</x-button>
                 </form>

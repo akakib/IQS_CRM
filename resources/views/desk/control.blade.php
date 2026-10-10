@@ -16,7 +16,10 @@
         },
         page(e) { const a = e.target.closest('[data-pages] a[href]'); if (a) { e.preventDefault(); this.load(a.href) } },
     }">
-    <p class="mb-4 text-sm text-gray-500">{{ __('Who holds what and where orders are stuck. Tap any number to see those orders. Reload for the latest numbers.') }}</p>
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm text-gray-500">{{ __('Who holds what and where orders are stuck. Tap any number to see those orders.') }}</p>
+        <x-button size="sm" variant="secondary" type="button" onclick="location.reload()">{{ __('Refresh') }}</x-button>
+    </div>
 
     <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <button type="button" class="flex h-full flex-col text-left" @click="show(@js(__('Waiting, nobody took')), { box: 'waiting' })">

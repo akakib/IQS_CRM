@@ -15,6 +15,7 @@
         x-data="{
             channel: @js(old('channel', $chatChannel?->orderChannel() ?? (array_key_exists((string) request('channel'), \App\Models\Order::manualChannels()) ? request('channel') : ''))),
             chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
+            byChat: @js((bool) $chatChannel),
             phone: @js(old('phone', (string) request('phone', ''))), name: @js(old('name', '')),
             customer: null, looking: false,
             addressId: @js(old('customer_address_id')), zoneId: @js(old('zone_id')),
@@ -110,7 +111,7 @@
                             <p class="mb-1 text-sm font-medium text-gray-700">{{ __('From which chat') }}</p>
                             <x-simple-select :options="['' => __('Not from a chat')] + $chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->name])->all()"
                                 :value="(string) old('chat_channel_id', $chatChannel?->id ?? '')" full-width class="w-full sm:w-72"
-                                @select-change="chatChannel = $event.detail; const t = @js($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all())[$event.detail]; if (t) channel = t" />
+                                @select-change="chatChannel = $event.detail; const t = @js($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all())[$event.detail]; if (t) { channel = t; byChat = true } else if (byChat) { channel = ''; byChat = false }" />
                             @error('chat_channel_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
                         </div>
                     @endif
@@ -162,10 +163,9 @@
                     <div x-show="!addressId" class="space-y-2">
                         <textarea name="address_line" rows="2" maxlength="500" placeholder="{{ __('House, road, area') }}" class="{{ $input }}">{{ old('address_line') }}</textarea>
                         <div class="grid grid-cols-2 gap-2">
-                            <input name="district" list="bd-districts" value="{{ old('district') }}" placeholder="{{ __('District') }}" class="{{ $input }}">
+                            <x-simple-select name="district" :options="['' => __('District')] + array_combine($districts, $districts)" :value="(string) old('district', '')" searchable full-width class="w-full" />
                             <input name="thana" value="{{ old('thana') }}" placeholder="{{ __('Thana / area') }}" class="{{ $input }}">
                         </div>
-                        <datalist id="bd-districts">@foreach ($districts as $d)<option value="{{ $d }}">@endforeach</datalist>
                         <input type="hidden" name="zone_id" :value="zoneId || ''">
                         <div @class(['flex flex-wrap gap-2', 'hidden' => \App\Services\Orders\DeliveryCharges::flat()])>
                             @foreach ($zones as $id => $zone)

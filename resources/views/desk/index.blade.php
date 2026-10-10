@@ -380,7 +380,7 @@
                         @if ($tab === 'packaging' || in_array($key, ['ready_for_packaging', 'packed', 'ready_for_pickup'], true))
                             <div class="mt-3 rounded-lg border border-gray-200 px-4 py-3 text-sm">
                                 @if ($order->booking_state === 'queued')
-                                    <p class="text-gray-700">{{ __('Booking the courier… this takes a few seconds. Reload to see the CN.') }}</p>
+                                    <p class="flex flex-wrap items-center gap-2 text-gray-700">{{ __('Booking the courier… this takes a few seconds.') }} <button type="button" onclick="location.reload()" class="text-xs font-medium text-primary hover:underline">{{ __('Refresh') }}</button></p>
                                 @elseif ($order->booking_state === 'failed')
                                     <p class="font-medium text-red-700">{{ __('Courier booking failed: :e', ['e' => $order->booking_error]) }}</p>
                                 @else

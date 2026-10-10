@@ -13,7 +13,11 @@
     </x-list.filter-bar>
 
     @if ($users->isEmpty())
-        <x-empty-state :message="__('No staff match these filters.')" :action="route('users.index')" :action-label="__('Clear filters')" />
+        @if ($list->hasFilters())
+            <x-empty-state :message="__('No staff match these filters.')" :action="route('users.index')" :action-label="__('Clear filters')" />
+        @else
+            <x-empty-state :message="__('No staff yet.')" />
+        @endif
     @else
         <x-list.table>
             <x-slot:head>

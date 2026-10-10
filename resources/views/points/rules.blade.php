@@ -24,7 +24,7 @@
                                             <p class="mt-1 text-xs text-gray-500">
                                                 <span class="mr-1 inline-block rounded bg-gray-100 px-1.5 py-0.5">{{ __($t[0]) }}</span>
                                                 @foreach ($conditions[$r->id] ?? [] as $c)
-                                                    <span class="mr-1 inline-block rounded bg-gray-100 px-1.5 py-0.5">{{ $c->field }} {{ $c->operator }} {{ $c->value }}</span>
+                                                    <span class="mr-1 inline-block rounded bg-gray-100 px-1.5 py-0.5">{{ __($fields[$c->field] ?? $c->field) }} {{ $c->operator }} {{ $c->value }}</span>
                                                 @endforeach
                                                 · {{ $recipients[$r->recipient] }} · {{ $settle[$r->settle_on] }}
                                                 @if ($r->requires_delivery) · {{ __('only if delivered') }} @endif
@@ -113,7 +113,7 @@
                         <div class="rounded-lg border border-gray-200 p-2">
                             <div class="mb-1 flex flex-wrap gap-1">
                                 @foreach ($fields as $key => $label)
-                                    <button type="button" @click="c.field = @js($key)" class="rounded border px-1.5 py-0.5 text-[11px]" :class="c.field === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-600'">{{ $key }}</button>
+                                    <button type="button" @click="c.field = @js($key)" class="rounded border px-1.5 py-0.5 text-[11px]" :class="c.field === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-600'">{{ __($label) }}</button>
                                 @endforeach
                             </div>
                             <input type="hidden" :name="`conditions[${i}][field]`" :value="c.field">
@@ -122,7 +122,7 @@
                                 @foreach (['>=', '<=', '=', '!=', '>', '<'] as $op)
                                     <button type="button" @click="c.operator = @js($op)" class="w-8 rounded border text-xs" :class="c.operator === @js($op) ? 'border-primary bg-primary text-white' : 'border-gray-300'">{{ $op }}</button>
                                 @endforeach
-                                <input :name="`conditions[${i}][value]`" x-model="c.value" required placeholder="30 / true / sales" class="min-w-0 flex-1 rounded border border-gray-300 px-2 text-xs">
+                                <input :name="`conditions[${i}][value]`" x-model="c.value" required placeholder="{{ __('Value, e.g. 30') }}" class="min-w-0 flex-1 rounded border border-gray-300 px-2 text-xs">
                                 <button type="button" @click="conds.splice(i, 1)" class="px-1 text-gray-400 hover:text-red-600">&times;</button>
                             </div>
                         </div>

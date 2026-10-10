@@ -22,11 +22,12 @@
                             {{ $f->details }} · {{ \Illuminate\Support\Carbon::parse($f->created_at)->format('d M, g:i A') }}
                         </p>
                     </div>
-                    <form method="POST" action="{{ route('points.review.flag', $f->id) }}" class="flex shrink-0 flex-wrap items-center gap-2">
+                    <form method="POST" action="{{ route('points.review.flag', $f->id) }}" id="flag-{{ $f->id }}" class="flex shrink-0 flex-wrap items-center gap-2">
+                        <input type="hidden" name="decision" value="">
                         @csrf
                         <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-40 rounded-lg border border-gray-300 px-2 py-1 text-sm">
                         <x-button size="sm" name="decision" value="dismissed" variant="secondary">{{ __('Dismiss') }}</x-button>
-                        <x-button size="sm" name="decision" value="confirmed" variant="danger">{{ __('Confirm fake') }}</x-button>
+                        <x-button type="button" size="sm" variant="danger" @click="$el.form.querySelector('input[type=hidden][name=decision]').value = 'confirmed'; $dispatch('open-confirm', { id: 'points-confirm', form: 'flag-{{ $f->id }}', verb: @js(__('Confirm fake')) })">{{ __('Confirm fake') }}</x-button>
                     </form>
                 </div>
             </div>
@@ -46,10 +47,11 @@
                             "{{ $d->dispute_note }}"
                         </p>
                     </div>
-                    <form method="POST" action="{{ route('points.review.dispute', $d->id) }}" class="flex shrink-0 gap-2">
+                    <form method="POST" action="{{ route('points.review.dispute', $d->id) }}" id="dispute-{{ $d->id }}" class="flex shrink-0 gap-2">
+                        <input type="hidden" name="decision" value="">
                         @csrf
                         <x-button size="sm" name="decision" value="rejected" variant="secondary">{{ __('Keep the point') }}</x-button>
-                        <x-button size="sm" name="decision" value="upheld">{{ __('Remove the point') }}</x-button>
+                        <x-button type="button" size="sm" @click="$el.form.querySelector('input[type=hidden][name=decision]').value = 'upheld'; $dispatch('open-confirm', { id: 'points-confirm', form: 'dispute-{{ $d->id }}', verb: @js(__('Remove the point')) })">{{ __('Remove the point') }}</x-button>
                     </form>
                 </div>
             </div>
@@ -70,11 +72,12 @@
                             · <span class="font-mono">{{ $canSeeContact ? $o->ship_phone : substr($o->ship_phone, 0, 3).'*****'.substr($o->ship_phone, -3) }}</span>
                             · ৳{{ number_format((float) $o->grand_total) }}
                         </div>
-                        <form method="POST" action="{{ route('points.review.qa', $o->id) }}" class="flex shrink-0 flex-wrap items-center gap-2">
+                        <form method="POST" action="{{ route('points.review.qa', $o->id) }}" id="qa-{{ $o->id }}" class="flex shrink-0 flex-wrap items-center gap-2">
+                            <input type="hidden" name="result" value="">
                             @csrf
                             <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-36 rounded-lg border border-gray-300 px-2 py-1 text-sm">
                             <x-button size="sm" name="result" value="call_verified">{{ __('Was called') }}</x-button>
-                            <x-button size="sm" name="result" value="not_called" variant="danger">{{ __('Not called') }}</x-button>
+                            <x-button type="button" size="sm" variant="danger" @click="$el.form.querySelector('input[type=hidden][name=result]').value = 'not_called'; $dispatch('open-confirm', { id: 'points-confirm', form: 'qa-{{ $o->id }}', verb: @js(__('Not called')) })">{{ __('Not called') }}</x-button>
                             <x-button size="sm" name="result" value="wrong_info" variant="secondary">{{ __('Wrong info') }}</x-button>
                         </form>
                     </div>
@@ -84,4 +87,5 @@
             <div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-500">{{ __('No orders to check this week.') }}</div>
         @endforelse
     @endif
+    <x-confirm-modal id="points-confirm" :verb="__('Confirm')" :message="__('This takes points off the person.')" />
 </x-layouts.app>

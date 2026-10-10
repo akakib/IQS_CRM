@@ -85,7 +85,7 @@
                 <x-card :title="__('Add a lot')" x-data="{ usd: '', rate: '', paid: '' }">
                     <form method="POST" action="{{ route('usd-lots.store') }}" class="space-y-2">
                         @csrf
-                        <x-simple-select name="vendor_id" :options="$vendorOptions" :value="array_key_first($vendorOptions)" full-width class="w-full" />
+                        <x-simple-select name="vendor_id" :options="$vendorOptions" :value="old('vendor_id')" :placeholder="__('Choose the vendor')" full-width class="w-full" />
                         <x-date-input name="purchased_on" :value="old('purchased_on', today()->toDateString())" :max="today()->toDateString()" :clearable="false" full-width />
                         <div class="grid grid-cols-2 gap-2">
                             <input type="number" name="usd" x-model="usd" step="0.01" min="1" required placeholder="{{ __('USD') }}" class="{{ $input }}">
@@ -108,10 +108,10 @@
                 <x-card :title="__('Pay a vendor')">
                     <form method="POST" action="{{ route('usd-lots.payments.store') }}" class="space-y-2">
                         @csrf
-                        <x-simple-select name="vendor_id" :options="$vendorOptions" :value="array_key_first($vendorOptions)" full-width class="w-full" />
+                        <x-simple-select name="vendor_id" :options="$vendorOptions" :value="old('vendor_id')" :placeholder="__('Choose the vendor')" full-width class="w-full" />
                         <input type="number" name="amount_bdt" step="0.01" min="1" required placeholder="{{ __('Amount (৳)') }}" class="{{ $input }}">
                         <x-date-input name="paid_on" :value="today()->toDateString()" :max="today()->toDateString()" :clearable="false" full-width />
-                        <x-simple-select name="payment_method_id" :options="$methods" :value="array_key_first($methods)" full-width class="w-full" />
+                        <x-simple-select name="payment_method_id" :options="$methods" :value="old('payment_method_id')" :placeholder="__('How it was paid')" full-width class="w-full" />
                         <input name="transaction_ref" maxlength="100" placeholder="{{ __('Transaction ID') }}" class="{{ $input }}">
                         <x-button size="sm" class="w-full">{{ __('Record payment') }}</x-button>
                     </form>

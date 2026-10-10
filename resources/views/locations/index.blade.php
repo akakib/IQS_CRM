@@ -59,11 +59,11 @@
             @if ($canBulk)
                 <x-slot:actions>
                     @foreach (['activate' => __('Activate'), 'deactivate' => __('Deactivate')] as $action => $label)
-                        <form method="POST" action="{{ route('locations.bulk') }}">
+                        <form method="POST" action="{{ route('locations.bulk') }}" id="loc-bulk-{{ $action }}">
                             @csrf
                             <input type="hidden" name="action" value="{{ $action }}">
                             <x-list.selected-inputs />
-                            <button type="submit" class="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20">{{ $label }}</button>
+                            <button type="{{ $action === 'deactivate' ? 'button' : 'submit' }}" @if ($action === 'deactivate') @click="$dispatch('open-confirm', { id: 'loc-deactivate', form: 'loc-bulk-deactivate', label: selected.length + ' ' + @js(__('locations')) })" @endif class="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20">{{ $label }}</button>
                         </form>
                     @endforeach
                 </x-slot:actions>
@@ -74,4 +74,5 @@
     @endif
 
     <x-confirm-modal id="delete-location" :message="__('The location will be removed from lists.')" />
+    <x-confirm-modal id="loc-deactivate" :verb="__('Deactivate')" :message="__('They can no longer be picked.')" />
 </x-layouts.app>

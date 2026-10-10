@@ -48,7 +48,7 @@
                     @can('orders.approve')
                         <div class="mt-3 flex gap-2">
                             <form method="POST" action="{{ route('orders.amendments.decide', [$order, $a->id]) }}">@csrf<input type="hidden" name="decision" value="approve"><x-button size="sm">{{ __('Approve') }}</x-button></form>
-                            <form method="POST" action="{{ route('orders.amendments.decide', [$order, $a->id]) }}">@csrf<input type="hidden" name="decision" value="reject"><x-button size="sm" variant="secondary">{{ __('Reject') }}</x-button></form>
+                            <form method="POST" action="{{ route('orders.amendments.decide', [$order, $a->id]) }}" id="amend-reject-{{ $a->id }}">@csrf<input type="hidden" name="decision" value="reject"><x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'reject-confirm', form: 'amend-reject-{{ $a->id }}', label: @js(__('this change')) })">{{ __('Reject') }}</x-button></form>
                         </div>
                     @endcan
                 </div>
@@ -116,7 +116,7 @@
                                     <span class="flex flex-wrap items-center gap-2">
                                         @if ($p->counts_now)<x-badge color="amber">{{ __('COD already lowered') }}</x-badge>@endif
                                         <form method="POST" action="{{ route('orders.payments.verify', [$order, $p->id]) }}">@csrf<input type="hidden" name="decision" value="approve"><x-button size="sm">{{ __('Verify') }}</x-button></form>
-                                        <form method="POST" action="{{ route('orders.payments.verify', [$order, $p->id]) }}">@csrf<input type="hidden" name="decision" value="reject"><x-button size="sm" variant="secondary">{{ __('Reject') }}</x-button></form>
+                                        <form method="POST" action="{{ route('orders.payments.verify', [$order, $p->id]) }}" id="pay-reject-{{ $p->id }}">@csrf<input type="hidden" name="decision" value="reject"><x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'reject-confirm', form: 'pay-reject-{{ $p->id }}', label: @js('৳'.number_format((float) $p->amount)) })">{{ __('Reject') }}</x-button></form>
                                     </span>
                                 @else
                                     <x-badge color="amber">{{ $p->counts_now ? __('To check · COD already lowered') : __('Waiting for the check') }}</x-badge>
@@ -173,7 +173,7 @@
                     @canseefield('customer_contact'){{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}@else<span class="text-gray-400">{{ __('Address hidden for your role') }}</span>@endcanseefield
                 </p>
                 <p class="mt-3 text-xs text-gray-500">{{ __(':o orders · :d delivered · :r returned', ['o' => $order->customer->orders_count, 'd' => $order->customer->delivered_count, 'r' => $order->customer->returned_count]) }}
-                    @if ($order->customer->risk_level !== 'normal')<x-badge color="red">{{ ucfirst($order->customer->risk_level) }}</x-badge>@endif</p>
+                    @if ($order->customer->risk_level !== 'normal')<x-badge color="red">{{ \App\Support\Labels::risk($order->customer->risk_level) }}</x-badge>@endif</p>
                 @if ($order->customer_note)<p class="mt-3 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{{ $order->customer_note }}</p>@endif
             </x-card>
 
@@ -245,7 +245,7 @@
                                     <dt class="text-gray-500">{{ $t['sent_to'] === 'confirmed' ? __('Confirmed') : __('Cancelled') }}</dt><dd class="tabular-nums text-gray-800">{{ $t['sent']->format('g:i A') }}</dd>
                                     <dt class="text-gray-500">{{ __('Net time') }}</dt><dd class="font-semibold tabular-nums text-gray-900">{{ $span($t['net_seconds']) }}</dd>
                                 @elseif ($t['ended_reason'] && $t['ended_reason'] !== 'finished')
-                                    <dt class="text-gray-500">{{ __('Ended') }}</dt><dd @class(['text-gray-800', 'font-medium text-red-600' => in_array($t['ended_reason'], ['idle', 'timeout'], true)])>{{ match ($t['ended_reason']) { 'idle' => __('Given back: nothing done'), 'break' => __('Back to New: break'), 'reassigned' => __('Handed to someone else'), default => $t['ended_reason'] } }}</dd>
+                                    <dt class="text-gray-500">{{ __('Ended') }}</dt><dd @class(['text-gray-800', 'font-medium text-red-600' => in_array($t['ended_reason'], ['idle', 'timeout'], true)])>{{ \App\Support\Labels::ended($t['ended_reason']) }}</dd>
                                 @endif
                             </dl>
                         </div>
@@ -257,4 +257,5 @@
             @endcan
         </div>
     </div>
+    <x-confirm-modal id="reject-confirm" :verb="__('Reject')" :message="__('This cannot be undone from here.')" />
 </x-layouts.app>

@@ -13,7 +13,6 @@
                     @method('PUT')
                     <input type="color" name="color" value="{{ $s->color }}" class="h-9 w-10 rounded border border-gray-300" aria-label="{{ __('Colour') }}">
                     <input name="name_en" value="{{ $s->name_en }}" maxlength="100" class="{{ $input }}">
-                    <span class="hidden w-28 shrink-0 font-mono text-xs text-gray-400 md:block">{{ $s->system_key }}</span>
                     <x-button size="sm" variant="secondary">{{ __('Save') }}</x-button>
                 </form>
             @endforeach

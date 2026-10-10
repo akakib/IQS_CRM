@@ -40,7 +40,7 @@
                                 @if ($e->order_no)<a href="{{ route('orders.show', $e->order_id) }}" class="font-mono text-primary hover:underline">{{ $e->order_no }}</a> · @endif
                                 {{ \Illuminate\Support\Carbon::parse($e->created_at)->format('d M, g:i A') }}
                                 @if ($e->revoke_reason) · {{ $e->revoke_reason }} @endif
-                                @if ($e->dispute_status) · {{ __('Dispute: :s', ['s' => $e->dispute_status]) }} @endif
+                                @if ($e->dispute_status) · {{ __('Dispute: :s', ['s' => \App\Support\Labels::dispute($e->dispute_status)]) }} @endif
                             </p>
                         </div>
                         <div class="flex shrink-0 items-center gap-2">

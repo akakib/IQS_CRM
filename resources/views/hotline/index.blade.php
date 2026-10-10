@@ -1,6 +1,6 @@
 @php
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
-    $types = ['no_answer' => __('Customer not answering'), 'partial' => __('Partial delivery'), 'cancel' => __('Wants to cancel'), 'exchange' => __('Exchange'), 'address' => __('Address problem'), 'hold' => __('Deliver later'), 'other' => __('Other')];
+    $types = array_map('__', \App\Support\Labels::ISSUE_TYPES);
 @endphp
 
 <x-layouts.app :heading="__('Rider hotline')">
@@ -33,7 +33,7 @@
                         <div>
                             <a href="{{ route('orders.show', $o) }}" class="font-mono text-lg font-semibold hover:underline">{{ $o->order_no }}</a>
                             <x-order-status :order="$o" :statuses="$statuses" />
-                            <p class="mt-1 text-sm text-gray-600">{{ __('CN') }} {{ $detail['shipment']->consignment_id ?? '-' }} · {{ $detail['shipment']->courier_status ?? '' }}</p>
+                            <p class="mt-1 text-sm text-gray-600">{{ __('CN') }} {{ $detail['shipment']->consignment_id ?? '-' }} · {{ \App\Support\Labels::courierStatus($detail['shipment']->courier_status ?? null) }}</p>
                         </div>
                         <div class="text-right">
                             <p class="text-xs text-gray-500">{{ __('COD') }}</p>
@@ -69,7 +69,7 @@
                 </x-card>
 
                 @can('hotline.create')
-                    <x-card :title="__('Bigger issue: send to the assigned moderator')" x-data="{ type: 'partial' }">
+                    <x-card :title="__('Bigger issue: send to the assigned moderator')" x-data="{ type: null }">
                         <form method="POST" action="{{ route('hotline.issue', $o) }}" class="space-y-2">
                             @csrf
                             <input type="hidden" name="issue_type" :value="type">
@@ -80,7 +80,7 @@
                             </div>
                             <input name="rider_phone" inputmode="tel" placeholder="{{ __('Rider phone') }}" class="{{ $input }}">
                             <textarea name="note" rows="2" maxlength="500" placeholder="{{ __('Details') }}" class="{{ $input }}"></textarea>
-                            <x-button variant="danger" class="w-full">{{ __('Send with timer') }}</x-button>
+                            <x-button variant="danger" class="w-full" x-bind:disabled="!type">{{ __('Send with timer') }}</x-button>
                         </form>
                     </x-card>
                 @endcan

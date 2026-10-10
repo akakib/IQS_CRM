@@ -27,7 +27,6 @@
                     @method('PUT')
                     <div>
                         <p class="text-sm font-semibold text-gray-800">{{ $type->name }}</p>
-                        <p class="font-mono text-xs text-gray-400">{{ $type->system_key }}</p>
                     </div>
                     <div class="flex items-center gap-3">
                         <x-simple-select name="default_priority" size="sm" :options="$priorityOptions" :value="$type->default_priority" />

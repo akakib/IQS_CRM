@@ -44,7 +44,7 @@
                             <label class="block text-sm text-gray-700">{{ __('New webhook auth token') }}<input name="webhook_token" type="password" autocomplete="new-password" placeholder="{{ __('Same token as the Steadfast webhook page. Empty keeps the saved one') }}" class="{{ $input }} mt-1 font-mono"></label>
                             <div class="flex flex-wrap gap-4 text-sm text-gray-700">
                                 <label class="flex items-center gap-2"><input type="hidden" name="is_active" value="0"><input type="checkbox" name="is_active" value="1" @checked($a->is_active) class="rounded border-gray-300 text-primary"> {{ __('On') }}</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="is_default" value="1" @checked($a->is_default) class="rounded border-gray-300 text-primary"> {{ __('Use this account for booking') }}</label>
+                                @if ($a->is_default)<span class="flex items-center gap-2 text-green-800">✓ {{ __('Used for booking (to change, tick it on another account)') }}</span>@else<label class="flex items-center gap-2"><input type="checkbox" name="is_default" value="1" class="rounded border-gray-300 text-primary"> {{ __('Use this account for booking') }}</label>@endif
                             </div>
                             <x-button>{{ __('Save') }}</x-button>
                         </form>
@@ -79,7 +79,7 @@
                 <label class="block text-sm text-gray-700">{{ __('API key') }}<input name="api_key" required autocomplete="off" class="{{ $input }} mt-1 font-mono"></label>
                 <label class="block text-sm text-gray-700">{{ __('Secret key') }}<input name="secret_key" type="password" required autocomplete="new-password" class="{{ $input }} mt-1 font-mono"></label>
                 <label class="block text-sm text-gray-700">{{ __('Webhook auth token (optional)') }}<input name="webhook_token" type="password" autocomplete="new-password" placeholder="{{ __('Same token as the Steadfast webhook page') }}" class="{{ $input }} mt-1 font-mono"></label>
-                <label class="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" name="is_default" value="1" checked class="rounded border-gray-300 text-primary"> {{ __('Use this account for booking') }}</label>
+                <label class="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" name="is_default" value="1" @checked(! \App\Models\CourierAccount::exists()) class="rounded border-gray-300 text-primary"> {{ __('Use this account for booking') }}</label>
                 @if ($errors->any())<p class="text-sm text-red-600">{{ $errors->first() }}</p>@endif
                 <x-button>{{ __('Save account') }}</x-button>
             </form>

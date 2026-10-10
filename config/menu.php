@@ -16,7 +16,7 @@ return [
         ['Order activity', 'orders.activity', 'orders.activity', 'orders.reassign', 'board'],
         ['Order management', 'desk.index', 'desk.index', 'orders.edit', 'clipboard'],
         ['All orders', 'orders.index', 'orders.index', 'orders.view', 'list'],
-        ['Quick order', 'orders.create', 'orders.create', 'orders.create', 'plus'],
+        ['New order', 'orders.create', 'orders.create', 'orders.create', 'plus'],
         ['Courier booking', 'shipping.index', 'shipping.*', 'shipping.view', 'truck'],
         ['Packaging', 'packaging.index', 'packaging.*', 'packaging.view', 'box'],
         ['Handover', 'handover.index', 'handover.*', 'packaging.view', 'swap'],
@@ -27,8 +27,7 @@ return [
         ['Control room', 'desk.control', 'desk.control', 'orders.reassign', 'monitor'],
     ]],
     'catalog' => ['Catalog', [
-        ['Products', 'products.index', 'products.*', 'products.view', 'tag'],
-        ['Categories', 'categories.index', 'categories.*', 'products.edit', 'list'],
+        ['Products', 'products.index', ['products.index', 'products.create', 'products.edit', 'products.import*', 'categories.*'], 'products.view', 'tag'],
         ['Customers', 'customers.index', 'customers.*', 'customers.view', 'users'],
     ]],
     'analysis' => ['Analysis', [
@@ -45,14 +44,16 @@ return [
         ['USD lots', 'usd-lots.index', 'usd-lots.*', 'marketing.view', 'dollar'],
     ]],
     'stock' => ['Stock', [
+        ['Stock count', 'products.stock', 'products.stock*', 'products.view', 'box'],
+        ['Stock status', 'products.availability', 'products.availability*', 'products.availability', 'flag'],
         ['Locations', 'locations.index', 'locations.*', 'locations.view', 'pin'],
     ]],
-    'accounting' => ['Accounting', []],
     'team' => ['Team', [
         ['Staff', 'users.index', 'users.*', 'staff.view', 'users'],
         ['Roles', 'roles.index', 'roles.*', 'roles.view', 'shield'],
         ['Attendance & breaks', 'attendance.index', 'attendance.*', 'attendance.view', 'clock'],
         ['Points review', 'points.review', 'points.review*', 'points.manage', 'flag'],
+        ['Points rules', 'settings.points', 'settings.points*', 'points.manage', 'star'],
     ]],
     'settings' => ['Settings', [
         ['General', 'settings.edit', 'settings.edit', 'settings.view', 'cog'],
@@ -61,7 +62,6 @@ return [
         ['Communication channels', 'settings.chat-channels', 'settings.chat-channels*', 'settings.view', 'phone'],
         ['Delivery charges', 'settings.charges', 'settings.charges*', 'settings.view', 'cash'],
         ['Ad tracking', 'settings.tracking', 'settings.tracking*', 'settings.view', 'cursor'],
-        ['Points rules', 'settings.points', 'settings.points*', 'points.manage', 'star'],
         ['Statuses & reasons', 'settings.reasons', 'settings.reasons*', 'settings.view', 'tag'],
         ['Activity log', 'activity.index', 'activity.*', 'activity.view', 'document'],
         ['Website connection', 'settings.integrations', 'settings.integrations*', 'access.manage', 'globe'],

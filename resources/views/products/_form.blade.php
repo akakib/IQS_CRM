@@ -118,7 +118,7 @@
         <x-card :title="__('Publishing')">
             <div class="mb-4">
                 <label class="mb-2 block text-sm font-medium text-gray-700">{{ __('Status') }}</label>
-                <x-simple-select name="status" :options="['active' => __('Active (on website)'), 'draft' => __('Draft'), 'archived' => __('Archived')]" :value="old('status', $product->status)" full-width class="w-full" />
+                <x-simple-select name="status" :options="['active' => __('Active'), 'draft' => __('Draft'), 'archived' => __('Archived')]" :value="old('status', $product->status)" full-width class="w-full" />
             </div>
             <x-form.input name="image_url" type="url" :label="__('Main image URL')" :value="$product->image_url" maxlength="500" />
             @if ($product->image_url)

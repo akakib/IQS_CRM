@@ -3,7 +3,7 @@
 @endphp
 
 {{-- embed=1: the form sits in the New order popup from Communication, so no sidebar or header. --}}
-<x-dynamic-component :component="request('embed') ? 'layouts.embed' : 'layouts.app'" :heading="__('Quick order')">
+<x-dynamic-component :component="request('embed') ? 'layouts.embed' : 'layouts.app'" :heading="__('New order')">
     @if ($errors->any())
         <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             @foreach ($errors->all() as $e)<p>{{ $e }}</p>@endforeach
@@ -138,7 +138,7 @@
                     <div x-show="customer" x-cloak class="mt-3 rounded-lg bg-gray-50 p-3 text-sm">
                         <p><span class="font-medium" x-text="customer?.name"></span>
                             <span class="ml-2 text-xs text-gray-500" x-text="`${customer?.orders} orders · ${customer?.delivered} delivered · ${customer?.returned} returned`"></span>
-                            <span x-show="customer?.risk_level !== 'normal'" class="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700" x-text="customer?.risk_level"></span>
+                            <span x-show="customer?.risk_level !== 'normal'" class="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700" x-text="({{ \Illuminate\Support\Js::from(array_map('__', \App\Support\Labels::RISK)) }})[customer?.risk_level] || customer?.risk_level"></span>
                             <span x-show="customer?.credit > 0" class="ml-2 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800" x-text="@js(__('Credit')) + ' ৳' + Math.round(customer?.credit || 0).toLocaleString('en-IN') + ' ' + @js(__('is used on this order'))"></span>
                         </p>
                     </div>

@@ -43,10 +43,11 @@
                         <span>{{ __('Average / day') }}: <b>{{ $hm($r['avg']) }}</b></span>
                         <span class="{{ $r['over'] ? 'text-red-600' : '' }}">{{ __('Days over limit') }}: <b>{{ $r['over'] }}</b></span>
                         <span>{{ __('Away on work') }}: <b>{{ $hm($r['away']) }}</b></span>
+                        <span class="{{ $r['not_closed'] ? 'text-red-600' : '' }}">{{ __('Did not come back') }}: <b>{{ $r['not_closed'] }}</b></span>
                     </div>
                 </div>
             @endforeach
         </x-list.cards>
-        <p class="mt-3 text-xs text-gray-500">{{ __('Open a day to see each break, correct one, or approve an extra day.') }}</p>
+        <p class="mt-3 text-xs text-gray-500">{{ __('To see each break, correct one, or approve an extra day:') }} <a href="{{ route('attendance.index', ['date' => today()->toDateString()]) }}" class="text-primary hover:underline">{{ __('open a day') }}</a>.</p>
     @endif
 </x-layouts.app>

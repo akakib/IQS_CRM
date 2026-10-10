@@ -15,7 +15,7 @@
                     <div>
                         <a href="{{ route('orders.show', $i->order_id) }}" class="font-mono font-semibold hover:underline">{{ $i->order_no }}</a>
                         <span class="text-sm text-gray-600">· {{ $i->ship_name }} · ৳{{ number_format((float) $i->cod_amount) }}</span>
-                        <p class="text-sm text-gray-800">{{ ucfirst(str_replace('_', ' ', $i->issue_type)) }}{{ $i->note ? ': '.$i->note : '' }}</p>
+                        <p class="text-sm text-gray-800">{{ \App\Support\Labels::issueType($i->issue_type) }}{{ $i->note ? ': '.$i->note : '' }}</p>
                         @if ($i->rider_phone)<a href="tel:{{ $i->rider_phone }}" class="text-xs text-primary">☎ {{ __('Rider') }} {{ $i->rider_phone }}</a>@endif
                         @if ($all)<p class="text-xs text-gray-500">{{ __('Assigned to') }}: {{ $i->moderator ?? '-' }}</p>@endif
                     </div>

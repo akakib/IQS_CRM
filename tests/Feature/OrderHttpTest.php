@@ -51,7 +51,7 @@ class OrderHttpTest extends TestCase
 
     public function test_quick_order_form_creates_an_owned_order(): void
     {
-        $this->actingAs($this->agent)->get('/orders/create')->assertOk()->assertSee('Quick order');
+        $this->actingAs($this->agent)->get('/orders/create')->assertOk()->assertSee('New order');
 
         $this->post('/orders', [
             'channel' => 'whatsapp', 'phone' => '01812345678', 'name' => 'Rahim', 'address_line' => 'House 9',

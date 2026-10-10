@@ -228,7 +228,7 @@
                             'border-l-primary bg-primary-soft/60' => $current, 'border-l-transparent' => ! $current])>
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $row->ship_name }}</span>
-                            <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }}@if ($row->channel !== 'web') · {{ $row->channel }}@endif</span>
+                            <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }}@if ($row->channel !== 'web') · {{ \App\Models\Order::channelLabel($row->channel) }}@endif</span>
                         </span>
                         <span class="shrink-0 text-right">
                             @if ($row->action_due_at)
@@ -342,7 +342,7 @@
                                 @php $c = $order->customer; @endphp
                                 @if ($c && $c->orders_count > 1)
                                     <p class="text-base font-semibold text-gray-900">{{ __(':d delivered · :r returned', ['d' => $c->delivered_count, 'r' => $c->returned_count]) }}</p>
-                                    <p class="mt-1 text-xs {{ $c->returned_count > $c->delivered_count ? 'text-red-600' : 'text-green-800' }}">{{ __(':n orders in total', ['n' => $c->orders_count]) }}@if ($c->risk_level && $c->risk_level !== 'normal') · {{ __('risk: :r', ['r' => $c->risk_level]) }}@endif</p>
+                                    <p class="mt-1 text-xs {{ $c->returned_count > $c->delivered_count ? 'text-red-600' : 'text-green-800' }}">{{ __(':n orders in total', ['n' => $c->orders_count]) }}@if ($c->risk_level && $c->risk_level !== 'normal') · {{ \App\Support\Labels::risk($c->risk_level) }}@endif</p>
                                 @else
                                     <p class="text-base font-semibold text-gray-900">{{ __('New customer') }}</p>
                                     <p class="mt-1 text-xs text-gray-500">{{ __('First order with us') }}</p>

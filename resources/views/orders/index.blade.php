@@ -4,14 +4,14 @@
     $statusOptions = ['' => __('Any status')] + collect($statuses)->filter(fn ($s) => $s['key'])->mapWithKeys(fn ($s) => [$s['key'] => __($s['name'])])->all();
 @endphp
 
-<x-layouts.app :heading="__('Orders')">
+<x-layouts.app :heading="__('All orders')">
     {{-- Actions sit above the tab line, never on it. --}}
     <div class="mb-2 flex flex-wrap items-center justify-end gap-2">
         <x-order-export :from="$list->filter('from') ?? today()->subDays(29)->toDateString()" :to="$list->filter('to') ?? today()->toDateString()"
             :staff="$list->filter('moderator')" :people="collect($moderatorOptions)->map(fn ($name, $id) => (object) ['id' => $id, 'name' => $name])->values()" />
         <x-website-sync size="sm" />
         @can('orders.create')
-            <x-button size="sm" :href="route('orders.create')" class="shrink-0">+ {{ __('Quick order') }}</x-button>
+            <x-button size="sm" :href="route('orders.create')" class="shrink-0">+ {{ __('New order') }}</x-button>
         @endcan
     </div>
     <x-tabs class="mb-3" :tabs="[

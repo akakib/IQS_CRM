@@ -31,8 +31,9 @@
             <button type="button" @click="panel = panel === 'pay' ? null : 'pay'" class="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-dark">{{ __('Customer paid: add payment') }}</button>
             <button type="button" @click="panel = panel === 'date' ? null : 'date'" class="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">{{ __('Will pay by a date') }}</button>
             @if ($isAdmin)
-                <form method="POST" action="{{ route('orders.advance-waiver.decide', $order) }}">@csrf<input type="hidden" name="decision" value="allow">
-                    <button class="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">{{ __('Process without advance') }}</button></form>
+                <form method="POST" action="{{ route('orders.advance-waiver.decide', $order) }}" id="waive-{{ $order->id }}">@csrf<input type="hidden" name="decision" value="allow">
+                    <button type="button" @click="$dispatch('open-confirm', { id: 'waive-confirm-{{ $order->id }}', form: 'waive-{{ $order->id }}', label: @js($order->order_no) })" class="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">{{ __('Process without advance') }}</button></form>
+                <x-confirm-modal :id="'waive-confirm-'.$order->id" :verb="__('Process without advance')" :message="__('The order goes on to booking with no advance paid.')" :danger="false" />
                 @if ($order->advance_waiver_requested_at)
                     <form method="POST" action="{{ route('orders.advance-waiver.decide', $order) }}">@csrf<input type="hidden" name="decision" value="refuse">
                         <button class="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">{{ __('Refuse, advance needed') }}</button></form>

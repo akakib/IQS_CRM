@@ -126,6 +126,17 @@
                         <x-slot:badge><span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700"><span class="h-2.5 w-2.5 rounded-full {{ $dot[$r['overall']] }}"></span>{{ $overallText[$r['overall']] }}</span></x-slot:badge>
                         <x-slot:footer>{{ __('Net :n · free while waiting :f · given back :g · points :p', ['n' => $span($r['net']), 'f' => $span($r['free_waiting'] ?: null), 'g' => $r['given_back'], 'p' => $r['points'] + 0]) }}@if ($seePay)<span class="block">{{ __('Profit :a · pay :b', ['a' => $money($r['profit']), 'b' => $money($r['pay'] ?: null)]) }}</span>@endif</x-slot:footer>
                         <x-slot:actions>@if ($seePay)<span class="text-right"><span class="block text-xs text-gray-500">{{ __('Per ৳1') }}</span><span class="font-semibold tabular-nums">{{ $r['per_taka'] === null ? '-' : '৳'.$r['per_taka'] }}</span></span>@endif</x-slot:actions>
+                        @if ($seePay && $canSetBonus && ! $closed)
+                            {{-- The bonus can be set from a phone too. --}}
+                            <form method="POST" action="{{ route('scorecard.bonus', $r['id']) }}" class="mt-2 flex items-center gap-2 border-t border-gray-100 pt-2">
+                                @csrf
+                                <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
+                                <span class="text-xs text-gray-500">{{ __('Bonus') }}</span>
+                                <input name="amount" type="number" min="0" step="1" value="{{ $r['bonus'] === null ? '' : $r['bonus'] + 0 }}" placeholder="0" aria-label="{{ __('Bonus') }}"
+                                    class="w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm tabular-nums focus:border-primary focus:outline-none">
+                                <button class="rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50">{{ __('Save') }}</button>
+                            </form>
+                        @endif
                     </x-record-card>
                 </a>
             @endforeach

@@ -42,7 +42,7 @@ return [
     'desk.extend_daily_limit' => ['int', 5, 'Times a day one moderator can add extra time (0 = not allowed)', 'Order desk', ['required', 'integer', 'min:0', 'max:100']],
     'desk.hold_limit' => ['int', 5, 'Orders one moderator may keep on hold at once (holds for an advance and by packers not counted; 0 = no limit). Every hold needs a reason and a follow-up date', 'Order desk', ['required', 'integer', 'min:0', 'max:100']],
     'desk.assign_on_arrival' => ['bool', true, 'Give website orders as soon as they come in, to a free person (empty hands, not on a break; the one free the longest first)', 'Order desk', ['boolean']],
-    'desk.assign_to_chat' => ['bool', true, 'People in Chat mode get website orders too', 'Order desk', ['boolean']],
+    'desk.assign_to_chat' => ['bool', true, 'People in Communication get website orders too', 'Order desk', ['boolean']],
     'desk.chat_fallback_minutes' => ['int', 5, 'When people in Chat mode do not get orders: if nobody else is free, someone in chat gets it after (minutes)', 'Order desk', ['required', 'integer', 'min:0', 'max:120']],
     'desk.respect_shifts' => ['bool', true, 'Give orders only inside working hours (and not in the last 10 minutes). Off: anyone online gets them, for overtime', 'Order desk', ['boolean']],
     'desk.auto_assign_minutes' => ['int', 15, 'Give an order nobody took to the least busy active moderator after (minutes). Also when managers hear that orders wait with nobody free', 'Order desk', ['required', 'integer', 'min:1', 'max:1440']],

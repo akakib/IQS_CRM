@@ -26,7 +26,7 @@
                                 @empty
                                     <span class="text-gray-400">{{ __('No conditions: matches everything left') }}</span>
                                 @endforelse
-                                @if ($r->applies_to_channel !== 'all')<span class="ml-1 text-gray-400">· {{ $r->applies_to_channel }}</span>@endif
+                                @if ($r->applies_to_channel !== 'all')<span class="ml-1 text-gray-400">· {{ \App\Models\Order::channelLabel($r->applies_to_channel) }}</span>@endif
                             </p>
                         </div>
                         <div class="flex items-center gap-2">

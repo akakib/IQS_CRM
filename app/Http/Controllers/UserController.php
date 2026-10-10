@@ -106,7 +106,8 @@ class UserController extends Controller
         if ($amount === null || $amount === '' || ($current !== null && (float) $current === (float) $amount)) {
             return;
         }
-        \Illuminate\Support\Facades\DB::table('staff_salaries')->updateOrInsert(['user_id' => $user->id, 'from_month' => today()->startOfMonth()->toDateString()],
+        $fromMonth = preg_match('/^\d{4}-\d{2}$/', (string) $request->input('salary_from')) ? $request->input('salary_from').'-01' : today()->startOfMonth()->toDateString();
+        \Illuminate\Support\Facades\DB::table('staff_salaries')->updateOrInsert(['user_id' => $user->id, 'from_month' => $fromMonth],
             ['monthly_salary' => (float) $amount, 'set_by' => $request->user()->id, 'updated_at' => now(), 'created_at' => now()]);
         app(\App\Services\ActivityLogger::class)->log('staff.salary_set', $user, ['monthly_salary' => $current], ['monthly_salary' => (float) $amount]);
     }

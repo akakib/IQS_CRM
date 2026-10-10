@@ -222,14 +222,16 @@ class TeamController extends Controller
             'days.*.end' => ['nullable', 'date_format:H:i'],
         ]);
         $rows = [];
+        $from = today()->toDateString(); // from today: earlier days keep the week they had
         foreach ($data['days'] ?? [] as $weekday => $d) {
             if (! empty($d['on']) && ! empty($d['start']) && ! empty($d['end']) && in_array((int) $weekday, range(0, 6), true)) {
-                $rows[] = ['user_id' => $user->id, 'weekday' => (int) $weekday, 'start_time' => $d['start'], 'end_time' => $d['end']];
+                $rows[] = ['user_id' => $user->id, 'weekday' => (int) $weekday, 'start_time' => $d['start'], 'end_time' => $d['end'], 'effective_from' => $from];
             }
         }
-        DB::transaction(function () use ($user, $rows) {
-            DB::table('work_schedules')->where('user_id', $user->id)->delete();
-            DB::table('work_schedules')->insert($rows);
+        DB::transaction(function () use ($user, $rows, $from) {
+            DB::table('work_schedules')->where('user_id', $user->id)->where('effective_from', $from)->delete();
+            // No day at all = back to the office default from today (weekday 7 marks it).
+            DB::table('work_schedules')->insert($rows ?: [['user_id' => $user->id, 'weekday' => 7, 'start_time' => '00:00', 'end_time' => '00:00', 'effective_from' => $from]]);
         });
         $this->logger->log('work_schedule.saved', ['user', $user->id], null, ['days' => $rows]);
 
@@ -244,14 +246,14 @@ class TeamController extends Controller
             'delivery_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
         $userId = $data['user_id'] ?? null;
+        $month = today()->startOfMonth()->toDateString(); // from this month on: past months keep their target
         foreach (['delivered_count', 'delivery_rate'] as $metric) {
-            $query = DB::table('kpi_targets')->where('metric', $metric)->when($userId, fn ($q) => $q->where('user_id', $userId), fn ($q) => $q->whereNull('user_id'));
-            if (($data[$metric] ?? null) === null) {
-                $query->delete();
-            } elseif ($query->exists()) {
-                $query->update(['target' => $data[$metric], 'updated_at' => now()]);
+            $query = DB::table('kpi_targets')->where('metric', $metric)->where('from_month', $month)->when($userId, fn ($q) => $q->where('user_id', $userId), fn ($q) => $q->whereNull('user_id'));
+            $value = $data[$metric] ?? null; // empty = no target from this month
+            if ($query->exists()) {
+                $query->update(['target' => $value, 'updated_at' => now()]);
             } else {
-                DB::table('kpi_targets')->insert(['user_id' => $userId, 'metric' => $metric, 'target' => $data[$metric], 'created_at' => now(), 'updated_at' => now()]);
+                DB::table('kpi_targets')->insert(['user_id' => $userId, 'metric' => $metric, 'target' => $value, 'from_month' => $month, 'created_at' => now(), 'updated_at' => now()]);
             }
         }
         $this->logger->log('kpi_target.saved', ['user', (int) $userId], null, $data);

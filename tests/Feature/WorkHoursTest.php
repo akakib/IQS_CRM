@@ -57,6 +57,30 @@ class WorkHoursTest extends TestCase
         $this->assertSame(3600, $row['overtime']);
     }
 
+    public function test_a_new_week_target_or_salary_counts_from_when_it_was_set_and_the_past_keeps_its_own(): void
+    {
+        $boss = $this->owner(['name' => 'Boss']);
+        $cal = fn () => new \App\Services\Work\WorkCalendar;
+
+        // Until today Mahim worked the office hours (9 to 5). From today: 2 PM to 10 PM.
+        $days = collect(range(0, 6))->mapWithKeys(fn ($d) => [$d => ['on' => 1, 'start' => '14:00', 'end' => '22:00']])->all();
+        $this->actingAs($boss)->post('/users/'.$this->mahim->id.'/schedule', ['days' => $days])->assertSessionHas('success');
+        $this->assertSame('14:00', $cal()->shift($this->mahim->id, Carbon::parse('2026-10-07'))[0]->format('H:i'));
+        $this->assertSame('09:00', $cal()->shift($this->mahim->id, Carbon::parse('2026-10-05'))[0]->format('H:i')); // last Monday: as it was
+
+        // A target set this month does not rewrite September.
+        DB::table('kpi_targets')->insert(['user_id' => null, 'metric' => 'delivered_count', 'target' => 40, 'from_month' => '2026-09-01', 'created_at' => now(), 'updated_at' => now()]);
+        $this->post('/kpi/targets', ['delivered_count' => 60])->assertSessionHas('success');
+        $this->assertSame(40.0, \App\Services\Reports\KpiScorecard::targetsFor('2026-09-01')[0]['delivered_count']);
+        $this->assertSame(60.0, \App\Services\Reports\KpiScorecard::targetsFor('2026-10-01')[0]['delivered_count']);
+
+        // A raise from next month: this month keeps the old salary.
+        DB::table('staff_salaries')->insert(['user_id' => $this->mahim->id, 'from_month' => '2026-09-01', 'monthly_salary' => 15000, 'created_at' => now(), 'updated_at' => now()]);
+        $this->put('/users/'.$this->mahim->id, ['name' => 'Mahim', 'email' => $this->mahim->email, 'monthly_salary' => 18000, 'salary_from' => '2026-11'])->assertRedirect();
+        $this->assertDatabaseHas('staff_salaries', ['user_id' => $this->mahim->id, 'from_month' => '2026-11-01']);
+        $this->assertEquals(15000, DB::table('staff_salaries')->where('user_id', $this->mahim->id)->where('from_month', '<=', '2026-10-01')->orderByDesc('from_month')->value('monthly_salary')); // October: still 15,000
+    }
+
     public function test_a_break_forgotten_on_a_night_shift_closes_at_that_morning_s_shift_end(): void
     {
         foreach (range(0, 6) as $d) {

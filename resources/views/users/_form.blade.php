@@ -80,10 +80,17 @@
         @php($salaryNow = $user->exists ? \Illuminate\Support\Facades\DB::table('staff_salaries')->where('user_id', $user->id)->orderByDesc('from_month')->first(['monthly_salary', 'from_month']) : null)
         <div class="mt-2 border-t border-gray-100 pt-4">
             <p class="text-sm font-semibold text-gray-800">{{ __('Pay') }}</p>
-            <p class="mb-3 text-xs text-gray-500">{{ __('Fixed monthly salary. A change counts from this month; earlier months keep their amount. The month-end bonus is set on the Scorecard.') }}</p>
-            <div class="md:w-1/2">
-                <x-form.input name="monthly_salary" type="number" min="0" step="1" :label="__('Monthly salary (৳)')" :value="$salaryNow ? $salaryNow->monthly_salary + 0 : null" />
-                @if ($salaryNow)<p class="-mt-2 text-xs text-gray-500">{{ __('Since :m', ['m' => \Illuminate\Support\Carbon::parse($salaryNow->from_month)->format('F Y')]) }}</p>@endif
+            <p class="mb-3 text-xs text-gray-500">{{ __('Fixed monthly salary. A change counts from the month you pick; earlier months keep their amount. The month-end bonus is set on the Scorecard.') }}</p>
+            <div class="grid gap-3 md:grid-cols-2">
+                <div>
+                    <x-form.input name="monthly_salary" type="number" min="0" step="1" :label="__('Monthly salary (৳)')" :value="$salaryNow ? $salaryNow->monthly_salary + 0 : null" />
+                    @if ($salaryNow)<p class="-mt-2 text-xs text-gray-500">{{ __('Since :m', ['m' => \Illuminate\Support\Carbon::parse($salaryNow->from_month)->format('F Y')]) }}</p>@endif
+                </div>
+                <div>
+                    <p class="mb-1 text-sm font-medium text-gray-700">{{ __('A change counts from') }}</p>
+                    <x-simple-select name="salary_from" :value="today()->format('Y-m')" full-width class="w-full"
+                        :options="collect(range(-3, 2))->mapWithKeys(fn ($i) => [today()->startOfMonth()->addMonths($i)->format('Y-m') => today()->startOfMonth()->addMonths($i)->format('F Y')])->all()" />
+                </div>
             </div>
         </div>
     @endif

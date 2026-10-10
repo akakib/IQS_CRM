@@ -69,7 +69,7 @@ class KpiScorecard
             return ['rows' => [], 'team' => self::EMPTY + ['taken' => 0, 'released' => 0, 'pending' => 0] + $this->rates(self::EMPTY)];
         }
         $names = DB::table('users')->whereIn('id', $ids)->pluck('name', 'id');
-        $targets = $this->targets($ids);
+        $targets = $this->targets($ids, substr($from, 0, 7).'-01'); // the targets of the month the range starts in
 
         $rows = [];
         $sum = self::EMPTY + ['taken' => 0, 'released' => 0, 'pending' => 0];
@@ -96,16 +96,29 @@ class KpiScorecard
         return ['rows' => $rows, 'team' => $team + $this->rates($sum)];
     }
 
-    /** @return array<int, array<string, float>> user id (0 = default for everyone) => metric => target */
-    public function targets(?array $userIds = null): array
+    /**
+     * The targets in force in a month (the latest set on or before it; none set = no target).
+     *
+     * @return array<int, array<string, float>> user id (0 = default for everyone) => metric => target
+     */
+    public static function targetsFor(?string $month = null, ?array $userIds = null): array
     {
+        $month ??= today()->startOfMonth()->toDateString();
         $out = [];
-        $rows = DB::table('kpi_targets')->when($userIds !== null, fn ($q) => $q->where(fn ($q) => $q->whereNull('user_id')->orWhereIn('user_id', $userIds)))->get();
+        $rows = DB::table('kpi_targets')->when($userIds !== null, fn ($q) => $q->where(fn ($q) => $q->whereNull('user_id')->orWhereIn('user_id', $userIds)))
+            ->where(fn ($q) => $q->whereNull('from_month')->orWhere('from_month', '<=', $month))
+            ->orderByRaw('COALESCE(from_month, ?)', ['2000-01-01'])->orderBy('id')->get();
         foreach ($rows as $t) {
-            $out[(int) $t->user_id][$t->metric] = (float) $t->target;
+            $out[(int) $t->user_id][$t->metric] = $t->target === null ? null : (float) $t->target; // later rows win
         }
 
-        return $out;
+        return array_map(fn ($m) => array_filter($m, fn ($v) => $v !== null), $out);
+    }
+
+    /** @return array<int, array<string, float>> */
+    public function targets(?array $userIds = null, ?string $month = null): array
+    {
+        return self::targetsFor($month, $userIds);
     }
 
     /** @return array{delivery_rate: ?float, cancel_rate: ?float, return_rate: ?float} */

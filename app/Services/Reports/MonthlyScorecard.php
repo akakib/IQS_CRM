@@ -83,8 +83,7 @@ class MonthlyScorecard
             return [$u->id => max(0, min($daysIn, (int) $start->diffInDays($end->copy()->startOfDay(), true) + 1))];
         });
         // Everyone has a target (their own, else the default), even with no ended order yet.
-        $targets = DB::table('kpi_targets')->orderBy('id')->get(['user_id', 'metric', 'target'])->groupBy(fn ($t) => (int) $t->user_id)
-            ->map(fn ($g) => $g->pluck('target', 'metric'));
+        $targets = KpiScorecard::targetsFor($from->toDateString()); // the targets of that month, not today's
         $targetOf = fn (int $id, string $metric) => $targets[$id][$metric] ?? $targets[0][$metric] ?? null;
         // Managers and owners may confirm a few orders: they are shown, not part of the team middle.
         $leads = $people->filter(fn ($u) => $u->can('orders.reassign'))->pluck('id')->all();

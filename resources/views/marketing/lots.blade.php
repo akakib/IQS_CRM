@@ -27,7 +27,10 @@
     </div>
 
     <div class="grid gap-6 xl:grid-cols-3">
-        <div class="xl:col-span-2">
+        <div class="xl:col-span-2" x-data="tabs('lots')">
+            {{-- Lots and payments, one at a time. --}}
+            <x-tabs :tabs="['lots' => [__('Lots'), '#lots'], 'payments' => [__('Latest payments'), '#payments', $payments->count() ?: null]]" active="lots" />
+            <section x-show="tab === 'lots'">
             <form method="GET" action="{{ route('usd-lots.index') }}" x-ref="f" @select-change="setTimeout(() => $refs.f.requestSubmit(), 0)" class="mb-3 flex flex-wrap items-center gap-2">
                 <x-simple-select name="vendor" :options="['' => __('All vendors')] + $vendors->pluck('name', 'id')->all()" :value="(string) ($filters['vendor'] ?? '')" />
                 <x-simple-select name="open" :options="['' => __('All lots'), '1' => __('With dollars left')]" :value="$filters['open'] ? '1' : ''" />
@@ -69,15 +72,19 @@
                 </x-list.cards>
                 <div class="mt-4">{{ $lots->links() }}</div>
             @endif
+            </section>
 
-            @if ($payments->isNotEmpty())
-                <h2 class="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ __('Latest payments') }}</h2>
+            <section x-show="tab === 'payments'" x-cloak>
+            @if ($payments->isEmpty())
+                <div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-500">{{ __('No payments yet.') }}</div>
+            @else
                 <div class="space-y-1 rounded-xl border border-gray-200 bg-white p-3 text-sm">
                     @foreach ($payments as $p)
                         <p>{{ date('d M', strtotime($p->paid_on)) }} · {{ $p->vendor }} · <b>{{ $tk($p->amount_bdt) }}</b> <span class="text-xs text-gray-400">{{ $p->method }} {{ $p->transaction_ref }}</span></p>
                     @endforeach
                 </div>
             @endif
+            </section>
         </div>
 
         @can('marketing.create')

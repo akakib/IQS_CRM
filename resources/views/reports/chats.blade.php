@@ -45,7 +45,10 @@
             </x-card>
         @endif
 
-        <h2 class="mb-2 text-sm font-semibold text-gray-800">{{ __('By channel') }}</h2>
+        {{-- One list at a time. --}}
+        <div x-data="tabs('channel')">
+            <x-tabs :tabs="['channel' => [__('By channel'), '#channel'], 'person' => [__('By person'), '#person']]" active="channel" />
+            <section x-show="tab === 'channel'">
         <x-list.table class="mb-6">
             <x-slot:head>
                 <th>{{ __('Channel') }}</th>
@@ -77,7 +80,8 @@
             @endforeach
         </x-list.cards>
 
-        <h2 class="mb-2 text-sm font-semibold text-gray-800">{{ __('By person') }}</h2>
+            </section>
+            <section x-show="tab === 'person'" x-cloak>
         <x-list.table>
             <x-slot:head>
                 <th>{{ __('Person') }}</th>
@@ -108,5 +112,7 @@
                 </x-record-card>
             @endforeach
         </x-list.cards>
+            </section>
+        </div>
     @endif
 </x-layouts.app>

@@ -136,7 +136,7 @@ class CustomerCallController extends Controller
             ->orderByRaw('COUNT(*) DESC')->get();
         $calls = DB::table('customer_calls as c')->join('users as u', 'u.id', '=', 'c.user_id')->leftJoin('orders as o', 'o.id', '=', 'c.order_id')
             ->whereBetween('c.started_at', $range)->orderByDesc('c.started_at')
-            ->select('c.*', 'u.name as person', 'o.order_no')->paginate(25)->withQueryString();
+            ->select('c.*', 'u.name as person', 'o.order_no')->paginate(25)->withQueryString()->fragment('calls');
 
         return view('reports.customer-calls', [
             'from' => $from, 'to' => $to, 'people' => $people, 'calls' => $calls,

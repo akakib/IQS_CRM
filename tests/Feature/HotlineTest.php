@@ -77,6 +77,11 @@ class HotlineTest extends TestCase
         $this->assertDatabaseHas('app_notifications', ['user_id' => $this->agent->id, 'priority' => 'urgent']);
 
         $this->actingAs($this->agent)->get('/issues')->assertOk()->assertSee('Wants only one item');
+        // Search and filters: by order number, and Overdue (not yet).
+        $no = DB::table('orders')->where('id', $issue->order_id)->value('order_no');
+        $this->get('/issues?q='.$no)->assertOk()->assertSee('Wants only one item');
+        $this->get('/issues?q=IQ99999')->assertOk()->assertDontSee('Wants only one item')->assertSee('No issue matches these filters.');
+        $this->get('/issues?show=overdue')->assertOk()->assertDontSee('Wants only one item');
 
         $this->travel(2)->hours();
         Artisan::call('issues:escalate');

@@ -15,8 +15,10 @@
         @endcan
     </div>
 
+    <x-list.filter-bar :list="$list" :action="route('shipping.index')" :placeholder="__('Order no, phone or area')" />
+
     <div x-data="tabs('book')">
-    <x-tabs :tabs="['book' => [__('Ready to book'), '#book', $orders->count()], 'booked' => [__('Booked, waiting for packaging'), '#booked', $booked->count()]]" active="book" />
+    <x-tabs :tabs="['book' => [__('Ready to book'), '#book', $orders->total()], 'booked' => [__('Booked, waiting for packaging'), '#booked', $booked->total()]]" active="book" />
 
     <section id="book" x-show="tab === 'book'">
         @if ($orders->isEmpty())
@@ -54,6 +56,7 @@
                     </form>
                 </x-slot:actions>
             </x-list.selectable>
+            <div class="mt-4">{{ $orders->links() }}</div>
         @endif
     </section>
 
@@ -96,6 +99,7 @@
                     <button type="button" class="rounded-lg bg-white/10 px-3 py-1.5 text-xs" @click="window.open(@js(route('shipping.labels')) + '?orders=' + selected.join(','), '_blank')">{{ __('Print labels again') }}</button>
                 </x-slot:actions>
             </x-list.selectable>
+            <div class="mt-4">{{ $booked->links() }}</div>
         @endif
     </section>
     </div>

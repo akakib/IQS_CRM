@@ -22,7 +22,10 @@
     @if ($people->isEmpty())
         <x-empty-state :message="__('No customer calls in these dates.')" />
     @else
-        <h2 class="mb-2 text-sm font-semibold text-gray-800">{{ __('By person') }}</h2>
+        {{-- One list at a time. --}}
+        <div x-data="tabs('person')">
+            <x-tabs :tabs="['person' => [__('By person'), '#person'], 'calls' => [__('Calls'), '#calls']]" active="person" />
+            <section x-show="tab === 'person'">
         <x-list.table class="mb-6">
             <x-slot:head>
                 <th>{{ __('Person') }}</th>
@@ -51,7 +54,8 @@
             @endforeach
         </x-list.cards>
 
-        <h2 class="mb-2 text-sm font-semibold text-gray-800">{{ __('Calls') }}</h2>
+            </section>
+            <section x-show="tab === 'calls'" x-cloak>
         <x-list.table>
             <x-slot:head>
                 <th>{{ __('When') }}</th>
@@ -85,5 +89,7 @@
             @endforeach
         </x-list.cards>
         <div class="mt-4">{{ $calls->links() }}</div>
+            </section>
+        </div>
     @endif
 </x-layouts.app>

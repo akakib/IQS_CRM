@@ -76,13 +76,22 @@ class HotlineController extends Controller
         $user = $request->user();
         $all = $user->can('orders.approve');
 
+        $list = \App\Support\Lists\ListState::from($request, ['sla_due_at'], ['show' => ['all', 'overdue'], 'person' => 'int'], 'asc');
+        $q = trim($list->search);
+        $digits = preg_replace('/\D/', '', $q);
         $issues = DB::table('delivery_issues as i')->join('orders as o', 'o.id', '=', 'i.order_id')->leftJoin('users as u', 'u.id', '=', 'i.assigned_to')
             ->whereNull('i.resolved_at')
-            ->when(! $all, fn ($q) => $q->where('i.assigned_to', $user->id))
+            ->when(! $all, fn ($w) => $w->where('i.assigned_to', $user->id))
+            ->when($list->filter('show') === 'overdue', fn ($w) => $w->where('i.sla_due_at', '<', now()))
+            ->when($all && $list->filter('person'), fn ($w, $p) => $w->where('i.assigned_to', $p))
+            ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('o.order_no', strtoupper($q))->when($digits, fn ($d) => $d->orWhere('o.ship_phone', 'like', $digits.'%'))))
             ->orderBy('i.sla_due_at')
-            ->get(['i.*', 'o.order_no', 'o.ship_name', 'o.cod_amount', 'u.name as moderator']);
+            ->select(['i.*', 'o.order_no', 'o.ship_name', 'o.cod_amount', 'u.name as moderator'])
+            ->paginate($list->perPage)->withQueryString();
+        $people = $all ? DB::table('delivery_issues as i')->join('users as u', 'u.id', '=', 'i.assigned_to')->whereNull('i.resolved_at')
+            ->distinct()->orderBy('u.name')->pluck('u.name', 'u.id')->all() : [];
 
-        return view('hotline.issues', ['issues' => $issues, 'all' => $all]);
+        return view('hotline.issues', ['issues' => $issues, 'all' => $all, 'list' => $list, 'people' => $people]);
     }
 
     public function resolve(int $issue, Request $request, DeliveryIssueService $issues): RedirectResponse

@@ -1,17 +1,25 @@
-@php($canEdit = auth()->user()->can('settings.edit'))
+@php
+    $canEdit = auth()->user()->can('settings.edit');
+    $slug = fn ($g) => \Illuminate\Support\Str::slug($g);
+    // A field with an error: its group opens first, so the message is seen.
+    $errorGroup = collect($groups)->search(fn ($fields) => collect(array_keys($fields))->contains(fn ($k) => $errors->has(str_replace('.', '_', $k)) || $errors->has(str_replace('.', '_', $k).'.*')));
+    $firstTab = $slug($errorGroup !== false ? $errorGroup : array_key_first($groups));
+@endphp
 
 <x-layouts.app :heading="__('Settings')">
-    <form method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" class="max-w-3xl space-y-6">
+    <form method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" class="max-w-3xl space-y-6" x-data="tabs(@js($firstTab))">
         @csrf
         <input type="hidden" name="settings_page" value="1">
         @method('PUT')
 
+        <x-tabs :tabs="collect($groups)->keys()->mapWithKeys(fn ($g) => [$slug($g) => [__($g), '#'.$slug($g)]])->all()" :active="$firstTab" />
+
         @foreach ($groups as $group => $fields)
-            <section class="rounded-xl border border-gray-200 bg-white p-6">
+            <section class="rounded-xl border border-gray-200 bg-white p-6" x-show="tab === @js($slug($group))" @if ($slug($group) !== $firstTab) x-cloak @endif>
                 <h2 class="mb-4 text-sm font-semibold text-gray-800">{{ __($group) }}</h2>
                 <fieldset @disabled(! $canEdit) class="grid gap-x-4 md:grid-cols-2">
                     @foreach ($fields as $key => $f)
-                        @php($name = str_replace('.', '_', $key))
+                        @php $name = str_replace('.', '_', $key); @endphp
                         @if ($key === 'store.logo')
                             <div class="mb-4 md:col-span-2" x-data="{ remove: false }">
                                 <p class="mb-2 text-sm font-medium text-gray-700">{{ $f['label'] }}</p>
@@ -76,7 +84,11 @@
         @endforeach
 
         @if ($canEdit)
-            <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Save settings') }}</button>
+            {{-- Saves every tab at once. --}}
+            <div class="sticky bottom-0 z-10 -mx-1 flex items-center gap-3 border-t border-gray-200 bg-gray-50/95 px-1 py-3">
+                <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Save settings') }}</button>
+                <span class="text-xs text-gray-500">{{ __('Saves all tabs.') }}</span>
+            </div>
         @endif
     </form>
 </x-layouts.app>

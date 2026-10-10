@@ -67,6 +67,7 @@ class ShippingTest extends TestCase
         $b = $this->confirmedOrder('01812345678');
 
         $this->get('/shipping')->assertOk()->assertSee($a->order_no)->assertSee('Test mode');
+        $this->get('/shipping?q='.$a->order_no)->assertOk()->assertSee($a->order_no)->assertDontSee($b->order_no); // one search for both lists
         $this->post('/shipping/book', ['ids' => [$a->id, $b->id]])
             // Stays on Courier booking; the labels open in their own tab from the banner.
             ->assertRedirect(route('shipping.index').'#booked')

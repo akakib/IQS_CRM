@@ -3,8 +3,13 @@
 @endphp
 
 <x-layouts.app :heading="$all ? __('Delivery issues') : __('My delivery issues')">
+    <x-list.filter-bar :list="$list" :action="route('issues.index')" :placeholder="__('Order no or phone')">
+        <x-simple-select name="show" :options="['all' => __('All open'), 'overdue' => __('Overdue')]" :value="$list->filter('show') ?? 'all'" />
+        @if ($all)<x-simple-select name="person" :options="['' => __('Anyone')] + $people" :value="$list->filter('person') ?? ''" />@endif
+    </x-list.filter-bar>
+
     @if ($issues->isEmpty())
-        <x-empty-state :message="__('No open delivery issue.')" />
+        <x-empty-state :message="$list->hasFilters() ? __('No issue matches these filters.') : __('No open delivery issue.')" />
     @endif
 
     <div class="grid gap-3 lg:grid-cols-2">
@@ -36,4 +41,5 @@
             </div>
         @endforeach
     </div>
+    <div class="mt-4">{{ $issues->links() }}</div>
 </x-layouts.app>

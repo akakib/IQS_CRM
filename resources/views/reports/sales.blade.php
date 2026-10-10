@@ -10,7 +10,7 @@
 @endphp
 
 <x-layouts.app :heading="__('Sales')">
-    <p class="mb-4 text-sm text-gray-500">{{ __('Per day: orders placed, completed (delivered by the courier), cancelled and returned. Completed and cancelled count on the day they ended, not the day they were placed.') }}</p>
+    <p class="mb-4 text-sm text-gray-500">{{ __('Orders placed, completed (delivered by the courier), cancelled and returned, per day. Pick one day (or "Today") to see it per hour. Completed and cancelled count when they ended, not when they were placed.') }}</p>
 
     <div class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-3">
         <form method="GET" action="{{ route('reports.sales') }}" class="flex flex-wrap items-center gap-2">
@@ -20,7 +20,7 @@
                 <a href="{{ route('reports.sales') }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">{{ __('Last 30 days') }}</a>
             @endif
         </form>
-        <span class="ml-auto text-xs text-gray-500">{{ $report['from'] }} → {{ $report['to'] }}@if ($report['weekly']) · {{ __('shown per week') }}@endif</span>
+        <span class="ml-auto text-xs text-gray-500">{{ $report['from'] }} → {{ $report['to'] }}@if ($report['weekly']) · {{ __('shown per week') }}@elseif ($report['hourly']) · {{ __('shown per hour') }}@endif</span>
     </div>
 
     <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -29,16 +29,16 @@
         <x-stat-tile :label="__('Cancelled')" :value="number_format($t['cancelled'])" :trend="$t['cancelled'] ? 'down' : null" :hint="$t['cancelled'] ? __('of orders that ended') : null" />
         <x-stat-tile :label="__('Returned')" :value="number_format($t['returned'])" :trend="$t['returned'] ? 'down' : null" :hint="$t['returned'] ? __('of orders that ended') : null" />
         <x-stat-tile :label="__('Completion rate')" :value="$t['completion_rate'] === null ? '-' : rtrim(rtrim(number_format($t['completion_rate'], 1), '0'), '.').'%'" :hint="__('completed ÷ ended')" />
-        <x-stat-tile :label="__('Per day')" :value="number_format($t['days'] ? $t['placed'] / $t['days'] : 0, 1)" :hint="__('orders placed on average')" />
+        <x-stat-tile :label="$report['hourly'] ? __('Busiest hour') : __('Per day')" :value="$report['hourly'] ? (collect($report['rows'])->sortByDesc('placed')->first()['placed'] ? collect($report['rows'])->sortByDesc('placed')->first()['label'] : '-') : number_format($t['days'] ? $t['placed'] / $t['days'] : 0, 1)" :hint="$report['hourly'] ? __('most orders placed') : __('orders placed on average')" />
     </div>
 
-    <x-card :title="__('Orders per :p', ['p' => $report['weekly'] ? __('week') : __('day')])" class="mb-4">
+    <x-card :title="__('Orders per :p', ['p' => $report['weekly'] ? __('week') : ($report['hourly'] ? __('hour') : __('day'))])" class="mb-4">
         <x-line-chart :rows="$report['rows']" :series="$series" />
     </x-card>
 
     <x-list.table>
         <x-slot:head>
-            <th>{{ $report['weekly'] ? __('Week') : __('Day') }}</th>
+            <th>{{ $report['weekly'] ? __('Week') : ($report['hourly'] ? __('Hour') : __('Day')) }}</th>
             <th class="text-right">{{ __('Placed') }}</th>
             <th class="text-right">{{ __('Placed ৳') }}</th>
             <th class="text-right">{{ __('Completed') }}</th>
@@ -46,7 +46,7 @@
             <th class="text-right">{{ __('Cancelled') }}</th>
             <th class="text-right">{{ __('Returned') }}</th>
         </x-slot:head>
-        @foreach (array_reverse($report['rows']) as $r)
+        @foreach ($report['hourly'] ? $report['rows'] : array_reverse($report['rows']) as $r)
             <tr>
                 <td class="text-gray-800">{{ $r['label'] }}</td>
                 <td class="text-right tabular-nums">{{ number_format($r['placed']) }}</td>
@@ -69,7 +69,7 @@
     </x-list.table>
 
     <x-list.cards>
-        @foreach (array_reverse($report['rows']) as $r)
+        @foreach ($report['hourly'] ? $report['rows'] : array_reverse($report['rows']) as $r)
             <x-record-card :title="$r['label']" :subtitle="__('Placed :n · :m', ['n' => number_format($r['placed']), 'm' => $money($r['placed_amount'])])">
                 <x-slot:badge><x-badge color="blue">{{ __(':n completed', ['n' => number_format($r['completed'])]) }}</x-badge></x-slot:badge>
                 <x-slot:footer>{{ __('Delivered :m', ['m' => $money($r['completed_amount'])]) }} · <span class="{{ $r['cancelled'] ? 'text-red-600' : '' }}">{{ __(':n cancelled', ['n' => $r['cancelled']]) }}</span> · <span class="{{ $r['returned'] ? 'text-amber-600' : '' }}">{{ __(':n returned', ['n' => $r['returned']]) }}</span></x-slot:footer>

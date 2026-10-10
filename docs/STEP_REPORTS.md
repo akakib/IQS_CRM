@@ -398,7 +398,7 @@ Tests: 198 passing.
   - Refund reasons are reasons too (Settings, "Refund reasons").
 - **Sales report** (Analysis menu, `reports.view`): pick any date range (presets: today, yesterday, 7 days, this month; default last 30 days).
   - Tiles: orders placed (+ ৳), completed (+ ৳ delivered), cancelled, returned, completion rate (completed ÷ ended), average per day.
-  - Line graph (plain SVG, no JS library): placed / completed / cancelled / returned per day; tap or hover a day to read its numbers. Ranges over 3 months are shown per week; at most one year.
+  - Line graph (plain SVG, no JS library): placed / completed / cancelled / returned per day; tap or hover a day to read its numbers. Ranges over 3 months are shown per week; at most one year. **One day (or "Today") is shown per hour** (24 rows, plus a "Busiest hour" tile).
   - Table (desktop) / cards (phone) per day with the same numbers.
   - Completed and cancelled count on the day the courier/agent ended them, placed counts on the day the order came in.
   - Dashboard: the same graph for the last 14 days, with a link to the report.

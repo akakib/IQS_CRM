@@ -84,6 +84,29 @@ class SalesReportTest extends TestCase
         $this->assertEquals(60.0, $t['completion_rate'], '3 of 5 ended orders');
     }
 
+    public function test_a_single_day_is_shown_per_hour(): void
+    {
+        $a = $this->order('2026-10-02');
+        $b = $this->order('2026-10-02', 'cancelled', '2026-10-02');
+        DB::table('orders')->where('id', $a->id)->update(['created_at' => '2026-10-02 09:15:00']);
+        DB::table('orders')->where('id', $b->id)->update(['created_at' => '2026-10-02 21:40:00']);
+
+        $r = app(SalesReport::class)->build('2026-10-02', '2026-10-02');
+        $this->assertTrue($r['hourly']);
+        $this->assertCount(24, $r['rows']);
+        $byHour = collect($r['rows'])->keyBy('label');
+        $this->assertSame(1, $byHour['09:00']['placed']);
+        $this->assertSame(1, $byHour['21:00']['placed']);
+        $this->assertSame(0, $byHour['10:00']['placed']);
+        $this->assertSame(1, $byHour['15:00']['cancelled'], 'ended events are stamped 15:00 by the helper');
+        $this->assertSame(2, $r['totals']['placed']);
+
+        $viewer = User::factory()->create();
+        $viewer->roles()->attach($this->role(['reports.view'], [], 'Viewer')->id);
+        $this->actingAs($viewer)->get('/reports/sales?from=2026-10-02&to=2026-10-02')->assertOk()
+            ->assertSee('Orders per hour')->assertSee('Busiest hour')->assertSee('21:00');
+    }
+
     public function test_long_ranges_are_grouped_per_week_and_capped(): void
     {
         $r = app(SalesReport::class)->build('2026-01-01', '2026-06-30');

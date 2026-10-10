@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\DB;
  * Daily sales: orders placed, completed (delivered + partial), cancelled and
  * returned per day, with the money delivered. Two grouped queries for any
  * range; days with nothing are filled with zeros so the graph is continuous.
- * Ranges over ~3 months are shown per week so the graph stays readable.
+ * Ranges over ~3 months are shown per week so the graph stays readable; a
+ * single day is shown per hour.
  */
 class SalesReport
 {
@@ -27,11 +28,14 @@ class SalesReport
             $start = $end->copy()->subDays(self::MAX_DAYS - 1);
         }
         $weekly = $start->diffInDays($end) > 92;
+        $hourly = $start->equalTo($end);
+        // Bucket expression: the day, or the hour of that one day.
+        $bucket = fn (string $col) => $hourly ? $this->hourExpr($col) : "DATE($col)";
 
         $placed = DB::table('orders')
             ->whereBetween('created_at', [$start->toDateTimeString(), $end->copy()->endOfDay()->toDateTimeString()])
-            ->groupByRaw('DATE(created_at)')
-            ->selectRaw('DATE(created_at) as d, COUNT(*) as n, SUM(grand_total) as amount')
+            ->groupByRaw($bucket('created_at'))
+            ->selectRaw($bucket('created_at').' as d, COUNT(*) as n, SUM(grand_total) as amount')
             ->get()->keyBy('d');
 
         $keys = ['delivered', 'partial_delivered', 'cancelled', 'returned'];
@@ -45,8 +49,8 @@ class SalesReport
             ->leftJoin('shipments as s', 's.id', '=', 'o.active_shipment_id')
             ->whereIn('e.to_status_id', $ids)
             ->whereBetween('e.created_at', [$start->toDateTimeString(), $end->copy()->endOfDay()->toDateTimeString()])
-            ->groupByRaw('DATE(e.created_at), e.to_status_id')
-            ->selectRaw("DATE(e.created_at) as d, e.to_status_id as status_id, COUNT(*) as n,
+            ->groupByRaw($bucket('e.created_at').', e.to_status_id')
+            ->selectRaw($bucket('e.created_at')." as d, e.to_status_id as status_id, COUNT(*) as n,
                 SUM(CASE WHEN e.to_status_id IN ($done) THEN COALESCE(s.collected_amount, o.cod_amount) + o.advance_verified ELSE 0 END) as amount")
             ->get();
         $endedByDay = [];
@@ -59,13 +63,21 @@ class SalesReport
         }
 
         $rows = [];
-        for ($day = $start->copy(); $day <= $end; $day->addDay()) {
-            $d = $day->toDateString();
+        // One slot per hour of the day, or per day of the range (weeks merge days).
+        $slots = $hourly
+            ? array_map(fn ($h) => [(string) $h, sprintf('%02d:00', $h), (string) $h], range(0, 23))
+            : [];
+        if (! $hourly) {
+            for ($day = $start->copy(); $day <= $end; $day->addDay()) {
+                $key = $weekly ? $day->copy()->startOfWeek(Carbon::SATURDAY)->toDateString() : $day->toDateString();
+                $slots[] = [$day->toDateString(), $weekly ? __('Week of :d', ['d' => Carbon::parse($key)->format('d M')]) : $day->format('d M'), $key];
+            }
+        }
+        foreach ($slots as [$d, $label, $key]) {
             $e = $endedByDay[$d] ?? [];
-            $bucket = $weekly ? $day->copy()->startOfWeek(Carbon::SATURDAY)->toDateString() : $d;
-            $rows[$bucket] ??= ['day' => $bucket, 'label' => $weekly ? __('Week of :d', ['d' => Carbon::parse($bucket)->format('d M')]) : $day->format('d M'),
+            $rows[$key] ??= ['day' => $key, 'label' => $label,
                 'placed' => 0, 'placed_amount' => 0.0, 'completed' => 0, 'completed_amount' => 0.0, 'cancelled' => 0, 'returned' => 0];
-            $r = &$rows[$bucket];
+            $r = &$rows[$key];
             $r['placed'] += (int) ($placed[$d]->n ?? 0);
             $r['placed_amount'] += (float) ($placed[$d]->amount ?? 0);
             $r['completed'] += ($e['delivered']['n'] ?? 0) + ($e['partial_delivered']['n'] ?? 0);
@@ -86,6 +98,12 @@ class SalesReport
         $totals['completion_rate'] = $endedCount ? round($totals['completed'] * 100 / $endedCount, 1) : null;
         $totals['days'] = count($rows);
 
-        return ['rows' => $rows, 'totals' => $totals, 'weekly' => $weekly, 'from' => $start->toDateString(), 'to' => $end->toDateString()];
+        return ['rows' => $rows, 'totals' => $totals, 'weekly' => $weekly, 'hourly' => $hourly, 'from' => $start->toDateString(), 'to' => $end->toDateString()];
+    }
+
+    /** Hour of day (0-23) as an integer, for MySQL/MariaDB and SQLite. */
+    private function hourExpr(string $col): string
+    {
+        return in_array(DB::getDriverName(), ['mysql', 'mariadb'], true) ? "HOUR($col)" : "CAST(strftime('%H', $col) AS INTEGER)";
     }
 }

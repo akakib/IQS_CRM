@@ -19,6 +19,13 @@
         'mine' => [__('Mine'), $tabUrl('mine'), $counts['mine']],
         'all' => [__('All'), $tabUrl('all')],
     ]" :active="$tab" />
+    @if ($tab === 'take' && auth()->user()->can('orders.take') && ! auth()->user()->isOwner())
+        {{-- Taking happens one at a time, oldest first: one tap from here. --}}
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+            <span>{{ __('Orders are taken one at a time, oldest first.') }}</span>
+            <form method="POST" action="{{ route('desk.next') }}">@csrf<x-button size="sm">{{ __('Take next') }}</x-button></form>
+        </div>
+    @endif
 
     <x-list.filter-bar :list="$list" :action="route('orders.index')" :placeholder="__('Order no, phone, name or CN')">
         <input type="hidden" name="tab" value="{{ $tab }}">

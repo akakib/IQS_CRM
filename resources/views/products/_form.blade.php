@@ -61,6 +61,16 @@
                                 <span x-text="i === 0 ? @js(__('Main variant')) : @js(__('Variant')) + ' ' + (i + 1)"></span>
                                 <span x-show="row.availability" class="ml-2 font-normal normal-case text-gray-400" x-text="row.availability"></span>
                             </p>
+                            @can('products.availability')
+                                {{-- Stock status from here (no need to find it on the Stock status page). Saved at once. --}}
+                                <span x-show="row.id" class="flex gap-1">
+                                    @foreach (\App\Models\ProductVariant::AVAILABILITY as $key => $label)
+                                        <button type="button" class="rounded-full border border-gray-300 px-2 py-0.5 text-[11px] text-gray-600 hover:border-primary hover:text-primary"
+                                            @click="(async () => { const f = new FormData(); f.append('_token', document.querySelector('meta[name=csrf-token]').content); f.append('ids[]', row.id); f.append('status', @js($key));
+                                                const r = await fetch(@js(route('products.availability.update')), { method: 'POST', body: f }); if (r.ok) row.availability = @js(__($label)); })()">{{ __($label) }}</button>
+                                    @endforeach
+                                </span>
+                            @endcan
                             <div class="flex items-center gap-3">
                                 <label class="flex items-center gap-1.5 text-xs text-gray-600">
                                     <input type="hidden" :name="`variants[${i}][is_active]`" :value="row.is_active ? 1 : 0">

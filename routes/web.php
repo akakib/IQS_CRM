@@ -345,6 +345,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('roles', RoleController::class)->except(['index', 'show']);
 
         Route::get('/users/{user}/access', [UserAccessController::class, 'edit'])->name('users.access');
+        Route::post('/roles/{role}/people', [RoleController::class, 'people'])->name('roles.people');
         Route::post('/users/{user}/access/roles', [UserAccessController::class, 'storeRole'])->name('users.access.roles.store');
         Route::delete('/users/{user}/access/roles/{assignment}', [UserAccessController::class, 'destroyRole'])->name('users.access.roles.destroy');
         Route::post('/users/{user}/access/overrides', [UserAccessController::class, 'storeOverride'])->name('users.access.overrides.store');

@@ -15,13 +15,19 @@
         </div>
     </div>
 
+    @can('orders.create')
+        @php $firstPhone = optional($customer->phones->first())->phone; @endphp
+        <div class="mb-4 flex justify-end">
+            <x-button type="button" size="sm" @click="window.dispatchEvent(new CustomEvent('order-new', { detail: @js(route('orders.create', array_filter(['phone' => $firstPhone, 'embed' => 1]))) }))">+ {{ __('New order for this customer') }}</x-button>
+        </div>
+    @endcan
     <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <x-stat-tile :label="__('Orders')" :value="$customer->orders_count" />
         <x-stat-tile :label="__('Delivered')" :value="$customer->delivered_count" />
         <x-stat-tile :label="__('Returned')" :value="$customer->returned_count" :trend="$customer->returned_count ? 'down' : null" :hint="$total ? round($customer->delivered_count * 100 / $total).'% '.__('success') : __('New customer')" />
         <div class="rounded-xl border border-gray-200 bg-white p-4">
             <p class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ __('Risk') }}</p>
-            <div class="mt-2"><x-badge :color="$riskColor[$customer->risk_level]">{{ ucfirst($customer->risk_level) }}</x-badge></div>
+            <div class="mt-2"><x-badge :color="$riskColor[$customer->risk_level]">{{ \App\Support\Labels::risk($customer->risk_level) }}</x-badge></div>
             @if ($customer->blocked_reason)<p class="mt-1 text-xs text-gray-500">{{ $customer->blocked_reason }}</p>@endif
         </div>
     </div>
@@ -61,7 +67,7 @@
                         <p class="text-sm font-medium text-gray-800">{{ $check->provider->name }}</p>
                         <p class="text-xs text-gray-500">{{ __(':t parcels · :d delivered · :c cancelled', ['t' => $check->total_parcels ?? 0, 'd' => $check->delivered ?? 0, 'c' => $check->cancelled ?? 0]) }} · {{ $check->checked_at->diffForHumans() }}</p>
                     </div>
-                    @php($rate = $check->success_rate)
+                    @php $rate = $check->success_rate; @endphp
                     <x-badge :color="$rate === null ? 'gray' : ($rate >= 80 ? 'green' : ($rate >= 50 ? 'amber' : 'red'))">{{ $rate === null ? __('No history') : rtrim(rtrim($rate, '0'), '.').'%' }}</x-badge>
                 </div>
             @empty
@@ -85,4 +91,18 @@
         </x-modal>
         <x-confirm-modal id="merge-confirm" :verb="__('Merge')" :message="__('The other customer is removed for good; everything moves here.')" />
     @endcan
+    {{-- Their orders, newest first. --}}
+    <x-card :title="__('Orders')" class="mt-6">
+        @forelse ($orders as $o)
+            <a href="{{ route('orders.show', $o->id) }}" class="flex items-center justify-between gap-3 border-b border-gray-100 py-2 text-sm last:border-0 hover:bg-gray-50">
+                <span><span class="font-mono font-medium text-gray-800">{{ $o->order_no }}</span> <span class="text-xs text-gray-500">· {{ $o->created_at->format('d M Y') }} · {{ \App\Models\Order::channelLabel($o->channel) }}</span></span>
+                <span class="flex items-center gap-2"><x-order-status :order="$o" :statuses="$statuses" /><span class="tabular-nums text-gray-700">৳{{ number_format((float) $o->grand_total) }}</span></span>
+            </a>
+        @empty
+            <p class="text-sm text-gray-500">{{ __('No orders yet.') }}</p>
+        @endforelse
+        @if ($customer->orders_count > $orders->count())
+            <a href="{{ route('orders.index', ['tab' => 'all', 'q' => optional($customer->phones->first())->phone]) }}" class="mt-2 inline-block text-sm text-primary hover:underline">{{ __('See all :n orders', ['n' => $customer->orders_count]) }}</a>
+        @endif
+    </x-card>
 </x-layouts.app>

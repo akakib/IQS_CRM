@@ -150,7 +150,7 @@ class DeskController extends Controller
             'limit' => $rules['limit'],
             'canTake' => $user->can('orders.take') && ! $user->isOwner(), // owners watch, staff take
             // Order activity popup: the admin can hand the order to someone else.
-            'reassign' => $request->boolean('embed') && $order && $user->can('orders.reassign') ? [
+            'reassign' => $order && $user->can('orders.reassign') && ! OrderStatus::map()[$order->status_id]['final'] ? [
                 'staff' => \App\Models\User::where('is_active', true)->orderBy('name')->get(['id', 'name', 'photo_path'])
                     ->filter(fn ($u) => $u->id !== $order->moderator_id && $u->can('orders.take') && ! $u->isOwner())->values(),
                 'reasons' => \App\Models\StatusReason::options('reassign'),

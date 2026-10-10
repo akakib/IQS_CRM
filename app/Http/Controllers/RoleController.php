@@ -26,7 +26,31 @@ class RoleController extends Controller
             ->orderByRaw('system_key is null, id')
             ->get();
 
-        return view('roles.index', ['roles' => $roles]);
+        // Who holds each role for good (temporary access is set on the person's Access page).
+        $holders = \Illuminate\Support\Facades\DB::table('user_roles as ur')->join('users as u', 'u.id', '=', 'ur.user_id')->whereNull('ur.expires_at')
+            ->orderBy('u.name')->get(['ur.role_id', 'u.id', 'u.name'])->groupBy('role_id');
+        $staff = request()->user()->can('access.manage') ? \App\Models\User::where('is_active', true)->orderBy('name')->get(['id', 'name']) : collect();
+
+        return view('roles.index', ['roles' => $roles, 'holders' => $holders, 'staff' => $staff]);
+    }
+
+    /** Set who holds this role (for good). The owner role is never changed from here. */
+    public function people(\Illuminate\Http\Request $request, Role $role): \Illuminate\Http\RedirectResponse
+    {
+        abort_if($role->isOwner(), 403);
+        $data = $request->validate(['users' => ['nullable', 'array'], 'users.*' => ['integer']]);
+        $want = \App\Models\User::where('is_active', true)->whereIn('id', $data['users'] ?? [])->pluck('id')->all();
+        $now = \Illuminate\Support\Facades\DB::table('user_roles')->where('role_id', $role->id)->whereNull('expires_at')->pluck('user_id')->all();
+        \Illuminate\Support\Facades\DB::transaction(function () use ($role, $want, $now, $request) {
+            \Illuminate\Support\Facades\DB::table('user_roles')->where('role_id', $role->id)->whereNull('expires_at')->whereIn('user_id', array_diff($now, $want))->delete();
+            foreach (array_diff($want, $now) as $id) {
+                \Illuminate\Support\Facades\DB::table('user_roles')->insert(['user_id' => $id, 'role_id' => $role->id, 'assigned_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now()]);
+            }
+        });
+        app(\App\Services\PermissionService::class)->bump();
+        app(\App\Services\ActivityLogger::class)->log('role.people_set', null, ['users' => $now], ['role' => $role->name, 'users' => $want]);
+
+        return back()->with('success', __('People saved for :r.', ['r' => $role->name]));
     }
 
     public function create(): View

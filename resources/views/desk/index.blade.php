@@ -270,7 +270,7 @@
                 @unless ($embed)
                 <a href="{{ $url(['tab' => $tab]) }}" class="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-primary lg:hidden">&larr; {{ __('My orders') }} · {{ $tabLabels[$tab] }} ({{ $counts[$tab] }})</a>
                 @endunless
-                @if ($embed && $reassign)
+                @if ($reassign)
                     @include('desk._reassign', ['order' => $order, 'reassign' => $reassign])
                 @endif
                 <x-order-presence :order="$order" mode="view" />

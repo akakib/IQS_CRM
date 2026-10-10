@@ -57,8 +57,13 @@ class CustomerController extends Controller
         $customer->load(['phones', 'addresses.zone:id,name']);
         $checks = $customer->fraudChecks()->with('provider:id,name,system_key')->latest('checked_at')->limit(20)->get();
 
+        $orders = \App\Models\Order::visibleTo($request->user())->where('customer_id', $customer->id)->latest('id')->limit(10)
+            ->get(['id', 'order_no', 'status_id', 'grand_total', 'created_at', 'channel']);
+
         return view('customers.show', [
             'customer' => $customer,
+            'orders' => $orders,
+            'statuses' => \App\Models\OrderStatus::map(),
             'checks' => $checks,
             'latest' => $checks->unique('provider_id'),
             'canSeeContact' => $request->user()->canSeeField('customer_contact'),

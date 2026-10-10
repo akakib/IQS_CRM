@@ -107,6 +107,40 @@ class SalesReportTest extends TestCase
             ->assertSee('Orders per hour')->assertSee('Busiest hour')->assertSee('21:00');
     }
 
+    public function test_channel_breakdown_and_filter(): void
+    {
+        $this->order('2026-10-02', 'delivered', '2026-10-03');           // web
+        $this->order('2026-10-02');                                       // web, open
+        $chat = app(OrderService::class)->create([
+            'channel' => 'messenger', 'phone' => '01799999999', 'name' => 'Rina', 'address_line' => 'House 2',
+            'items' => [['variant_id' => ProductVariant::first()->id, 'qty' => 1]],
+        ], $this->agent);
+        DB::table('orders')->where('id', $chat->id)->update(['created_at' => '2026-10-03 10:00:00']);
+        DB::table('order_events')->insert(['order_id' => $chat->id, 'to_status_id' => OrderStatus::idFor('cancelled'), 'source' => 'user', 'created_at' => '2026-10-03 12:00:00']);
+
+        $r = app(SalesReport::class)->build('2026-10-01', '2026-10-05');
+        $byChannel = collect($r['channels'])->keyBy('channel');
+        $this->assertSame(['web', 'messenger'], array_keys($byChannel->all()), 'busiest channel first, empty channels left out');
+        $this->assertSame(2, $byChannel['web']['placed']);
+        $this->assertSame(1, $byChannel['web']['completed']);
+        $this->assertSame(1, $byChannel['messenger']['placed']);
+        $this->assertSame(1, $byChannel['messenger']['cancelled']);
+        $this->assertEquals(66.7, $byChannel['web']['share']);
+
+        // The filter narrows the whole report to one channel.
+        $only = app(SalesReport::class)->build('2026-10-01', '2026-10-05', 'messenger');
+        $this->assertSame(1, $only['totals']['placed']);
+        $this->assertSame(0, $only['totals']['completed']);
+        $this->assertSame(1, $only['totals']['cancelled']);
+        $this->assertCount(1, $only['channels']);
+
+        $viewer = User::factory()->create();
+        $viewer->roles()->attach($this->role(['reports.view'], [], 'Viewer')->id);
+        $this->actingAs($viewer)->get('/reports/sales?from=2026-10-01&to=2026-10-05')->assertOk()->assertSee('Orders by channel')->assertSee('Messenger');
+        $this->actingAs($viewer)->get('/reports/sales?from=2026-10-01&to=2026-10-05&channel=messenger')->assertOk()->assertSee('2026-10-01 → 2026-10-05 · Messenger');
+        $this->actingAs($viewer)->get('/reports/sales?channel=nope')->assertOk();
+    }
+
     public function test_long_ranges_are_grouped_per_week_and_capped(): void
     {
         $r = app(SalesReport::class)->build('2026-01-01', '2026-06-30');

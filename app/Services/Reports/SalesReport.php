@@ -20,7 +20,10 @@ class SalesReport
     /**
      * @return array{rows: list<array{day: string, label: string, placed: int, placed_amount: float, completed: int, completed_amount: float, cancelled: int, returned: int}>, totals: array<string, float|int>, weekly: bool}
      */
-    public function build(string $from, string $to): array
+    public const CHANNELS = ['web', 'messenger', 'whatsapp', 'phone', 'b2b'];
+
+    /** @param  string|null  $channel  limit everything to one sales channel */
+    public function build(string $from, string $to, ?string $channel = null): array
     {
         $start = Carbon::parse($from)->startOfDay();
         $end = Carbon::parse($to)->startOfDay();
@@ -32,8 +35,10 @@ class SalesReport
         // Bucket expression: the day, or the hour of that one day.
         $bucket = fn (string $col) => $hourly ? $this->hourExpr($col) : "DATE($col)";
 
+        $range = [$start->toDateTimeString(), $end->copy()->endOfDay()->toDateTimeString()];
         $placed = DB::table('orders')
-            ->whereBetween('created_at', [$start->toDateTimeString(), $end->copy()->endOfDay()->toDateTimeString()])
+            ->whereBetween('created_at', $range)
+            ->when($channel, fn ($q) => $q->where('channel', $channel))
             ->groupByRaw($bucket('created_at'))
             ->selectRaw($bucket('created_at').' as d, COUNT(*) as n, SUM(grand_total) as amount')
             ->get()->keyBy('d');
@@ -45,14 +50,55 @@ class SalesReport
         }
         $ids = array_keys($keyById);
         $done = implode(',', array_map('intval', OrderStatus::idsFor(['delivered', 'partial_delivered']))) ?: '0';
-        $ended = DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')
+        $delivered = "SUM(CASE WHEN e.to_status_id IN ($done) THEN COALESCE(s.collected_amount, o.cod_amount) + o.advance_verified ELSE 0 END) as amount";
+        $endedQuery = fn () => DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')
             ->leftJoin('shipments as s', 's.id', '=', 'o.active_shipment_id')
             ->whereIn('e.to_status_id', $ids)
-            ->whereBetween('e.created_at', [$start->toDateTimeString(), $end->copy()->endOfDay()->toDateTimeString()])
+            ->whereBetween('e.created_at', $range)
+            ->when($channel, fn ($q) => $q->where('o.channel', $channel));
+        $ended = $endedQuery()
             ->groupByRaw($bucket('e.created_at').', e.to_status_id')
-            ->selectRaw($bucket('e.created_at')." as d, e.to_status_id as status_id, COUNT(*) as n,
-                SUM(CASE WHEN e.to_status_id IN ($done) THEN COALESCE(s.collected_amount, o.cod_amount) + o.advance_verified ELSE 0 END) as amount")
+            ->selectRaw($bucket('e.created_at')." as d, e.to_status_id as status_id, COUNT(*) as n, $delivered")
             ->get();
+
+        // Which channel the orders came from (two more grouped queries).
+        $channels = [];
+        foreach (self::CHANNELS as $c) {
+            $channels[$c] = ['channel' => $c, 'placed' => 0, 'placed_amount' => 0.0, 'completed' => 0, 'completed_amount' => 0.0, 'cancelled' => 0, 'returned' => 0, 'share' => 0.0];
+        }
+        $placedByChannel = DB::table('orders')->whereBetween('created_at', $range)
+            ->when($channel, fn ($q) => $q->where('channel', $channel))
+            ->groupBy('channel')->selectRaw('channel, COUNT(*) as n, SUM(grand_total) as amount')->get();
+        foreach ($placedByChannel as $row) {
+            if (isset($channels[$row->channel])) {
+                $channels[$row->channel]['placed'] = (int) $row->n;
+                $channels[$row->channel]['placed_amount'] = (float) $row->amount;
+            }
+        }
+        $endedByChannel = $endedQuery()->groupBy('o.channel', 'e.to_status_id')
+            ->selectRaw("o.channel, e.to_status_id as status_id, COUNT(*) as n, $delivered")->get();
+        foreach ($endedByChannel as $row) {
+            $key = $keyById[$row->status_id] ?? null;
+            if ($key === null || ! isset($channels[$row->channel])) {
+                continue;
+            }
+            $c = &$channels[$row->channel];
+            if ($key === 'delivered' || $key === 'partial_delivered') {
+                $c['completed'] += (int) $row->n;
+                $c['completed_amount'] += (float) $row->amount;
+            } else {
+                $c[$key] += (int) $row->n;
+            }
+            unset($c);
+        }
+        $placedAll = array_sum(array_column($channels, 'placed'));
+        foreach ($channels as &$c) {
+            $c['share'] = $placedAll ? round($c['placed'] * 100 / $placedAll, 1) : 0.0;
+        }
+        unset($c);
+        // Channels with nothing in the period are left out; the busiest first.
+        $channels = array_values(array_filter($channels, fn ($c) => $c['placed'] || $c['completed'] || $c['cancelled'] || $c['returned']));
+        usort($channels, fn ($a, $b) => $b['placed'] <=> $a['placed']);
         $endedByDay = [];
         foreach ($ended as $row) {
             $key = $keyById[$row->status_id] ?? null;
@@ -98,7 +144,7 @@ class SalesReport
         $totals['completion_rate'] = $endedCount ? round($totals['completed'] * 100 / $endedCount, 1) : null;
         $totals['days'] = count($rows);
 
-        return ['rows' => $rows, 'totals' => $totals, 'weekly' => $weekly, 'hourly' => $hourly, 'from' => $start->toDateString(), 'to' => $end->toDateString()];
+        return ['rows' => $rows, 'totals' => $totals, 'channels' => $channels, 'channel' => $channel, 'weekly' => $weekly, 'hourly' => $hourly, 'from' => $start->toDateString(), 'to' => $end->toDateString()];
     }
 
     /** Hour of day (0-23) as an integer, for MySQL/MariaDB and SQLite. */

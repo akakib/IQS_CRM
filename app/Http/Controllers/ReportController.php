@@ -108,7 +108,9 @@ class ReportController extends Controller
             [$from, $to] = [$to, $from];
         }
 
-        return view('reports.sales', ['report' => $sales->build($from, $to), 'from' => $from, 'to' => $to]);
+        $channel = in_array($request->query('channel'), SalesReport::CHANNELS, true) ? $request->query('channel') : null;
+
+        return view('reports.sales', ['report' => $sales->build($from, $to, $channel), 'from' => $from, 'to' => $to, 'channel' => $channel]);
     }
 
     /** @return array{0: string, 1: string} default: this month */

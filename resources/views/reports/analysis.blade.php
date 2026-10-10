@@ -28,12 +28,18 @@
         </div>
     </form>
 
+    {{-- An item sold with no cost price counts its whole price as profit: say how many, so the number is read with care. --}}
+    @if ($seeCost && $missingCost)
+        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{{ trans_choice('{1} 1 delivered order has an item with no cost price: its full price counts as profit. Set the cost on the product.|[2,*] :count delivered orders have an item with no cost price: their full price counts as profit. Set the cost on the products.', $missingCost, ['count' => $missingCost]) }}</div>
+    @endif
+
     <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <x-stat-tile :label="__('Revenue')" :value="$tk($totals['revenue'])" :hint="__(':d delivered of :n ended', ['d' => $totals['delivered'], 'n' => $totals['orders']])" />
         @if ($seeCost)
             <x-stat-tile :label="__('Product cost')" :value="$tk($totals['cogs'])" />
         @endif
         <x-stat-tile :label="__('Delivery, COD fee, packaging')" :value="$tk($totals['delivery'] + $totals['cod_fee'] + $totals['packaging'])" />
+        <x-stat-tile :label="__('Returns (courier charge, damaged, missing)')" :value="$tk($totals['returns'])" />
         <x-stat-tile :label="__('Ad cost')" :value="$tk($totals['ad_cost'])" />
         @if ($seeProfit)
             <x-stat-tile :label="__('Profit before ads')" :value="$tk($totals['profit_before_ads'])" :trend="$totals['profit_before_ads'] >= 0 ? 'up' : 'down'" />
@@ -53,7 +59,7 @@
                 @if ($lineLevel)<th class="text-right">{{ __('Qty') }}</th>@endif
                 <th class="text-right">{{ __('Revenue') }}</th>
                 @if ($seeCost)<th class="text-right">{{ __('Product cost') }}</th>@endif
-                @unless ($lineLevel)<th class="text-right">{{ __('Delivery + COD + pack') }}</th><th class="text-right">{{ __('Ad cost') }}</th>@endunless
+                @unless ($lineLevel)<th class="text-right">{{ __('Delivery, fees, returns') }}</th><th class="text-right">{{ __('Ad cost') }}</th>@endunless
                 @if ($seeProfit)<th class="text-right">{{ $lineLevel ? __('Gross profit') : __('Profit after ads') }}</th>@endif
             </x-slot:head>
             @foreach ($rows as $r)
@@ -63,7 +69,7 @@
                     @if ($lineLevel)<td class="text-right tabular-nums">{{ rtrim(rtrim(number_format((float) $r->qty, 3), '0'), '.') }}</td>@endif
                     <td class="text-right tabular-nums">{{ $tk($r->revenue) }}</td>
                     @if ($seeCost)<td class="text-right tabular-nums">{{ $tk($r->cogs) }}</td>@endif
-                    @unless ($lineLevel)<td class="text-right tabular-nums">{{ $tk($r->delivery + $r->cod_fee + $r->packaging) }}</td><td class="text-right tabular-nums">{{ $tk($r->ad_cost) }}</td>@endunless
+                    @unless ($lineLevel)<td class="text-right tabular-nums">{{ $tk($r->delivery + $r->cod_fee + $r->packaging + $r->returns) }}</td><td class="text-right tabular-nums">{{ $tk($r->ad_cost) }}</td>@endunless
                     @if ($seeProfit)<td @class(['text-right font-semibold tabular-nums', 'text-green-800' => $r->profit >= 0, 'text-red-700' => $r->profit < 0])>{{ $tk($r->profit) }}</td>@endif
                 </tr>
             @endforeach

@@ -34,11 +34,13 @@ class KpiScorecard
             $stats = DB::table('orders as o')->whereNotNull('o.moderator_id')->whereBetween('o.assigned_at', $range);
         } else {
             // One row per order, even if a courier correction logged its final status twice.
-            $stats = DB::table('orders as o')->whereNotNull('o.moderator_id')->whereIn('o.status_id', $ended)
+            $stats = DB::table('orders as o')->whereRaw('COALESCE(o.confirmed_by, o.moderator_id) IS NOT NULL')->whereIn('o.status_id', $ended)
                 ->whereExists(fn ($q) => $q->from('order_events as e')->whereColumn('e.order_id', 'o.id')->whereColumn('e.to_status_id', 'o.status_id')->whereBetween('e.created_at', $range));
         }
-        $stats = $stats->groupBy('o.moderator_id', 'o.status_id')
-            ->selectRaw('o.moderator_id, o.status_id, COUNT(*) as n, SUM(CASE WHEN o.had_setback = 1 THEN 1 ELSE 0 END) as setbacks, SUM(o.grand_total) as amount')->get();
+        // Ended orders count for who confirmed them (a later reassign does not move them); the cohort view follows the holder.
+        $who = $mode === 'cohort' ? 'o.moderator_id' : 'COALESCE(o.confirmed_by, o.moderator_id)';
+        $stats = $stats->groupByRaw("$who, o.status_id")
+            ->selectRaw("$who as moderator_id, o.status_id, COUNT(*) as n, SUM(CASE WHEN o.had_setback = 1 THEN 1 ELSE 0 END) as setbacks, SUM(o.grand_total) as amount")->get();
 
         $by = [];
         foreach ($stats as $r) {

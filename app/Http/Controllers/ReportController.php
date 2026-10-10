@@ -74,6 +74,7 @@ class ReportController extends Controller
 
         return view('reports.analysis', [
             'totals' => $profit->totals($from, $to, $channel),
+            'missingCost' => $profit->missingCost($from, $to, $channel),
             'rows' => $rows,
             'moderators' => $group === 'moderator' ? DB::table('users')->whereIn('id', collect($rows->items())->pluck('g')->filter())->pluck('name', 'id') : collect(),
             'group' => $group, 'channel' => $channel, 'from' => $from, 'to' => $to, 'perPage' => $perPage,

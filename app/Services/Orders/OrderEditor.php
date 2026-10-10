@@ -127,8 +127,14 @@ class OrderEditor
         $version = $order->current_version + 1;
         $oldCod = (float) $order->cod_amount;
 
+        $frozen = DB::table('order_items')->where('order_id', $order->id)->whereNotNull('cost_price_snapshot')->pluck('cost_price_snapshot', 'variant_id');
         DB::table('order_items')->where('order_id', $order->id)->delete();
-        $order->items()->createMany($p['items']);
+        $items = $p['items'];
+        if ($order->confirmed_at) {
+            $today = DB::table('product_variants')->whereIn('id', collect($items)->pluck('variant_id')->filter())->pluck('cost_price', 'id');
+            $items = array_map(fn ($i) => $i + ['cost_price_snapshot' => $frozen[$i['variant_id'] ?? 0] ?? $today[$i['variant_id'] ?? 0] ?? null], $items);
+        }
+        $order->items()->createMany($items);
         $order->fill($p['shipping'] + $p['totals']);
         $order->current_version = $version;
         $order->lock_version++;

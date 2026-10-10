@@ -91,7 +91,8 @@ class MonthlyScorecard
             return $r;
         })->sortByDesc(fn ($r) => [$r['overall'] === 'green' ? 2 : ($r['overall'] === 'yellow' ? 1 : 0), $r['delivered']])->values();
 
-        return ['rows' => $rows, 'team' => $team, 'from' => $from, 'to' => $to];
+        // Orders confirmed by a rule with nobody holding them: their profit is nobody's, shown on its own so the people add up.
+        return ['rows' => $rows, 'team' => $team, 'from' => $from, 'to' => $to, 'unassigned' => (float) ($profit[0] ?? 0)];
     }
 
     private function light(int|float|null $value, ?float $team, bool $higherBetter): ?string

@@ -87,7 +87,7 @@ class OrderStateMachine
             $fresh->lock_version++;
             match ($to['key']) {
                 'record_verified' => $fresh->verified_at ??= now(),
-                'confirmed' => $fresh->confirmed_at ??= now(),
+                'confirmed' => [$fresh->confirmed_at ??= now(), $fresh->confirmed_by ??= ($fresh->moderator_id ?? $user?->id)],
                 default => null,
             };
             $fresh->hold_reason_id = $to['key'] === 'hold' ? $reasonId : null;

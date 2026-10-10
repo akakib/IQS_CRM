@@ -22,7 +22,8 @@
     </div>
     <p class="mb-4 text-xs text-gray-500">
         {{ __('Each number against the team\'s middle value: green better, red worse (by more than 15%), yellow around it. Delivered and rates count orders that ended this month.') }}
-        @if ($seePay){{ __('Profit is before ads, from the orders each person confirmed. Per ৳1 = profit for every taka of salary and bonus.') }}@endif
+        @if ($seePay){{ __('Profit is before ads, from the orders each person confirmed (a later reassign does not move them), after refunds and returns. Per ৳1 = profit for every taka of salary and bonus.') }}@endif
+        @if ($seePay && ($unassigned ?? 0)){{ __('Profit on orders nobody held when they were confirmed: :a.', ['a' => '৳'.number_format($unassigned)]) }}@endif
         <span class="ml-1 inline-flex items-center gap-3 align-middle">
             <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-green-500"></span>{{ __('better') }}</span>
             <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-400"></span>{{ __('around') }}</span>

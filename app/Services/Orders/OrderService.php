@@ -134,6 +134,10 @@ class OrderService
     /** Admin only: move the order to another moderator, with a reason (it can count against the previous one). */
     public function reassign(Order $order, User $by, User $to, int $reasonId): Order
     {
+        if (\App\Models\OrderStatus::map()[$order->status_id]['final']) {
+            throw ValidationException::withMessages(['order' => __(':no is closed: its credit stays with the person who confirmed it.', ['no' => $order->order_no])]);
+        }
+
         return DB::transaction(function () use ($order, $by, $to, $reasonId) {
             $previous = $order->moderator_id;
             DB::table('order_assignments')->where('order_id', $order->id)->whereNull('ended_at')->update(['ended_at' => now(), 'ended_reason' => 'reassigned']);

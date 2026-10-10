@@ -73,6 +73,54 @@ class ReportsTest extends TestCase
         $this->assertEqualsWithDelta($cod - 800 - $delivery - $cod / 100 - 20, $t['profit'], 0.01);
     }
 
+    public function test_profit_takes_off_refunds_and_return_losses_and_credit_stays_with_the_confirmer(): void
+    {
+        $range = [today()->toDateString(), today()->toDateString()];
+        $b = $this->deliveredOrder('returned');
+        $base = app(OrderProfit::class)->totals(...$range);
+
+        // A returned order: ৳300 advance paid, then given back; a ৳60 courier charge; one of two items damaged (cost 400).
+        $bkash = (int) DB::table('payment_methods')->where('system_key', 'bkash')->value('id');
+        DB::table('order_payments')->insert([
+            ['order_id' => $b->id, 'payment_type' => 'advance', 'method_id' => $bkash, 'amount' => 300, 'status' => 'verified', 'transaction_id' => 'P1', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+            ['order_id' => $b->id, 'payment_type' => 'refund', 'method_id' => $bkash, 'amount' => 300, 'status' => 'verified', 'transaction_id' => 'P2', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('orders')->where('id', $b->id)->update(['advance_verified' => 300, 'return_charge' => 60]);
+        $item = DB::table('order_items')->where('order_id', $b->id)->first();
+        DB::table('return_items')->insert(['order_id' => $b->id, 'order_item_id' => $item->id, 'variant_id' => $item->variant_id, 'qty' => 1, 'condition' => 'damaged', 'created_at' => now()]);
+
+        $t = app(OrderProfit::class)->totals(...$range);
+        $this->assertEqualsWithDelta($base['revenue'], $t['revenue'], 0.01);            // the ৳300 came in and went back: no revenue
+        $this->assertEqualsWithDelta(60 + 400, $t['returns'], 0.01);                    // courier charge + the damaged item at cost
+        $this->assertEqualsWithDelta($base['profit'] - 460, $t['profit'], 0.01);
+
+        // Reassigned later: the profit stays with the person who confirmed it.
+        $other = User::factory()->create(['name' => 'Rafi']);
+        DB::table('orders')->where('id', $b->id)->update(['confirmed_by' => $this->agent->id, 'moderator_id' => $other->id]);
+        $rows = collect(app(OrderProfit::class)->grouped('moderator', ...$range, ...[null, 50])->items());
+        $this->assertSame([$this->agent->id], $rows->pluck('g')->map(fn ($g) => (int) $g)->all());
+    }
+
+    public function test_an_edit_keeps_the_frozen_cost_and_a_missing_cost_is_flagged(): void
+    {
+        $a = $this->deliveredOrder();
+        $a->forceFill(['confirmed_at' => now()])->save();
+        // The editor's proposed lines carry no cost (as buildItems makes them).
+        $items = DB::table('order_items')->where('order_id', $a->id)->get()
+            ->map(fn ($i) => collect((array) $i)->except(['id', 'order_id', 'cost_price_snapshot', 'created_at', 'updated_at'])->all())->all();
+        // An edit re-creates the items (here the same lines): the cost frozen at confirmation must survive.
+        $amendment = DB::table('order_amendments')->insertGetId([
+            'order_id' => $a->id, 'requested_by' => $this->agent->id, 'reason_id' => (int) DB::table('status_reasons')->where('reason_type', 'amendment')->value('id'),
+            'from_version' => 1, 'status_at_time_id' => $a->status_id, 'edit_class' => 'label', 'changes' => '{}', 'created_at' => now(), 'updated_at' => now(),
+            'proposed' => json_encode(['items' => $items, 'shipping' => [], 'totals' => []]),
+        ]);
+        (fn () => $this->apply($a, $amendment, \App\Models\User::first()))->call(app(\App\Services\Orders\OrderEditor::class));
+        $this->assertEquals([400], DB::table('order_items')->where('order_id', $a->id)->pluck('cost_price_snapshot')->map(fn ($c) => (float) $c)->unique()->values()->all());
+
+        DB::table('order_items')->where('order_id', $a->id)->update(['cost_price_snapshot' => null]);
+        $this->assertSame(1, app(OrderProfit::class)->missingCost(today()->toDateString(), today()->toDateString()));
+    }
+
     public function test_kpi_scores_the_order_moderator(): void
     {
         $this->deliveredOrder();

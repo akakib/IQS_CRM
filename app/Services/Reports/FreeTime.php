@@ -56,21 +56,31 @@ class FreeTime
     {
         $todo = OrderStatus::idsFor(['new', 'record_verified']);
         $now = now()->getTimestamp();
+        // An order nobody acts on is not hours of work: at most this long counts (the idle rule takes it back after it).
+        $cap = max(5, (int) settings('desk.idle_return_minutes')) * 60;
         $spans = [];
         foreach ($assignments as $a) {
-            $start = Carbon::parse($a->started_at)->getTimestamp();
+            // Busy from opening it, not from being given it (given and never opened = not worked on).
+            $opened = $a->first_opened_at ?? null;
+            $start = Carbon::parse($opened ?? $a->started_at)->getTimestamp();
             $end = $a->ended_at ? Carbon::parse($a->ended_at)->getTimestamp() : $now;
             $orderEvents = $events->get($a->order_id, collect());
             $left = $orderEvents->first(fn ($e) => Carbon::parse($e->created_at)->getTimestamp() > $start && ! in_array($e->to_status_id, $todo, true));
-            $spans[] = [$start, $left ? min($end, Carbon::parse($left->created_at)->getTimestamp()) : $end];
-            // Back from No answer: in hand again until the next step.
+            $stop = $left ? min($end, Carbon::parse($left->created_at)->getTimestamp()) : $end;
+            if (property_exists($a, 'first_opened_at') && ! $opened) {
+                $stop = $start; // never opened
+            } elseif (! $left) {
+                $stop = min($stop, $start + $cap); // parked (an advance hold, or untouched): not open-ended
+            }
+            $spans[] = [$start, $stop];
+            // Back from No answer: in hand again until the next step, at most the idle time.
             foreach ($returns->get($a->order_id, collect()) as $r) {
                 $back = $r['back']->getTimestamp();
                 if ($back <= $start || $back >= $end || $back > $now) {
                     continue;
                 }
                 $next = $orderEvents->first(fn ($e) => Carbon::parse($e->created_at)->getTimestamp() > $back);
-                $spans[] = [$back, min($end, $next ? Carbon::parse($next->created_at)->getTimestamp() : $now)];
+                $spans[] = [$back, min($end, $next ? Carbon::parse($next->created_at)->getTimestamp() : $now, $back + $cap)];
             }
         }
         foreach ($breaks as $b) {

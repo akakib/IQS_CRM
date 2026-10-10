@@ -158,12 +158,12 @@ class OrderTimelineTest extends TestCase
         $this->travel(14)->minutes();
         app(OrderStateMachine::class)->transition($o->fresh(), 'confirmed', $this->mahim); // 11:00 (back at 10:55)
 
-        // Free: 9:00 to 10:20 (orders waiting 10:00 to 10:20), 10:25 to 10:26 and 10:46 to 10:55 (nothing waiting).
+        // Free: 9:00 to 10:21 (given at 10:20 but opened at 10:21: busy from opening; orders waiting 10:00 to 10:20), 10:25 to 10:26 and 10:46 to 10:55.
         $activity = app(\App\Services\Reports\PersonActivity::class)->day($this->mahim->id, today());
         $this->assertSame(20 * 60, $activity['free']['waiting']);
-        $this->assertSame(70 * 60, $activity['free']['nothing']);
+        $this->assertSame(71 * 60, $activity['free']['nothing']);
         $texts = array_map(fn ($e) => $e['at']->format('H:i').' '.$e['text'], $activity['entries']);
-        $this->assertSame('09:00 Free 1 h 20 min · orders were waiting for 20 min of it', $texts[0]);
+        $this->assertSame('09:00 Free 1 h 21 min · orders were waiting for 20 min of it', $texts[0]);
         $this->assertContains('10:20 Took '.$o->order_no, $texts);
         $this->assertContains('10:21 Opened '.$o->order_no, $texts);
         $this->assertContains('10:46 Free 9 min · nothing was waiting', $texts);
@@ -176,13 +176,13 @@ class OrderTimelineTest extends TestCase
         $boss->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'orders.reassign'], [], 'Manager')->id);
         app(\App\Services\PermissionService::class)->bump();
         $this->actingAs($boss)->get('/work-time')->assertOk()
-            ->assertSeeInOrder(['Mahim', '20 min', '1 h 10 min', 'Rima', '20 min', '1 h 40 min']);
+            ->assertSeeInOrder(['Mahim', '20 min', '1 h 11 min', 'Rima', '20 min', '1 h 40 min']);
         $this->get('/work-time?person='.$this->mahim->id)->assertOk()
             ->assertSee('href="#activity"', false)->assertSee('No answer on '.$o->order_no.' just before the break')->assertSee('Free 9 min · nothing was waiting');
 
         // A range: the same numbers added up over the days (here only today has any); Activity asks for one day.
         $this->get('/work-time?from=2026-09-29&to=2026-10-05')->assertOk()
-            ->assertSee('Orders given to each person from 29 Sep to 05 Oct')->assertSeeInOrder(['Mahim', '20 min', '1 h 10 min']);
+            ->assertSee('Orders given to each person from 29 Sep to 05 Oct')->assertSeeInOrder(['Mahim', '20 min', '1 h 11 min']);
         $this->get('/work-time?from=2026-09-29&to=2026-10-05&person='.$this->mahim->id)->assertOk()
             ->assertSee('Activity shows one day at a time')->assertDontSee('href="#activity"', false)->assertSee('05 Oct, 10:20 AM');
     }

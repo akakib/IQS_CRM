@@ -34,6 +34,7 @@ class DeskTick extends Command
         $desk->recoverStale(); // a booking that stopped half way: ask the courier before trying again
         $desk->runBookings();
         $closed = $breaks->autoClose();
+        app(\App\Services\Work\ChatService::class)->closeStale(); // Communication left on by someone who left
         $this->digest($telegram);
 
         $this->line("released {$released}, auto-assigned {$assigned}, breaks closed {$closed}");

@@ -72,38 +72,59 @@ class WorkTime
 
         $breakRows = DB::table('staff_breaks')->where('started_at', '<=', $to)->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))
             ->get(['user_id', 'started_at', 'ended_at', 'minutes', 'counts_as_break'])->groupBy('user_id');
-        $breaks = $breakRows->map(fn ($b) => (int) $b->where('counts_as_break', true)->filter(fn ($x) => Carbon::parse($x->started_at)->between($from, $to))->sum('minutes'));
+        $breaks = $breakRows->map(fn ($b) => (int) $b->where('counts_as_break', true)->filter(fn ($x) => Carbon::parse($x->started_at)->between($from, $to))
+            ->sum(fn ($x) => $x->minutes ?? (int) Carbon::parse($x->started_at)->diffInMinutes(now(), true)));
 
         // Everyone who works orders and was on shift that day, even with no order at all (free all day is worth seeing).
-        $staff = \App\Models\User::where('is_active', true)->get(['id', 'name', 'photo_path', 'created_at'])
-            ->filter(fn ($u) => $u->can('orders.take') && ! $u->isOwner());
+        $staff = \App\Models\User::where(fn ($q) => $q->where('is_active', true)->orWhereIn('id', $turns->keys()))->get(['id', 'name', 'photo_path', 'created_at', 'is_active'])
+            ->filter(fn ($u) => ($u->can('orders.take') || ! $u->is_active) && ! $u->isOwner());
         $this->calendar->preload($staff->pluck('id')->all());
         // Days before someone joined are not their free time.
         $joined = fn ($u, $d) => ! $u->created_at || $d->gte($u->created_at->copy()->startOfDay());
-        $staff = $staff->filter(fn ($u) => $turns->has($u->id) || $days->contains(fn ($d) => $joined($u, $d) && $this->calendar->shift($u->id, $d)));
+        $staff = $staff->filter(fn ($u) => $turns->has($u->id) || ($u->is_active && $days->contains(fn ($d) => $joined($u, $d) && $this->calendar->shift($u->id, $d))));
+
+        // A night shift (8 PM to 9 AM) runs into the next morning: free and worked time look that far ahead.
+        $until = min($to->copy()->addDay(), now());
 
         // Free time: turns that touch the day (also ones given before it), their history, breaks, orders waiting.
-        $open = DB::table('order_assignments')->where('role', 'moderator')->whereIn('user_id', $staff->pluck('id'))->where('started_at', '<=', $to)
-            ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))->get(['user_id', 'order_id', 'started_at', 'ended_at'])->groupBy('user_id');
+        $open = DB::table('order_assignments')->where('role', 'moderator')->whereIn('user_id', $staff->pluck('id'))->where('started_at', '<=', $until)
+            ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))->get(['user_id', 'order_id', 'started_at', 'ended_at', 'first_opened_at', 'first_action_at'])->groupBy('user_id');
         $allIds = $open->flatten(1)->pluck('order_id')->unique()->values()->all();
         $allEvents = $this->timeline->events($allIds);
         $allReturns = $this->timeline->returns($allIds);
-        $waitingSpans = $this->free->waiting($from, $to);
-        $chats = DB::table('chat_sessions')->whereIn('user_id', $staff->pluck('id'))->where('started_at', '<=', $to)
+        $waitingSpans = $this->free->waiting($from, $until);
+        $nightBreaks = DB::table('staff_breaks')->whereIn('user_id', $staff->pluck('id'))->where('started_at', '<=', $until)
+            ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))->get(['user_id', 'started_at', 'ended_at', 'counts_as_break'])->groupBy('user_id');
+        $chats = DB::table('chat_sessions')->whereIn('user_id', $staff->pluck('id'))->where('started_at', '<=', $until)
             ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))->get(['user_id', 'started_at', 'ended_at'])->groupBy('user_id');
         $chatCounts = DB::table('chat_events')->whereIn('user_id', $staff->pluck('id'))->whereBetween('created_at', [$from, $to])
             ->groupBy('user_id', 'kind')->selectRaw('user_id, kind, COUNT(*) as n')->get()->groupBy('user_id');
         $chatOrders = DB::table('orders')->whereIn('created_by', $staff->pluck('id'))->whereNotNull('chat_channel_id')->whereBetween('created_at', [$from, $to])
             ->groupBy('created_by')->selectRaw('created_by, COUNT(*) as n')->pluck('n', 'created_by');
-        $freeOf = function ($u) use ($days, $open, $allEvents, $allReturns, $breakRows, $chats, $waitingSpans, $joined) {
+        $freeOf = function ($u) use ($days, $open, $allEvents, $allReturns, $nightBreaks, $chats, $waitingSpans, $joined, $from, $to, $until) {
             $id = $u->id;
-            $busy = $this->free->busy($open->get($id, collect()), $allEvents, $allReturns, $breakRows->get($id, collect()), $chats->get($id, collect()));
+            $busy = $this->free->busy($open->get($id, collect()), $allEvents, $allReturns, $nightBreaks->get($id, collect()), $chats->get($id, collect()));
             $sum = ['waiting' => 0, 'nothing' => 0];
             foreach ($days->filter(fn ($d) => $joined($u, $d)) as $d) {
                 $f = $this->free->forPerson($id, $d, $busy, $waitingSpans);
                 $sum['waiting'] += $f['waiting'];
                 $sum['nothing'] += $f['nothing'];
             }
+            // Worked = orders being worked on and Communication (breaks left out); overtime = the part outside the shifts.
+            // The range belongs to this person's work days: a night shift's morning goes with the evening it began.
+            $before = $this->calendar->shift($id, $from->copy()->subDay());
+            $last = $this->calendar->shift($id, $to->copy()->startOfDay());
+            $a = max($from->getTimestamp(), $before && $before[1]->gt($from) ? $before[1]->getTimestamp() : 0);
+            $b = min(now()->getTimestamp(), max($to->getTimestamp(), $last ? $last[1]->getTimestamp() : 0));
+            $work = FreeTime::clip($this->free->busy($open->get($id, collect()), $allEvents, $allReturns, collect(), $chats->get($id, collect())), $a, $b);
+            $shifts = [];
+            foreach (\Carbon\CarbonPeriod::create($from->copy()->subDay(), $until->copy()->startOfDay()) as $d) {
+                if ($s = $this->calendar->shift($id, Carbon::parse($d))) {
+                    $shifts[] = [$s[0]->getTimestamp(), $s[1]->getTimestamp()];
+                }
+            }
+            $sum['worked'] = FreeTime::length($work);
+            $sum['overtime'] = FreeTime::length(FreeTime::subtract($work, FreeTime::union($shifts)));
 
             return $sum;
         };
@@ -118,6 +139,7 @@ class WorkTime
             return [
                 'id' => $u->id, 'name' => $u->name, 'photo' => $u->photo_path,
                 'free_waiting' => $free['waiting'], 'free_nothing' => $free['nothing'],
+                'worked' => $free['worked'], 'overtime' => $free['overtime'], 'left' => ! $u->is_active,
                 'chat_seconds' => FreeTime::length(FreeTime::clip(FreeTime::union($chatSpans), $from->getTimestamp(), min($to->getTimestamp(), $nowTs))),
                 'chat_messages' => (int) ($kinds['message'] ?? 0) - (int) ($kinds['undo'] ?? 0),
                 'chat_no_order' => (int) ($kinds['no_order'] ?? 0),

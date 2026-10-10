@@ -60,6 +60,23 @@ class ChatService
         DB::table('chat_sessions')->where('user_id', $user->id)->whereNull('ended_at')->update(['ended_at' => now()]);
     }
 
+    /**
+     * Communication left on by someone who went home: closed at the last moment the app saw them
+     * (not now), so the night does not count as work. Run every minute (desk:tick).
+     */
+    public function closeStale(int $minutes = 45): int
+    {
+        $stale = DB::table('chat_sessions as c')->join('users as u', 'u.id', '=', 'c.user_id')->whereNull('c.ended_at')
+            ->where(fn ($q) => $q->whereNull('u.last_seen_at')->orWhere('u.last_seen_at', '<', now()->subMinutes($minutes)))
+            ->get(['c.id', 'c.started_at', 'u.last_seen_at']);
+        foreach ($stale as $c) {
+            $end = $c->last_seen_at && $c->last_seen_at > $c->started_at ? $c->last_seen_at : $c->started_at;
+            DB::table('chat_sessions')->where('id', $c->id)->update(['ended_at' => $end]);
+        }
+
+        return $stale->count();
+    }
+
     /** + (message), − (undo, with a reason) or No order (with a reason). */
     public function record(User $user, int $channelId, string $kind, ?int $reasonId = null): void
     {

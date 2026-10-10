@@ -42,6 +42,7 @@ class BreakService
         }
 
         DB::transaction(function () use ($user, $reason) {
+            app(ChatService::class)->stop($user); // on a break is not in Communication
             $id = DB::table('staff_breaks')->insertGetId([
                 'user_id' => $user->id, 'reason_id' => $reason->id, 'counts_as_break' => (bool) $reason->counts_as_break, 'started_at' => now(),
             ]);
@@ -86,7 +87,9 @@ class BreakService
 
         foreach ($open as $b) {
             $start = Carbon::parse($b->started_at);
-            $shift = $this->calendar->shift($b->user_id, $start->copy()->startOfDay());
+            $shift = collect([$start->copy()->subDay()->startOfDay(), $start->copy()->startOfDay()])
+                ->map(fn ($d) => $this->calendar->shift($b->user_id, $d))->first(fn ($s) => $s && $start->betweenIncluded($s[0], $s[1]))
+                ?? $this->calendar->shift($b->user_id, $start->copy()->startOfDay());
             $end = $shift && $shift[1]->greaterThan($start) ? $shift[1] : $start->copy()->endOfDay();
             if (now()->lessThan($end)) {
                 continue;

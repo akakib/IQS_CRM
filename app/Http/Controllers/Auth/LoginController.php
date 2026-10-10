@@ -52,6 +52,9 @@ class LoginController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
+        if ($request->user()) {
+            app(\App\Services\Work\ChatService::class)->stop($request->user()); // logging out ends Communication
+        }
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

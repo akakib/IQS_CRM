@@ -27,7 +27,7 @@
             <x-date-input name="to" :value="$to->toDateString()" :max="today()->toDateString()" :clearable="false" @date-change="$nextTick(() => $refs.range.requestSubmit())" />
         </form>
     </div>
-    <p class="mb-4 text-xs text-gray-500">{{ $single ? __('Orders given to each person on this day.') : __('Orders given to each person from :a to :b. Free time and breaks are added up over the days.', ['a' => $from->format('d M'), 'b' => $to->format('d M')]) }} {{ __('Times are the middle value (median). Net time leaves out the time the customer made us wait: No answer until the order came back, and On hold. Chat mode counts as work, not free time.') }}</p>
+    <p class="mb-4 text-xs text-gray-500">{{ $single ? __('Orders given to each person on this day.') : __('Orders given to each person from :a to :b. Free time and breaks are added up over the days.', ['a' => $from->format('d M'), 'b' => $to->format('d M')]) }} {{ __('Times are the middle value (median). Net time leaves out the time the customer made us wait: No answer until the order came back, and On hold. Communication counts as work, not free time. Worked = time on opened orders and in Communication (breaks left out); overtime = the part of it outside the shift.') }}</p>
 
     @if ($people->isEmpty())
         <x-empty-state :message="__('Nobody had orders or a shift in these dates.')" />
@@ -35,6 +35,8 @@
         <x-list.table>
             <x-slot:head>
                 <th>{{ __('Person') }}</th>
+                <th class="text-right">{{ __('Worked') }}</th>
+                <th class="text-right">{{ __('Overtime') }}</th>
                 <th class="text-right">{{ __('Orders') }}</th>
                 <th class="text-right">{{ __('Confirmed') }}</th>
                 <th class="text-right">{{ __('Cancelled') }}</th>
@@ -43,13 +45,15 @@
                 <th class="text-right">{{ __('To packaging (net)') }}</th>
                 <th class="text-right">{{ __('Given back') }}</th>
                 <th class="text-right">{{ __('Break') }}</th>
-                <th class="text-right">{{ __('Chat') }}</th>
+                <th class="text-right">{{ __('Communication') }}</th>
                 <th class="text-right">{{ __('Free, orders waiting') }}</th>
                 <th class="text-right">{{ __('Free, nothing waiting') }}</th>
             </x-slot:head>
             @foreach ($people as $p)
                 <tr @class(['cursor-pointer', 'bg-primary-soft' => $person && $person['id'] === $p['id']]) onclick="location.href='{{ $personUrl($p['id']) }}'">
-                    <td><span class="flex items-center gap-2"><x-avatar :name="$p['name']" :photo="$p['photo']" size="sm" /><span class="font-medium text-gray-800">{{ $p['name'] }}</span></span></td>
+                    <td><span class="flex items-center gap-2"><x-avatar :name="$p['name']" :photo="$p['photo']" size="sm" /><span class="font-medium text-gray-800">{{ $p['name'] }}</span>@if ($p['left'] ?? false)<span class="text-xs text-gray-400">({{ __('left') }})</span>@endif</span></td>
+                    <td class="text-right font-medium tabular-nums">{{ $span($p['worked'] ?: null) }}</td>
+                    <td @class(['text-right tabular-nums', 'font-medium text-amber-700' => $p['overtime'] >= 600, 'text-gray-500' => $p['overtime'] < 600])>{{ $span($p['overtime'] ?: null) }}</td>
                     <td class="text-right tabular-nums">{{ $p['turns'] }}</td>
                     <td class="text-right tabular-nums">{{ $p['confirmed'] }}</td>
                     <td class="text-right tabular-nums">{{ $p['cancelled'] }}</td>
@@ -69,7 +73,7 @@
             @foreach ($people as $p)
                 <a href="{{ $personUrl($p['id']) }}" class="block">
                     <x-record-card :title="$p['name']" :subtitle="__(':n orders · :c confirmed · :x cancelled', ['n' => $p['turns'], 'c' => $p['confirmed'], 'x' => $p['cancelled']])">
-                        <x-slot:footer>{{ __('Opened in :a · first action in :b · break :m min', ['a' => $span($p['open']), 'b' => $span($p['start']), 'm' => $p['break_minutes']]) }}@if ($p['given_back']) · <span class="text-red-600">{{ __(':n given back', ['n' => $p['given_back']]) }}</span>@endif
+                        <x-slot:footer>{{ __('Worked :w · overtime :o', ['w' => $span($p['worked'] ?: null), 'o' => $span($p['overtime'] ?: null)]) }}<span class="block">{{ __('Opened in :a · first action in :b · break :m min', ['a' => $span($p['open']), 'b' => $span($p['start']), 'm' => $p['break_minutes']]) }}</span>@if ($p['given_back']) · <span class="text-red-600">{{ __(':n given back', ['n' => $p['given_back']]) }}</span>@endif
                             <span class="block">{{ __('Chat :t · :m msg · :o orders', ['t' => $span($p['chat_seconds'] ?: null), 'm' => $p['chat_messages'], 'o' => $p['chat_orders']]) }}</span>
                             <span @class(['block', 'font-medium text-red-600' => $p['free_waiting'] >= 600])>{{ __('Free while orders waited: :w', ['w' => $span($p['free_waiting'] ?: null)]) }}</span></x-slot:footer>
                         <x-slot:actions><span class="text-right"><span class="block text-xs text-gray-500">{{ __('Net') }}</span><span class="font-semibold tabular-nums">{{ $span($p['net']) }}</span></span></x-slot:actions>

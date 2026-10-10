@@ -152,4 +152,14 @@ class MarketingController extends Controller
 
         return back()->with($code === 0 ? 'success' : 'error', $code === 0 ? __('Spend pulled for the last 3 days.') : __('Some accounts failed. See the system log.'));
     }
+
+    /** An ad account's name or id corrected. */
+    public function updateAccount(Request $request, int $account): RedirectResponse
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'max:120'], 'external_id' => ['nullable', 'string', 'max:60']]);
+        DB::table('ad_accounts')->where('id', $account)->update($data + ['updated_at' => now()]);
+        $this->logger->log('ad_account.updated', ['ad_account', $account], null, $data);
+
+        return back()->with('success', __('Account saved.'));
+    }
 }

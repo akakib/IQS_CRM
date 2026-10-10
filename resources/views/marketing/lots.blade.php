@@ -10,9 +10,13 @@
 
     <div class="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         @forelse ($vendors as $v)
-            <div class="rounded-xl border border-gray-200 bg-white p-4">
-                <div class="flex items-center justify-between">
-                    <p class="font-medium text-gray-800">{{ $v->name }}</p>
+            <div class="rounded-xl border border-gray-200 bg-white p-4" x-data="{ edit: false }">
+                @can('marketing.create')<form x-show="edit" x-cloak method="POST" action="{{ route('usd-lots.vendors.update', $v->id) }}" class="mb-2 flex flex-wrap items-center gap-1.5">@csrf @method('PUT')
+                    <input name="name" value="{{ $v->name }}" maxlength="120" required class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none">
+                    <input name="phone" value="{{ $v->phone }}" inputmode="tel" placeholder="01XXXXXXXXX" class="w-32 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none">
+                    <button class="text-xs font-medium text-primary hover:underline">{{ __('Save') }}</button><button type="button" @click="edit = false" class="text-xs text-gray-500">{{ __('Cancel') }}</button></form>@endcan
+                <div class="flex items-center justify-between" x-show="! edit">
+                    <p class="font-medium text-gray-800">{{ $v->name }} @can('marketing.create')<button type="button" @click="edit = true" class="ml-1 text-xs font-normal text-primary hover:underline">{{ __('Edit') }}</button>@endcan</p>
                     @if ($v->due > 0)
                         <x-badge :color="$v->next_due && $v->next_due <= today()->toDateString() ? 'red' : 'amber'">{{ __('Due :a', ['a' => $tk($v->due)]) }}</x-badge>
                     @else
@@ -46,7 +50,7 @@
                 <x-list.table>
                     <x-slot:head>
                         <th>{{ __('Date') }}</th><th>{{ __('Vendor') }}</th><th class="text-right">{{ __('USD') }}</th><th class="text-right">{{ __('Rate') }}</th>
-                        <th class="text-right">{{ __('Taka') }}</th><th class="text-right">{{ __('Left') }}</th>
+                        <th class="text-right">{{ __('Taka') }}</th><th class="text-right">{{ __('Left') }}</th><th></th>
                     </x-slot:head>
                     @foreach ($lots as $l)
                         <tr class="border-t border-gray-100 [&_td]:px-4 [&_td]:py-3">
@@ -56,6 +60,7 @@
                             <td class="text-right tabular-nums">{{ number_format((float) $l->rate, 2) }}</td>
                             <td class="text-right tabular-nums">{{ $tk($l->bdt_total) }}</td>
                             <td @class(['text-right tabular-nums', 'text-gray-400' => (float) $l->usd_remaining <= 0, 'font-medium text-primary' => (float) $l->usd_remaining > 0])>{{ $usd($l->usd_remaining) }}</td>
+                            <td class="text-right">@can('marketing.create')@if ((float) $l->usd_remaining >= (float) $l->usd)<form method="POST" action="{{ route('usd-lots.destroy', $l->id) }}" id="lot-del-{{ $l->id }}">@csrf @method('DELETE')<button type="button" @click="$dispatch('open-confirm', { id: 'lot-delete', form: 'lot-del-{{ $l->id }}', label: @js($usd($l->usd).' · '.$l->vendor) })" class="text-xs text-red-600 hover:underline">{{ __('Delete') }}</button></form>@endif @endcan</td>
                         </tr>
                     @endforeach
                 </x-list.table>
@@ -80,7 +85,8 @@
             @else
                 <div class="space-y-1 rounded-xl border border-gray-200 bg-white p-3 text-sm">
                     @foreach ($payments as $p)
-                        <p>{{ date('d M', strtotime($p->paid_on)) }} · {{ $p->vendor }} · <b>{{ $tk($p->amount_bdt) }}</b> <span class="text-xs text-gray-400">{{ $p->method }} {{ $p->transaction_ref }}</span></p>
+                        <p class="flex items-center justify-between gap-2"><span>{{ date('d M', strtotime($p->paid_on)) }} · {{ $p->vendor }} · <b>{{ $tk($p->amount_bdt) }}</b> <span class="text-xs text-gray-400">{{ $p->method }} {{ $p->transaction_ref }}</span></span>
+                            @can('marketing.create')<form method="POST" action="{{ route('usd-lots.payments.destroy', $p->id) }}" id="pay-del-{{ $p->id }}">@csrf @method('DELETE')<button type="button" @click="$dispatch('open-confirm', { id: 'payment-delete', form: 'pay-del-{{ $p->id }}', label: @js($tk($p->amount_bdt).' · '.$p->vendor) })" class="text-xs text-red-600 hover:underline">{{ __('Delete') }}</button></form>@endcan</p>
                     @endforeach
                 </div>
             @endif
@@ -135,4 +141,6 @@
             </div>
         @endcan
     </div>
+    <x-confirm-modal id="lot-delete" :verb="__('Delete the lot')" :message="__('Only a lot with no dollar used yet can be deleted.')" />
+    <x-confirm-modal id="payment-delete" :verb="__('Delete the payment')" :message="__('The vendor due goes back up by this amount.')" />
 </x-layouts.app>

@@ -116,16 +116,19 @@
                 <input type="number" name="delivery_rate" min="0" max="100" step="0.1" placeholder="{{ __('Delivery %') }}" class="{{ $input }}">
                 <x-button size="sm" class="sm:col-span-4 sm:justify-self-start">{{ __('Save target') }}</x-button>
             </form>
-            @if ($targets)
+            @if ($targets = array_filter($targets))
                 <div class="mt-4 space-y-1 border-t border-gray-100 pt-3 text-sm text-gray-700">
                     @foreach ($targets as $userId => $t)
-                        <p><b>{{ $userId ? ($staff[$userId] ?? '#'.$userId) : __('Everyone (default)') }}</b>:
+                        <div class="flex items-center justify-between gap-2"><p><b>{{ $userId ? ($staff[$userId] ?? '#'.$userId) : __('Everyone (default)') }}</b>:
                             {{ isset($t['delivered_count']) ? __(':n delivered / month', ['n' => $num($t['delivered_count'])]) : '' }}
                             {{ isset($t['delivery_rate']) ? '· '.$num($t['delivery_rate']).'%' : '' }}</p>
+                            <form method="POST" action="{{ route('kpi.targets') }}" id="target-del-{{ $userId }}">@csrf<input type="hidden" name="user_id" value="{{ $userId ?: '' }}">
+                                <button type="button" @click="$dispatch('open-confirm', { id: 'target-remove', form: 'target-del-{{ $userId }}', label: @js($userId ? ($staff[$userId] ?? '#'.$userId) : __('Everyone (default)')) })" class="text-xs text-red-600 hover:underline">{{ __('Remove') }}</button></form></div>
                     @endforeach
-                    <p class="text-xs text-gray-400">{{ __('To remove a target, save it again with the box empty.') }}</p>
+                    <p class="text-xs text-gray-400">{{ __('A change counts from this month; earlier months keep theirs.') }}</p>
                 </div>
             @endif
         </x-card>
     @endif
+    <x-confirm-modal id="target-remove" :verb="__('Remove the target of')" :message="__('From this month there is no target; earlier months keep theirs.')" />
 </x-layouts.app>

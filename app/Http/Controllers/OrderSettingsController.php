@@ -65,6 +65,54 @@ class OrderSettingsController extends Controller
         return back()->with('success', __('Charge rule added.'));
     }
 
+    /** A typo in a zone name is fixed, not re-added (orders keep their zone). */
+    public function updateZone(Request $request, int $zone): RedirectResponse
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'max:100', Rule::unique('delivery_zones', 'name')->ignore($zone)], 'is_active' => ['nullable', 'boolean']]);
+        $old = DB::table('delivery_zones')->where('id', $zone)->first() ?? abort(404);
+        DB::table('delivery_zones')->where('id', $zone)->update(['name' => $data['name'], 'is_active' => $request->boolean('is_active', (bool) $old->is_active), 'updated_at' => now()]);
+        DeliveryCharges::forget();
+        $this->logger->log('delivery_zone.updated', ['delivery_zone', $zone], ['name' => $old->name], ['name' => $data['name']]);
+
+        return back()->with('success', __('Zone saved.'));
+    }
+
+    /** A rule is corrected in place; orders already made keep the charge they got. */
+    public function updateRule(Request $request, int $rule): RedirectResponse
+    {
+        abort_unless(DB::table('delivery_charge_rules')->where('id', $rule)->exists(), 404);
+        $data = $request->validate([
+            'zone_id' => ['nullable', Rule::exists('delivery_zones', 'id')],
+            'min_weight_g' => ['required', 'integer', 'min:0'], 'max_weight_g' => ['nullable', 'integer', 'gte:min_weight_g'],
+            'min_order_total' => ['required', 'numeric', 'min:0'], 'charge' => ['required', 'numeric', 'min:0'], 'priority' => ['required', 'integer', 'min:1', 'max:999'],
+        ]);
+        DB::table('delivery_charge_rules')->where('id', $rule)->update($data + ['updated_at' => now()]);
+        DeliveryCharges::forget();
+        $this->logger->log('delivery_rule.updated', ['delivery_rule', $rule], null, $data);
+
+        return back()->with('success', __('Rule saved.'));
+    }
+
+    public function destroyRule(int $rule): RedirectResponse
+    {
+        DB::table('delivery_charge_rules')->where('id', $rule)->delete();
+        DeliveryCharges::forget();
+        $this->logger->log('delivery_rule.deleted', ['delivery_rule', $rule], null, null);
+
+        return back()->with('success', __('Rule deleted. Orders already made keep their charge.'));
+    }
+
+    /** Rename a reason (what it does stays). */
+    public function updateReason(Request $request, int $reason): RedirectResponse
+    {
+        $data = $request->validate(['label_en' => ['required', 'string', 'max:150']]);
+        $old = DB::table('status_reasons')->where('id', $reason)->value('label_en') ?? abort(404);
+        DB::table('status_reasons')->where('id', $reason)->update(['label_en' => $data['label_en'], 'updated_at' => now()]);
+        $this->logger->log('status_reason.updated', ['status_reason', $reason], ['label_en' => $old], $data);
+
+        return back()->with('success', __('Saved.'));
+    }
+
     public function toggleRule(int $rule): RedirectResponse
     {
         $row = DB::table('delivery_charge_rules')->where('id', $rule)->first();

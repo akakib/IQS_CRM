@@ -109,4 +109,28 @@ class MarketingTest extends TestCase
         $this->get(route('usd-lots.index'))->assertOk()->assertSee('Dollar Bhai');
         $this->get(route('analysis.index'))->assertOk()->assertSee('Profit after ads');
     }
+
+    public function test_typing_mistakes_are_fixed_or_deleted(): void
+    {
+        $this->actingAs($this->owner)->put(route('usd-lots.vendors.update', $this->vendor), ['name' => 'Dollar Bhai Ctg', 'phone' => '01712345678'])->assertSessionHas('success');
+        $this->assertSame('Dollar Bhai Ctg', DB::table('ad_vendors')->where('id', $this->vendor)->value('name'));
+        $this->put(route('marketing.accounts.update', $this->account), ['name' => 'Main page', 'external_id' => 'act_1'])->assertSessionHas('success');
+        $this->assertSame('act_1', DB::table('ad_accounts')->where('id', $this->account)->value('external_id'));
+
+        // A lot whose dollars were used stays; an untouched one goes.
+        $this->lot(100, 120, '2026-09-01');
+        $this->lot(50, 125, '2026-09-02');
+        app(AdCostService::class)->saveSpend($this->account, '2026-09-20', ['spend_usd' => 10], 'manual');
+        app(AdCostService::class)->rebuild();
+        [$used, $fresh] = DB::table('usd_lots')->orderBy('id')->pluck('id')->all();
+        $this->get(route('usd-lots.index'))->assertOk()->assertSee('lot-del-'.$fresh, false)->assertDontSee('lot-del-'.$used.'"', false);
+        $this->delete(route('usd-lots.destroy', $used))->assertSessionHas('error');
+        $this->delete(route('usd-lots.destroy', $fresh))->assertSessionHas('success');
+        $this->assertSame(1, DB::table('usd_lots')->count());
+
+        $this->post(route('usd-lots.payments.store'), ['vendor_id' => $this->vendor, 'amount_bdt' => 500, 'paid_on' => today()->toDateString(), 'payment_method_id' => DB::table('payment_methods')->value('id')]);
+        $pay = DB::table('vendor_payments')->value('id');
+        $this->delete(route('usd-lots.payments.destroy', $pay))->assertSessionHas('success');
+        $this->assertSame(0, DB::table('vendor_payments')->count());
+    }
 }

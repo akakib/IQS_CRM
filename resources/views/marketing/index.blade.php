@@ -85,8 +85,12 @@
         <x-card :title="__('Ad accounts')">
             <div class="space-y-2">
                 @forelse ($accounts as $a)
-                    <div @class(['flex items-center justify-between gap-2 text-sm', 'opacity-50' => ! $a->is_active])>
-                        <span>{{ $a->name }} <span class="text-xs text-gray-400">{{ ucfirst($a->platform) }} · {{ $a->external_id ?: __('no id') }} · {{ $a->timezone }}</span></span>
+                    <div @class(['flex items-center justify-between gap-2 text-sm', 'opacity-50' => ! $a->is_active]) x-data="{ edit: false }">
+                        @can('marketing.create')<form x-show="edit" x-cloak method="POST" action="{{ route('marketing.accounts.update', $a->id) }}" class="flex flex-1 flex-wrap items-center gap-1.5">@csrf @method('PUT')
+                            <input name="name" value="{{ $a->name }}" maxlength="120" required class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none">
+                            <input name="external_id" value="{{ $a->external_id }}" maxlength="60" placeholder="{{ __('Account id') }}" class="w-32 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none">
+                            <button class="text-xs font-medium text-primary hover:underline">{{ __('Save') }}</button><button type="button" @click="edit = false" class="text-xs text-gray-500">{{ __('Cancel') }}</button></form>@endcan
+                        <span x-show="! edit">@can('marketing.create')<button type="button" @click="edit = true" class="mr-1 text-xs text-primary hover:underline">{{ __('Edit') }}</button>@endcan{{ $a->name }} <span class="text-xs text-gray-400">{{ ucfirst($a->platform) }} · {{ $a->external_id ?: __('no id') }} · {{ $a->timezone }}</span></span>
                         @can('marketing.create')
                             <form method="POST" action="{{ route('marketing.accounts.toggle', $a->id) }}">@csrf<button class="text-xs text-primary hover:underline">{{ $a->is_active ? __('Off') : __('On') }}</button></form>
                         @endcan

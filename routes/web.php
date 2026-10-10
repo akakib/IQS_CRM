@@ -274,6 +274,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/settings/charges/mode', [OrderSettingsController::class, 'chargeMode'])->name('settings.charges.mode');
         Route::post('/settings/charges/zones', [OrderSettingsController::class, 'storeZone'])->name('settings.charges.zones.store');
         Route::post('/settings/charges/rules', [OrderSettingsController::class, 'storeRule'])->name('settings.charges.rules.store');
+        Route::put('/settings/charges/zones/{zone}', [OrderSettingsController::class, 'updateZone'])->whereNumber('zone')->name('settings.charges.zones.update');
+        Route::put('/settings/charges/rules/{rule}', [OrderSettingsController::class, 'updateRule'])->whereNumber('rule')->name('settings.charges.rules.update');
+        Route::delete('/settings/charges/rules/{rule}', [OrderSettingsController::class, 'destroyRule'])->whereNumber('rule')->name('settings.charges.rules.destroy');
+        Route::put('/settings/reasons/{reason}', [OrderSettingsController::class, 'updateReason'])->whereNumber('reason')->name('settings.reasons.update');
         Route::post('/settings/charges/rules/{rule}/toggle', [OrderSettingsController::class, 'toggleRule'])->whereNumber('rule')->name('settings.charges.rules.toggle');
         Route::post('/settings/reasons', [OrderSettingsController::class, 'storeReason'])->name('settings.reasons.store');
         Route::post('/settings/reasons/{reason}/toggle', [OrderSettingsController::class, 'toggleReason'])->whereNumber('reason')->name('settings.reasons.toggle');
@@ -302,6 +306,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/usd-lots', [UsdLotController::class, 'index'])->middleware('can:marketing.view')->name('usd-lots.index');
     Route::middleware('can:marketing.create')->group(function () {
         Route::post('/marketing/accounts', [MarketingController::class, 'storeAccount'])->name('marketing.accounts.store');
+        Route::put('/marketing/accounts/{account}', [MarketingController::class, 'updateAccount'])->whereNumber('account')->name('marketing.accounts.update');
         Route::post('/marketing/accounts/{account}/toggle', [MarketingController::class, 'toggleAccount'])->whereNumber('account')->name('marketing.accounts.toggle');
         Route::post('/marketing/spend', [MarketingController::class, 'storeSpend'])->name('marketing.spend.store');
         Route::post('/marketing/import', [MarketingController::class, 'import'])->name('marketing.import');
@@ -309,6 +314,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/usd-lots', [UsdLotController::class, 'storeLot'])->name('usd-lots.store');
         Route::post('/usd-lots/vendors', [UsdLotController::class, 'storeVendor'])->name('usd-lots.vendors.store');
         Route::post('/usd-lots/payments', [UsdLotController::class, 'storePayment'])->name('usd-lots.payments.store');
+        Route::put('/usd-lots/vendors/{vendor}', [UsdLotController::class, 'updateVendor'])->whereNumber('vendor')->name('usd-lots.vendors.update');
+        Route::delete('/usd-lots/{lot}', [UsdLotController::class, 'destroyLot'])->whereNumber('lot')->name('usd-lots.destroy');
+        Route::delete('/usd-lots/payments/{payment}', [UsdLotController::class, 'destroyPayment'])->whereNumber('payment')->name('usd-lots.payments.destroy');
     });
 
     // Points: everyone sees their own; managing rules and reviews needs points.manage.

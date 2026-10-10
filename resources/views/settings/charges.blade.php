@@ -46,7 +46,27 @@
                                 <td class="py-2 pr-3 text-right font-medium tabular-nums">{{ (float) $r->charge ? '৳'.number_format((float) $r->charge) : __('Free') }}</td>
                                 <td class="py-2 pr-3">{{ $r->priority }}</td>
                                 <td class="py-2 text-right">
+                                    <span class="inline-flex items-center gap-3">
                                     <form method="POST" action="{{ route('settings.charges.rules.toggle', $r->id) }}">@csrf<button class="text-xs text-primary hover:underline">{{ $r->is_active ? __('Switch off') : __('Switch on') }}</button></form>
+                                    @can('settings.edit')
+                                        <button type="button" @click="$dispatch('open-modal', 'rule-{{ $r->id }}')" class="text-xs text-primary hover:underline">{{ __('Edit') }}</button>
+                                        <form method="POST" action="{{ route('settings.charges.rules.destroy', $r->id) }}" id="rule-del-{{ $r->id }}">@csrf @method('DELETE')
+                                            <button type="button" @click="$dispatch('open-confirm', { id: 'charge-rule-delete', form: 'rule-del-{{ $r->id }}', label: @js($r->zone ?? __('Any zone')) })" class="text-xs text-red-600 hover:underline">{{ __('Delete') }}</button></form>
+                                    @endcan
+                                    </span>
+                                    @can('settings.edit')
+                                    <x-modal :id="'rule-'.$r->id" :title="__('Edit charge rule')" persistent>
+                                        <form method="POST" action="{{ route('settings.charges.rules.update', $r->id) }}" id="rule-form-{{ $r->id }}" class="grid gap-3 text-left sm:grid-cols-2">@csrf @method('PUT')
+                                            <div class="sm:col-span-2"><p class="mb-1 text-sm font-medium text-gray-700">{{ __('Zone') }}</p><x-simple-select name="zone_id" :options="['' => __('Any zone')] + $zones->pluck('name', 'id')->all()" :value="(string) ($r->zone_id ?? '')" full-width class="w-full" /></div>
+                                            <label class="text-sm text-gray-700">{{ __('From weight (g)') }}<input name="min_weight_g" type="number" min="0" value="{{ $r->min_weight_g }}" required class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none"></label>
+                                            <label class="text-sm text-gray-700">{{ __('Up to weight (g), empty = no limit') }}<input name="max_weight_g" type="number" min="0" value="{{ $r->max_weight_g }}" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none"></label>
+                                            <label class="text-sm text-gray-700">{{ __('From order total (৳)') }}<input name="min_order_total" type="number" min="0" step="0.01" value="{{ $r->min_order_total + 0 }}" required class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none"></label>
+                                            <label class="text-sm text-gray-700">{{ __('Charge (৳)') }}<input name="charge" type="number" min="0" step="0.01" value="{{ $r->charge + 0 }}" required class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none"></label>
+                                            <label class="text-sm text-gray-700">{{ __('Priority (lower wins)') }}<input name="priority" type="number" min="1" max="999" value="{{ $r->priority }}" required class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none"></label>
+                                        </form>
+                                        <x-slot:footer><x-button type="button" variant="secondary" @click="$dispatch('close-modal', 'rule-{{ $r->id }}')">{{ __('Cancel') }}</x-button><x-button type="submit" form="rule-form-{{ $r->id }}">{{ __('Save') }}</x-button></x-slot:footer>
+                                    </x-modal>
+                                    @endcan
                                 </td>
                             </tr>
                         @endforeach
@@ -73,7 +93,12 @@
             </x-card>
 
             <x-card :title="__('Zones')">
-                <ul class="mb-3 space-y-1 text-sm">@foreach ($zones as $z)<li>{{ $z->name }}</li>@endforeach</ul>
+                <ul class="mb-3 space-y-1 text-sm">@foreach ($zones as $z)<li x-data="{ edit: false }">
+                    <span x-show="! edit">{{ $z->name }} @can('settings.edit')<button type="button" @click="edit = true" class="ml-1 text-xs text-primary hover:underline">{{ __('Rename') }}</button>@endcan</span>
+                    @can('settings.edit')<form x-show="edit" x-cloak method="POST" action="{{ route('settings.charges.zones.update', $z->id) }}" class="flex items-center gap-1.5">@csrf @method('PUT')
+                        <input name="name" value="{{ $z->name }}" maxlength="100" required class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none">
+                        <button class="text-xs font-medium text-primary hover:underline">{{ __('Save') }}</button><button type="button" @click="edit = false" class="text-xs text-gray-500">{{ __('Cancel') }}</button></form>@endcan
+                </li>@endforeach</ul>
                 <form method="POST" action="{{ route('settings.charges.zones.store') }}" class="flex gap-2">
                     @csrf
                     <input name="name" required maxlength="100" placeholder="{{ __('New zone name') }}" class="{{ $input }}">
@@ -82,4 +107,5 @@
             </x-card>
         </div>
     </div>
+    <x-confirm-modal id="charge-rule-delete" :verb="__('Delete the rule for')" :message="__('Orders already made keep their charge.')" />
 </x-layouts.app>

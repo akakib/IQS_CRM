@@ -81,4 +81,37 @@ class UsdLotController extends Controller
 
         return back()->with('success', __('Payment recorded.'));
     }
+
+    /** A vendor's name or phone corrected. */
+    public function updateVendor(Request $request, int $vendor): RedirectResponse
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'max:120', \Illuminate\Validation\Rule::unique('ad_vendors', 'name')->ignore($vendor)], 'phone' => ['nullable', 'regex:/^01[3-9]\d{8}$/']]);
+        abort_unless(DB::table('ad_vendors')->where('id', $vendor)->exists(), 404);
+        DB::table('ad_vendors')->where('id', $vendor)->update($data + ['updated_at' => now()]);
+        $this->logger->log('ad_vendor.updated', ['ad_vendor', $vendor], null, $data);
+
+        return back()->with('success', __('Vendor saved.'));
+    }
+
+    /** A lot typed by mistake: only while none of its dollars were used for ad cost. */
+    public function destroyLot(int $lot): RedirectResponse
+    {
+        $row = DB::table('usd_lots')->where('id', $lot)->first() ?? abort(404);
+        if ((float) $row->usd_remaining < (float) $row->usd) {
+            return back()->with('error', __('Some dollars of this lot already paid for ads, so it cannot be deleted.'));
+        }
+        DB::table('usd_lots')->where('id', $lot)->delete();
+        $this->logger->log('usd_lot.deleted', ['usd_lot', $lot], (array) $row, null);
+
+        return back()->with('success', __('Lot deleted.'));
+    }
+
+    public function destroyPayment(int $payment): RedirectResponse
+    {
+        $row = DB::table('vendor_payments')->where('id', $payment)->first() ?? abort(404);
+        DB::table('vendor_payments')->where('id', $payment)->delete();
+        $this->logger->log('vendor_payment.deleted', ['vendor_payment', $payment], (array) $row, null);
+
+        return back()->with('success', __('Payment deleted.'));
+    }
 }

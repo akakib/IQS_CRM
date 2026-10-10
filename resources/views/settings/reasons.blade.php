@@ -49,9 +49,14 @@
                 @continue(! isset($reasons[$type]))
                 <x-card :title="$label">
                     @foreach ($reasons[$type] as $r)
-                        <div @class(['flex items-center justify-between gap-2 py-1 text-sm', 'opacity-40' => ! $r->is_active])>
-                            <span>{{ $r->label_en }} <span class="text-xs text-gray-400">· {{ $type === 'break' ? ($r->counts_as_break ? __('counts as break') : __('work, not counted')) : $blame[$r->blame_stage] }}</span></span>
-                            <form method="POST" action="{{ route('settings.reasons.toggle', $r->id) }}">@csrf<button class="text-xs text-primary hover:underline">{{ $r->is_active ? __('Hide') : __('Show') }}</button></form>
+                        <div @class(['flex items-center justify-between gap-2 py-1 text-sm', 'opacity-40' => ! $r->is_active]) x-data="{ edit: false }">
+                            @can('settings.edit')
+                                <form x-show="edit" x-cloak method="POST" action="{{ route('settings.reasons.update', $r->id) }}" class="flex flex-1 items-center gap-1.5">@csrf @method('PUT')
+                                    <input name="label_en" value="{{ $r->label_en }}" maxlength="150" required class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-primary focus:outline-none">
+                                    <button class="text-xs font-medium text-primary hover:underline">{{ __('Save') }}</button><button type="button" @click="edit = false" class="text-xs text-gray-500">{{ __('Cancel') }}</button></form>
+                            @endcan
+                            <span x-show="! edit">{{ $r->label_en }} @can('settings.edit')<button type="button" @click="edit = true" class="ml-1 text-xs text-primary hover:underline">{{ __('Rename') }}</button>@endcan <span class="text-xs text-gray-400">· {{ $type === 'break' ? ($r->counts_as_break ? __('counts as break') : __('work, not counted')) : $blame[$r->blame_stage] }}</span></span>
+                            <form x-show="! edit" method="POST" action="{{ route('settings.reasons.toggle', $r->id) }}">@csrf<button class="text-xs text-primary hover:underline">{{ $r->is_active ? __('Hide') : __('Show') }}</button></form>
                         </div>
                     @endforeach
                 </x-card>

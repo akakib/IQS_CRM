@@ -40,11 +40,16 @@ class TrackPresence
             DB::table('users')->where('id', $user->id)->update(['last_seen_at' => $now]);
             $user->last_seen_at = $now;
 
-            $today = $now->toDateString();
+            // The work day is the day the shift began: a night shift (8 PM to 9 AM, and a little after) stays one day.
+            $calendar = app(WorkCalendar::class);
+            $night = $calendar->shift($user->id, $now->copy()->subDay()->startOfDay());
+            $workDay = $night && $night[1]->isAfter($now->copy()->startOfDay()) && $now->lte($night[1]->copy()->addHours(2))
+                ? $now->copy()->subDay() : $now->copy();
+            $today = $workDay->toDateString();
             if (! DB::table('work_days')->where('user_id', $user->id)->where('work_date', $today)->update(['last_seen_at' => $now])) {
                 DB::table('work_days')->insertOrIgnore([
                     'user_id' => $user->id, 'work_date' => $today, 'first_seen_at' => $now, 'last_seen_at' => $now,
-                    'is_extra' => app(WorkCalendar::class)->isOffDay($user->id, $now),
+                    'is_extra' => $calendar->isOffDay($user->id, $workDay),
                 ]);
             }
         }

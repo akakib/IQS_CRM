@@ -24,6 +24,7 @@
             <x-slot:head>
                 <th>{{ __('Packer') }}</th>
                 <th class="text-right">{{ __('Packed') }}</th>
+                <th class="text-right">{{ __('Worked') }}</th>
                 <th class="text-right">{{ __('Days') }}</th>
                 <th class="text-right">{{ __('Helpers a day') }}</th>
                 <th class="text-right">{{ __('Per day') }}</th>
@@ -36,6 +37,7 @@
                 <tr>
                     <td class="font-medium text-gray-800">{{ $r['name'] }}</td>
                     <td class="text-right tabular-nums">{{ $r['packed'] }}</td>
+                    <td class="text-right tabular-nums">{{ $span($r['worked'] ?: null) }}</td>
                     <td class="text-right tabular-nums">{{ $r['days'] ?: '-' }}</td>
                     <td class="text-right tabular-nums">{{ $r['helpers_avg'] ?: '-' }}</td>
                     <td class="text-right tabular-nums">{{ $r['per_day'] ?? '-' }}</td>
@@ -49,7 +51,7 @@
         <x-list.cards>
             @foreach ($rows as $r)
                 <x-record-card :title="$r['name']" :subtitle="__(':p packed · :d days · :h helpers a day', ['p' => $r['packed'], 'd' => $r['days'], 'h' => $r['helpers_avg']])">
-                    <x-slot:footer>{{ __('Per day :a · time to pack :t · scan errors :e · returned for packing :r', ['a' => $r['per_day'] ?? '-', 't' => $span($r['median']), 'e' => $r['errors'], 'r' => $r['returned']]) }}</x-slot:footer>
+                    <x-slot:footer>{{ __('Worked :w · per day :a · time to pack :t · scan errors :e · returned for packing :r', ['w' => $span($r['worked'] ?: null), 'a' => $r['per_day'] ?? '-', 't' => $span($r['median']), 'e' => $r['errors'], 'r' => $r['returned']]) }}</x-slot:footer>
                     <x-slot:actions><span class="text-right"><span class="block text-xs text-gray-500">{{ __('Per head') }}</span><span class="font-semibold tabular-nums">{{ $r['per_head'] ?? '-' }}</span></span></x-slot:actions>
                 </x-record-card>
             @endforeach

@@ -229,6 +229,11 @@ class PackagingTest extends TestCase
         // 3 packed by 1 packer + 2 helpers on 1 day = 1 per head.
         $this->actingAs($this->desk)->get('/packers-report')->assertOk()
             ->assertSeeInOrder(['Packer', '3', '1', '2', '3', '1'])->assertSeeInOrder(['Scan errors', 'Packer']);
+        // Worked: time on each box (a box left open counts at most 30 minutes).
+        $ids = DB::table('orders')->where('packer_id', $this->packer->id)->orderBy('id')->pluck('id');
+        DB::table('orders')->where('id', $ids[0])->update(['packaging_started_at' => now()->subMinutes(10), 'packed_at' => now()]);
+        DB::table('orders')->where('id', $ids[1])->update(['packaging_started_at' => now()->subHours(5), 'packed_at' => now()->subHours(3)]);
+        $this->get('/packers-report')->assertSeeInOrder(['Packer', '3', '40 min']);
         $this->actingAs($this->packer)->get('/packers-report')->assertForbidden();
     }
 

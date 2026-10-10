@@ -81,6 +81,19 @@ class WorkHoursTest extends TestCase
         $this->assertEquals(15000, DB::table('staff_salaries')->where('user_id', $this->mahim->id)->where('from_month', '<=', '2026-10-01')->orderByDesc('from_month')->value('monthly_salary')); // October: still 15,000
     }
 
+    public function test_a_night_shift_is_one_attendance_day(): void
+    {
+        foreach (range(0, 6) as $d) {
+            DB::table('work_schedules')->insert(['user_id' => $this->mahim->id, 'weekday' => $d, 'start_time' => '20:00', 'end_time' => '09:00']);
+        }
+        $this->travelTo(Carbon::parse('2026-10-07 21:00:00'));
+        $this->actingAs($this->mahim)->get('/dashboard');
+        $this->travelTo(Carbon::parse('2026-10-08 02:00:00'));
+        $this->get('/dashboard');
+        $this->assertSame(['2026-10-07'], DB::table('work_days')->where('user_id', $this->mahim->id)->pluck('work_date')->map(fn ($d) => substr($d, 0, 10))->all());
+        $this->assertSame('2026-10-08 02:00:00', (string) DB::table('work_days')->where('user_id', $this->mahim->id)->value('last_seen_at'));
+    }
+
     public function test_a_break_forgotten_on_a_night_shift_closes_at_that_morning_s_shift_end(): void
     {
         foreach (range(0, 6) as $d) {

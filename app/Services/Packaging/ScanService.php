@@ -65,6 +65,8 @@ class ScanService
             $this->orders->note($order, 'system', $previous
                 ? __('Packaging taken over by :n (was :p).', ['n' => $by->name, 'p' => $previous])
                 : __('Packaging started by :n.', ['n' => $by->name]), $by);
+        } elseif ($repack) {
+            $order->forceFill(['packaging_started_at' => now()])->save();
         }
 
         $r = $this->log('packaging', null, $code, $order, $label, [

@@ -11,7 +11,9 @@ use Illuminate\View\View;
 /**
  * Packers: per packer over a range, days on duty, parcels packed, the
  * middle time to pack one, scan errors and returns blamed on packing, and
- * with the helpers they had, parcels per head. Five queries.
+ * with the helpers they had, parcels per head. Worked = time packing (each
+ * box at most 30 minutes) and at handovers they ran (open ones up to their
+ * last scan), overlaps counted once. Seven queries.
  */
 class PackerReportController extends Controller
 {
@@ -34,11 +36,25 @@ class PackerReportController extends Controller
         $returned = DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')->join('status_reasons as r', 'r.id', '=', 'e.reason_id')
             ->where('e.to_status_id', OrderStatus::idFor('returned'))->where('r.blame_stage', 'packaging')->whereNotNull('o.packer_id')->whereBetween('e.created_at', $range)
             ->groupBy('o.packer_id')->selectRaw('o.packer_id, COUNT(DISTINCT o.id) as n')->pluck('n', 'o.packer_id');
-        $ids = $packs->keys()->merge($shifts->keys())->unique();
+        $handovers = DB::table('handover_sessions as h')->whereBetween('h.started_at', $range)
+            ->selectRaw('h.started_by, h.started_at, h.closed_at, (SELECT MAX(l.created_at) FROM scan_logs l WHERE l.handover_session_id = h.id) as last_scan')->get()->groupBy('started_by');
+        $ids = $packs->keys()->merge($shifts->keys())->merge($handovers->keys())->filter()->unique();
         $names = DB::table('users')->whereIn('id', $ids)->pluck('name', 'id');
 
-        $rows = $ids->map(function ($id) use ($packs, $shifts, $errors, $returned, $names) {
+        $rows = $ids->map(function ($id) use ($packs, $shifts, $errors, $returned, $names, $handovers) {
             $mine = $packs->get($id, collect());
+            $spans = $mine->filter(fn ($o) => $o->packaging_started_at)->map(function ($o) {
+                $a = Carbon::parse($o->packaging_started_at)->getTimestamp();
+
+                return [$a, min(Carbon::parse($o->packed_at)->getTimestamp(), $a + 1800)];
+            })->values()->all();
+            foreach ($handovers->get($id, collect()) as $h) {
+                $end = $h->closed_at ?? $h->last_scan;
+                if ($end) {
+                    $spans[] = [Carbon::parse($h->started_at)->getTimestamp(), Carbon::parse($end)->getTimestamp()];
+                }
+            }
+            $worked = \App\Services\Reports\FreeTime::length(\App\Services\Reports\FreeTime::union($spans));
             $times = $mine->filter(fn ($o) => $o->packaging_started_at)->map(fn ($o) => max(0, Carbon::parse($o->packed_at)->getTimestamp() - Carbon::parse($o->packaging_started_at)->getTimestamp()))->sort()->values();
             $days = (int) ($shifts[$id]->days ?? 0);
             $helperDays = (int) ($shifts[$id]->helper_days ?? 0);
@@ -50,7 +66,7 @@ class PackerReportController extends Controller
                 'per_head' => $heads ? round($mine->count() / $heads, 1) : null,
                 'per_day' => $days ? round($mine->count() / $days, 1) : null,
                 'median' => $times->isEmpty() ? null : (int) $times[intdiv($times->count(), 2)],
-                'errors' => (int) ($errors[$id] ?? 0), 'returned' => (int) ($returned[$id] ?? 0),
+                'errors' => (int) ($errors[$id] ?? 0), 'returned' => (int) ($returned[$id] ?? 0), 'worked' => $worked,
             ];
         })->sortByDesc('packed')->values();
 

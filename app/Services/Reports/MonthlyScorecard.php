@@ -26,6 +26,31 @@ class MonthlyScorecard
 
     public function __construct(private KpiScorecard $kpi, private WorkTime $work, private OrderProfit $profit) {}
 
+    /** A closed month: what was saved when it was closed (later returns or revoked points do not change it). */
+    public function closed(Carbon $month): ?array
+    {
+        $row = DB::table('scorecard_closes as c')->leftJoin('users as u', 'u.id', '=', 'c.closed_by')->where('c.month', $month->copy()->startOfMonth()->toDateString())
+            ->first(['c.snapshot', 'c.closed_at', 'u.name as closer']);
+        if (! $row) {
+            return null;
+        }
+        $s = json_decode($row->snapshot, true);
+
+        return ['rows' => collect($s['rows']), 'team' => $s['team'], 'from' => Carbon::parse($s['from']), 'to' => Carbon::parse($s['to']),
+            'unassigned' => (float) ($s['unassigned'] ?? 0), 'closedAt' => Carbon::parse($row->closed_at), 'closedBy' => $row->closer];
+    }
+
+    /** Save the month as it stands now. */
+    public function close(Carbon $month, int $by): void
+    {
+        $data = $this->month($month);
+        DB::table('scorecard_closes')->updateOrInsert(['month' => $month->copy()->startOfMonth()->toDateString()], [
+            'snapshot' => json_encode(['rows' => $data['rows']->values(), 'team' => $data['team'], 'from' => $data['from']->toDateString(),
+                'to' => $data['to']->toDateString(), 'unassigned' => $data['unassigned']]),
+            'closed_by' => $by, 'closed_at' => now(),
+        ]);
+    }
+
     /** @return array{rows: Collection<int, array<string, mixed>>, team: array<string, ?float>, from: Carbon, to: Carbon} */
     public function month(Carbon $month): array
     {
@@ -34,7 +59,7 @@ class MonthlyScorecard
 
         $kpi = collect($this->kpi->build($from->toDateString(), $to->toDateString())['rows'])->keyBy('user_id');
         $work = $this->work->period($from, $to)['people']->keyBy('id');
-        $points = DB::table('point_ledger')->where('status', '!=', 'revoked')->whereBetween('created_at', [$from, $to->copy()->endOfDay()])
+        $points = DB::table('point_ledger')->where('status', 'final')->whereBetween('created_at', [$from, $to->copy()->endOfDay()])
             ->groupBy('user_id')->selectRaw('user_id, SUM(points) as p')->pluck('p', 'user_id');
         // Profit before ads: staff do not decide the ad spend.
         $profit = collect($this->profit->grouped('moderator', $from->toDateString(), $to->toDateString(), null, 1000)->items())
@@ -45,13 +70,34 @@ class MonthlyScorecard
         $bonus = DB::table('staff_bonuses')->where('month', $from->toDateString())->get(['user_id', 'amount', 'note'])->keyBy('user_id');
 
         // Owners watch; they are not scored against the team.
-        $people = \App\Models\User::whereIn('id', $work->keys()->merge($kpi->keys())->unique())->get(['id', 'name'])->reject(fn ($u) => $u->isOwner());
+        $people = \App\Models\User::whereIn('id', $work->keys()->merge($kpi->keys())->unique())->get(['id', 'name', 'created_at', 'left_at'])->reject(fn ($u) => $u->isOwner());
         $ids = $people->pluck('id');
         $names = $people->pluck('name', 'id');
-        $rows = $ids->map(function ($id) use ($kpi, $work, $points, $profit, $salary, $bonus, $names) {
+        // The days of the month each person was with us: salary and target are for those days only.
+        $monthEnd = $month->copy()->endOfMonth();
+        $daysIn = $month->daysInMonth;
+        $here = $people->mapWithKeys(function ($u) use ($from, $monthEnd, $daysIn) {
+            $start = $u->created_at ? max($from->copy(), $u->created_at->copy()->startOfDay()) : $from->copy();
+            $end = $u->left_at ? min($monthEnd->copy(), \Illuminate\Support\Carbon::parse($u->left_at)->endOfDay()) : $monthEnd->copy();
+
+            return [$u->id => max(0, min($daysIn, (int) $start->diffInDays($end->copy()->startOfDay(), true) + 1))];
+        });
+        // Everyone has a target (their own, else the default), even with no ended order yet.
+        $targets = DB::table('kpi_targets')->orderBy('id')->get(['user_id', 'metric', 'target'])->groupBy(fn ($t) => (int) $t->user_id)
+            ->map(fn ($g) => $g->pluck('target', 'metric'));
+        $targetOf = fn (int $id, string $metric) => $targets[$id][$metric] ?? $targets[0][$metric] ?? null;
+        // Managers and owners may confirm a few orders: they are shown, not part of the team middle.
+        $leads = $people->filter(fn ($u) => $u->can('orders.reassign'))->pluck('id')->all();
+        $rows = $ids->map(function ($id) use ($kpi, $work, $points, $profit, $salary, $bonus, $names, $here, $daysIn, $leads, $targetOf) {
             $k = $kpi->get($id, []);
             $w = $work->get($id, []);
-            $pay = (float) ($salary[$id] ?? 0) + (float) ($bonus[$id]->amount ?? 0);
+            $days = (int) ($here[$id] ?? $daysIn);
+            $share = $daysIn ? $days / $daysIn : 1;
+            $monthly = isset($salary[$id]) ? (float) $salary[$id] : null;
+            $paid = $monthly === null ? null : round($monthly * $share, 2);
+            $monthTarget = $targetOf((int) $id, 'delivered_count');
+            $target = $monthTarget !== null ? (int) round((float) $monthTarget * $share) : null;
+            $pay = (float) ($paid ?? 0) + (float) ($bonus[$id]->amount ?? 0);
             $made = $profit[$id] ?? 0.0;
 
             return [
@@ -60,13 +106,17 @@ class MonthlyScorecard
                 'delivered' => (int) ($k['delivered'] ?? 0),
                 'delivery_rate' => $k['delivery_rate'] ?? null,
                 'return_rate' => $k['return_rate'] ?? null,
-                'target_count' => $k['target_count'] ?? null,
+                'target_count' => $target,
+                'target_done' => $target ? (int) round(((int) ($k['delivered'] ?? 0)) * 100 / $target) : null,
+                'target_rate' => ($r = $targetOf((int) $id, 'delivery_rate')) !== null ? (float) $r : null,
+                'days' => $days, 'days_in_month' => $daysIn, 'lead' => in_array($id, $leads, true),
                 'net' => $w['net'] ?? null,
                 'free_waiting' => (int) ($w['free_waiting'] ?? 0),
                 'given_back' => (int) ($w['given_back'] ?? 0),
                 'points' => (float) ($points[$id] ?? 0),
                 'profit' => $made,
-                'salary' => isset($salary[$id]) ? (float) $salary[$id] : null,
+                'salary' => $paid,
+                'monthly_salary' => $monthly,
                 'bonus' => isset($bonus[$id]) ? (float) $bonus[$id]->amount : null,
                 'bonus_note' => $bonus[$id]->note ?? null,
                 'pay' => $pay,
@@ -76,13 +126,16 @@ class MonthlyScorecard
 
         // The team's middle value for each number, then a colour for each person.
         $team = [];
+        $trial = (bool) settings('points.trial_mode');
+        $core = $rows->where('lead', false);
         foreach (array_keys(self::METRICS) as $m) {
-            $team[$m] = $this->median($rows->pluck($m)->filter(fn ($v) => $v !== null));
+            $team[$m] = $this->median(($core->isNotEmpty() ? $core : $rows)->pluck($m)->filter(fn ($v) => $v !== null));
         }
-        $rows = $rows->map(function ($r) use ($team) {
+        $rows = $rows->map(function ($r) use ($team, $trial) {
             $r['lights'] = [];
             foreach (self::METRICS as $m => $higherBetter) {
-                $r['lights'][$m] = $this->light($r[$m], $team[$m], $higherBetter);
+                // Trial month: points are shown but do not colour anyone.
+                $r['lights'][$m] = $m === 'points' && $trial ? null : $this->light($r[$m], $team[$m], $higherBetter);
             }
             $reds = count(array_keys($r['lights'], 'red', true));
             $greens = count(array_keys($r['lights'], 'green', true));

@@ -128,6 +128,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/returns/{order}/reason', [\App\Http\Controllers\ReturnReportController::class, 'reason'])->middleware('can:orders.edit')->name('returns.reason');
     Route::get('/packers-report', [\App\Http\Controllers\PackerReportController::class, 'index'])->middleware('can:packaging.manage')->name('packers-report.index');
     Route::get('/scorecard', [\App\Http\Controllers\ScorecardController::class, 'index'])->middleware('can:orders.reassign')->name('scorecard.index');
+    Route::post('/scorecard/close', [\App\Http\Controllers\ScorecardController::class, 'close'])->middleware('can:staff.edit')->name('scorecard.close');
     Route::post('/scorecard/{user}/bonus', [\App\Http\Controllers\ScorecardController::class, 'bonus'])->whereNumber('user')->middleware('can:staff.edit')->name('scorecard.bonus');
     Route::get('/work-time', [\App\Http\Controllers\WorkTimeController::class, 'index'])->middleware('can:orders.reassign')->name('work-time.index');
     Route::get('/attendance', [TeamController::class, 'attendance'])->middleware('can:attendance.view')->name('attendance.index');

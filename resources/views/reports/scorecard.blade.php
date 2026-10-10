@@ -20,9 +20,27 @@
             <a href="{{ $monthUrl(today()) }}" class="text-sm text-primary hover:underline">{{ __('This month') }}</a>
         @endif
     </div>
+    @if ($closed)
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+            <span>{{ __('Closed on :d by :n. These are the numbers as they stood then; later returns or revoked points do not change them.', ['d' => $closedAt?->format('d M Y'), 'n' => $closedBy ?? '-']) }}</span>
+            @if (auth()->user()->isOwner())
+                <form method="POST" action="{{ route('scorecard.close') }}" id="scorecard-reopen">@csrf<input type="hidden" name="month" value="{{ $month->format('Y-m') }}"><input type="hidden" name="reopen" value="1">
+                    <x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'scorecard-reopen-confirm', form: 'scorecard-reopen', label: @js($month->format('F Y')) })">{{ __('Reopen') }}</x-button></form>
+                <x-confirm-modal id="scorecard-reopen-confirm" :verb="__('Reopen')" :message="__('Numbers become live again and may change.')" />
+            @endif
+        </div>
+    @elseif ($canClose)
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <span>{{ __('This month is over but still live: a late return or a revoked point can still change it. Close it once bonuses are decided.') }}</span>
+            <form method="POST" action="{{ route('scorecard.close') }}" id="scorecard-close">@csrf<input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
+                <x-button type="button" size="sm" @click="$dispatch('open-confirm', { id: 'scorecard-close-confirm', form: 'scorecard-close', label: @js($month->format('F Y')) })">{{ __('Close month') }}</x-button></form>
+            <x-confirm-modal id="scorecard-close-confirm" :verb="__('Close')" :message="__('The numbers are saved as they stand now and stop changing.')" :danger="false" />
+        </div>
+    @endif
     <p class="mb-4 text-xs text-gray-500">
         {{ __('Each number against the team\'s middle value: green better, red worse (by more than 15%), yellow around it. Delivered and rates count orders that ended this month.') }}
-        @if ($seePay){{ __('Profit is before ads, from the orders each person confirmed (a later reassign does not move them), after refunds and returns. Per ৳1 = profit for every taka of salary and bonus.') }}@endif
+        @if ($seePay){{ __('Profit is before ads, from the orders each person confirmed (a later reassign does not move them), after refunds and returns. Per ৳1 = profit for every taka of salary and bonus. Salary and target count only the days each person was with us that month; managers are shown but not in the team middle; only final points count.') }}@endif
+        @if ($trial){{ __('Trial month: points are shown but do not colour anyone.') }}@endif
         @if ($seePay && ($unassigned ?? 0)){{ __('Profit on orders nobody held when they were confirmed: :a.', ['a' => '৳'.number_format($unassigned)]) }}@endif
         <span class="ml-1 inline-flex items-center gap-3 align-middle">
             <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-green-500"></span>{{ __('better') }}</span>
@@ -72,8 +90,8 @@
                         <span class="ml-4.5 block text-xs text-gray-500">{{ $overallText[$r['overall']] }}</span>
                     </td>
                     <td class="text-right tabular-nums">{{ $r['orders'] }}</td>
-                    <td class="text-right tabular-nums">{!! $cell($r, 'delivered') !!}{{ $r['delivered'] }}@if ($r['target_count'])<span class="block text-xs {{ $r['delivered'] >= $r['target_count'] ? 'text-green-700' : 'text-gray-400' }}">{{ __('target :t', ['t' => (int) $r['target_count']]) }}</span>@endif</td>
-                    <td class="text-right tabular-nums">{!! $cell($r, 'delivery_rate') !!}{{ $pct($r['delivery_rate']) }}</td>
+                    <td class="text-right tabular-nums">{!! $cell($r, 'delivered') !!}{{ $r['delivered'] }}@if ($r['target_count'])<span class="block text-xs {{ $r['delivered'] >= $r['target_count'] ? 'text-green-700' : 'text-gray-500' }}">{{ __('target :t · :p%', ['t' => (int) $r['target_count'], 'p' => (int) ($r['target_done'] ?? 0)]) }}</span>@endif</td>
+                    <td class="text-right tabular-nums">{!! $cell($r, 'delivery_rate') !!}{{ $pct($r['delivery_rate']) }}@if ($r['target_rate'] ?? null)<span class="block text-xs {{ ($r['delivery_rate'] ?? 0) >= $r['target_rate'] ? 'text-green-700' : 'text-gray-500' }}">{{ __('target :t%', ['t' => $r['target_rate'] + 0]) }}</span>@endif</td>
                     <td class="text-right tabular-nums">{!! $cell($r, 'return_rate') !!}{{ $pct($r['return_rate']) }}</td>
                     <td class="text-right tabular-nums">{!! $cell($r, 'net') !!}{{ $span($r['net']) }}</td>
                     <td class="text-right tabular-nums">{!! $cell($r, 'free_waiting') !!}{{ $span($r['free_waiting'] ?: null) }}</td>
@@ -81,9 +99,9 @@
                     <td class="text-right tabular-nums">{!! $cell($r, 'points') !!}{{ $r['points'] + 0 }}</td>
                     @if ($seePay)
                         <td class="text-right tabular-nums">{{ $money($r['profit']) }}</td>
-                        <td class="text-right tabular-nums">{{ $money($r['salary']) }}</td>
+                        <td class="text-right tabular-nums">{{ $money($r['salary']) }}@if (($r['days'] ?? null) && $r['days'] < ($r['days_in_month'] ?? 0))<span class="block text-xs text-gray-500">{{ __(':d of :m days', ['d' => $r['days'], 'm' => $r['days_in_month']]) }}</span>@endif</td>
                         <td class="text-right">
-                            @if ($canSetBonus)
+                            @if ($canSetBonus && ! $closed)
                                 <form method="POST" action="{{ route('scorecard.bonus', $r['id']) }}" class="flex items-center justify-end gap-1">
                                     @csrf
                                     <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">

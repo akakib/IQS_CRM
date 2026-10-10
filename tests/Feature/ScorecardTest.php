@@ -44,7 +44,7 @@ class ScorecardTest extends TestCase
         $boss->roles()->attach($this->role(['orders.view' => 'all', 'orders.reassign', 'staff.view', 'staff.edit'], [], 'Manager')->id);
         $mod = $this->role(['orders.view' => 'own', 'orders.edit', 'orders.take'], [], 'Moderator');
         [$mahim, $rima, $jesi] = collect(['Mahim', 'Rima', 'Jesi'])->map(function ($n) use ($mod) {
-            $u = User::factory()->create(['name' => $n]);
+            $u = User::factory()->create(['name' => $n, 'created_at' => '2026-09-01']); // with us the whole month
             $u->roles()->attach($mod->id);
 
             return $u;
@@ -84,5 +84,38 @@ class ScorecardTest extends TestCase
         app(\App\Services\PermissionService::class)->bump();
         $this->actingAs($lead)->get('/scorecard?month=2026-10')->assertOk()->assertSee('Mahim')->assertDontSee('৳15,000')->assertDontSee('Per ৳1');
         $this->post('/scorecard/'.$mahim->id.'/bonus', ['month' => '2026-10', 'amount' => 9])->assertForbidden();
+    }
+
+    public function test_joined_mid_month_pays_and_targets_for_the_days_here_final_points_only_and_a_closed_month_stays(): void
+    {
+        (new OrderConfigSeeder)->run();
+        $this->travelTo(Carbon::parse('2026-11-05 12:00:00'));
+        // Joined on 17 October: 15 of 31 days.
+        $rafi = User::factory()->create(['name' => 'Rafi', 'created_at' => '2026-10-17 10:00:00']);
+        $rafi->roles()->attach($this->role(['orders.view' => 'own', 'orders.edit', 'orders.take'], [], 'Moderator')->id);
+        $boss = $this->owner(['name' => 'Boss']);
+        app(\App\Services\PermissionService::class)->bump();
+        DB::table('staff_salaries')->insert(['user_id' => $rafi->id, 'from_month' => '2026-10-01', 'monthly_salary' => 31000, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('kpi_targets')->insert(['user_id' => null, 'metric' => 'delivered_count', 'target' => 62, 'created_at' => now(), 'updated_at' => now()]);
+        foreach (['final' => 5, 'pending' => 3] as $status => $p) {
+            DB::table('point_ledger')->insert(['user_id' => $rafi->id, 'trigger_key' => 'test', 'points' => $p, 'rule_snapshot' => '{}', 'status' => $status, 'created_at' => '2026-10-20 10:00:00']);
+        }
+
+        $card = app(\App\Services\Reports\MonthlyScorecard::class);
+        $row = $card->month(Carbon::parse('2026-10-01'))['rows']->firstWhere('name', 'Rafi');
+        $this->assertSame(15, $row['days']);
+        $this->assertSame(15000.0, $row['salary']);       // 31,000 for 15 of 31 days
+        $this->assertSame(30, $row['target_count']);      // 62 for 15 of 31 days
+        $this->assertSame(5.0, $row['points']);           // a pending point can still be taken back: not counted
+
+        // October is over: close it. A point revoked later no longer changes it; a bonus waits for a reopen.
+        $this->actingAs($boss)->post('/scorecard/close', ['month' => '2026-10'])->assertSessionHas('success');
+        DB::table('point_ledger')->where('status', 'final')->update(['status' => 'revoked']);
+        $this->get('/scorecard?month=2026-10')->assertOk()->assertSee('Closed on')->assertSee('৳15,000');
+        $this->assertEquals(5, $card->closed(Carbon::parse('2026-10-01'))['rows']->firstWhere('name', 'Rafi')['points']);
+        $this->post('/scorecard/'.$rafi->id.'/bonus', ['month' => '2026-10', 'amount' => 500])->assertSessionHas('error');
+        $this->post('/scorecard/close', ['month' => '2026-11'])->assertStatus(422); // the month is not over
+        $this->post('/scorecard/close', ['month' => '2026-10', 'reopen' => 1])->assertSessionHas('success');
+        $this->assertNull($card->closed(Carbon::parse('2026-10-01')));
     }
 }

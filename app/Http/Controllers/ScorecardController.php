@@ -17,12 +17,37 @@ class ScorecardController extends Controller
         $month = $this->month($request->query('month'));
         $user = $request->user();
 
-        return view('reports.scorecard', $scorecard->month($month) + [
-            'month' => $month,
+        $closed = $scorecard->closed($month);
+
+        return view('reports.scorecard', ($closed ?? $scorecard->month($month)) + [
+            'month' => $month, 'closed' => (bool) $closed, 'closedAt' => $closed['closedAt'] ?? null, 'closedBy' => $closed['closedBy'] ?? null,
+            // A finished month can be closed (saved as it stands) by those who decide pay.
+            'canClose' => $user->canSeeField('salary') && $user->can('staff.edit') && $month->lt(today()->startOfMonth()),
+            'trial' => (bool) settings('points.trial_mode'),
             // Pay and profit only for roles that may see them; bonuses are set by those who edit staff.
             'seePay' => $user->canSeeField('salary') && $user->canSeeField('profit'),
             'canSetBonus' => $user->canSeeField('salary') && $user->can('staff.edit'),
         ]);
+    }
+
+    /** Close a finished month: its numbers are saved and stop changing. Reopen (owner) to work it again. */
+    public function close(Request $request, MonthlyScorecard $scorecard): RedirectResponse
+    {
+        abort_unless($request->user()->canSeeField('salary') && $request->user()->can('staff.edit'), 403);
+        $data = $request->validate(['month' => ['required', 'date_format:Y-m'], 'reopen' => ['nullable', 'boolean']]);
+        $month = $this->month($data['month']);
+        abort_unless($month->lt(today()->startOfMonth()), 422, __('Only a finished month can be closed.'));
+        if ($request->boolean('reopen')) {
+            abort_unless($request->user()->isOwner(), 403);
+            DB::table('scorecard_closes')->where('month', $month->toDateString())->delete();
+            app(\App\Services\ActivityLogger::class)->log('scorecard.reopened', null, null, ['month' => $month->toDateString()]);
+
+            return back()->with('success', __(':m reopened: numbers are live again.', ['m' => $month->format('F Y')]));
+        }
+        $scorecard->close($month, $request->user()->id);
+        app(\App\Services\ActivityLogger::class)->log('scorecard.closed', null, null, ['month' => $month->toDateString()]);
+
+        return back()->with('success', __(':m closed: these numbers no longer change.', ['m' => $month->format('F Y')]));
     }
 
     public function bonus(Request $request, int $user): RedirectResponse
@@ -30,6 +55,9 @@ class ScorecardController extends Controller
         abort_unless($request->user()->canSeeField('salary'), 403);
         $data = $request->validate(['month' => ['required', 'date_format:Y-m'], 'amount' => ['nullable', 'numeric', 'min:0', 'max:10000000'], 'note' => ['nullable', 'string', 'max:255']]);
         $month = $this->month($data['month'])->toDateString();
+        if (DB::table('scorecard_closes')->where('month', $month)->exists()) {
+            return back()->with('error', __('This month is closed. Reopen it to change a bonus.'));
+        }
         abort_unless(DB::table('users')->where('id', $user)->exists(), 404);
         if (($data['amount'] ?? null) === null || $data['amount'] === '') {
             DB::table('staff_bonuses')->where('user_id', $user)->where('month', $month)->delete();

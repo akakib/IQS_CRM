@@ -149,6 +149,7 @@ class UserController extends Controller
 
         // Never deleted: deactivated staff keep their history but cannot log in.
         $user->update(['is_active' => ! $user->is_active]);
+        $user->forceFill(['left_at' => $user->is_active ? null : now()])->save(); // salary and target count only the days they were here
 
         if (! $user->is_active) {
             $this->logOutEverywhere($user);

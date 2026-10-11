@@ -304,9 +304,11 @@ class DeskService
             ->update(['ended_at' => now(), 'ended_reason' => $reason]);
 
         $name = DB::table('users')->where('id', $userId)->value('name');
-        $this->systemNote($orderId, $reason === 'idle'
-            ? __('Nothing done for :m minutes: taken back from :n, waiting in New again.', ['m' => settings('desk.idle_return_minutes'), 'n' => $name])
-            : __(':n went on a break: waiting in New again.', ['n' => $name]), null, ['released_from' => $userId, 'reason' => $reason]);
+        $this->systemNote($orderId, match ($reason) {
+            'idle' => __('Nothing done for :m minutes: taken back from :n, waiting in New again.', ['m' => settings('desk.idle_return_minutes'), 'n' => $name]),
+            'left' => __(':n no longer works here: waiting in New again.', ['n' => $name]),
+            default => __(':n went on a break: waiting in New again.', ['n' => $name]),
+        }, null, ['released_from' => $userId, 'reason' => $reason]);
     }
 
     /** How many times this person took extra time today. */

@@ -15,8 +15,10 @@
             @csrf
             @method('PATCH')
             @if ($user->is_active)
+                <input type="hidden" name="give_to" value="">
+                {{-- The popup first shows what they still hold and who takes it over. --}}
                 <button type="button" class="text-sm font-medium text-red-600 hover:underline"
-                    @click="$dispatch('open-confirm', { id: 'user-status', form: @js($formId), label: @js($user->name), verb: @js(__('Deactivate')), message: @js(__('They will be logged out and cannot log in until activated again.')), danger: true })">{{ __('Deactivate') }}</button>
+                    @click="$dispatch('deactivate-staff', { url: @js(route('users.work', $user)), form: @js($formId), name: @js($user->name) })">{{ __('Deactivate') }}</button>
             @else
                 <button type="button" class="text-sm font-medium text-primary hover:underline"
                     @click="$dispatch('open-confirm', { id: 'user-status', form: @js($formId), label: @js($user->name), verb: @js(__('Activate')), message: @js(__('They will be able to log in again.')), danger: false })">{{ __('Activate') }}</button>

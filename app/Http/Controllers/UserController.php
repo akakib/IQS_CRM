@@ -7,6 +7,8 @@ use App\Http\Requests\UserRequest;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\Lists\ListState;
+use App\Services\Work\StaffHandover;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -142,10 +144,26 @@ class UserController extends Controller
         }
     }
 
-    public function toggleStatus(Request $request, User $user): RedirectResponse
+    /** What a person still holds, and who could take it, for the Deactivate popup. */
+    public function work(User $user, StaffHandover $handover): JsonResponse
+    {
+        $work = $handover->work($user);
+
+        return response()->json([
+            'fresh' => count($work['fresh']), 'talking' => count($work['talking']), 'issues' => count($work['issues']),
+            'people' => $handover->people($user),
+        ]);
+    }
+
+    public function toggleStatus(Request $request, User $user, StaffHandover $handover): RedirectResponse
     {
         if ($user->is($request->user())) {
             return back()->with('error', __('You cannot deactivate your own account.'));
+        }
+        $moved = null;
+        if ($user->is_active) {
+            $request->validate(['give_to' => ['nullable', 'integer', 'exists:users,id']]);
+            $moved = $handover->handOver($user, $request->filled('give_to') ? User::find($request->integer('give_to')) : null, $request->user());
         }
 
         // Never deleted: deactivated staff keep their history but cannot log in.
@@ -158,7 +176,7 @@ class UserController extends Controller
 
         return back()->with('success', $user->is_active
             ? __('Staff ":name" activated.', ['name' => $user->name])
-            : __('Staff ":name" deactivated.', ['name' => $user->name]));
+            : __('Staff ":name" deactivated.', ['name' => $user->name]).($moved && array_sum($moved) ? ' '.__(':f back to New, :t orders and :i issues handed over.', ['f' => $moved['fresh'], 't' => $moved['talking'], 'i' => $moved['issues']]) : ''));
     }
 
     private function logOutEverywhere(User $user): void

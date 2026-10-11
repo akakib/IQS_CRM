@@ -17,7 +17,7 @@ class Labels
 
     public const RISK = ['normal' => 'Normal', 'watch' => 'Watch closely', 'blocked' => 'Blocked'];
 
-    public const ENDED = ['idle' => 'Given back: nothing done', 'timeout' => 'Given back: timer', 'break' => 'Back to New: break', 'reassigned' => 'Handed to someone else', 'finished' => 'Finished'];
+    public const ENDED = ['idle' => 'Given back: nothing done', 'timeout' => 'Given back: timer', 'break' => 'Back to New: break', 'reassigned' => 'Handed to someone else', 'left' => 'Back to New: staff left', 'finished' => 'Finished'];
 
     public const DISPUTE = ['open' => 'Waiting for a decision', 'upheld' => 'Upheld (point removed)', 'rejected' => 'Rejected (point stays)'];
 

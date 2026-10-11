@@ -241,6 +241,7 @@ Route::middleware('auth')->group(function () {
         ->middlewareFor(['create', 'store'], 'can:staff.create')
         ->middlewareFor(['edit', 'update'], 'can:staff.edit');
     // Deactivate/activate is the "delete" action for staff (they are never deleted).
+    Route::get('/users/{user}/work', [UserController::class, 'work'])->middleware('can:staff.delete')->name('users.work');
     Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])
         ->middleware('can:staff.delete')->name('users.status');
 

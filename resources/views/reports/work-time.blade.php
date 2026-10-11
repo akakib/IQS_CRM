@@ -37,6 +37,7 @@
                 <th>{{ __('Person') }}</th>
                 <th class="text-right">{{ __('Worked') }}</th>
                 <th class="text-right">{{ __('Overtime') }}</th>
+                <th class="text-right">{{ __('Outside shift') }}</th>
                 <th class="text-right">{{ __('Orders') }}</th>
                 <th class="text-right">{{ __('Confirmed') }}</th>
                 <th class="text-right">{{ __('Cancelled') }}</th>
@@ -54,6 +55,7 @@
                     <td><span class="flex items-center gap-2"><x-avatar :name="$p['name']" :photo="$p['photo']" size="sm" /><span class="font-medium text-gray-800">{{ $p['name'] }}</span>@if ($p['left'] ?? false)<span class="text-xs text-gray-400">({{ __('left') }})</span>@endif</span></td>
                     <td class="text-right font-medium tabular-nums">{{ $span($p['worked'] ?: null) }}</td>
                     <td @class(['text-right tabular-nums', 'font-medium text-amber-700' => $p['overtime'] >= 600, 'text-gray-500' => $p['overtime'] < 600])>{{ $span($p['overtime'] ?: null) }}</td>
+                    <td class="text-right tabular-nums">@if ($p['outside_confirmed'] || $p['outside_made'])<span class="font-medium text-amber-700">{{ $p['outside_confirmed'] }}</span><span class="block text-xs text-gray-500">{{ __(':c confirmed · :m made', ['c' => $p['outside_confirmed'], 'm' => $p['outside_made']]) }}</span>@else<span class="text-gray-400">-</span>@endif</td>
                     <td class="text-right tabular-nums">{{ $p['turns'] }}</td>
                     <td class="text-right tabular-nums">{{ $p['confirmed'] }}</td>
                     <td class="text-right tabular-nums">{{ $p['cancelled'] }}</td>
@@ -73,7 +75,7 @@
             @foreach ($people as $p)
                 <a href="{{ $personUrl($p['id']) }}" class="block">
                     <x-record-card :title="$p['name']" :subtitle="__(':n orders · :c confirmed · :x cancelled', ['n' => $p['turns'], 'c' => $p['confirmed'], 'x' => $p['cancelled']])">
-                        <x-slot:footer>{{ __('Worked :w · overtime :o', ['w' => $span($p['worked'] ?: null), 'o' => $span($p['overtime'] ?: null)]) }}<span class="block">{{ __('Opened in :a · first action in :b · break :m min', ['a' => $span($p['open']), 'b' => $span($p['start']), 'm' => $p['break_minutes']]) }}</span>@if ($p['given_back']) · <span class="text-red-600">{{ __(':n given back', ['n' => $p['given_back']]) }}</span>@endif
+                        <x-slot:footer>{{ __('Worked :w · overtime :o', ['w' => $span($p['worked'] ?: null), 'o' => $span($p['overtime'] ?: null)]) }}@if ($p['outside_confirmed'] || $p['outside_made'])<span class="block text-amber-700">{{ __('Outside shift: :c confirmed · :m made', ['c' => $p['outside_confirmed'], 'm' => $p['outside_made']]) }}</span>@endif<span class="block">{{ __('Opened in :a · first action in :b · break :m min', ['a' => $span($p['open']), 'b' => $span($p['start']), 'm' => $p['break_minutes']]) }}</span>@if ($p['given_back']) · <span class="text-red-600">{{ __(':n given back', ['n' => $p['given_back']]) }}</span>@endif
                             <span class="block">{{ __('Chat :t · :m msg · :o orders', ['t' => $span($p['chat_seconds'] ?: null), 'm' => $p['chat_messages'], 'o' => $p['chat_orders']]) }}</span>
                             <span @class(['block', 'font-medium text-red-600' => $p['free_waiting'] >= 600])>{{ __('Free while orders waited: :w', ['w' => $span($p['free_waiting'] ?: null)]) }}</span></x-slot:footer>
                         <x-slot:actions><span class="text-right"><span class="block text-xs text-gray-500">{{ __('Net') }}</span><span class="font-semibold tabular-nums">{{ $span($p['net']) }}</span></span></x-slot:actions>
@@ -90,6 +92,17 @@
                     <a href="{{ $rangeUrl($d, $d, $person['id']) }}" class="ml-1 text-primary hover:underline">{{ $d->format('d M') }}</a>@if (! $loop->last),@endif
                 @endforeach
             </p>
+        @endif
+        @if ($person['outside']->isNotEmpty())
+            {{-- Work done outside the shift, order by order: was the overtime real? --}}
+            <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+                <p class="mb-1 font-medium text-amber-900">{{ __('Outside the shift: :c confirmed, :m made', ['c' => $person['outside_confirmed'], 'm' => $person['outside_made']]) }}</p>
+                <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-amber-900">
+                    @foreach ($person['outside'] as $o)
+                        <a href="{{ route('orders.show', $o['id']) }}" class="hover:underline"><span class="font-mono">{{ $o['order_no'] }}</span> {{ $o['kind'] === 'made' ? __('made') : __('confirmed') }} {{ $o['at']->format($single ? 'g:i A' : 'd M, g:i A') }}</a>
+                    @endforeach
+                </div>
+            </div>
         @endif
         {{-- Closing: the address drops the person, so a reload shows just the table. --}}
         <div x-data="tabs(@js($activity ? 'activity' : 'orders'))" x-on:modal-closed.window="if ($event.detail === 'person') history.replaceState(null, '', @js($personUrl(null)))">

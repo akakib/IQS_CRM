@@ -129,8 +129,9 @@ class WorkTime
             return $sum;
         };
         $nowTs = now()->getTimestamp();
+        $outside = app(OutsideShift::class)->orders($staff->pluck('id')->all(), $from, $to);
 
-        $people = $staff->map(function ($u) use ($turns, $breaks, $freeOf, $chats, $chatCounts, $chatOrders, $from, $to, $nowTs) {
+        $people = $staff->map(function ($u) use ($turns, $breaks, $freeOf, $chats, $chatCounts, $chatOrders, $from, $to, $nowTs, $outside) {
             $mine = $turns->get($u->id, collect());
             $free = $freeOf($u);
             $kinds = $chatCounts->get($u->id, collect())->pluck('n', 'kind');
@@ -140,6 +141,9 @@ class WorkTime
                 'id' => $u->id, 'name' => $u->name, 'photo' => $u->photo_path,
                 'free_waiting' => $free['waiting'], 'free_nothing' => $free['nothing'],
                 'worked' => $free['worked'], 'overtime' => $free['overtime'], 'left' => ! $u->is_active,
+                'outside' => $outside->get($u->id, collect())->values(),
+                'outside_confirmed' => $outside->get($u->id, collect())->where('kind', 'confirmed')->count(),
+                'outside_made' => $outside->get($u->id, collect())->where('kind', 'made')->count(),
                 'chat_seconds' => FreeTime::length(FreeTime::clip(FreeTime::union($chatSpans), $from->getTimestamp(), min($to->getTimestamp(), $nowTs))),
                 'chat_messages' => (int) ($kinds['message'] ?? 0) - (int) ($kinds['undo'] ?? 0),
                 'chat_no_order' => (int) ($kinds['no_order'] ?? 0),

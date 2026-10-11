@@ -102,6 +102,8 @@ class MonthlyScorecard
             return [
                 'id' => (int) $id, 'name' => $names[$id] ?? '#'.$id,
                 'orders' => (int) ($w['turns'] ?? $k['taken'] ?? 0),
+                'outside_confirmed' => (int) ($w['outside_confirmed'] ?? 0),
+                'outside_made' => (int) ($w['outside_made'] ?? 0),
                 'delivered' => (int) ($k['delivered'] ?? 0),
                 'delivery_rate' => $k['delivery_rate'] ?? null,
                 'return_rate' => $k['return_rate'] ?? null,

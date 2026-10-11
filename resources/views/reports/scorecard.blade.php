@@ -89,7 +89,7 @@
                             <a href="{{ route('work-time.index', ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'person' => $r['id']]) }}" class="font-medium text-gray-800 hover:text-primary">{{ $r['name'] }}</a></span>
                         <span class="ml-4.5 block text-xs text-gray-500">{{ $overallText[$r['overall']] }}</span>
                     </td>
-                    <td class="text-right tabular-nums">{{ $r['orders'] }}</td>
+                    <td class="text-right tabular-nums">{{ $r['orders'] }}@if ($r['outside_confirmed'] ?? 0)<span class="block text-xs text-amber-700">{{ __(':n outside shift', ['n' => $r['outside_confirmed']]) }}</span>@endif</td>
                     <td class="text-right tabular-nums">{!! $cell($r, 'delivered') !!}{{ $r['delivered'] }}@if ($r['target_count'])<span class="block text-xs {{ $r['delivered'] >= $r['target_count'] ? 'text-green-700' : 'text-gray-500' }}">{{ __('target :t · :p%', ['t' => (int) $r['target_count'], 'p' => (int) ($r['target_done'] ?? 0)]) }}</span>@endif</td>
                     <td class="text-right tabular-nums">{!! $cell($r, 'delivery_rate') !!}{{ $pct($r['delivery_rate']) }}@if ($r['target_rate'] ?? null)<span class="block text-xs {{ ($r['delivery_rate'] ?? 0) >= $r['target_rate'] ? 'text-green-700' : 'text-gray-500' }}">{{ __('target :t%', ['t' => $r['target_rate'] + 0]) }}</span>@endif</td>
                     <td class="text-right tabular-nums">{!! $cell($r, 'return_rate') !!}{{ $pct($r['return_rate']) }}</td>
@@ -124,7 +124,7 @@
                 <a href="{{ route('work-time.index', ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'person' => $r['id']]) }}" class="block">
                     <x-record-card :title="$r['name']" :subtitle="__(':o orders · :d delivered · :p delivery · :r return', ['o' => $r['orders'], 'd' => $r['delivered'], 'p' => $pct($r['delivery_rate']), 'r' => $pct($r['return_rate'])])">
                         <x-slot:badge><span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700"><span class="h-2.5 w-2.5 rounded-full {{ $dot[$r['overall']] }}"></span>{{ $overallText[$r['overall']] }}</span></x-slot:badge>
-                        <x-slot:footer>{{ __('Net :n · free while waiting :f · given back :g · points :p', ['n' => $span($r['net']), 'f' => $span($r['free_waiting'] ?: null), 'g' => $r['given_back'], 'p' => $r['points'] + 0]) }}@if ($seePay)<span class="block">{{ __('Profit :a · pay :b', ['a' => $money($r['profit']), 'b' => $money($r['pay'] ?: null)]) }}</span>@endif</x-slot:footer>
+                        <x-slot:footer>{{ __('Net :n · free while waiting :f · given back :g · points :p', ['n' => $span($r['net']), 'f' => $span($r['free_waiting'] ?: null), 'g' => $r['given_back'], 'p' => $r['points'] + 0]) }}@if ($r['outside_confirmed'] ?? 0)<span class="block text-amber-700">{{ __(':n confirmed outside shift', ['n' => $r['outside_confirmed']]) }}</span>@endif @if ($seePay)<span class="block">{{ __('Profit :a · pay :b', ['a' => $money($r['profit']), 'b' => $money($r['pay'] ?: null)]) }}</span>@endif</x-slot:footer>
                         <x-slot:actions>@if ($seePay)<span class="text-right"><span class="block text-xs text-gray-500">{{ __('Per ৳1') }}</span><span class="font-semibold tabular-nums">{{ $r['per_taka'] === null ? '-' : '৳'.$r['per_taka'] }}</span></span>@endif</x-slot:actions>
                         @if ($seePay && $canSetBonus && ! $closed)
                             {{-- The bonus can be set from a phone too. --}}

@@ -121,4 +121,33 @@ class WorkHoursTest extends TestCase
         $this->assertTrue($cal->isOffDay(null, \Illuminate\Support\Carbon::parse('2026-10-17')));  // Saturday is off from now on
         $this->assertSame('10:00', \Illuminate\Support\Facades\DB::table('office_schedules')->where('effective_from', '2026-10-14')->value('start_time'));
     }
+
+    public function test_orders_confirmed_or_made_outside_the_shift_are_counted(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-14 12:00')); // a Wednesday
+        $user = \App\Models\User::factory()->create(['name' => 'Rakin', 'created_at' => '2026-01-01']);
+        (new \Database\Seeders\RoleSeeder)->run();
+        $user->roles()->attach(\Illuminate\Support\Facades\DB::table('roles')->where('system_key', 'moderator')->value('id'));
+        app(\App\Services\PermissionService::class)->bump();
+        // Night shift 20:00 to 09:00 every day from before.
+        foreach (range(0, 6) as $wd) {
+            \Illuminate\Support\Facades\DB::table('work_schedules')->insert(['user_id' => $user->id, 'weekday' => $wd, 'start_time' => '20:00', 'end_time' => '09:00', 'effective_from' => '2026-01-01']);
+        }
+        $customer = \Illuminate\Support\Facades\DB::table('customers')->insertGetId(['name' => 'K', 'primary_phone' => '01712345678']);
+        $order = fn (string $no, ?string $confirmedAt, string $createdAt, ?int $by = null) => \Illuminate\Support\Facades\DB::table('orders')->insertGetId([
+            'order_no' => $no, 'customer_id' => $customer, 'channel' => 'messenger', 'status_id' => \Illuminate\Support\Facades\DB::table('order_statuses')->value('id'), 'ship_name' => 'K', 'ship_phone' => '01712345678',
+            'ship_address' => 'R', 'confirmed_by' => $confirmedAt ? $user->id : null, 'confirmed_at' => $confirmedAt, 'created_by' => $by, 'created_at' => $createdAt, 'updated_at' => $createdAt,
+        ]);
+        $order('IQ1', '2026-10-13 23:30', '2026-10-13 23:00');            // in the shift
+        $order('IQ2', '2026-10-14 02:00', '2026-10-14 01:00');            // after midnight: still the night shift
+        $order('IQ3', '2026-10-14 11:00', '2026-10-14 10:30');            // outside
+        $order('IQ4', null, '2026-10-14 15:00', $user->id);               // made by hand, outside
+
+        $rows = app(\App\Services\Reports\OutsideShift::class)->orders([$user->id], \Illuminate\Support\Carbon::parse('2026-10-13'), \Illuminate\Support\Carbon::parse('2026-10-14'))->get($user->id);
+        $this->assertSame(['IQ3 confirmed', 'IQ4 made'], $rows->map(fn ($r) => $r['order_no'].' '.$r['kind'])->all());
+
+        $this->actingAs($this->owner());
+        $this->get(route('work-time.index', ['from' => '2026-10-13', 'to' => '2026-10-14', 'person' => $user->id]))->assertOk()
+            ->assertSee('Outside shift')->assertSee('1 confirmed · 1 made')->assertSee('Outside the shift: 1 confirmed, 1 made');
+    }
 }

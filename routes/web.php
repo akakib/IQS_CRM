@@ -169,6 +169,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/advance-waiver/decide', [OrderController::class, 'decideWaiver'])->middleware('can:orders.approve')->name('orders.advance-waiver.decide');
     Route::get('/payments', [\App\Http\Controllers\PaymentController::class, 'index'])->name('payments.index');
     Route::post('/payments/decide', [\App\Http\Controllers\PaymentController::class, 'decide'])->name('payments.decide');
+    Route::get('/payments/cod', [\App\Http\Controllers\CodPayoutController::class, 'index'])->name('cod.index');
+    Route::post('/payments/cod', [\App\Http\Controllers\CodPayoutController::class, 'upload'])->name('cod.upload');
     Route::get('/payments/refunds', [\App\Http\Controllers\RefundController::class, 'index'])->name('refunds.index');
     Route::post('/payments/refunds/{order}/refund', [\App\Http\Controllers\RefundController::class, 'refund'])->name('refunds.refund');
     Route::post('/payments/refunds/{order}/credit', [\App\Http\Controllers\RefundController::class, 'credit'])->name('refunds.credit');

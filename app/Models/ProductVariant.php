@@ -37,7 +37,7 @@ class ProductVariant extends Model
             'oos_marked_at' => 'datetime',
             'oos_review_at' => 'datetime',
             'expected_restock_date' => 'date',
-            'stock_qty' => 'integer',
+            'stock_qty' => 'float',
             'stock_counted_at' => 'datetime',
         ];
     }

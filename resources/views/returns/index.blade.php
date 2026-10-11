@@ -45,11 +45,11 @@
                 <div class="mt-4 space-y-2">
                     <p class="text-sm font-semibold text-gray-900"><span class="font-mono" x-text="order.order_no"></span> · <span x-text="order.customer"></span></p>
                     <p x-show="order.partial" class="text-xs text-amber-700">{{ __('Partly delivered: what came back is Good or Damaged, what the customer kept is Customer kept.') }}</p>
-                    <p class="text-xs text-gray-500">{{ __('Count each item: how many are good, how many damaged. Tap a name to put the whole line there.') }}</p>
+                    <p class="text-xs text-gray-500">{{ __('Count each item in the unit it was sold in: how many are good, how many damaged. A part is fine: 0.9 of a 1 kg pack. Tap a name to put the whole line there.') }}</p>
                     <template x-for="i in order.items" :key="i.id">
                         <div class="rounded-lg border p-3" :class="left(i) === 0 ? 'border-green-300 bg-green-50/40' : 'border-gray-200'">
                             <div class="mb-2 flex items-center justify-between gap-2">
-                                <p class="text-sm text-gray-800"><span x-text="i.name"></span> <b x-text="'×' + i.qty"></b></p>
+                                <p class="text-sm text-gray-800"><span x-text="i.name"></span> <b x-text="'×' + i.qty"></b> <span x-show="i.pack" class="text-xs text-gray-500" x-text="'(' + @js(__('each')) + ' ' + i.pack + ')'"></span></p>
                                 <span class="shrink-0 text-xs font-medium" :class="left(i) === 0 ? 'text-green-700' : 'text-amber-700'"
                                     x-text="left(i) === 0 ? @js(__('Done')) : left(i) + ' ' + @js(__('left to count'))"></span>
                             </div>
@@ -60,7 +60,8 @@
                                         <button type="button" @click="all(i, @js($key))" class="min-w-0 truncate text-left text-xs font-medium text-gray-700">{{ __($label) }}</button>
                                         <span class="flex shrink-0 items-center gap-1">
                                             <button type="button" @click="step(i, @js($key), -1)" class="h-7 w-7 rounded-md border border-gray-300 text-sm leading-none text-gray-600" aria-label="{{ __('Less') }}">&minus;</button>
-                                            <span class="w-6 text-center text-sm font-semibold tabular-nums" x-text="marks[i.id]?.{{ $key }} ?? 0"></span>
+                                            <input type="number" min="0" step="any" inputmode="decimal" x-model.number="marks[i.id].{{ $key }}" @focus="$el.select()"
+                                                class="w-14 rounded-md border border-gray-300 px-1 py-1 text-center text-sm font-semibold tabular-nums focus:border-primary focus:outline-none" aria-label="{{ __($label) }}">
                                             <button type="button" @click="step(i, @js($key), Math.min(1, left(i)))" class="h-7 w-7 rounded-md border border-gray-300 text-sm leading-none text-gray-600" aria-label="{{ __('More') }}">+</button>
                                         </span>
                                     </div>

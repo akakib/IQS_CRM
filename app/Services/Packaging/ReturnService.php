@@ -79,7 +79,7 @@ class ReturnService
                     ]);
                     $count[$state] += $qty;
                     if ($state === 'good' && $item->variant_id) {
-                        $good[$item->variant_id] = ($good[$item->variant_id] ?? 0) + (int) round($qty);
+                        $good[$item->variant_id] = ($good[$item->variant_id] ?? 0) + $qty;
                     }
                 }
             }

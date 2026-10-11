@@ -374,25 +374,25 @@ class PackagingTest extends TestCase
 
         $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
         $b = $this->booked('01822222222', [['variant_id' => $this->dates->id, 'qty' => 1]]);
-        $this->assertSame(3, $this->dates->fresh()->stock_qty); // confirmed is not off the shelf yet
+        $this->assertSame(3.0, $this->dates->fresh()->stock_qty); // confirmed is not off the shelf yet
 
         $this->actingAs($this->packer);
         $this->packIt($a);
-        $this->assertSame(1, $this->dates->fresh()->stock_qty);
+        $this->assertSame(1.0, $this->dates->fresh()->stock_qty);
         $this->assertNull($this->nuts->fresh()->stock_qty);
 
         // The last one packed: none left, so it goes Out of stock by itself.
         $this->packIt($b);
-        $this->assertSame(0, $this->dates->fresh()->stock_qty);
+        $this->assertSame(0.0, $this->dates->fresh()->stock_qty);
         $this->assertSame('out_of_stock', $this->dates->fresh()->availability_status);
 
         // The box is opened and the item put back: on the shelf again, and back In stock (the count had put it out).
         DB::table('orders')->where('id', $b->id)->update(['unpack_needed_at' => now()]);
         app(\App\Services\Orders\DeskService::class)->markUnpacked($b->fresh(), $this->packer);
-        $this->assertSame(1, $this->dates->fresh()->stock_qty);
+        $this->assertSame(1.0, $this->dates->fresh()->stock_qty);
         $this->assertSame('in_stock', $this->dates->fresh()->availability_status);
         app(\App\Services\Orders\DeskService::class)->markUnpacked($b->fresh(), $this->packer); // twice changes nothing
-        $this->assertSame(1, $this->dates->fresh()->stock_qty);
+        $this->assertSame(1.0, $this->dates->fresh()->stock_qty);
 
         // Every change is listed with why and which order.
         $this->actingAs($this->desk)->getJson('/products/stock/'.$this->dates->id.'/history')->assertOk()
@@ -413,7 +413,7 @@ class PackagingTest extends TestCase
         $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
         $this->actingAs($this->packer);
         $this->packIt($a);
-        $this->assertSame(1, $this->dates->fresh()->stock_qty);
+        $this->assertSame(1.0, $this->dates->fresh()->stock_qty);
         $this->returned($a);
 
         // To receive lists it; a scan of its label finds it with its items.
@@ -428,7 +428,7 @@ class PackagingTest extends TestCase
         $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => ['good' => 1, 'kept' => 1], $items[$this->nuts->id] => 'damaged']])->assertStatus(422); // not a partial
         $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => ['good' => 1, 'damaged' => 1], $items[$this->nuts->id] => 'damaged']])
             ->assertOk()->assertJson(['ok' => true]);
-        $this->assertSame(2, $this->dates->fresh()->stock_qty);
+        $this->assertSame(2.0, $this->dates->fresh()->stock_qty);
         $this->assertNotNull($a->fresh()->return_received_at);
         $this->assertDatabaseHas('return_items', ['order_id' => $a->id, 'variant_id' => $this->nuts->id, 'condition' => 'damaged']);
         $this->assertDatabaseHas('order_notes', ['order_id' => $a->id, 'body' => 'Return received at the shop by Packer: 1 good, 2 damaged, 0 not in the parcel.']);
@@ -437,7 +437,7 @@ class PackagingTest extends TestCase
         // Twice is refused; an order that was not returned is not taken in.
         $this->postJson('/returns/find', ['code' => $a->order_no])->assertJson(['ok' => false, 'level' => 'orange']);
         $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => 'good', $items[$this->nuts->id] => 'good']])->assertStatus(422);
-        $this->assertSame(2, $this->dates->fresh()->stock_qty);
+        $this->assertSame(2.0, $this->dates->fresh()->stock_qty);
         $b = $this->booked('01822222222', [['variant_id' => $this->nuts->id, 'qty' => 1]]);
         $this->postJson('/returns/find', ['code' => $b->order_no])->assertJson(['ok' => false, 'level' => 'red']);
         $this->get('/returns?tab=received')->assertSee($a->order_no)->assertSee('2 damaged');
@@ -468,8 +468,27 @@ class PackagingTest extends TestCase
         $item = DB::table('order_items')->where('order_id', $a->id)->value('id');
 
         $this->postJson("/returns/{$a->id}", ['items' => [$item => ['kept' => 2, 'good' => 1]]])->assertOk();
-        $this->assertSame(3, $this->dates->fresh()->stock_qty); // 5 - 3 packed + 1 back
+        $this->assertSame(3.0, $this->dates->fresh()->stock_qty); // 5 - 3 packed + 1 back
         $this->assertSame(0, DB::table('app_notifications')->where('subject_id', $a->id)->where('title', 'like', '%damaged or missing%')->count());
         $this->get('/returns?tab=received')->assertSee('2 kept by the customer');
+    }
+
+    public function test_a_part_of_a_pack_is_counted_in_the_same_unit(): void
+    {
+        // 10 packs of dates sold; 0.9 of a pack came back good, the rest spoiled.
+        $this->actingAs($this->desk)->postJson('/products/stock/'.$this->dates->id, ['qty' => 12]);
+        $a = $this->booked('01844444444', [['variant_id' => $this->dates->id, 'qty' => 10]]);
+        $this->actingAs($this->packer);
+        $this->packIt($a);
+        $this->returned($a);
+        $item = DB::table('order_items')->where('order_id', $a->id)->value('id');
+
+        $this->postJson("/returns/{$a->id}", ['items' => [$item => ['good' => 0.9, 'damaged' => 9]]])->assertStatus(422); // must add up to 10
+        $this->postJson("/returns/{$a->id}", ['items' => [$item => ['good' => 0.9, 'damaged' => 9.1]]])->assertOk();
+        $this->assertSame(2.9, $this->dates->fresh()->stock_qty);
+        $this->assertSame(9.1, (float) DB::table('return_items')->where('order_id', $a->id)->where('condition', 'damaged')->value('qty'));
+
+        // A count can be a part too, and under one whole pack it cannot fill an order.
+        $this->actingAs($this->desk)->postJson('/products/stock/'.$this->dates->id, ['qty' => 0.9])->assertOk()->assertJson(['qty' => 0.9, 'status' => 'out_of_stock']);
     }
 }

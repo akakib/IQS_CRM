@@ -27,7 +27,7 @@ class StockController extends Controller
             ->select(['id', 'product_id', 'sku', 'name', 'shelf_code', 'availability_status', 'stock_qty', 'stock_counted_at'])
             ->with('product:id,name')
             ->when($show === 'not_counted', fn ($w) => $w->whereNull('stock_qty'))
-            ->when($show === 'low', fn ($w) => $w->whereBetween('stock_qty', [1, 5]))
+            ->when($show === 'low', fn ($w) => $w->where('stock_qty', '>', 0)->where('stock_qty', '<=', 5))
             ->when($show === 'zero', fn ($w) => $w->where('stock_qty', '<=', 0))
             ->when($q !== '', fn ($w) => $w->where('search_text', 'like', '%'.$q.'%'))
             ->tap(fn ($w) => $list->applySort($w))
@@ -35,7 +35,7 @@ class StockController extends Controller
             ->withQueryString();
 
         $counts = ProductVariant::query()->selectRaw('COUNT(*) as all_n, SUM(CASE WHEN stock_qty IS NULL THEN 1 ELSE 0 END) as not_counted,
-            SUM(CASE WHEN stock_qty BETWEEN 1 AND 5 THEN 1 ELSE 0 END) as low, SUM(CASE WHEN stock_qty <= 0 THEN 1 ELSE 0 END) as zero')->first();
+            SUM(CASE WHEN stock_qty > 0 AND stock_qty <= 5 THEN 1 ELSE 0 END) as low, SUM(CASE WHEN stock_qty <= 0 THEN 1 ELSE 0 END) as zero')->first();
 
         return view('products.stock', compact('variants', 'list', 'show', 'counts'));
     }
@@ -43,10 +43,10 @@ class StockController extends Controller
     /** The number counted on the shelf. */
     public function count(Request $request, int $variant, StockService $stock): JsonResponse
     {
-        $data = $request->validate(['qty' => ['required', 'integer', 'min:0', 'max:1000000'], 'note' => ['nullable', 'string', 'max:255']]);
-        $stock->count($variant, (int) $data['qty'], $request->user(), $data['note'] ?? null);
+        $data = $request->validate(['qty' => ['required', 'numeric', 'min:0', 'max:1000000'], 'note' => ['nullable', 'string', 'max:255']]);
+        $stock->count($variant, (float) $data['qty'], $request->user(), $data['note'] ?? null);
 
-        return response()->json(['qty' => (int) $data['qty'], 'counted' => now()->format('d M, g:i A'),
+        return response()->json(['qty' => round((float) $data['qty'], 3) + 0, 'counted' => now()->format('d M, g:i A'),
             'status' => DB::table('product_variants')->where('id', $variant)->value('availability_status')]);
     }
 
@@ -59,7 +59,7 @@ class StockController extends Controller
 
         return response()->json(['rows' => $rows->map(fn ($r) => [
             'when' => \Illuminate\Support\Carbon::parse($r->created_at)->format('d M, g:i A'),
-            'change' => $r->qty_change, 'after' => $r->qty_after, 'why' => __(StockService::REASONS[$r->reason] ?? $r->reason),
+            'change' => (float) $r->qty_change + 0, 'after' => (float) $r->qty_after + 0, 'why' => __(StockService::REASONS[$r->reason] ?? $r->reason),
             'who' => $r->person, 'order' => $r->order_no, 'note' => $r->note,
         ])]);
     }

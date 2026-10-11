@@ -26,12 +26,13 @@ class StockService
     public function __construct(private ProductService $products) {}
 
     /** A count on the shelf: the number is set, the difference is recorded. */
-    public function count(int $variantId, int $qty, ?User $by, ?string $note = null): void
+    public function count(int $variantId, float $qty, ?User $by, ?string $note = null): void
     {
+        $qty = round($qty, 3);
         DB::transaction(function () use ($variantId, $qty, $by, $note) {
             $v = DB::table('product_variants')->where('id', $variantId)->lockForUpdate()->first(['id', 'stock_qty']);
             abort_unless($v, 404);
-            $change = $qty - (int) ($v->stock_qty ?? 0);
+            $change = round($qty - (float) ($v->stock_qty ?? 0), 3);
             DB::table('product_variants')->where('id', $variantId)->update(['stock_qty' => $qty, 'stock_counted_at' => now()]);
             DB::table('stock_movements')->insert([
                 'variant_id' => $variantId, 'qty_change' => $change, 'qty_after' => $qty, 'reason' => 'count',
@@ -45,21 +46,21 @@ class StockService
      * Make what this order has taken from the shelf equal $want (variant => qty):
      * packed = its items, put back = nothing. Only the difference moves.
      *
-     * @param  array<int, int>  $want
+     * @param  array<int, float>  $want
      */
     public function settleOrder(Order $order, array $want, string $reason, ?User $by): void
     {
         DB::transaction(function () use ($order, $want, $reason, $by) {
             $taken = DB::table('stock_movements')->where('order_id', $order->id)->whereIn('reason', ['packed', 'unpacked'])
-                ->groupBy('variant_id')->selectRaw('variant_id, -SUM(qty_change) as n')->pluck('n', 'variant_id')->map(fn ($n) => (int) $n);
+                ->groupBy('variant_id')->selectRaw('variant_id, -SUM(qty_change) as n')->pluck('n', 'variant_id')->map(fn ($n) => round((float) $n, 3));
             $ids = collect(array_keys($want))->merge($taken->keys())->unique()->all();
             $counted = DB::table('product_variants')->whereIn('id', $ids)->whereNotNull('stock_qty')->lockForUpdate()->get(['id', 'stock_qty'])->keyBy('id');
             foreach ($counted as $id => $v) {
-                $change = (int) ($taken[$id] ?? 0) - (int) ($want[$id] ?? 0); // taking more = negative
-                if ($change === 0) {
+                $change = round((float) ($taken[$id] ?? 0) - (float) ($want[$id] ?? 0), 3); // taking more = negative
+                if (abs($change) < 0.0005) {
                     continue;
                 }
-                $after = (int) $v->stock_qty + $change;
+                $after = round((float) $v->stock_qty + $change, 3);
                 DB::table('product_variants')->where('id', $id)->update(['stock_qty' => $after]);
                 DB::table('stock_movements')->insert([
                     'variant_id' => $id, 'qty_change' => $change, 'qty_after' => $after, 'reason' => $change < 0 ? 'packed' : $reason,
@@ -70,16 +71,16 @@ class StockService
         });
     }
 
-    /** A return received: good items back on the shelf. @param array<int, int> $good variant => qty */
+    /** A return received: good items back on the shelf, fractions too (0.9 of a 1 kg pack). @param array<int, float> $good variant => qty */
     public function returnGood(Order $order, array $good, ?User $by): void
     {
         $counted = DB::table('product_variants')->whereIn('id', array_keys($good))->whereNotNull('stock_qty')->lockForUpdate()->get(['id', 'stock_qty']);
         foreach ($counted as $v) {
-            $add = (int) $good[$v->id];
+            $add = round((float) $good[$v->id], 3);
             if ($add <= 0) {
                 continue;
             }
-            $after = (int) $v->stock_qty + $add;
+            $after = round((float) $v->stock_qty + $add, 3);
             DB::table('product_variants')->where('id', $v->id)->update(['stock_qty' => $after]);
             DB::table('stock_movements')->insert([
                 'variant_id' => $v->id, 'qty_change' => $add, 'qty_after' => $after, 'reason' => 'return_good',
@@ -94,15 +95,16 @@ class StockService
     {
         return DB::table('order_items')->where('order_id', $order->id)->whereNotNull('variant_id')
             ->groupBy('variant_id')->selectRaw('variant_id, SUM(qty) as n')->pluck('n', 'variant_id')
-            ->map(fn ($n) => (int) round((float) $n))->all();
+            ->map(fn ($n) => round((float) $n, 3))->all();
     }
 
-    private function followAvailability(int $variantId, int $qty, ?User $by): void
+    /** Less than one whole unit left (e.g. 0.9 of a 1 kg pack) cannot fill an order: Out of stock. */
+    private function followAvailability(int $variantId, float $qty, ?User $by): void
     {
         $v = DB::table('product_variants')->where('id', $variantId)->first(['availability_status', 'availability_source']);
-        if ($qty <= 0 && $v->availability_status === 'in_stock') {
-            $this->products->setAvailability([$variantId], 'out_of_stock', $by?->id, null, __('Stock count reached 0'), 'stock');
-        } elseif ($qty > 0 && $v->availability_status === 'out_of_stock' && $v->availability_source === 'stock') {
+        if ($qty < 1 && $v->availability_status === 'in_stock') {
+            $this->products->setAvailability([$variantId], 'out_of_stock', $by?->id, null, $qty <= 0 ? __('Stock count reached 0') : __('Less than one left'), 'stock');
+        } elseif ($qty >= 1 && $v->availability_status === 'out_of_stock' && $v->availability_source === 'stock') {
             $this->products->setAvailability([$variantId], 'in_stock', $by?->id, null, __('Back in stock: :n on the shelf', ['n' => $qty]), 'stock');
         }
     }

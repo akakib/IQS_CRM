@@ -73,7 +73,7 @@
                         </div>
                         @if ($canCount)
                             <form @submit.prevent="save()" class="flex items-center gap-1.5">
-                                <input type="number" min="0" x-model.number="typed" required class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums focus:border-primary focus:outline-none" aria-label="{{ __('Counted') }}">
+                                <input type="number" min="0" step="any" x-model.number="typed" required class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums focus:border-primary focus:outline-none" aria-label="{{ __('Counted') }}">
                                 <button :disabled="busy || typed === qty || typed === '' || typed === null" class="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-40">{{ __('Save') }}</button>
                             </form>
                         @endif

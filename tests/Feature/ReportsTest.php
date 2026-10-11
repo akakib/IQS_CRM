@@ -101,6 +101,40 @@ class ReportsTest extends TestCase
         $this->assertSame([$this->agent->id], $rows->pluck('g')->map(fn ($g) => (int) $g)->all());
     }
 
+    public function test_a_partly_delivered_order_counts_only_what_the_customer_kept(): void
+    {
+        $range = [today()->toDateString(), today()->toDateString()];
+        $a = $this->deliveredOrder('partial_delivered');
+        // The courier collected the price of one (600) plus the delivery fee the customer paid, and charged us 70.
+        $collected = 600 + (float) $a->delivery_charge;
+        DB::table('shipments')->insert(['order_id' => $a->id, 'courier' => 'steadfast', 'consignment_id' => '777', 'cod_amount' => $a->cod_amount,
+            'collected_amount' => $collected, 'delivery_charge' => 70, 'final_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('orders')->where('id', $a->id)->update(['active_shipment_id' => DB::table('shipments')->max('id')]);
+
+        // Before the parcel is received: estimated from the money.
+        $estimate = app(OrderProfit::class)->totals(...$range);
+        $this->assertEqualsWithDelta($collected, $estimate['revenue'], 0.01);
+        $this->assertEqualsWithDelta(70, $estimate['delivery'], 0.01); // the courier's charge, whoever paid it
+
+        // Received: 1 kept, 0.5 good back on the shelf, 0.5 spoiled.
+        $item = DB::table('order_items')->where('order_id', $a->id)->first();
+        foreach (['kept' => 1, 'good' => 0.5, 'damaged' => 0.5] as $state => $qty) {
+            DB::table('return_items')->insert(['order_id' => $a->id, 'order_item_id' => $item->id, 'variant_id' => $item->variant_id, 'qty' => $qty, 'condition' => $state, 'created_at' => now()]);
+        }
+        $t = app(OrderProfit::class)->totals(...$range);
+        $this->assertEqualsWithDelta(400, $t['cogs'], 0.01);     // only the one the customer kept
+        $this->assertEqualsWithDelta(200, $t['returns'], 0.01);  // half a piece spoiled, at cost
+        $this->assertEqualsWithDelta($collected - 400 - 70 - $collected / 100 - 10 - 200, $t['profit'], 0.01);
+
+        // The payout statement's charge wins over the webhook's.
+        DB::table('shipments')->where('order_id', $a->id)->update(['payout_charge' => 75]);
+        $this->assertEqualsWithDelta(75, app(OrderProfit::class)->totals(...$range)['delivery'], 0.01);
+
+        $row = collect(app(OrderProfit::class)->grouped('product', ...$range, ...[null, 50])->items())->first();
+        $this->assertEqualsWithDelta(1, (float) $row->qty, 0.001);
+        $this->assertEqualsWithDelta(600, (float) $row->revenue, 0.01);
+    }
+
     public function test_an_edit_keeps_the_frozen_cost_and_a_missing_cost_is_flagged(): void
     {
         $a = $this->deliveredOrder();

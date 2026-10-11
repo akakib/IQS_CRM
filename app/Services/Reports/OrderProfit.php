@@ -10,14 +10,17 @@ use Illuminate\Support\Facades\DB;
  * Order P&L for orders that reached delivered / partial / returned in a date
  * range.
  *
- *   revenue   delivered: money collected + verified advance; returned: verified advance kept
- *   cogs      cost snapshot frozen at confirmation (partial: scaled by what was collected)
- *   delivery  courier charge on the shipment (estimate: the order's delivery charge)
+ *   revenue   delivered: money collected + verified advance; returned: verified advance kept.
+ *             What the customer paid for delivery is in the money collected, so it counts here.
+ *   cogs      cost snapshot frozen at confirmation. Partly delivered: once the parcel is received
+ *             at the shop, only what the customer kept; before that, scaled by what was collected
+ *   delivery  what the courier charged us, paid or not by the customer: the payout statement's
+ *             charge, else the courier's own (webhook), else the order's delivery charge
  *   cod_fee   courier COD fee % on the cash collected
  *   packaging per shipped order (setting)
  *   ad_cost   the order's share of its placing day's ad cost (ad_cost_days, FIFO taka)
- *   returns   the courier's charge for a return (kept on the order) + damaged items, and items
- *             missing from a returned parcel, at cost
+ *   returns   the courier's charge for a return (kept on the order) + items that came back
+ *             damaged or did not come back (not in the parcel), at cost. Good ones are on the shelf.
  *   refunds   money given back or kept as the customer's credit comes off revenue
  *   credit    an order counts for confirmed_by (who held it when confirmed), not whoever holds it now
  */
@@ -42,11 +45,13 @@ class OrderProfit
         $isDelivered = "o.status_id IN ($in)";
         $cogs = '(SELECT COALESCE(SUM(i.qty * COALESCE(i.cost_price_snapshot, 0)), 0) FROM order_items i WHERE i.order_id = o.id)';
         $share = "CASE WHEN o.grand_total > 0 THEN ($collected + o.advance_verified) / o.grand_total ELSE 1 END";
+        // Received at the shop: what the customer kept is known item by item (a partial parcel marks it Customer kept).
+        $received = 'EXISTS (SELECT 1 FROM return_items rx WHERE rx.order_id = o.id)';
+        $keptCost = "(SELECT COALESCE(SUM(rk.qty * COALESCE(ik.cost_price_snapshot, 0)), 0) FROM return_items rk JOIN order_items ik ON ik.id = rk.order_item_id
+            WHERE rk.order_id = o.id AND rk.`condition` = 'kept')";
         $refunds = "(SELECT COALESCE(SUM(rp.amount), 0) FROM order_payments rp WHERE rp.order_id = o.id AND rp.payment_type = 'refund' AND rp.status = 'verified')";
-        $returnedId = (int) OrderStatus::idFor('returned');
-        // Partly delivered: "not in the parcel" is what the customer kept (and paid for), not a loss.
         $lostItems = "(SELECT COALESCE(SUM(ri.qty * COALESCE(ii.cost_price_snapshot, 0)), 0) FROM return_items ri JOIN order_items ii ON ii.id = ri.order_item_id
-            WHERE ri.order_id = o.id AND (ri.`condition` = 'damaged' OR (ri.`condition` = 'missing' AND o.status_id = $returnedId)))";
+            WHERE ri.order_id = o.id AND ri.`condition` IN ('damaged', 'missing'))";
 
         return DB::table('orders as o')
             ->joinSub($finals, 'f', 'f.order_id', '=', 'o.id')
@@ -58,8 +63,8 @@ class OrderProfit
                 CASE WHEN $isDelivered THEN 1 ELSE 0 END as delivered,
                 (CASE WHEN $isDelivered THEN $collected + o.advance_verified ELSE o.advance_verified END) - $refunds as revenue,
                 COALESCE(o.return_charge, 0) + $lostItems as returns,
-                CASE WHEN $isDelivered THEN $cogs * (CASE WHEN $share < 1 THEN $share ELSE 1 END) ELSE 0 END as cogs,
-                COALESCE(s.delivery_charge, o.delivery_charge) as delivery,
+                CASE WHEN NOT $isDelivered THEN 0 WHEN $received THEN $keptCost ELSE $cogs * (CASE WHEN $share < 1 THEN $share ELSE 1 END) END as cogs,
+                COALESCE(s.payout_charge, s.delivery_charge, o.delivery_charge) as delivery,
                 CASE WHEN $isDelivered THEN $collected * $pct ELSE 0 END as cod_fee,
                 $packaging as packaging,
                 CASE WHEN o.channel = 'b2b' THEN 0 ELSE COALESCE(ad.per_order, 0) END as ad_cost");
@@ -93,6 +98,8 @@ class OrderProfit
         if (in_array($group, ['product', 'category'], true)) {
             $key = $group === 'product' ? 'p.id' : 'p.category_id';
             $label = $group === 'product' ? 'MAX(p.name)' : 'MAX(c.name)';
+            // Pieces of a partly delivered parcel that came back are not sold.
+            $sold = "(i.qty - (SELECT COALESCE(SUM(rs.qty), 0) FROM return_items rs WHERE rs.order_item_id = i.id AND rs.`condition` <> 'kept'))";
 
             return DB::query()->fromSub($this->orders($from, $to, $channel), 'x')
                 ->join('order_items as i', 'i.order_id', '=', 'x.id')
@@ -101,9 +108,9 @@ class OrderProfit
                 ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
                 ->where('x.delivered', 1)
                 ->groupByRaw($key)
-                ->selectRaw("$key as g, $label as label, COUNT(DISTINCT x.id) as orders, SUM(i.qty) as qty,
-                    SUM(i.line_total) as revenue, SUM(i.qty * COALESCE(i.cost_price_snapshot, 0)) as cogs,
-                    SUM(i.line_total) - SUM(i.qty * COALESCE(i.cost_price_snapshot, 0)) as profit")
+                ->selectRaw("$key as g, $label as label, COUNT(DISTINCT x.id) as orders, SUM($sold) as qty,
+                    SUM(i.line_total * $sold / i.qty) as revenue, SUM($sold * COALESCE(i.cost_price_snapshot, 0)) as cogs,
+                    SUM(i.line_total * $sold / i.qty) - SUM($sold * COALESCE(i.cost_price_snapshot, 0)) as profit")
                 ->orderByDesc('revenue')->paginate($perPage)->withQueryString();
         }
 

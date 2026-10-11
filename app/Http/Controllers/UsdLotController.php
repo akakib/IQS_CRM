@@ -27,7 +27,11 @@ class UsdLotController extends Controller
 
         return view('marketing.lots', [
             'lots' => $lots,
-            'vendors' => $this->costs->vendorBalances(),
+            'vendors' => $vendors = $this->costs->vendorBalances(),
+            'totals' => ['due' => $vendors->sum('due'), 'advance' => $vendors->sum('advance'),
+                'usd_left' => (float) DB::table('usd_lots')->sum('usd_remaining'),
+                'usd_month' => (float) DB::table('usd_lots')->where('purchased_on', '>=', today()->startOfMonth()->toDateString())->sum('usd'),
+                'bdt_month' => (float) DB::table('usd_lots')->where('purchased_on', '>=', today()->startOfMonth()->toDateString())->sum('bdt_total')],
             'methods' => DB::table('payment_methods')->where('is_active', true)->orderBy('name')->pluck('name', 'id')->all(),
             'payments' => DB::table('vendor_payments as p')->join('ad_vendors as v', 'v.id', '=', 'p.vendor_id')
                 ->leftJoin('payment_methods as m', 'm.id', '=', 'p.payment_method_id')
@@ -37,9 +41,27 @@ class UsdLotController extends Controller
         ]);
     }
 
+    /** One vendor's ledger: every lot and payment by date with the running balance. */
+    public function vendor(int $vendor): View
+    {
+        $v = $this->costs->vendorBalances()->firstWhere('id', $vendor) ?? abort(404);
+
+        return view('marketing.vendor', ['vendor' => $v, 'rows' => $this->costs->ledger($vendor)->reverse()->values()]);
+    }
+
+    /** Opening balance as typed: an amount and which way it goes (we owe them, or they hold our advance). */
+    private function opening(Request $request): array
+    {
+        $o = $request->validate(['opening_amount' => ['nullable', 'numeric', 'min:0', 'max:100000000'], 'opening_side' => ['nullable', 'in:due,advance'], 'opening_on' => ['nullable', 'date', 'before_or_equal:today']]);
+        $amount = round((float) ($o['opening_amount'] ?? 0), 2);
+
+        return ['opening_balance' => ($o['opening_side'] ?? 'due') === 'advance' ? -$amount : $amount, 'opening_on' => $amount ? ($o['opening_on'] ?? today()->toDateString()) : null];
+    }
+
     public function storeVendor(Request $request): RedirectResponse
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:120', 'unique:ad_vendors,name'], 'phone' => ['nullable', 'regex:/^01[3-9]\d{8}$/'], 'note' => ['nullable', 'string', 'max:255']]);
+        $data += $this->opening($request);
         $id = DB::table('ad_vendors')->insertGetId($data + ['is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
         $this->logger->log('ad_vendor.created', ['ad_vendor', $id], null, $data);
 
@@ -86,6 +108,7 @@ class UsdLotController extends Controller
     public function updateVendor(Request $request, int $vendor): RedirectResponse
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:120', \Illuminate\Validation\Rule::unique('ad_vendors', 'name')->ignore($vendor)], 'phone' => ['nullable', 'regex:/^01[3-9]\d{8}$/']]);
+        $data += $this->opening($request);
         abort_unless(DB::table('ad_vendors')->where('id', $vendor)->exists(), 404);
         DB::table('ad_vendors')->where('id', $vendor)->update($data + ['updated_at' => now()]);
         $this->logger->log('ad_vendor.updated', ['ad_vendor', $vendor], null, $data);

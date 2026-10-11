@@ -133,4 +133,30 @@ class MarketingTest extends TestCase
         $this->delete(route('usd-lots.payments.destroy', $pay))->assertSessionHas('success');
         $this->assertSame(0, DB::table('vendor_payments')->count());
     }
+
+    public function test_vendor_opening_advance_ledger_and_next_due(): void
+    {
+        $this->actingAs($this->owner);
+        $method = DB::table('payment_methods')->value('id');
+        // A new vendor who already held ৳5,000 of our money before the app.
+        $this->post(route('usd-lots.vendors.store'), ['name' => 'Dollar Ghor', 'opening_amount' => 5000, 'opening_side' => 'advance', 'opening_on' => '2026-09-01'])->assertSessionHas('success');
+        $v = (int) DB::table('ad_vendors')->where('name', 'Dollar Ghor')->value('id');
+        $this->assertSame(-5000.0, (float) DB::table('ad_vendors')->where('id', $v)->value('opening_balance'));
+
+        // 100 dollars at 122 = 12,200; the advance covers 5,000, so 7,200 is owed by the lot's due date.
+        $this->post(route('usd-lots.store'), ['vendor_id' => $v, 'purchased_on' => '2026-09-05', 'usd' => 100, 'rate' => 122, 'due_date' => '2026-09-20']);
+        $bal = fn () => app(AdCostService::class)->vendorBalances()->firstWhere('id', $v);
+        $this->assertSame([7200.0, 0.0, '2026-09-20'], [$bal()->due, $bal()->advance, $bal()->next_due]);
+
+        // Paying 10,000 clears it and leaves 2,800 as our advance.
+        $this->post(route('usd-lots.payments.store'), ['vendor_id' => $v, 'amount_bdt' => 10000, 'paid_on' => '2026-09-10', 'payment_method_id' => $method]);
+        $this->assertSame([0.0, 2800.0, null], [$bal()->due, $bal()->advance, $bal()->next_due]);
+
+        $this->get(route('usd-lots.index'))->assertOk()->assertSee('Advance ৳2,800')->assertSee('Our advance with vendors');
+        $this->get(route('usd-lots.vendor', $v))->assertOk()->assertSee('Opening balance')->assertSee('we owe ৳7,200')->assertSee('advance ৳2,800');
+
+        // Editing the name keeps the opening balance (the form sends it back).
+        $this->put(route('usd-lots.vendors.update', $v), ['name' => 'Dollar Ghor Ctg', 'opening_amount' => 5000, 'opening_side' => 'advance', 'opening_on' => '2026-09-01']);
+        $this->assertSame(-5000.0, (float) DB::table('ad_vendors')->where('id', $v)->value('opening_balance'));
+    }
 }

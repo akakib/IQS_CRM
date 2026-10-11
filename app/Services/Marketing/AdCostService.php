@@ -52,19 +52,70 @@ class AdCostService
         $this->logger->log('vendor_payment.created', ['ad_vendor', $vendorId], null, $d);
     }
 
-    /** @return \Illuminate\Support\Collection<int, object> vendors with bought, paid and due (BDT) */
+    /**
+     * Vendors with what we stand at: opening + bought - paid. Plus = we owe them (due),
+     * minus = they hold our advance. The next due date is the first lot payments have
+     * not covered yet (payments go to the opening balance first, then lots oldest first).
+     *
+     * @return \Illuminate\Support\Collection<int, object>
+     */
     public function vendorBalances(): \Illuminate\Support\Collection
     {
-        $bought = DB::table('usd_lots')->groupBy('vendor_id')->selectRaw('vendor_id, SUM(bdt_total) as t, MIN(due_date) as next_due')->get()->keyBy('vendor_id');
+        $lots = DB::table('usd_lots')->orderBy('purchased_on')->orderBy('id')->get(['vendor_id', 'bdt_total', 'due_date', 'purchased_on'])->groupBy('vendor_id');
         $paid = DB::table('vendor_payments')->groupBy('vendor_id')->selectRaw('vendor_id, SUM(amount_bdt) as t')->pluck('t', 'vendor_id');
 
-        return DB::table('ad_vendors')->orderBy('name')->get()->map(function ($v) use ($bought, $paid) {
-            $v->bought = (float) ($bought[$v->id]->t ?? 0);
+        return DB::table('ad_vendors')->orderBy('name')->get()->map(function ($v) use ($lots, $paid) {
+            $mine = $lots->get($v->id, collect());
+            $v->opening = (float) $v->opening_balance;
+            $v->bought = (float) $mine->sum('bdt_total');
             $v->paid = (float) ($paid[$v->id] ?? 0);
-            $v->due = round($v->bought - $v->paid, 2);
-            $v->next_due = $v->due > 0 ? ($bought[$v->id]->next_due ?? null) : null;
+            $balance = round($v->opening + $v->bought - $v->paid, 2);
+            $v->due = max(0.0, $balance);
+            $v->advance = max(0.0, -$balance);
+            $v->next_due = null;
+            if ($v->due > 0) {
+                $left = $v->paid - max(0, $v->opening); // what payments still cover after the opening
+                foreach ($mine as $lot) {
+                    $left -= (float) $lot->bdt_total;
+                    if ($left < -0.005) {
+                        $v->next_due = $lot->due_date ?? $lot->purchased_on;
+                        break;
+                    }
+                }
+            }
 
             return $v;
+        });
+    }
+
+    /**
+     * One vendor's ledger, oldest first: opening, each lot (we owe more), each payment
+     * (we owe less), with the running balance. Plus = we owe them, minus = advance.
+     *
+     * @return \Illuminate\Support\Collection<int, array{date: string, kind: string, usd: ?float, rate: ?float, amount: float, ref: ?string, note: ?string, balance: float}>
+     */
+    public function ledger(int $vendorId): \Illuminate\Support\Collection
+    {
+        $v = DB::table('ad_vendors')->find($vendorId);
+        $rows = collect();
+        if ((float) $v->opening_balance != 0) {
+            $rows->push(['date' => $v->opening_on ?? substr((string) $v->created_at, 0, 10), 'order' => 0, 'kind' => 'opening', 'usd' => null, 'rate' => null,
+                'amount' => (float) $v->opening_balance, 'ref' => null, 'note' => null, 'id' => null]);
+        }
+        foreach (DB::table('usd_lots')->where('vendor_id', $vendorId)->get() as $l) {
+            $rows->push(['date' => $l->purchased_on, 'order' => 1, 'kind' => 'lot', 'usd' => (float) $l->usd, 'rate' => (float) $l->rate,
+                'amount' => (float) $l->bdt_total, 'ref' => null, 'note' => $l->note, 'id' => $l->id]);
+        }
+        foreach (DB::table('vendor_payments as p')->leftJoin('payment_methods as m', 'm.id', '=', 'p.payment_method_id')->where('p.vendor_id', $vendorId)->get(['p.*', 'm.name as method']) as $p) {
+            $rows->push(['date' => $p->paid_on, 'order' => 2, 'kind' => 'payment', 'usd' => null, 'rate' => null,
+                'amount' => -(float) $p->amount_bdt, 'ref' => trim(($p->method ?? '').' '.($p->transaction_ref ?? '')) ?: null, 'note' => $p->note, 'id' => $p->id]);
+        }
+        $balance = 0.0;
+
+        return $rows->sortBy([['date', 'asc'], ['order', 'asc'], ['id', 'asc']])->values()->map(function ($r) use (&$balance) {
+            $balance = round($balance + $r['amount'], 2);
+
+            return $r + ['balance' => $balance];
         });
     }
 

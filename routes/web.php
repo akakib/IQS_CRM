@@ -308,6 +308,7 @@ Route::middleware('auth')->group(function () {
     // Marketing: ad spend, ROAS and dollar lots.
     Route::get('/marketing', [MarketingController::class, 'index'])->middleware('can:marketing.view')->name('marketing.index');
     Route::get('/usd-lots', [UsdLotController::class, 'index'])->middleware('can:marketing.view')->name('usd-lots.index');
+    Route::get('/usd-lots/vendors/{vendor}', [UsdLotController::class, 'vendor'])->whereNumber('vendor')->middleware('can:marketing.view')->name('usd-lots.vendor');
     Route::middleware('can:marketing.create')->group(function () {
         Route::post('/marketing/accounts', [MarketingController::class, 'storeAccount'])->name('marketing.accounts.store');
         Route::put('/marketing/accounts/{account}', [MarketingController::class, 'updateAccount'])->whereNumber('account')->name('marketing.accounts.update');

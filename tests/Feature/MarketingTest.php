@@ -159,4 +159,32 @@ class MarketingTest extends TestCase
         $this->put(route('usd-lots.vendors.update', $v), ['name' => 'Dollar Ghor Ctg', 'opening_amount' => 5000, 'opening_side' => 'advance', 'opening_on' => '2026-09-01']);
         $this->assertSame(-5000.0, (float) DB::table('ad_vendors')->where('id', $v)->value('opening_balance'));
     }
+
+    public function test_an_ads_manager_csv_gives_campaign_adset_and_ad_results(): void
+    {
+        $this->lot(1000, 120, '2026-09-01');
+        DB::table('ad_accounts')->where('id', $this->account)->update(['external_id' => 'act_111']);
+        $csv = "\xEF\xBB\xBFAccount ID,Campaign name,Ad set name,Ad name,Day,Amount spent (USD),Results,Result indicator,Impressions,Link clicks,Messaging conversations started\n"
+            ."111,Dates Oct,Dhaka 25-45,Video A,2026-10-01,10.00,20,actions:onsite_conversion.messaging_conversation_started_7d,5000,90,20\n"
+            ."111,Dates Oct,Dhaka 25-45,Video B,2026-10-01,5.00,5,actions:onsite_conversion.messaging_conversation_started_7d,2000,30,5\n"
+            ."111,Nuts,All BD,Photo,2026-10-02,4.00,2,actions:offsite_conversion.fb_pixel_purchase,1000,10,0\n"
+            ."999,Other,X,Y,2026-10-02,1.00,1,a,1,1,1\n"
+            .",,,,,20.00,,,,,\n";
+        $this->actingAs($this->owner)->post(route('campaigns.import'), ['file' => UploadedFile::fake()->createWithContent('ads.csv', $csv), 'fill_daily' => 1])
+            ->assertSessionHas('error'); // one unknown account id is reported
+        $this->assertSame(3, DB::table('ad_insights')->count());
+        // The account's daily spend came from the same file, and its taka cost from the lot.
+        $this->assertSame(15.0, (float) DB::table('ad_spend_daily')->where('spend_date', '2026-10-01')->value('spend_usd'));
+        $this->assertSame(1800.0, (float) DB::table('ad_spend_daily')->where('spend_date', '2026-10-01')->value('bdt_cost'));
+
+        $q = ['from' => '2026-10-01', 'to' => '2026-10-02'];
+        $this->get(route('campaigns.index', $q))->assertOk()->assertSee('Dates Oct')->assertSee('$15.00')->assertSee('৳1,800')->assertSee('৳72'); // 1,800 / 25 results
+        $this->get(route('campaigns.index', $q + ['level' => 'ad']))->assertOk()->assertSee('Video B')->assertSee('Dates Oct › Dhaka 25-45');
+
+        // The same file again replaces, it does not add.
+        $this->post(route('campaigns.import'), ['file' => UploadedFile::fake()->createWithContent('ads.csv', $csv), 'fill_daily' => 1]);
+        $this->assertSame(3, DB::table('ad_insights')->count());
+
+        $this->post(route('campaigns.import'), ['file' => UploadedFile::fake()->createWithContent('bad.csv', "Name,Cost\nA,1\n")])->assertSessionHasErrors('file');
+    }
 }

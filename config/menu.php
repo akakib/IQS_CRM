@@ -41,6 +41,7 @@ return [
     ]],
     'marketing' => ['Marketing', [
         ['Ad spend & ROAS', 'marketing.index', 'marketing.*', 'marketing.view', 'megaphone'],
+        ['Campaigns', 'campaigns.index', 'campaigns.*', 'marketing.view', 'megaphone'],
         ['USD lots', 'usd-lots.index', 'usd-lots.*', 'marketing.view', 'dollar'],
     ]],
     'stock' => ['Stock', [

@@ -46,4 +46,20 @@ class CorrectionsTest extends TestCase
         $this->assertNull(DB::table('kpi_targets')->where('metric', 'delivered_count')->value('target'));
         $this->get('/kpi')->assertOk()->assertDontSee('target-del-', false); // an emptied target leaves no row
     }
+
+    public function test_a_verification_rule_is_edited_with_its_conditions(): void
+    {
+        (new OrderConfigSeeder)->run();
+        $this->actingAs($this->owner());
+        $rule = DB::table('verification_rules')->insertGetId(['name' => 'Smal order', 'priority' => 45, 'outcome' => 'record_verified', 'applies_to_channel' => 'all', 'stop_on_match' => true, 'is_active' => true]);
+        DB::table('verification_rule_conditions')->insert(['rule_id' => $rule, 'field' => 'cod_amount', 'operator' => '<=', 'value' => '50']);
+
+        $this->get('/settings/verification')->assertOk()->assertSee('Edit rule')->assertSee('rule-edit-'.$rule, false);
+        $this->put(route('settings.verification.update', $rule), ['name' => 'Small order', 'priority' => 46, 'outcome' => 'manual_review', 'applies_to_channel' => 'messenger',
+            'conditions' => [['field' => 'cod_amount', 'operator' => '<=', 'value' => '500']]])->assertSessionHas('success');
+
+        $row = DB::table('verification_rules')->find($rule);
+        $this->assertSame(['Small order', 46, 'manual_review', 'messenger'], [$row->name, (int) $row->priority, $row->outcome, $row->applies_to_channel]);
+        $this->assertSame(['500'], DB::table('verification_rule_conditions')->where('rule_id', $rule)->pluck('value')->all());
+    }
 }

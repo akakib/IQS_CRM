@@ -20,8 +20,8 @@ class WorkCalendar
     /** @var array<int, bool> users already looked up */
     private array $loaded = [];
 
-    /** @var array<int, array{0: string, 1: string}>|null */
-    private ?array $default = null;
+    /** @var array<string, array<int, array{0: string, 1: string}>>|null effective_from => office week */
+    private ?array $office = null;
 
     /** Load several people's schedules with one query. */
     public function preload(array $userIds): void
@@ -64,10 +64,29 @@ class WorkCalendar
             return $own;
         }
 
-        return $this->default ??= array_fill_keys(
-            array_map('intval', explode(',', (string) settings('work.days'))),
-            [(string) settings('work.start'), (string) settings('work.end')]
-        );
+        return $this->officeWeek($date);
+    }
+
+    /** The office default as it was on that date (no history yet = today's Settings). */
+    private function officeWeek(?Carbon $date): array
+    {
+        $build = fn (string $days, string $start, string $end) => array_fill_keys(array_map('intval', explode(',', $days)), [substr($start, 0, 5), substr($end, 0, 5)]);
+        if ($this->office === null) {
+            $this->office = [];
+            foreach (DB::table('office_schedules')->orderBy('effective_from')->get() as $row) {
+                $this->office[substr((string) $row->effective_from, 0, 10)] = $build($row->days, $row->start_time, $row->end_time);
+            }
+            $this->office['now'] = $build((string) settings('work.days'), (string) settings('work.start'), (string) settings('work.end'));
+        }
+        $day = ($date ?? now())->toDateString();
+        $week = null;
+        foreach ($this->office as $from => $rows) {
+            if ($from !== 'now' && $from <= $day) {
+                $week = $rows;
+            }
+        }
+
+        return $week ?? $this->office['now'];
     }
 
     public function hasOwnSchedule(int $userId): bool

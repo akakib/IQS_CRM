@@ -258,6 +258,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:settings.edit')->group(function () {
         Route::post('/settings/verification', [VerificationRuleController::class, 'store'])->name('settings.verification.store');
         Route::post('/settings/verification/{rule}/toggle', [VerificationRuleController::class, 'toggle'])->whereNumber('rule')->name('settings.verification.toggle');
+        Route::put('/settings/verification/{rule}', [VerificationRuleController::class, 'update'])->whereNumber('rule')->name('settings.verification.update');
         Route::delete('/settings/verification/{rule}', [VerificationRuleController::class, 'destroy'])->whereNumber('rule')->name('settings.verification.destroy');
     });
     Route::post('/orders/{order}/verify', [VerificationRuleController::class, 'rerun'])->middleware('can:orders.approve')->name('orders.verify');

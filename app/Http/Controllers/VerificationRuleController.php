@@ -31,7 +31,34 @@ class VerificationRuleController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
+        $data = $request->validate($this->rules());
+        DB::transaction(function () use ($data) {
+            $id = DB::table('verification_rules')->insertGetId($this->row($data) + ['stop_on_match' => true, 'is_active' => true, 'created_at' => now()]);
+            $this->saveConditions($id, $data);
+            $this->logger->log('verification_rule.created', ['verification_rule', $id], null, $data);
+        });
+
+        return back()->with('success', __('Rule added.'));
+    }
+
+    /** A rule typed wrong is corrected in place; its conditions are replaced as a whole. */
+    public function update(Request $request, int $rule): RedirectResponse
+    {
+        $old = DB::table('verification_rules')->where('id', $rule)->first() ?? abort(404);
+        $data = $request->validate($this->rules());
+        DB::transaction(function () use ($data, $rule, $old) {
+            DB::table('verification_rules')->where('id', $rule)->update($this->row($data));
+            DB::table('verification_rule_conditions')->where('rule_id', $rule)->delete();
+            $this->saveConditions($rule, $data);
+            $this->logger->log('verification_rule.updated', ['verification_rule', $rule], (array) $old, $data);
+        });
+
+        return back()->with('success', __('Rule saved.'));
+    }
+
+    private function rules(): array
+    {
+        return [
             'name' => ['required', 'string', 'max:150'],
             'priority' => ['required', 'integer', 'min:1', 'max:999'],
             'outcome' => ['required', Rule::in(['record_verified', 'record_verified_and_confirmed', 'manual_review', 'hold_for_advance'])],
@@ -41,24 +68,22 @@ class VerificationRuleController extends Controller
             'conditions.*.provider_id' => ['nullable', 'integer'],
             'conditions.*.operator' => ['required', Rule::in(['>=', '<=', '=', '!=', '>', '<'])],
             'conditions.*.value' => ['required', 'string', 'max:50'],
-        ]);
+        ];
+    }
 
-        DB::transaction(function () use ($data) {
-            $id = DB::table('verification_rules')->insertGetId([
-                'name' => $data['name'], 'priority' => $data['priority'], 'outcome' => $data['outcome'],
-                'applies_to_channel' => $data['applies_to_channel'], 'stop_on_match' => true, 'is_active' => true,
-                'created_at' => now(), 'updated_at' => now(),
+    private function row(array $data): array
+    {
+        return ['name' => $data['name'], 'priority' => $data['priority'], 'outcome' => $data['outcome'], 'applies_to_channel' => $data['applies_to_channel'], 'updated_at' => now()];
+    }
+
+    private function saveConditions(int $ruleId, array $data): void
+    {
+        foreach ($data['conditions'] ?? [] as $c) {
+            DB::table('verification_rule_conditions')->insert([
+                'rule_id' => $ruleId, 'field' => $c['field'], 'operator' => $c['operator'], 'value' => $c['value'],
+                'provider_id' => in_array($c['field'], VerificationEngine::PROVIDER_FIELDS, true) ? ($c['provider_id'] ?? null) : null,
             ]);
-            foreach ($data['conditions'] ?? [] as $c) {
-                DB::table('verification_rule_conditions')->insert([
-                    'rule_id' => $id, 'field' => $c['field'], 'operator' => $c['operator'], 'value' => $c['value'],
-                    'provider_id' => in_array($c['field'], VerificationEngine::PROVIDER_FIELDS, true) ? ($c['provider_id'] ?? null) : null,
-                ]);
-            }
-            $this->logger->log('verification_rule.created', ['verification_rule', $id], null, $data);
-        });
-
-        return back()->with('success', __('Rule added.'));
+        }
     }
 
     public function toggle(int $rule): RedirectResponse

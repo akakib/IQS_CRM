@@ -33,11 +33,18 @@
                             <x-badge :color="$outcomeColor[$r->outcome]">{{ $outcomes[$r->outcome] }}</x-badge>
                             @can('settings.edit')
                                 <form method="POST" action="{{ route('settings.verification.toggle', $r->id) }}" class="flex items-center gap-2">@csrf<x-badge :color="$r->is_active ? 'green' : 'gray'">{{ $r->is_active ? __('On') : __('Off') }}</x-badge><button class="text-xs text-primary hover:underline">{{ $r->is_active ? __('Turn off') : __('Turn on') }}</button></form>
+                                <button type="button" @click="$dispatch('open-modal', 'vrule-{{ $r->id }}')" class="text-xs text-primary hover:underline">{{ __('Edit') }}</button>
                                 <form method="POST" action="{{ route('settings.verification.destroy', $r->id) }}" id="rule-del-{{ $r->id }}">@csrf @method('DELETE')<button type="button" @click="$dispatch('open-confirm', { id: 'rule-delete', form: 'rule-del-{{ $r->id }}', label: @js($r->name) })" class="text-xs text-red-600 hover:underline">{{ __('Delete') }}</button></form>
                             @endcan
                         </div>
                     </div>
                 </div>
+                @can('settings.edit')
+                    <x-modal :id="'vrule-'.$r->id" :title="__('Edit rule')" width="max-w-xl" persistent>
+                        @include('settings._verification-form', ['rule' => $r, 'ruleConditions' => $conditions[$r->id] ?? [], 'formId' => 'rule-edit-'.$r->id])
+                        <x-slot:footer><x-button type="button" variant="secondary" @click="$dispatch('close-modal', 'vrule-{{ $r->id }}')">{{ __('Cancel') }}</x-button><x-button type="submit" form="rule-edit-{{ $r->id }}">{{ __('Save') }}</x-button></x-slot:footer>
+                    </x-modal>
+                @endcan
             @endforeach
         </div>
 
@@ -59,52 +66,8 @@
             </x-card>
 
             @can('settings.edit')
-                <x-card :title="__('Add a rule')" x-data="{ conds: [], provFields: {{ \Illuminate\Support\Js::from($providerFields) }} }">
-                    <form method="POST" action="{{ route('settings.verification.store') }}" class="space-y-3">
-                        @csrf
-                        <label class="block text-xs font-medium text-gray-600">{{ __('Rule name') }}
-                            <input name="name" required maxlength="150" placeholder="{{ __('e.g. Repeat customer, small order') }}" class="{{ $input }} mt-1">
-                        </label>
-                        <label class="block text-xs font-medium text-gray-600">{{ __('Position in the list') }}
-                            <input name="priority" type="number" min="1" max="999" value="{{ old('priority', 45) }}" placeholder="45" class="{{ $input }} mt-1">
-                            <span class="mt-1 block text-[11px] font-normal text-gray-400">{{ __('Rules are checked from the smallest number up; the first one that matches decides. 45 puts this rule between #40 and #50.') }}</span>
-                        </label>
-                        <div>
-                            <p class="mb-1 text-xs font-medium text-gray-600">{{ __('What happens when it matches') }}</p>
-                            <x-simple-select name="outcome" :options="$outcomes" value="record_verified" full-width class="w-full" />
-                        </div>
-                        <div>
-                            <p class="mb-1 text-xs font-medium text-gray-600">{{ __('Which orders it applies to') }}</p>
-                            <x-simple-select name="applies_to_channel" :options="['all' => __('All channels'), 'web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone')]" value="all" full-width class="w-full" />
-                        </div>
-                        <p class="text-xs font-medium text-gray-600">{{ __('Conditions (all must be true). None = matches every order.') }}</p>
-                        <template x-for="(c, i) in conds" :key="i">
-                            <div class="rounded-lg border border-gray-200 p-2">
-                                <div class="mb-1 flex flex-wrap gap-1">
-                                    @foreach ($fields as $key => $label)
-                                        <button type="button" @click="c.field = @js($key)" class="rounded border px-1.5 py-0.5 text-[11px]" :class="c.field === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-600'">{{ __($label) }}</button>
-                                    @endforeach
-                                </div>
-                                <input type="hidden" :name="`conditions[${i}][field]`" :value="c.field">
-                                <div x-show="provFields.includes(c.field)" class="mb-1 flex flex-wrap gap-1">
-                                    <input type="hidden" :name="`conditions[${i}][provider_id]`" :value="c.provider_id ?? ''">
-                                    @foreach ($providers as $id => $name)
-                                        <button type="button" @click="c.provider_id = {{ $id }}" class="rounded-full border px-2 py-0.5 text-[11px]" :class="c.provider_id == {{ $id }} ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $name }}</button>
-                                    @endforeach
-                                </div>
-                                <div class="flex gap-1">
-                                    <input type="hidden" :name="`conditions[${i}][operator]`" :value="c.operator">
-                                    @foreach (['>=', '<=', '=', '!=', '>', '<'] as $op)
-                                        <button type="button" @click="c.operator = @js($op)" class="w-8 rounded border text-xs" :class="c.operator === @js($op) ? 'border-primary bg-primary text-white' : 'border-gray-300'">{{ $op }}</button>
-                                    @endforeach
-                                    <input :name="`conditions[${i}][value]`" x-model="c.value" required placeholder="80 / true" class="min-w-0 flex-1 rounded border border-gray-300 px-2 text-xs">
-                                    <button type="button" @click="conds.splice(i, 1)" class="px-1 text-gray-400 hover:text-red-600">&times;</button>
-                                </div>
-                            </div>
-                        </template>
-                        <button type="button" @click="conds.push({ field: 'cod_amount', operator: '<=', value: '', provider_id: null })" class="text-sm font-medium text-primary hover:underline">+ {{ __('Add condition') }}</button>
-                        <x-button class="w-full">{{ __('Save rule') }}</x-button>
-                    </form>
+                <x-card :title="__('Add a rule')">
+                    @include('settings._verification-form', ['rule' => null, 'formId' => 'rule-add'])
                 </x-card>
             @endcan
         </div>

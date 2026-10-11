@@ -52,8 +52,25 @@ class SettingsService
 
         Cache::forget(self::CACHE_KEY);
         $this->values = null;
+        if (array_intersect_key($changes['after'], array_flip(self::OFFICE_WEEK))) {
+            $this->keepOfficeWeek($changes['before'], $userId);
+        }
 
         return $changes;
+    }
+
+    private const OFFICE_WEEK = ['work.days', 'work.start', 'work.end'];
+
+    /** New office hours count from today; the week before stays on record for past days. */
+    private function keepOfficeWeek(array $before, ?int $userId): void
+    {
+        $now = fn (string $k) => (string) $this->get($k);
+        if (! DB::table('office_schedules')->exists()) {
+            $was = fn (string $k) => (string) ($before[$k] ?? $this->get($k));
+            DB::table('office_schedules')->insert(['effective_from' => '2000-01-01', 'days' => $was('work.days'), 'start_time' => $was('work.start'), 'end_time' => $was('work.end'), 'created_at' => now(), 'updated_at' => now()]);
+        }
+        DB::table('office_schedules')->updateOrInsert(['effective_from' => today()->toDateString()],
+            ['days' => $now('work.days'), 'start_time' => $now('work.start'), 'end_time' => $now('work.end'), 'set_by' => $userId, 'created_at' => now(), 'updated_at' => now()]);
     }
 
     /** @return array{0: string, 1: mixed, 2: string, 3: string, 4: array} */

@@ -106,4 +106,19 @@ class WorkHoursTest extends TestCase
         $this->assertSame(1, app(BreakService::class)->autoClose());
         $this->assertSame('2026-10-08 09:00:00', (string) DB::table('staff_breaks')->value('ended_at')); // not the next day
     }
+
+    public function test_new_office_hours_count_from_today_and_the_past_keeps_its_hours(): void
+    {
+        $settings = app(\App\Services\SettingsService::class);
+        [$start, $end] = [settings('work.start'), settings('work.end')]; // the hours before the change
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-14 12:00')); // a Wednesday
+        $settings->set(['work.start' => '10:00', 'work.days' => '0,1,2,3,4']);
+
+        $cal = new \App\Services\Work\WorkCalendar;
+        $this->assertSame(['10:00', $end], $cal->week(null, \Illuminate\Support\Carbon::parse('2026-10-14'))[3]);
+        $this->assertSame([$start, $end], $cal->week(null, \Illuminate\Support\Carbon::parse('2026-10-07'))[3]); // last week stays
+        $this->assertFalse($cal->isOffDay(null, \Illuminate\Support\Carbon::parse('2026-10-10'))); // a Saturday that was a work day
+        $this->assertTrue($cal->isOffDay(null, \Illuminate\Support\Carbon::parse('2026-10-17')));  // Saturday is off from now on
+        $this->assertSame('10:00', \Illuminate\Support\Facades\DB::table('office_schedules')->where('effective_from', '2026-10-14')->value('start_time'));
+    }
 }

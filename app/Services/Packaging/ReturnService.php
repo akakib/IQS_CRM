@@ -22,7 +22,7 @@ class ReturnService
 {
     public const STATES = ['returned', 'partial_delivered'];
 
-    public const CONDITIONS = ['good' => 'Good', 'damaged' => 'Damaged', 'missing' => 'Not in the parcel'];
+    public const CONDITIONS = ['good' => 'Good', 'damaged' => 'Damaged', 'missing' => 'Not in the parcel', 'kept' => 'Customer kept'];
 
     public function __construct(private OrderService $orders, private StockService $stock) {}
 
@@ -37,44 +37,62 @@ class ReturnService
         return $orderId ? Order::find($orderId) : null;
     }
 
-    /** Mark the parcel received, item by item: [order_item_id => good|damaged|missing]. */
+    /**
+     * Mark the parcel received, item by item and piece by piece:
+     * [order_item_id => [good => 2, damaged => 1]] (a plain 'good' means the whole line).
+     * Each line must add up to what was sent. Kept = the customer kept it (partial delivery only):
+     * sold, not a loss, nothing goes back on the shelf.
+     *
+     * @return array{good: float, damaged: float, missing: float, kept: float}
+     */
     public function receive(Order $order, array $conditions, User $by): array
     {
         return DB::transaction(function () use ($order, $conditions, $by) {
             $order = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
-            if (! in_array(OrderStatus::map()[$order->status_id]['key'], self::STATES, true)) {
+            $key = OrderStatus::map()[$order->status_id]['key'];
+            if (! in_array($key, self::STATES, true)) {
                 throw ValidationException::withMessages(['order' => __(':no was not returned.', ['no' => $order->order_no])]);
             }
             if ($order->return_received_at) {
                 throw ValidationException::withMessages(['order' => __(':no was already received.', ['no' => $order->order_no])]);
             }
+            $allowed = $key === 'partial_delivered' ? array_keys(self::CONDITIONS) : array_diff(array_keys(self::CONDITIONS), ['kept']);
             $items = DB::table('order_items')->where('order_id', $order->id)->get(['id', 'variant_id', 'qty', 'name_snapshot']);
             if ($items->pluck('id')->diff(array_keys($conditions))->isNotEmpty()) {
                 throw ValidationException::withMessages(['items' => __('Mark every item first.')]);
             }
-            $count = ['good' => 0, 'damaged' => 0, 'missing' => 0];
+            $count = ['good' => 0.0, 'damaged' => 0.0, 'missing' => 0.0, 'kept' => 0.0];
             $good = [];
             foreach ($items as $item) {
-                $state = $conditions[$item->id];
-                abort_unless(isset(self::CONDITIONS[$state]), 422);
-                DB::table('return_items')->insert([
-                    'order_id' => $order->id, 'order_item_id' => $item->id, 'variant_id' => $item->variant_id,
-                    'qty' => $item->qty, 'condition' => $state, 'user_id' => $by->id, 'created_at' => now(),
-                ]);
-                $count[$state]++;
-                if ($state === 'good' && $item->variant_id) {
-                    $good[$item->variant_id] = ($good[$item->variant_id] ?? 0) + (int) round((float) $item->qty);
+                $split = is_array($conditions[$item->id]) ? $conditions[$item->id] : [$conditions[$item->id] => (float) $item->qty];
+                $split = array_filter(array_map(fn ($q) => round((float) $q, 3), $split), fn ($q) => $q > 0);
+                if (array_diff(array_keys($split), $allowed)) {
+                    throw ValidationException::withMessages(['items' => __('Customer kept is only for a partly delivered parcel.')]);
+                }
+                if (abs(array_sum($split) - (float) $item->qty) > 0.0005) {
+                    throw ValidationException::withMessages(['items' => __(':i: the numbers must add up to :q.', ['i' => $item->name_snapshot, 'q' => $item->qty + 0])]);
+                }
+                foreach ($split as $state => $qty) {
+                    DB::table('return_items')->insert([
+                        'order_id' => $order->id, 'order_item_id' => $item->id, 'variant_id' => $item->variant_id,
+                        'qty' => $qty, 'condition' => $state, 'user_id' => $by->id, 'created_at' => now(),
+                    ]);
+                    $count[$state] += $qty;
+                    if ($state === 'good' && $item->variant_id) {
+                        $good[$item->variant_id] = ($good[$item->variant_id] ?? 0) + (int) round($qty);
+                    }
                 }
             }
             $order->forceFill(['return_received_at' => now(), 'return_received_by' => $by->id])->save();
             $this->stock->returnGood($order, $good, $by);
 
+            $n = fn (float $v) => $v + 0;
             $this->orders->note($order, 'system', __('Return received at the shop by :n: :g good, :d damaged, :m not in the parcel.', [
-                'n' => $by->name, 'g' => $count['good'], 'd' => $count['damaged'], 'm' => $count['missing'],
-            ]), $by);
+                'n' => $by->name, 'g' => $n($count['good']), 'd' => $n($count['damaged']), 'm' => $n($count['missing']),
+            ]).($count['kept'] ? ' '.__(':k kept by the customer.', ['k' => $n($count['kept'])]) : ''), $by);
             if ($count['damaged'] || $count['missing']) {
                 app(NotificationService::class)->send('return_problem', __('Return :no: items damaged or missing', ['no' => $order->order_no]),
-                    __(':d damaged, :m not in the parcel. Received by :n.', ['d' => $count['damaged'], 'm' => $count['missing'], 'n' => $by->name]), [
+                    __(':d damaged, :m not in the parcel. Received by :n.', ['d' => $n($count['damaged']), 'm' => $n($count['missing']), 'n' => $by->name]), [
                         'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => app(DeskService::class)->managerIds(),
                     ]);
             }

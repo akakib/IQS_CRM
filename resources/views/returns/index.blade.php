@@ -21,9 +21,13 @@
                     try { r = await (await fetch(@js(route('returns.find')), { method: 'POST', headers: this.headers(), body: JSON.stringify({ code }) })).json() }
                     catch (e) { r = { ok: false, level: 'red', message: @js(__('Connection problem. Scan again.')) } }
                     this.order = r.ok ? r.order : null; this.marks = {};
+                    if (this.order) this.order.items.forEach(i => this.marks[i.id] = { good: 0, damaged: 0, missing: 0, kept: 0 });
                     $dispatch('scan-result', { ok: r.ok, message: r.message, level: r.level });
                 },
-                get ready() { return this.order && this.order.items.every(i => this.marks[i.id]) },
+                left(i) { const m = this.marks[i.id] || {}; return Math.round((i.qty - (+m.good || 0) - (+m.damaged || 0) - (+m.missing || 0) - (+m.kept || 0)) * 1000) / 1000 },
+                step(i, k, d) { const m = this.marks[i.id]; const v = Math.round(((+m[k] || 0) + d) * 1000) / 1000; if (v < 0 || (d > 0 && this.left(i) < d)) return; m[k] = v },
+                all(i, k) { const m = this.marks[i.id]; Object.keys(m).forEach(x => m[x] = 0); m[k] = i.qty },
+                get ready() { return this.order && this.order.items.every(i => this.left(i) === 0) },
                 async save() {
                     this.saving = true;
                     try {
@@ -40,14 +44,26 @@
             <template x-if="order">
                 <div class="mt-4 space-y-2">
                     <p class="text-sm font-semibold text-gray-900"><span class="font-mono" x-text="order.order_no"></span> · <span x-text="order.customer"></span></p>
-                    <p x-show="order.partial" class="text-xs text-amber-700">{{ __('Partly delivered: mark what came back as Good or Damaged, and what the customer kept as Not in the parcel.') }}</p>
+                    <p x-show="order.partial" class="text-xs text-amber-700">{{ __('Partly delivered: what came back is Good or Damaged, what the customer kept is Customer kept.') }}</p>
+                    <p class="text-xs text-gray-500">{{ __('Count each item: how many are good, how many damaged. Tap a name to put the whole line there.') }}</p>
                     <template x-for="i in order.items" :key="i.id">
-                        <div class="flex flex-col gap-2 rounded-lg border border-gray-200 p-3 sm:flex-row sm:items-center sm:justify-between">
-                            <p class="text-sm text-gray-800"><span x-text="i.name"></span> <b x-text="'×' + i.qty"></b></p>
-                            <div class="flex flex-wrap gap-1.5">
+                        <div class="rounded-lg border p-3" :class="left(i) === 0 ? 'border-green-300 bg-green-50/40' : 'border-gray-200'">
+                            <div class="mb-2 flex items-center justify-between gap-2">
+                                <p class="text-sm text-gray-800"><span x-text="i.name"></span> <b x-text="'×' + i.qty"></b></p>
+                                <span class="shrink-0 text-xs font-medium" :class="left(i) === 0 ? 'text-green-700' : 'text-amber-700'"
+                                    x-text="left(i) === 0 ? @js(__('Done')) : left(i) + ' ' + @js(__('left to count'))"></span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                 @foreach ($states as $key => $label)
-                                    <button type="button" @click="marks[i.id] = @js($key)" class="rounded-full border px-3 py-1.5 text-xs font-medium"
-                                        :class="marks[i.id] === @js($key) ? @js($key === 'good' ? 'border-green-600 bg-green-600 text-white' : 'border-red-600 bg-red-600 text-white') : 'border-gray-300 text-gray-700'">{{ __($label) }}</button>
+                                    <div @if ($key === 'kept') x-show="order.partial" @endif class="flex items-center justify-between gap-1 rounded-lg border px-2 py-1.5"
+                                        :class="marks[i.id]?.{{ $key }} > 0 ? @js($key === 'good' ? 'border-green-500 bg-green-50' : ($key === 'kept' ? 'border-blue-400 bg-blue-50' : 'border-red-400 bg-red-50')) : 'border-gray-200'">
+                                        <button type="button" @click="all(i, @js($key))" class="min-w-0 truncate text-left text-xs font-medium text-gray-700">{{ __($label) }}</button>
+                                        <span class="flex shrink-0 items-center gap-1">
+                                            <button type="button" @click="step(i, @js($key), -1)" class="h-7 w-7 rounded-md border border-gray-300 text-sm leading-none text-gray-600" aria-label="{{ __('Less') }}">&minus;</button>
+                                            <span class="w-6 text-center text-sm font-semibold tabular-nums" x-text="marks[i.id]?.{{ $key }} ?? 0"></span>
+                                            <button type="button" @click="step(i, @js($key), Math.min(1, left(i)))" class="h-7 w-7 rounded-md border border-gray-300 text-sm leading-none text-gray-600" aria-label="{{ __('More') }}">+</button>
+                                        </span>
+                                    </div>
                                 @endforeach
                             </div>
                         </div>
@@ -96,9 +112,10 @@
                         <span class="text-sm font-semibold text-red-700">{{ __('Not back after :n days: ask the courier', ['n' => (int) $at->diffInDays(now())]) }}</span>
                     @elseif ($tab === 'received')
                         <span class="text-xs">
-                            <span class="text-green-700">{{ __(':n good', ['n' => (int) ($c['good'] ?? 0)]) }}</span>
-                            @if ($c['damaged'] ?? 0) · <span class="font-medium text-red-700">{{ __(':n damaged', ['n' => (int) $c['damaged']]) }}</span>@endif
-                            @if ($c['missing'] ?? 0) · <span class="font-medium text-red-700">{{ __(':n not in the parcel', ['n' => (int) $c['missing']]) }}</span>@endif
+                            <span class="text-green-700">{{ __(':n good', ['n' => (float) ($c['good'] ?? 0) + 0]) }}</span>
+                            @if ($c['damaged'] ?? 0) · <span class="font-medium text-red-700">{{ __(':n damaged', ['n' => (float) $c['damaged'] + 0]) }}</span>@endif
+                            @if ($c['missing'] ?? 0) · <span class="font-medium text-red-700">{{ __(':n not in the parcel', ['n' => (float) $c['missing'] + 0]) }}</span>@endif
+                            @if ($c['kept'] ?? 0) · <span class="text-blue-700">{{ __(':n kept by the customer', ['n' => (float) $c['kept'] + 0]) }}</span>@endif
                         </span>
                     @endif
                 </div>

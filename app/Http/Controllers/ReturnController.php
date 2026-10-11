@@ -39,7 +39,7 @@ class ReturnController extends Controller
             ->paginate($list->perPage)->withQueryString();
         $returnedAt = $this->returns->returnedAt($rows->pluck('id')->all());
         $received = $tab === 'received' ? DB::table('return_items')->whereIn('order_id', $rows->pluck('id'))->groupBy('order_id', 'condition')
-            ->selectRaw('order_id, `condition` as c, COUNT(*) as n')->get()->groupBy('order_id') : collect();
+            ->selectRaw('order_id, `condition` as c, SUM(qty) as n')->get()->groupBy('order_id') : collect();
 
         // The reason each one came back with (from the courier: "not set yet" until someone sets it).
         $reasonOf = DB::table('order_events')->whereIn('order_id', $rows->pluck('id'))->whereIn('to_status_id', $states)
@@ -79,11 +79,19 @@ class ReturnController extends Controller
 
     public function receive(Request $request, Order $order): JsonResponse
     {
-        $data = $request->validate(['items' => ['required', 'array'], 'items.*' => ['required', 'in:'.implode(',', array_keys(ReturnService::CONDITIONS))]]);
+        $states = implode(',', array_keys(ReturnService::CONDITIONS));
+        $data = $request->validate(['items' => ['required', 'array']]);
+        foreach ($data['items'] as $line) {
+            $ok = is_array($line)
+                ? collect($line)->every(fn ($q, $state) => in_array($state, array_keys(ReturnService::CONDITIONS), true) && is_numeric($q) && $q >= 0)
+                : in_array($line, explode(',', $states), true);
+            abort_unless($ok, 422);
+        }
         $count = $this->returns->receive($order, $data['items'], $request->user());
+        $n = fn (float $v) => $v + 0;
 
         return response()->json(['ok' => true, 'message' => __(':no received: :g good, :d damaged, :m not in the parcel.', [
-            'no' => $order->order_no, 'g' => $count['good'], 'd' => $count['damaged'], 'm' => $count['missing'],
-        ])]);
+            'no' => $order->order_no, 'g' => $n($count['good']), 'd' => $n($count['damaged']), 'm' => $n($count['missing']),
+        ]).($count['kept'] ? ' '.__(':k kept by the customer.', ['k' => $n($count['kept'])]) : '')]);
     }
 }

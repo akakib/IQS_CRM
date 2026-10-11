@@ -423,20 +423,24 @@ class PackagingTest extends TestCase
 
         // Every item must be marked; then Good goes back on the shelf, Damaged does not, and the managers hear of it.
         $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => 'good']])->assertStatus(422);
-        $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => 'good', $items[$this->nuts->id] => 'damaged']])
+        // Piece by piece: of the 2 dates, 1 good and 1 damaged; the numbers must add up.
+        $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => ['good' => 1], $items[$this->nuts->id] => 'damaged']])->assertStatus(422);
+        $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => ['good' => 1, 'kept' => 1], $items[$this->nuts->id] => 'damaged']])->assertStatus(422); // not a partial
+        $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => ['good' => 1, 'damaged' => 1], $items[$this->nuts->id] => 'damaged']])
             ->assertOk()->assertJson(['ok' => true]);
-        $this->assertSame(3, $this->dates->fresh()->stock_qty);
+        $this->assertSame(2, $this->dates->fresh()->stock_qty);
         $this->assertNotNull($a->fresh()->return_received_at);
         $this->assertDatabaseHas('return_items', ['order_id' => $a->id, 'variant_id' => $this->nuts->id, 'condition' => 'damaged']);
-        $this->assertDatabaseHas('order_notes', ['order_id' => $a->id, 'body' => 'Return received at the shop by Packer: 1 good, 1 damaged, 0 not in the parcel.']);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $a->id, 'body' => 'Return received at the shop by Packer: 1 good, 2 damaged, 0 not in the parcel.']);
+        $this->assertSame(1.0, (float) DB::table('return_items')->where('order_id', $a->id)->where('variant_id', $this->dates->id)->where('condition', 'damaged')->value('qty'));
 
         // Twice is refused; an order that was not returned is not taken in.
         $this->postJson('/returns/find', ['code' => $a->order_no])->assertJson(['ok' => false, 'level' => 'orange']);
         $this->postJson("/returns/{$a->id}", ['items' => [$items[$this->dates->id] => 'good', $items[$this->nuts->id] => 'good']])->assertStatus(422);
-        $this->assertSame(3, $this->dates->fresh()->stock_qty);
+        $this->assertSame(2, $this->dates->fresh()->stock_qty);
         $b = $this->booked('01822222222', [['variant_id' => $this->nuts->id, 'qty' => 1]]);
         $this->postJson('/returns/find', ['code' => $b->order_no])->assertJson(['ok' => false, 'level' => 'red']);
-        $this->get('/returns?tab=received')->assertSee($a->order_no)->assertSee('1 damaged');
+        $this->get('/returns?tab=received')->assertSee($a->order_no)->assertSee('2 damaged');
 
         // Still not back after the setting's days: red, ask the courier.
         $this->returned($b, '-8 days');
@@ -452,5 +456,20 @@ class PackagingTest extends TestCase
             ->assertSee('৳310', false) // loss: courier ৳60 + damaged nuts ৳250
             ->assertSee('1 damaged');
         $this->actingAs($this->packer)->get('/returns-report')->assertForbidden();
+    }
+
+    public function test_a_partly_delivered_parcel_marks_what_the_customer_kept_and_no_alarm_goes_out(): void
+    {
+        $this->actingAs($this->desk)->postJson('/products/stock/'.$this->dates->id, ['qty' => 5]);
+        $a = $this->booked('01833333333', [['variant_id' => $this->dates->id, 'qty' => 3]]);
+        $this->actingAs($this->packer);
+        $this->packIt($a);
+        DB::table('orders')->where('id', $a->id)->update(['status_id' => OrderStatus::idFor('partial_delivered')]);
+        $item = DB::table('order_items')->where('order_id', $a->id)->value('id');
+
+        $this->postJson("/returns/{$a->id}", ['items' => [$item => ['kept' => 2, 'good' => 1]]])->assertOk();
+        $this->assertSame(3, $this->dates->fresh()->stock_qty); // 5 - 3 packed + 1 back
+        $this->assertSame(0, DB::table('app_notifications')->where('subject_id', $a->id)->where('title', 'like', '%damaged or missing%')->count());
+        $this->get('/returns?tab=received')->assertSee('2 kept by the customer');
     }
 }

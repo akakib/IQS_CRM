@@ -64,15 +64,24 @@ class RefundService
         });
     }
 
-    /** A new order for a customer with credit: it is used by itself, up to the order's total. */
+    /**
+     * A new order for a customer with credit: it is used by itself, but only for what the order's own
+     * payments (verified, or still being checked) leave open, and once per order. Paid in full online = no credit.
+     */
     public function useCredit(Order $order, ?User $by): void
     {
         if (! $order->customer_id || (float) $order->grand_total <= 0) {
             return;
         }
         DB::transaction(function () use ($order, $by) {
+            $grand = (float) DB::table('orders')->where('id', $order->id)->lockForUpdate()->value('grand_total');
+            $payments = DB::table('order_payments')->where('order_id', $order->id)->whereIn('payment_type', ['advance', 'adjustment'])->whereIn('status', ['verified', 'pending_verification']);
+            if ((clone $payments)->where('method_id', $this->creditMethodId())->exists()) {
+                return;
+            }
+            $open = $grand - (float) $payments->sum('amount');
             $credit = (float) DB::table('customers')->where('id', $order->customer_id)->lockForUpdate()->value('credit_balance');
-            $use = round(min($credit, (float) $order->grand_total), 2);
+            $use = round(min($credit, $open), 2);
             if ($use <= 0) {
                 return;
             }

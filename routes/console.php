@@ -34,9 +34,10 @@ Schedule::command('channel-sync:run')->everyMinute()->withoutOverlapping(5);
 // Access already stops at expires_at; this only clears the expired rows.
 Schedule::command('permissions:prune-expired')->hourly();
 
-// Owner's nightly numbers on Telegram, at the time set in Settings.
-Schedule::command('reports:owner-summary')->everyMinute()
-    ->when(fn () => now()->format('H:i') === (string) settings('reports.owner_summary_time'));
+// Owner's nightly numbers on Telegram, at the time set in Settings. A cron time (not an every-minute
+// filter) so a slow earlier task cannot push it past its minute. Read safely: on a fresh install the table is not there yet.
+$summaryAt = rescue(fn () => (string) settings('reports.owner_summary_time'), '22:00', false);
+Schedule::command('reports:owner-summary')->dailyAt(preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $summaryAt) ? $summaryAt : '22:00');
 
 // Ad spend (last 3 days re-pulled) and FIFO dollar cost.
 Schedule::command('ads:pull-spend')->everyThreeHours()->withoutOverlapping(30);

@@ -136,4 +136,30 @@ class UserManagementTest extends TestCase
         $this->patch("/users/{$this->admin->id}/status")->assertSessionHas('error');
         $this->assertTrue($this->admin->fresh()->is_active);
     }
+
+    public function test_only_the_owner_touches_the_owner_and_other_logins(): void
+    {
+        $manager = User::factory()->create(['name' => 'Manager']);
+        $manager->roles()->attach($this->role(['staff.view', 'staff.edit', 'staff.delete'], [], 'Manager')->id);
+        $staff = User::factory()->create(['name' => 'Rima', 'email' => 'rima@example.com', 'password' => 'rima-pass']);
+        $fields = fn (User $u, array $extra = []) => $extra + ['name' => $u->name, 'email' => $u->email, 'employment_type' => 'onsite'];
+
+        // The Owner's account: not editable, not resettable, not deactivatable by a manager.
+        $this->actingAs($manager)->put("/users/{$this->admin->id}", $fields($this->admin, ['password' => 'new-pass-123', 'password_confirmation' => 'new-pass-123']))->assertForbidden();
+        $this->patch("/users/{$this->admin->id}/status")->assertForbidden();
+        $this->assertTrue($this->admin->fresh()->is_active);
+        $this->assertTrue(Hash::check('new-pass-123', $this->admin->fresh()->password) === false);
+
+        // Another staff member: the manager edits the record, but their login stays as it was.
+        $r = $this->put("/users/{$staff->id}", $fields($staff, ['name' => 'Rima K', 'email' => 'taken@example.com', 'password' => 'new-pass-123', 'password_confirmation' => 'new-pass-123']));
+        $r->assertSessionHasNoErrors()->assertRedirect();
+        $staff->refresh();
+        $this->assertSame(['Rima K', 'rima@example.com'], [$staff->name, $staff->email]);
+        $this->assertTrue(Hash::check('rima-pass', $staff->password));
+        $this->get("/users/{$staff->id}/edit")->assertOk()->assertDontSee('Reset password')->assertSee('Only the Owner changes the login');
+
+        // The Owner can.
+        $this->actingAs($this->admin)->put("/users/{$staff->id}", $fields($staff, ['password' => 'new-pass-123', 'password_confirmation' => 'new-pass-123']))->assertRedirect();
+        $this->assertTrue(Hash::check('new-pass-123', $staff->fresh()->password));
+    }
 }

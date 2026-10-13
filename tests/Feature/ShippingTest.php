@@ -112,4 +112,50 @@ class ShippingTest extends TestCase
         $this->assertDatabaseHas('shipment_labels', ['barcode' => $order->order_no.'-2', 'voided_at' => null]);
         $this->assertSame(2, $order->fresh()->label_version);
     }
+
+    public function test_an_order_is_not_moved_by_hand_while_a_booking_run_holds_it(): void
+    {
+        $order = $this->confirmedOrder();
+        $cancel = (int) DB::table('status_reasons')->where('reason_type', 'cancel')->value('id');
+        DB::table('orders')->where('id', $order->id)->update(['booking_claim' => 'run-1', 'booking_claimed_at' => now()]);
+
+        try {
+            app(OrderStateMachine::class)->transition($order->fresh(), 'cancelled', auth()->user(), 'user', $cancel);
+            $this->fail('A claimed order was moved.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertStringContainsString('being booked right now', $e->getMessage());
+        }
+        // A claim left behind by a dead run (older than 5 minutes) does not block anyone.
+        DB::table('orders')->where('id', $order->id)->update(['booking_claimed_at' => now()->subMinutes(6)]);
+        app(OrderStateMachine::class)->transition($order->fresh(), 'cancelled', auth()->user(), 'user', $cancel);
+        $this->assertSame('cancelled', OrderStatus::map()[$order->fresh()->status_id]['key']);
+    }
+
+    public function test_a_parcel_booked_for_an_order_cancelled_meanwhile_is_recorded_and_flagged(): void
+    {
+        $order = $this->confirmedOrder();
+        $cancel = (int) DB::table('status_reasons')->where('reason_type', 'cancel')->value('id');
+        // The courier is slow; the moderator cancels during the call (no claim: the direct path).
+        $driver = new class($order->id, $cancel) extends \App\Services\Courier\FakeCourierDriver
+        {
+            public function __construct(private int $orderId, private int $reason) {}
+
+            public function bookBulk(array $requests): array
+            {
+                app(OrderStateMachine::class)->transition(Order::findOrFail($this->orderId), 'cancelled', auth()->user(), 'user', $this->reason);
+
+                return parent::bookBulk($requests);
+            }
+        };
+        $manager = app(\App\Services\Courier\CourierManager::class);
+        (fn () => $this->driver = $driver)->call($manager);
+
+        $result = app(\App\Services\Courier\BookingService::class)->book([$order->id], auth()->user());
+        $order->refresh();
+        $this->assertSame([$order->order_no], $result['booked']);
+        $this->assertSame('cancelled', OrderStatus::map()[$order->status_id]['key']); // the cancel stands
+        $this->assertNotNull($order->active_shipment_id);                              // the parcel is on record
+        $this->assertNotNull(app(OrderService::class)->pendingCourierCancel($order));    // "Deleted" is offered
+        $this->assertDatabaseHas('app_notifications', ['title' => 'Delete '.$order->order_no.' at the courier']);
+    }
 }

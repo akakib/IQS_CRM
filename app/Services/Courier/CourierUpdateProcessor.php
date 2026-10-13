@@ -18,9 +18,12 @@ use Illuminate\Support\Facades\DB;
  */
 class CourierUpdateProcessor
 {
-    /** courier status => our status (null = no status change, open an issue) */
+    /**
+     * courier status => our status. null = no status change, open an issue. 'none' = Steadfast says this from the
+     * moment a parcel is created until it is delivered or returned (in_review, pending): no change for us.
+     */
     private const MAP = [
-        'in_review' => 'in_transit', 'pending' => 'in_transit', 'in_transit' => 'in_transit',
+        'in_review' => 'none', 'pending' => 'none', 'in_transit' => 'in_transit',
         'delivered' => 'delivered', 'partial_delivered' => 'partial_delivered', 'cancelled' => 'returned',
         'hold' => null, 'delivered_approval_pending' => null, 'partial_delivered_approval_pending' => null,
         'cancelled_approval_pending' => null, 'unknown_approval_pending' => null, 'unknown' => null,
@@ -78,6 +81,12 @@ class CourierUpdateProcessor
         ], fn ($v) => $v !== null));
 
         $target = self::MAP[$status] ?? null;
+        $current = OrderStatus::map()[$order->status_id];
+        if ($target === 'none') {
+            $this->mark($eventId, null);
+
+            return 'no_change';
+        }
         if ($target === null) {
             $this->openIssue($order, $shipment, self::ISSUE_TYPE[$status] ?? 'other', __('Courier status: :s', ['s' => str_replace('_', ' ', $status)]));
             $this->mark($eventId, null);
@@ -85,7 +94,6 @@ class CourierUpdateProcessor
             return 'issue_opened';
         }
 
-        $current = OrderStatus::map()[$order->status_id];
         if (($current['key'] === 'cancelled' || $order->taken_back_at) && $status === 'cancelled') {
             $this->orders->markCourierCancelled($order, null, 'courier');
             $this->mark($eventId, null);

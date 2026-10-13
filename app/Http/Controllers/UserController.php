@@ -72,7 +72,13 @@ class UserController extends Controller
 
     public function update(UserRequest $request, User $user): RedirectResponse
     {
+        $actor = $request->user();
+        // The Owner's account is the Owner's alone; someone else's login (password, email) is changed only by the Owner.
+        abort_if($user->isOwner() && ! $actor->isOwner(), 403);
         $data = collect($request->validated())->except(['photo', 'remove_photo', 'chat_channels', 'monthly_salary'])->all();
+        if (! $actor->isOwner() && ! $user->is($actor)) {
+            unset($data['password'], $data['email']);
+        }
         $passwordReset = filled($data['password'] ?? null);
         $this->savePhoto($request, $user);
         $this->saveChatChannels($request, $user);
@@ -160,6 +166,7 @@ class UserController extends Controller
         if ($user->is($request->user())) {
             return back()->with('error', __('You cannot deactivate your own account.'));
         }
+        abort_if($user->isOwner() && ! $request->user()->isOwner(), 403); // the Owner is never locked out by staff
         $moved = null;
         if ($user->is_active) {
             $request->validate(['give_to' => ['nullable', 'integer', 'exists:users,id']]);

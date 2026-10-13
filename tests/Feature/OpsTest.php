@@ -93,6 +93,9 @@ class OpsTest extends TestCase
         $this->assertStringContainsString('queue:work --stop-when-empty', $commands);
         $this->assertStringContainsString('backup:database', $commands);
         $this->assertStringContainsString('permissions:prune-expired', $commands);
+        // The owner summary is a cron-time event (decided at the start of the run), not an every-minute filter.
+        $summary = collect(app(Schedule::class)->events())->first(fn ($e) => str_contains((string) $e->command, 'reports:owner-summary'));
+        $this->assertSame('0 22 * * *', $summary->expression);
     }
 
     public function test_health_page_is_owner_only(): void

@@ -23,7 +23,8 @@
 
     <div class="grid gap-x-4 md:grid-cols-2">
         <x-form.input name="name" :label="__('Name')" :value="$user->name" required maxlength="255" autofocus />
-        <x-form.input name="email" type="email" :label="__('Email (login)')" :value="$user->email" required maxlength="255" />
+        @php $canChangeLogin = ! $user->exists || auth()->user()->isOwner() || $user->is(auth()->user()); @endphp
+        <x-form.input name="email" type="email" :label="__('Email (login)')" :value="$user->email" required maxlength="255" :readonly="! $canChangeLogin" />
         <x-form.input name="phone" :label="__('Phone')" :value="$user->phone" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX" />
         <x-form.input name="telegram_user_id" :label="__('Telegram user ID')" :value="$user->telegram_user_id" maxlength="50" />
 
@@ -114,6 +115,7 @@
         </div>
     @endif
 
+    @if ($canChangeLogin)
     <div class="mt-2 border-t border-gray-100 pt-4">
         <p class="mb-3 text-sm font-semibold text-gray-800">{{ $user->exists ? __('Reset password') : __('Password') }}</p>
         @if ($user->exists)
@@ -124,6 +126,9 @@
             <x-form.input name="password_confirmation" type="password" :label="__('Confirm password')" autocomplete="new-password" :required="! $user->exists" />
         </div>
     </div>
+    @else
+        <p class="mt-2 border-t border-gray-100 pt-4 text-xs text-gray-500">{{ __('Only the Owner changes the login email or password of someone else.') }}</p>
+    @endif
 
     <div class="flex items-center gap-2">
         <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Save') }}</button>

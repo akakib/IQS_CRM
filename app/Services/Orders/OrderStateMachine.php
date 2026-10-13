@@ -48,6 +48,12 @@ class OrderStateMachine
                 throw ValidationException::withMessages(['order' => __('This order was changed by someone else. Reload and try again.')]);
             }
             $from = $map[$fresh->status_id];
+            // A booking run holds it this very moment: a cancel or hold now would leave a parcel at the courier
+            // that the order knows nothing about. Seconds normally; a stuck claim is released after 5 minutes.
+            if ($source === 'user' && $fresh->booking_claim && $fresh->booking_claimed_at
+                && \Illuminate\Support\Carbon::parse($fresh->booking_claimed_at)->gt(now()->subMinutes(5))) {
+                throw ValidationException::withMessages(['status' => __('The courier is being booked right now. Try again in a few seconds.')]);
+            }
 
             $rule = DB::table('order_status_transitions')
                 ->where('from_status_id', $from['id'])->where('to_status_id', $to['id'])->where('is_active', true)->first();

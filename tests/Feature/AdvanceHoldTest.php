@@ -351,4 +351,28 @@ class AdvanceHoldTest extends TestCase
         $this->assertSame('150.00', $c->fresh()->refund_due);
         $this->get('/payments/refunds?tab=done')->assertSee('BACK1')->assertSee('Kept as credit');
     }
+
+    public function test_credit_covers_only_what_the_order_leaves_open(): void
+    {
+        $make = fn (?float $paid) => app(OrderService::class)->create([
+            'channel' => 'web', 'phone' => '01777777777', 'name' => 'Buyer', 'address_line' => 'Road 1',
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
+        ] + ($paid ? ['advance' => ['method_id' => $this->bkash(), 'amount' => $paid, 'transaction_id' => 'ON'.uniqid(), 'status' => 'verified']] : []), null, 'webhook');
+        $a = $make(null);
+        DB::table('customers')->where('id', $a->customer_id)->update(['credit_balance' => 400]);
+        $balance = fn () => (float) DB::table('customers')->where('id', $a->customer_id)->value('credit_balance');
+
+        // Paid in full online: no credit is touched and nothing is owed back.
+        $full = $make((float) $a->grand_total);
+        $this->assertSame('0.00', $full->fresh()->refund_due);
+        $this->assertEquals((float) $full->grand_total, (float) $full->fresh()->advance_verified);
+        $this->assertEquals(400, $balance());
+
+        // Half paid: credit fills only the rest.
+        $paid = round((float) $a->grand_total / 2, 2);
+        $half = $make($paid);
+        $this->assertEquals((float) $half->grand_total, (float) $half->fresh()->advance_verified);
+        $this->assertSame('0.00', $half->fresh()->refund_due);
+        $this->assertEquals(400 - ((float) $half->grand_total - $paid), $balance());
+    }
 }

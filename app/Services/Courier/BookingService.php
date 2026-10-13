@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  */
 class BookingService
 {
-    public function __construct(private CourierManager $courier, private OrderStateMachine $machine, private OrderService $orders) {}
+    public function __construct(private CourierManager $courier, private OrderStateMachine $machine, private OrderService $orders, private \App\Services\NotificationService $notifications) {}
 
     /**
      * @param  list<int>  $orderIds
@@ -73,7 +73,8 @@ class BookingService
             }
 
             try {
-                DB::transaction(function () use ($order, $r, $by, $driver) {
+                $movedTo = DB::transaction(function () use ($order, $r, $by, $driver) {
+                    $now = OrderStatus::map()[Order::whereKey($order->id)->lockForUpdate()->value('status_id')];
                     DB::table('shipments')->where('order_id', $order->id)->where('is_active', true)->update(['is_active' => false, 'updated_at' => now()]);
                     $shipmentId = DB::table('shipments')->insertGetId([
                         'order_id' => $order->id, 'courier' => $driver->name(), 'consignment_id' => $r->consignmentId,
@@ -85,9 +86,17 @@ class BookingService
                         'booking_state' => 'none', 'booking_error' => null, 'packaging_sent_at' => now()])->save();
                     $this->issueLabel($order, $shipmentId, $by, null);
                     $this->orders->note($order, 'courier', __('Booked with :c · CN :cn · COD ৳:cod', ['c' => ucfirst($driver->name()), 'cn' => $r->consignmentId, 'cod' => $order->cod_amount]), $by);
+                    if ($now['key'] !== 'confirmed') {
+                        return $now['name']; // moved while the courier was booking: the parcel is real, the order stays where it went
+                    }
                     $this->machine->transition($order, 'ready_for_packaging', $by, 'system', null, 'CN '.$r->consignmentId);
+
+                    return null;
                 });
                 $result['booked'][] = $invoice;
+                if ($movedTo) {
+                    $this->bookedAfterMove($order->fresh(), (string) $r->consignmentId, $movedTo);
+                }
             } catch (\Throwable $e) {
                 $result['failed'][$invoice] = $e->getMessage();
                 $result['kind'][$invoice] = 'temporary';
@@ -95,6 +104,17 @@ class BookingService
         }
 
         return $result;
+    }
+
+    /** The order was cancelled or held while the courier was creating its parcel: the people on it must delete it there or move the order on. */
+    private function bookedAfterMove(Order $order, string $cn, string $status): void
+    {
+        $this->orders->note($order, 'courier', __('Booked (CN :cn) while the order was moved to :s. Delete it at the courier, or move the order on to packaging.', ['cn' => $cn, 's' => $status]), null);
+        $this->notifications->send('courier_cancel_needed', __('Delete :no at the courier', ['no' => $order->order_no]),
+            __('The courier created CN :cn while the order was moved to :s. Delete it in the courier panel and press "Deleted" on the order, or move the order on to packaging.', ['cn' => $cn, 's' => $status]), [
+                'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+                'user_ids' => array_values(array_unique(array_filter([$order->moderator_id, ...app(\App\Services\Orders\DeskService::class)->managerIds()]))),
+            ]);
     }
 
     /** The invoice sent to the courier: the order number, plus -2, -3 after a parcel was deleted at the courier. */

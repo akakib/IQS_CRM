@@ -128,4 +128,20 @@ class CourierWebhookTest extends TestCase
         $this->assertSame('delivered', $this->key());
         $this->assertDatabaseHas('courier_events', ['notification_type' => 'resync']);
     }
+
+    public function test_pending_and_in_review_leave_a_parcel_on_our_shelf_alone(): void
+    {
+        // Steadfast reports in_review, then pending, from the moment a parcel is created: the box is still with us.
+        foreach (['in_review', 'pending'] as $status) {
+            $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => (int) $this->cn, 'invoice' => $this->order->order_no, 'status' => $status])->assertOk();
+            $this->assertSame('ready_for_packaging', $this->key());
+        }
+        $this->assertSame(0, DB::table('delivery_issues')->count());
+        $this->assertSame(0, DB::table('courier_events')->whereNull('processed_at')->count());
+
+        // After the handover scan the same words change nothing either; delivered or returned does.
+        DB::table('orders')->where('id', $this->order->id)->update(['status_id' => OrderStatus::idFor('handed_over')]);
+        $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => (int) $this->cn, 'invoice' => $this->order->order_no, 'status' => 'pending'])->assertOk();
+        $this->assertSame('handed_over', $this->key());
+    }
 }

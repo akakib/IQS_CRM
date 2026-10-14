@@ -72,6 +72,9 @@ class OrderStateMachine
             if ($to['key'] === 'confirmed' && app(OrderService::class)->hasUncheckedAdvance($fresh)) {
                 throw ValidationException::withMessages(['status' => __('An advance is waiting for its check: check the TrxID and amount first (Payments to check), so the courier gets the right COD.')]);
             }
+            if ($from['key'] === 'cancelled' && $to['key'] === 'new' && app(OrderService::class)->pendingCourierCancel($fresh)) {
+                throw ValidationException::withMessages(['status' => __('The parcel still stands at the courier: delete it there and press "Deleted" first, then reopen.')]);
+            }
             if ($to['key'] === 'confirmed' && $fresh->taken_back_at) {
                 throw ValidationException::withMessages(['status' => __('The old parcel still stands at the courier: delete it there and press "Deleted" first, so this order never has two parcels.')]);
             }

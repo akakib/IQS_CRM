@@ -31,7 +31,7 @@ class DeliveryIssueService
         $id = DB::table('delivery_issues')->insertGetId([
             'order_id' => $order->id, 'shipment_id' => $shipmentId, 'issue_type' => $type,
             'rider_phone' => Phone::normalize($riderPhone), 'note' => $note, 'opened_by' => $by?->id,
-            'assigned_to' => $order->moderator_id, 'sla_due_at' => now()->addMinutes((int) settings('orders.issue_sla_minutes')),
+            'assigned_to' => $order->moderator_id && DB::table('users')->where('id', $order->moderator_id)->where('is_active', true)->exists() ? $order->moderator_id : null, 'sla_due_at' => now()->addMinutes((int) settings('orders.issue_sla_minutes')),
             'created_at' => now(), 'updated_at' => now(),
         ]);
 

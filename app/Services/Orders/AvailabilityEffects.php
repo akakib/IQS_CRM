@@ -49,8 +49,8 @@ class AvailabilityEffects
 
     private function release(int $variantId): void
     {
-        $awaiting = DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'awaiting_stock')->value('id');
-        $orders = Order::where('status_id', OrderStatus::idFor('hold'))->where('hold_reason_id', $awaiting)
+        $awaiting = DB::table('status_reasons')->where('reason_type', 'hold')->whereIn('system_key', ['awaiting_stock', 'stock_out'])->pluck('id');
+        $orders = Order::where('status_id', OrderStatus::idFor('hold'))->whereIn('hold_reason_id', $awaiting)
             ->whereIn('id', DB::table('order_items')->select('order_id')->where('variant_id', $variantId))
             ->orderBy('id')->get();
 
@@ -61,8 +61,13 @@ class AvailabilityEffects
             if ($blocked) {
                 continue;
             }
-            $this->machine->transition($order, 'confirmed', null, 'system', null, __('Stock arrived: released (first come, first served).'));
-            $released[] = $order->id;
+            try {
+                $this->machine->transition($order, 'confirmed', null, 'system', null, __('Stock arrived: released (first come, first served).'));
+                $released[] = $order->id;
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                // This order cannot move on by itself (an advance to check, a parcel to delete): it stays on hold, its person is told.
+                $this->orders->note($order, 'system', __('Stock arrived, but the order stays on hold: :e', ['e' => collect($e->errors())->flatten()->first()]), null);
+            }
         }
 
         if ($released) {

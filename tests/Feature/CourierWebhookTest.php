@@ -104,6 +104,14 @@ class CourierWebhookTest extends TestCase
 
     public function test_cancelled_is_a_return_with_a_reason_to_set(): void
     {
+        // Before pickup it is not a return: the parcel is on our shelf, someone books it again or cancels.
+        $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => $this->cn, 'status' => 'cancelled', 'tracking_message' => 'rejected']);
+        $this->assertSame('ready_for_packaging', $this->key());
+        $this->assertDatabaseHas('delivery_issues', ['order_id' => $this->order->id, 'issue_type' => 'cancel']);
+        DB::table('delivery_issues')->delete();
+        DB::table('courier_events')->delete();
+
+        DB::table('orders')->where('id', $this->order->id)->update(['status_id' => OrderStatus::idFor('handed_over')]);
         $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => $this->cn, 'status' => 'cancelled']);
 
         $this->assertSame('returned', $this->key());
@@ -143,5 +151,21 @@ class CourierWebhookTest extends TestCase
         DB::table('orders')->where('id', $this->order->id)->update(['status_id' => OrderStatus::idFor('handed_over')]);
         $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => (int) $this->cn, 'invoice' => $this->order->order_no, 'status' => 'pending'])->assertOk();
         $this->assertSame('handed_over', $this->key());
+    }
+
+    public function test_a_closed_order_or_a_held_order_never_loses_the_courier_news(): void
+    {
+        // Held: delivered cannot be applied, so an issue is opened and the event is not retried forever.
+        DB::table('orders')->where('id', $this->order->id)->update(['status_id' => OrderStatus::idFor('hold')]);
+        $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => $this->cn, 'status' => 'delivered', 'cod_amount' => 900])->assertOk();
+        $this->assertDatabaseHas('delivery_issues', ['order_id' => $this->order->id, 'issue_type' => 'other']);
+        $this->assertNotNull(DB::table('courier_events')->value('processed_at'));
+
+        // Cancelled, but the courier delivered it: written on the parcel, managers told.
+        DB::table('courier_events')->delete();
+        DB::table('orders')->where('id', $this->order->id)->update(['status_id' => OrderStatus::idFor('cancelled')]);
+        $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => $this->cn, 'status' => 'delivered', 'cod_amount' => 900])->assertOk();
+        $this->assertEquals(900, (float) DB::table('shipments')->where('consignment_id', $this->cn)->value('collected_amount'));
+        $this->assertDatabaseHas('app_notifications', ['title' => $this->order->order_no.': courier says delivered']);
     }
 }

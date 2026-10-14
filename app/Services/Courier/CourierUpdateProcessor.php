@@ -100,12 +100,46 @@ class CourierUpdateProcessor
 
             return 'cancel_confirmed';
         }
+        if ($current['final'] && in_array($target, ['delivered', 'partial_delivered', 'returned'], true) && ! $shipment->final_at && $current['key'] !== $target) {
+            DB::table('shipments')->where('id', $shipment->id)->update(['final_at' => now(), 'collected_amount' => $target === 'returned' ? 0 : $u->codAmount]);
+            $this->orders->note($order, 'courier', __('Courier says :s, but the order is :o. Check what happened to this parcel.', ['s' => str_replace('_', ' ', $target), 'o' => $current['name']]), null);
+            $this->notifications->send('delivery_issue', __(':no: courier says :s', ['no' => $order->order_no, 's' => str_replace('_', ' ', $target)]),
+                __('The order is :o. Check the parcel (and the money) with the courier.', ['o' => $current['name']]), [
+                    'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+                    'user_ids' => app(\App\Services\Orders\DeskService::class)->managerIds(),
+                ]);
+            $this->mark($eventId, null);
+
+            return 'closed_order_outcome';
+        }
         if ($current['key'] === $target || $current['final']) {
             $this->mark($eventId, null);
 
             return 'no_change';
         }
+        // kh4: cancelled by the courier before anyone picked it up (review rejected, deleted in the panel): not a customer return.
+        if ($status === 'cancelled' && in_array($current['key'], ['confirmed', 'ready_for_packaging', 'packed', 'ready_for_pickup'], true)) {
+            $this->openIssue($order, $shipment, 'cancel', __('The courier cancelled this parcel before pickup. Book it again or cancel the order.'));
+            $this->mark($eventId, null);
 
+            return 'cancelled_before_pickup';
+        }
+
+        try {
+            $this->applyStatus($order, $current, $target, $u, $shipment);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->openIssue($order, $shipment, 'other', __('Courier status :s could not be applied while the order is :o.', ['s' => str_replace('_', ' ', $status), 'o' => $current['name']]));
+            $this->mark($eventId, $e->getMessage());
+
+            return 'issue_opened';
+        }
+        $this->mark($eventId, null);
+
+        return $target;
+    }
+
+    private function applyStatus(Order $order, array $current, string $target, CourierUpdate $u, object $shipment): void
+    {
         DB::transaction(function () use ($order, $current, $target, $u, $shipment) {
             if (in_array($current['key'], ['ready_for_packaging', 'packed', 'ready_for_pickup'], true)) {
                 $this->machine->transition($order, 'in_transit', null, 'webhook', null, __('Courier picked up without a handover scan.'));
@@ -137,9 +171,6 @@ class CourierUpdateProcessor
             }
             app(NotificationService::class)->markActed('order', $order->id, 'delivery_issue');
         });
-        $this->mark($eventId, null);
-
-        return $target;
     }
 
     private function openIssue(Order $order, object $shipment, string $type, string $note): void
@@ -148,17 +179,18 @@ class CourierUpdateProcessor
         if ($open) {
             return;
         }
+        $owner = $order->moderator_id && DB::table('users')->where('id', $order->moderator_id)->where('is_active', true)->exists() ? $order->moderator_id : null;
         $id = DB::table('delivery_issues')->insertGetId([
             'order_id' => $order->id, 'shipment_id' => $shipment->id, 'issue_type' => $type, 'note' => $note,
-            'opened_by' => null, 'assigned_to' => $order->moderator_id,
+            'opened_by' => null, 'assigned_to' => $owner,
             'sla_due_at' => now()->addMinutes((int) settings('orders.issue_sla_minutes')),
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->orders->note($order, 'courier', $note, null, ['delivery_issue_id' => $id]);
         $this->notifications->send('delivery_issue', __(':no: :n', ['no' => $order->order_no, 'n' => $note]), $order->ship_name, [
-            'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'order_moderator_id' => $order->moderator_id,
+            'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'order_moderator_id' => $owner,
             'group_key' => 'delivery_issue:'.$order->id,
-        ]);
+        ] + ($owner ? [] : ['user_ids' => app(\App\Services\Orders\DeskService::class)->managerIds()]));
     }
 
     private function mark(?int $eventId, ?string $error): void

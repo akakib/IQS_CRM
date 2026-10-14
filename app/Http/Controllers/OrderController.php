@@ -449,6 +449,10 @@ class OrderController extends Controller
         if ($order->channel === 'web' || ! in_array($key, ['new', 'record_verified'], true)) {
             return;
         }
+        $run = DB::table('verification_runs')->where('order_id', $order->id)->orderByDesc('id')->first(['outcome', 'matched_rule_id']);
+        if ($run && $run->outcome === 'manual_review' && $run->matched_rule_id) {
+            return; // a rule asked for a person to look first (e.g. a blocked customer)
+        }
         if ($key === 'new') {
             $order = $this->machine->transition($order, 'record_verified', $user, 'user', null, __('Taken in a chat or call'));
         }

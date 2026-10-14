@@ -129,7 +129,7 @@ class CustomerImportController extends Controller
             'values' => ['nullable', 'array'], 'values.status' => ['nullable', 'array'], 'values.status.*' => [Rule::in(array_keys(HistoryImport::STATUSES))],
             'values.medium' => ['nullable', 'array'], 'values.medium.*' => [Rule::in(array_keys(Order::CHANNELS))],
             'default_medium' => ['nullable', Rule::in(array_keys(Order::CHANNELS))],
-            'source' => ['required', 'string', 'max:80'],
+            'source' => ['nullable', 'string', 'max:80'],
         ]);
         $used = array_count_values(array_filter($data['mapping']));
         if (($used['phone'] ?? 0) !== 1) {
@@ -143,7 +143,8 @@ class CustomerImportController extends Controller
                 abort(422, __(':f is picked for two columns.', ['f' => __(HistoryImport::FIELDS[$field])]));
             }
         }
-        $data['source'] = trim($data['source']);
+        // No name given: the saved template's, else the file's own name.
+        $data['source'] = mb_substr(trim((string) ($data['source'] ?? '')) ?: ($row->source ?: pathinfo($row->file_name, PATHINFO_FILENAME)), 0, 80);
         [$header, $rows] = json_decode(Storage::disk('local')->get($row->path) ?? abort(410), true);
 
         return [$row, $this->history->plan($header, $rows, $data['mapping'], $data['values'] ?? [], $data['default_medium'] ?? null, $data['source']), $data];

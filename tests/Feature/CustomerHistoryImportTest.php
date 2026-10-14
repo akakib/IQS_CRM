@@ -144,4 +144,20 @@ DM240726F65T8N,Shahin Raza,01326885301,2026-07-24
         $this->postJson(route('customers.history.preview', $again), ['source' => 'Other', 'mapping' => ['cn' => 'cn', 'name' => 'name', 'phone' => 'phone', 'date' => 'date']])
             ->assertJsonPath('counts.orders', 0)->assertJsonPath('counts.already', 1);
     }
+
+    public function test_a_pathao_file_is_guessed_right_and_needs_no_source_name(): void
+    {
+        (new CustomerSeeder)->run();
+        $owner = $this->owner();
+        $csv = "consignment_id,merchant_name,recipient_name,recipient_phone,invoice_id,created_at
+DM1AAAAA,Iqbal Store,Md Shahin Raza,01326885301,260726MQKJLAG,7/24/2026 16:27
+DM1BBBBB,Iqbal Store,Antara Das,01764121879,260726MQKJLAG,7/24/2026 16:26
+";
+        $this->actingAs($owner)->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('1st 300.csv', $csv)]);
+        $id = DB::table('customer_imports')->value('id');
+        $guess = $this->get(route('customers.history.map', $id))->viewData('mapping');
+        $this->assertSame(['consignment_id' => 'cn', 'merchant_name' => '', 'recipient_name' => 'name', 'recipient_phone' => 'phone', 'invoice_id' => '', 'created_at' => 'date'], $guess);
+        $this->postJson(route('customers.history.run', $id), ['source' => '', 'mapping' => $guess])->assertOk();
+        $this->assertSame(['1st 300', '1st 300'], DB::table('customer_past_orders')->pluck('source')->all()); // two parcels, named after the file
+    }
 }

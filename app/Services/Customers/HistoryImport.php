@@ -27,7 +27,7 @@ class HistoryImport
     /** Header words that point to a field, most specific first. */
     private const GUESS = [
         'phone' => ['billing phone', 'recipient phone', 'customer phone', 'phone', 'mobile', 'contact'],
-        'name' => ['billing first name', 'billing last name', 'recipient name', 'customer name', 'full name', 'name'],
+        'name' => ['billing first name', 'billing last name', 'recipient name', 'customer name', 'receiver name', 'full name', 'name'],
         'cn' => ['consignment id', 'consignment', 'cn', 'tracking code', 'tracking id', 'tracking'],
         'order_no' => ['order number', 'order no', 'order id', 'merchant order id', 'invoice'],
         'date' => ['order date', 'created at', 'date created', 'created', 'date'],
@@ -95,7 +95,10 @@ class HistoryImport
             $taken = 0;
             foreach ($words as $w) {
                 foreach ($lower as $i => $h) {
-                    if ($map[$header[$i]] === '' && ($h === $w || str_contains($h, $w)) && ! ($field === 'amount' && str_contains($h, 'item'))) {
+                    // One-word guesses that are easy to mistake match the whole header only (invoice_id is a payout invoice, not an order).
+                    $exact = in_array($w, ['invoice', 'cn', 'tracking', 'name'], true);
+                    if ($map[$header[$i]] === '' && ($h === $w || (! $exact && str_contains($h, $w))) && ! ($field === 'amount' && str_contains($h, 'item'))
+                        && ! ($field === 'name' && preg_match('/merchant|store|shop|product|item|hub|zone|file|user|sender/', $h))) {
                         $map[$header[$i]] = $field;
                         $taken++;
                         if ($taken >= (in_array($field, ['name'], true) ? 2 : 1)) {

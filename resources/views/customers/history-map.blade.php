@@ -14,17 +14,18 @@
             headers: @js($headers), map: @js($map), values: @js(['status' => (object) ($values['status'] ?? []), 'medium' => (object) ($values['medium'] ?? [])]),
             defaultMedium: 'other', source: @js($import->source ?? ''), counts: null, sample: [], error: '', busy: false,
             has(f) { return this.map.includes(f) },
-            body() { const m = {}; this.headers.forEach((h, i) => m[h] = this.map[i]); return { mapping: m, values: this.values, default_medium: this.defaultMedium, source: this.$refs.src.value.trim() } },
+            body() { const m = {}; this.headers.forEach((h, i) => m[h] = this.map[i]); return { mapping: m, values: this.values, default_medium: this.defaultMedium, source: this.src() } },
+            src() { return (document.getElementById('history-source')?.value || '').trim() },
             async send(url) {
                 this.error = ''; this.busy = true;
                 try {
-                    const r = await fetch(url + '?source=' + encodeURIComponent(this.$refs.src.value.trim()), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: JSON.stringify(this.body()) });
+                    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: JSON.stringify(this.body()) });
                     const j = await r.json();
                     if (! r.ok) { this.error = j.message || @js(__('Something went wrong.')); return null }
                     return j;
                 } catch (e) { this.error = @js(__('Something went wrong.')); return null } finally { this.busy = false }
             },
-            async check() { if (! this.has('phone') || ! this.has('name')) { this.error = @js(__('Pick the Phone and the Name columns.')); return } if (! this.$refs.src.value.trim()) { this.error = @js(__('Give this file a source name, like WooCommerce or Pathao.')); return } const j = await this.send(@js(route('customers.history.preview', $import->id))); if (j) { this.counts = j.counts; this.sample = j.sample } },
+            async check() { if (! this.has('phone') || ! this.has('name')) { this.error = @js(__('Pick the Phone and the Name columns.')); return } const j = await this.send(@js(route('customers.history.preview', $import->id))); if (j) { this.counts = j.counts; this.sample = j.sample } },
             async run() { const j = await this.send(@js(route('customers.history.run', $import->id))); if (j) window.location = j.url },
         }"
         x-init="$refs.rf.submit = () => run()">
@@ -34,8 +35,8 @@
             <p class="truncate text-sm font-semibold text-gray-900">{{ $import->file_name }}</p>
             <p class="text-xs text-gray-500">{{ trans_choice(':count row|:count rows', $import->row_count, ['count' => $import->row_count]) }}
                 · @if ($fromTemplate){{ __('Matched the saved template :t. Change anything below; the template updates.', ['t' => $import->source]) }}@else{{ __('New file shape. IQS guessed the fields marked auto; check them.') }}@endif</p>
-            <label class="mt-3 block text-xs font-medium text-gray-700">{{ __('Source name (shown on the journey)') }}</label>
-            <input type="text" x-ref="src" x-model="source" autocomplete="off" @input="counts = null" maxlength="80" placeholder="{{ __('WooCommerce, Pathao...') }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
+            <label class="mt-3 block text-xs font-medium text-gray-700">{{ __('Source name (shown on the journey; the file name if left empty)') }}</label>
+            <input type="text" id="history-source" value="{{ $import->source ?? '' }}" autocomplete="off" @input="counts = null" maxlength="80" placeholder="{{ __('WooCommerce, Pathao...') }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
         </div>
 
         <div class="rounded-2xl border border-gray-200 bg-white p-4">

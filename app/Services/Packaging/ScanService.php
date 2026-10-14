@@ -180,6 +180,10 @@ class ScanService
             return $this->log('handover', $sessionId, $code, $order, $label, $early, $by);
         }
 
+        if ($order->courier_mismatch_at) {
+            return $this->log('handover', $sessionId, $code, $order, $label, $this->fail('blocked', __('Do not hand over: the courier has a different COD (৳:c, order ৳:o). A manager checks it first.', [
+                'c' => number_format((float) $order->courier_mismatch_cod), 'o' => number_format((float) $order->cod_amount)])), $by);
+        }
         if (DB::table('scan_logs')->where('handover_session_id', $sessionId)->where('order_id', $order->id)->whereIn('result', ['ok', 'relabel_done'])->exists()) {
             return $this->log('handover', $sessionId, $code, $order, $label, $this->fail('duplicate', __('Scanned twice: this parcel is already in this handover.'), 'warn'), $by);
         }

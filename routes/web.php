@@ -161,6 +161,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders/{order}/edit', [OrderController::class, 'edit'])->middleware('can:orders.edit')->name('orders.edit');
     Route::post('/orders/{order}/amend', [OrderController::class, 'amend'])->middleware('can:orders.edit')->name('orders.amend');
     Route::post('/orders/{order}/merge', [OrderController::class, 'merge'])->middleware('can:orders.edit')->name('orders.merge');
+    Route::post('/orders/{order}/courier-mismatch', [OrderController::class, 'clearCourierMismatch'])->middleware('can:orders.approve')->name('orders.courier-mismatch.clear');
     Route::post('/orders/{order}/amendments/{amendment}', [OrderController::class, 'decideAmendment'])->whereNumber('amendment')->middleware('can:orders.approve')->name('orders.amendments.decide');
     Route::post('/orders/{order}/reassign', [OrderController::class, 'reassign'])->middleware('can:orders.reassign')->name('orders.reassign');
     Route::post('/orders/{order}/payments/{payment}', [OrderController::class, 'verifyPayment'])->whereNumber('payment')->name('orders.payments.verify');

@@ -64,6 +64,8 @@ class CourierUpdateProcessor
             return 'inactive_shipment'; // an old booking (rebooked); ignore its updates
         }
 
+        $this->checkCod($order, $shipment, $u);
+
         if ($u->type === 'tracking_update') {
             if ($u->message) {
                 $this->orders->note($order, 'courier', __('Courier: :m', ['m' => $u->message]), null);
@@ -191,6 +193,25 @@ class CourierUpdateProcessor
             'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'order_moderator_id' => $owner,
             'group_key' => 'delivery_issue:'.$order->id,
         ] + ($owner ? [] : ['user_ids' => app(\App\Services\Orders\DeskService::class)->managerIds()]));
+    }
+
+    /** Before delivery the courier's COD must be ours; a different one means the parcel was changed outside IQS. */
+    private function checkCod(Order $order, object $shipment, CourierUpdate $u): void
+    {
+        $final = in_array($u->status, ['delivered', 'partial_delivered', 'cancelled'], true) || OrderStatus::map()[$order->status_id]['final'];
+        // Skip: same as ours, already flagged, or the very amount a manager already checked.
+        $checked = $order->courier_mismatch_cod !== null && abs($u->codAmount - (float) $order->courier_mismatch_cod) < 1;
+        if ($u->codAmount === null || $final || abs($u->codAmount - (float) $order->cod_amount) < 1 || $order->courier_mismatch_at || $checked) {
+            return;
+        }
+        $order->forceFill(['courier_mismatch_at' => now(), 'courier_mismatch_cod' => $u->codAmount])->save();
+        $this->orders->note($order, 'courier', __('Courier COD is ৳:c but the order says ৳:o: the parcel was changed outside IQS. Handover blocked until a manager checks.', [
+            'c' => number_format($u->codAmount), 'o' => number_format((float) $order->cod_amount)]), null);
+        $this->notifications->send('delivery_issue', __(':no: courier COD differs', ['no' => $order->order_no]),
+            __('Steadfast ৳:c, order ৳:o. Check what the customer wants and fix the order.', ['c' => number_format($u->codAmount), 'o' => number_format((float) $order->cod_amount)]), [
+                'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+                'user_ids' => array_values(array_unique(array_filter([$order->moderator_id, ...app(\App\Services\Orders\DeskService::class)->managerIds()]))),
+            ]);
     }
 
     private function mark(?int $eventId, ?string $error): void

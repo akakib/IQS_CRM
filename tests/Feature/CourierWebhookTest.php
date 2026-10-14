@@ -168,4 +168,35 @@ class CourierWebhookTest extends TestCase
         $this->assertEquals(900, (float) DB::table('shipments')->where('consignment_id', $this->cn)->value('collected_amount'));
         $this->assertDatabaseHas('app_notifications', ['title' => $this->order->order_no.': courier says delivered']);
     }
+
+    public function test_a_parcel_changed_at_the_courier_blocks_the_handover_until_checked(): void
+    {
+        $cod = (float) $this->order->cod_amount;
+        // Same COD: nothing happens.
+        $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => (int) $this->cn, 'status' => 'in_review', 'cod_amount' => $cod])->assertOk();
+        $this->assertNull($this->order->fresh()->courier_mismatch_at);
+
+        // Changed in the Steadfast panel: flagged, managers told.
+        $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => (int) $this->cn, 'status' => 'pending', 'cod_amount' => $cod + 500])->assertOk();
+        $this->assertNotNull($this->order->fresh()->courier_mismatch_at);
+        $this->assertDatabaseHas('app_notifications', ['title' => $this->order->order_no.': courier COD differs']);
+
+        // The handover refuses it until a manager presses Checked.
+        $owner = \App\Models\User::whereHas('roles', fn ($q) => $q->where('system_key', 'owner'))->first();
+        $session = DB::table('handover_sessions')->insertGetId(['courier' => 'steadfast', 'pickup_date' => today(), 'started_by' => $owner->id, 'started_at' => now()]);
+        DB::table('orders')->where('id', $this->order->id)->update(['status_id' => OrderStatus::idFor('ready_for_pickup'), 'packed_version' => 1]);
+        $label = DB::table('shipment_labels')->where('order_id', $this->order->id)->whereNull('voided_at')->value('barcode');
+        $r = app(\App\Services\Packaging\ScanService::class)->handover($session, $label, $owner);
+        $this->assertFalse($r['ok']);
+        $this->assertStringContainsString('different COD', $r['message']);
+
+        $this->actingAs($owner)->post(route('orders.courier-mismatch.clear', $this->order))->assertSessionHas('success');
+        $this->assertNull($this->order->fresh()->courier_mismatch_at);
+        $this->get(route('orders.show', $this->order))->assertOk()->assertDontSee('The courier has a different COD');
+        // The same amount again does not block; another new amount does.
+        $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => (int) $this->cn, 'status' => 'pending', 'cod_amount' => $cod + 500, 'tracking_message' => 'again'])->assertOk();
+        $this->assertNull($this->order->fresh()->courier_mismatch_at);
+        $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => (int) $this->cn, 'status' => 'pending', 'cod_amount' => $cod + 900])->assertOk();
+        $this->assertNotNull($this->order->fresh()->courier_mismatch_at);
+    }
 }

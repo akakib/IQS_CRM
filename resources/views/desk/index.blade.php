@@ -274,6 +274,7 @@
                     @include('desk._reassign', ['order' => $order, 'reassign' => $reassign])
                 @endif
                 <x-order-presence :order="$order" mode="view" />
+                <x-courier-mismatch :order="$order" />
                 <x-cod-update :order="$order" />
                 <x-courier-cancel :order="$order" />
                 <x-take-back :order="$order" class="mb-3" />

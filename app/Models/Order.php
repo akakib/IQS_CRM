@@ -49,6 +49,7 @@ class Order extends Model
             'refund_due' => 'decimal:2',
             'edited_after_pack' => 'boolean',
             'is_duplicate_flag' => 'boolean',
+            'courier_mismatch_at' => 'datetime',
             'verified_at' => 'datetime',
             'confirmed_at' => 'datetime',
             'pickup_date' => 'date',

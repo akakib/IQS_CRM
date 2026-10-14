@@ -459,6 +459,18 @@ class OrderController extends Controller
         $this->machine->transition($order, 'confirmed', $user, 'user', null, __('Confirmed in the chat or call it was taken in'));
     }
 
+    /** A manager checked a COD the courier reported differently: the handover is open again. */
+    public function clearCourierMismatch(Order $order, Request $request): RedirectResponse
+    {
+        abort_unless(Order::visibleTo($request->user())->whereKey($order->id)->exists(), 403);
+        if ($order->courier_mismatch_at) {
+            $order->forceFill(['courier_mismatch_at' => null])->save(); // the checked amount stays, so the same news does not block again
+            app(\App\Services\Orders\OrderService::class)->note($order, 'courier', __('Courier COD difference checked by :n.', ['n' => $request->user()->name]), $request->user());
+        }
+
+        return back()->with('success', __('Checked. The parcel can be handed over.'));
+    }
+
     /** Two open orders of one customer in one parcel: this order's items go into the other, this one is cancelled. */
     public function merge(Order $order, Request $request, \App\Services\Orders\OrderMerger $merger): RedirectResponse
     {

@@ -132,7 +132,7 @@ class CustomerCallController extends Controller
         $people = DB::table('customer_calls as c')->join('users as u', 'u.id', '=', 'c.user_id')->whereBetween('c.started_at', $range)
             ->groupBy('c.user_id', 'u.name')
             ->selectRaw("u.name, SUM(CASE WHEN c.direction = 'out' THEN 1 ELSE 0 END) as out_n, SUM(CASE WHEN c.direction = 'out' AND c.outcome = 'answered' THEN 1 ELSE 0 END) as answered,
-                SUM(CASE WHEN c.direction = 'in' THEN 1 ELSE 0 END) as in_n, SUM(COALESCE(c.duration_seconds, 0)) as seconds, SUM(CASE WHEN c.recording_url IS NOT NULL THEN 1 ELSE 0 END) as recorded")
+                SUM(CASE WHEN c.direction = 'in' THEN 1 ELSE 0 END) as in_n, SUM(COALESCE(c.duration_seconds, 0)) as seconds, SUM(CASE WHEN c.recording_url IS NOT NULL OR c.proof_path IS NOT NULL THEN 1 ELSE 0 END) as recorded")
             ->orderByRaw('COUNT(*) DESC')->get();
         $calls = DB::table('customer_calls as c')->join('users as u', 'u.id', '=', 'c.user_id')->leftJoin('orders as o', 'o.id', '=', 'c.order_id')
             ->whereBetween('c.started_at', $range)->orderByDesc('c.started_at')

@@ -37,7 +37,7 @@
                         @can('customers.view')<a href="{{ route('journey.show', $item->customer_id) }}" target="_blank" rel="noopener" class="shrink-0 text-xs text-primary hover:underline">{{ __('Journey') }}</a>@endcan
                     @endif
                 </div>
-                <a href="tel:{{ $item->phone }}" @click="window.iqsCallStart = Date.now()" class="mt-3 flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-4 text-lg font-semibold text-white hover:bg-green-700">
+                <a href="tel:{{ $item->phone }}" @click="window.iqsCallStart = Date.now(); fetch(@js(route('calls.touch', [$list->id, $item->id])), { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {})" class="mt-3 flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-4 text-lg font-semibold text-white hover:bg-green-700">
                     <x-icon name="phone" class="h-5 w-5" /> {{ __('Call') }}
                 </a>
                 @if ($list->instructions)
@@ -77,19 +77,29 @@
                 x-data="{
                     outcome: @js(old('outcome', '')), sat: @js(old('satisfaction') === null ? null : (int) old('satisfaction')), topics: {}, laterAt: @js(old('later_at', '')),
                     file: '', order: null, busy: false, note: '', key: 'iqs-call-note-{{ $item->id }}',
-                    spoke() { return @js(CallListService::SPOKE).includes(this.outcome) },
+                    spoke() { return this.spokeOf(this.outcome) },
+                    spokeOf(o) { return @js(CallListService::SPOKE).includes(o) }, orderLinked: true,
                     init() {
                         try { this.note = @js(old('note', '')) || localStorage.getItem(this.key) || '' } catch (e) {}
                         this.$watch('note', v => { try { localStorage.setItem(this.key, v) } catch (e) {} });
                         // Back from the dialer: how long the call took.
-                        document.addEventListener('visibilitychange', () => { if (! document.hidden && window.iqsCallStart && ! window.iqsCallSeconds) window.iqsCallSeconds = Math.round((Date.now() - window.iqsCallStart) / 1000) });
-                        window.addEventListener('iqs-order-made', e => { this.order = e.detail.no; this.outcome = 'ordered' });
+                        window.iqsCallSeconds = 0;
+                        document.addEventListener('visibilitychange', () => {
+                            if (! document.hidden && window.iqsCallStart) { window.iqsCallSeconds += Math.round((Date.now() - window.iqsCallStart) / 1000); window.iqsCallStart = null }
+                        });
+                        window.addEventListener('iqs-order-made', e => {
+                            this.order = e.detail.no; this.orderLinked = e.detail.linked;
+                            if (e.detail.linked) this.outcome = 'ordered';
+                        });
+                        // A recording for a talk, a picture for no answer: a file picked for the other kind is dropped.
+                        this.$watch('outcome', (v, old) => { if (old && this.spokeOf(v) !== this.spokeOf(old)) { this.file = ''; this.$refs.proof.value = '' } });
+                        @if (session('saved_item')) try { localStorage.removeItem('iqs-call-note-{{ (int) session('saved_item') }}') } catch (e) {} @endif
                     },
                     laterIn(h) { const d = new Date(Date.now() + h * 3600000); this.laterAt = this.local(d) },
                     tomorrow() { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(11, 0, 0, 0); this.laterAt = this.local(d) },
                     local(d) { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) },
                     ready() { return this.outcome && this.file && (! this.spoke() || this.sat !== null) && (this.outcome !== 'later' || this.laterAt) },
-                    submit(e) { if (! this.ready()) { e.preventDefault(); return } this.$refs.seconds.value = window.iqsCallSeconds || ''; try { localStorage.removeItem(this.key) } catch (x) {} this.busy = true },
+                    submit(e) { if (! this.ready()) { e.preventDefault(); return } this.$refs.seconds.value = window.iqsCallSeconds || ''; this.busy = true },
                 }" @submit="submit($event)">
                 @csrf
                 <input type="hidden" name="seconds" x-ref="seconds">
@@ -105,7 +115,8 @@
                             </label>
                         @endforeach
                     </div>
-                    <p x-show="order" x-cloak class="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">{{ __('Order made:') }} <span class="font-mono font-semibold" x-text="order"></span></p>
+                    <p x-show="order && orderLinked" x-cloak class="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">{{ __('Order made:') }} <span class="font-mono font-semibold" x-text="order"></span></p>
+                    <p x-show="order && ! orderLinked" x-cloak class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('The order was made, but this number waited too long and went back to the list, so the order is not linked to it. Press Next call.') }} <span class="font-mono font-semibold" x-text="order"></span></p>
                     @if ($canOrder)
                         <button type="button" class="mt-2 w-full rounded-xl border border-primary px-3 py-2.5 text-sm font-semibold text-primary hover:bg-green-50"
                             @click="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: @js(route('orders.create', ['phone' => $item->phone, 'channel' => 'phone', 'embed' => 1, 'call_item' => $item->id])), title: @js(__('Order for :n', ['n' => $item->name])) } }))">+ {{ __('Take an order') }}</button>
@@ -154,7 +165,7 @@
                             <span class="block text-sm font-medium text-gray-900" x-text="file || (spoke() ? @js(__('Add the recording')) : @js(__('Add the screenshot')))"></span>
                             <span class="block text-xs text-gray-500">{{ __('From your phone: the newest one is on top.') }}</span>
                         </span>
-                        <input type="file" name="proof" class="sr-only" :accept="spoke() ? 'audio/*,.m4a,.amr,.mp3,.aac,.ogg,.opus,.wav,.3gp' : 'image/*'" @change="file = $event.target.files[0]?.name || ''">
+                        <input type="file" name="proof" x-ref="proof" class="sr-only" :accept="spoke() ? 'audio/*,.m4a,.amr,.mp3,.aac,.ogg,.opus,.wav,.3gp' : 'image/*'" @change="file = $event.target.files[0]?.name || ''">
                     </label>
                 </div>
 

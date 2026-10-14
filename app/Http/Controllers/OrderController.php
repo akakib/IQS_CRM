@@ -140,16 +140,14 @@ class OrderController extends Controller
 
         $message = __('Order :no created.', ['no' => $order->order_no]);
         // Taken during a call from a call list: linked to that call, and the caller stays on the call.
-        if (! empty($data['call_item'])) {
-            app(\App\Services\Calls\CallListService::class)->linkOrder((int) $data['call_item'], $order->id, $request->user());
-        }
+        $linked = ! empty($data['call_item']) && app(\App\Services\Calls\CallListService::class)->linkOrder((int) $data['call_item'], $order->id, $request->user());
         // Made from the New order popup (Communication): the page behind it goes to Order management.
         if ($request->boolean('embed')) {
             if (empty($data['call_item'])) {
                 session()->flash('success', $message);
             }
 
-            return response()->view('orders.create-done', ['order' => $order, 'stay' => ! empty($data['call_item'])]);
+            return response()->view('orders.create-done', ['order' => $order, 'stay' => ! empty($data['call_item']), 'linked' => $linked]);
         }
 
         return redirect()->route('orders.show', $order)->with('success', $message);

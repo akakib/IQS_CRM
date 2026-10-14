@@ -2,7 +2,7 @@
      Open with window.dispatchEvent(new CustomEvent('order-new', { detail: url })) where url is
      orders.create with embed=1. Closes only with Close (typing must not be lost to a stray click);
      after Create the page goes to Order management with the new order open. --}}
-@can('orders.view')
+@canany(['orders.view', 'orders.create'])
 <div x-data="{ src: '', title: '' }" @order-new.window="src = $event.detail.url || $event.detail; title = $event.detail.title || ''"
     @message.window="if ($event.origin === location.origin && $event.data?.iqsOrderCreated) {
         if ($event.data.stay) { src = ''; window.dispatchEvent(new CustomEvent('iqs-order-made', { detail: $event.data })) }
@@ -20,4 +20,4 @@
         </div>
     </template>
 </div>
-@endcan
+@endcanany

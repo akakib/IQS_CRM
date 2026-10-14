@@ -77,7 +77,7 @@ class WorkTime
 
         // Everyone who works orders and was on shift that day, even with no order at all (free all day is worth seeing).
         $staff = \App\Models\User::where(fn ($q) => $q->where('is_active', true)->orWhereIn('id', $turns->keys()))->get(['id', 'name', 'photo_path', 'created_at', 'is_active'])
-            ->filter(fn ($u) => ($u->can('orders.take') || ! $u->is_active) && ! $u->isOwner());
+            ->filter(fn ($u) => ($u->can('orders.take') || $u->can('calls.work') || ! $u->is_active) && ! $u->isOwner());
         $this->calendar->preload($staff->pluck('id')->all());
         // Days before someone joined are not their free time.
         $joined = fn ($u, $d) => ! $u->created_at || $d->gte($u->created_at->copy()->startOfDay());

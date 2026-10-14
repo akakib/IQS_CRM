@@ -214,4 +214,96 @@ class CallListTest extends TestCase
         // Callers cannot manage.
         $this->get(route('calls.lists'))->assertForbidden();
     }
+
+    public function test_review_fixes_pool_order_holds_and_do_not_call(): void
+    {
+        $list = $this->makeList([$this->rakin, $this->pranta]);
+        $rec = fn () => UploadedFile::fake()->create('c.m4a', 10, 'audio/mp4');
+
+        // Skip puts the number behind the others: the caller gets a different one next.
+        $this->actingAs($this->rakin)->get(route('calls.work', $list));
+        $first = $this->item($this->rakin, $list);
+        $this->post(route('calls.skip', [$list, $first->id]));
+        $this->get(route('calls.work', $list));
+        $this->assertNotSame($first->id, $this->item($this->rakin, $list)->id);
+
+        // A call-back left with someone who went away keeps its place: the next caller gets it before fresh numbers.
+        $held = $this->item($this->rakin, $list);
+        DB::table('call_list_items')->where('id', $held->id)->update(['attempts' => 1, 'next_at' => now()->subHour(), 'taken_at' => now()->subMinutes(31)]);
+        $this->actingAs($this->pranta)->get(route('calls.work', $list));
+        $this->assertSame($held->id, $this->item($this->pranta, $list)->id);
+
+        // Being on the page (or tapping Call) keeps the hold: not handed on while it is worked.
+        DB::table('call_list_items')->where('id', $held->id)->update(['taken_at' => now()->subMinutes(25)]);
+        $this->postJson(route('calls.touch', [$list, $held->id]))->assertOk();
+        $this->assertGreaterThan(now()->subMinute()->getTimestamp(), strtotime(DB::table('call_list_items')->find($held->id)->taken_at));
+
+        // Saving a number that went to someone else meanwhile: a clear message, nothing saved.
+        $this->actingAs($this->rakin)->get(route('calls.work', $list));
+        $mine = $this->item($this->rakin, $list);
+        DB::table('call_list_items')->where('id', $mine->id)->update(['user_id' => $this->pranta->id]);
+        $this->post(route('calls.record', [$list, $mine->id]), ['outcome' => 'answered', 'satisfaction' => 50, 'proof' => $rec()])->assertSessionHasErrors('outcome');
+        $this->assertSame(0, DB::table('customer_calls')->count());
+        DB::table('call_list_items')->where('id', $mine->id)->update(['user_id' => $this->rakin->id]);
+
+        // Do not call again also takes the customer's number out of someone else's hands in another list.
+        $other = $this->makeList([$this->pranta]);
+        $this->actingAs($this->pranta)->get(route('calls.work', $other));
+        $theirs = $this->item($this->pranta, $other);
+        DB::table('call_list_items')->where('id', $theirs->id)->update(['customer_id' => $mine->customer_id]);
+        $this->actingAs($this->rakin)->post(route('calls.record', [$list, $mine->id]), ['outcome' => 'do_not_call', 'satisfaction' => 0, 'proof' => $rec()]);
+        $this->assertSame(['done', null], [DB::table('call_list_items')->find($theirs->id)->state, DB::table('call_list_items')->find($theirs->id)->user_id]);
+
+        // Merging keeps the wish: the customer left after a merge is not called either.
+        $keep = Customer::where('primary_phone', '01733333333')->first();
+        app(\App\Services\Customers\CustomerService::class)->merge($keep, Customer::find($mine->customer_id), $this->owner->id);
+        $this->assertNotNull($keep->fresh()->do_not_call_at);
+    }
+
+    public function test_a_proof_is_judged_by_what_it_is_and_served_safely(): void
+    {
+        $list = $this->makeList([$this->rakin]);
+        $this->actingAs($this->rakin)->get(route('calls.work', $list));
+        $item = $this->item($this->rakin, $list);
+
+        // A web page named like a picture is not a screenshot; a picture is not a recording.
+        // A real file (its type read from the content, as on the server), named like a picture.
+        $path = tempnam(sys_get_temp_dir(), 'p');
+        file_put_contents($path, '<html><body><script>alert(1)</script></body></html>');
+        $html = new UploadedFile($path, 'log.jpg', 'image/jpeg', null, true);
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'no_answer', 'proof' => $html])->assertSessionHasErrors('proof');
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 100, 'proof' => UploadedFile::fake()->image('log.png')])->assertSessionHasErrors('proof');
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 100, 'proof' => UploadedFile::fake()->create('call.m4a', 10, 'audio/mp4'), 'seconds' => 300]);
+
+        $call = DB::table('customer_calls')->first();
+        $this->assertStringEndsWith('.m4a', $call->proof_path);
+        $r = $this->get(route('calls.proof', $call->id))->assertOk();
+        $this->assertSame('audio/mp4', $r->headers->get('Content-Type'));
+        $this->assertSame('nosniff', $r->headers->get('X-Content-Type-Options'));
+        $this->assertStringContainsString('sandbox', (string) $r->headers->get('Content-Security-Policy'));
+    }
+
+    public function test_work_time_reports_and_the_order_popup_see_list_calls(): void
+    {
+        $list = $this->makeList([$this->rakin]);
+        $this->actingAs($this->rakin)->get(route('calls.work', $list));
+        $item = $this->item($this->rakin, $list);
+        // Taken in the morning and saved after hours: never more than the 30-minute hold counts as work.
+        DB::table('call_list_items')->where('id', $item->id)->update(['taken_at' => now()->subHours(9)]);
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'busy', 'proof' => UploadedFile::fake()->image('log.png')]);
+        $call = DB::table('customer_calls')->first();
+        $this->assertLessThanOrEqual(30 * 60, strtotime($call->ended_at) - strtotime($call->started_at));
+
+        // Someone who only makes list calls is in Team Activity.
+        $this->assertNotNull(app(\App\Services\Reports\WorkTime::class)->day(today())['people']->firstWhere('id', $this->rakin->id));
+
+        // The calls report counts the proof as a recording.
+        $this->actingAs($this->owner)->get(route('calls-report.index'))->assertOk();
+
+        // A caller who may create orders but not browse them still gets the order popup.
+        $taker = User::factory()->create(['is_active' => true]);
+        $taker->roles()->attach($this->role(['calls.work', 'orders.create'], [], 'Caller who orders')->id);
+        $other = $this->makeList([$taker]);
+        $this->actingAs($taker)->get(route('calls.work', $other))->assertSee('Take an order')->assertSee('order-new.window', false);
+    }
 }

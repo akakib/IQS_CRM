@@ -128,6 +128,8 @@ class CustomerService
                 'delivered_count' => $keep->delivered_count + $duplicate->delivered_count,
                 'returned_count' => $keep->returned_count + $duplicate->returned_count,
                 'first_order_at' => collect([$keep->first_order_at, $duplicate->first_order_at])->filter()->min(),
+                // Asked not to be called on either number: still so.
+                'do_not_call_at' => collect([$keep->do_not_call_at, $duplicate->do_not_call_at])->filter()->min(),
                 'risk_level' => collect(['normal' => 0, 'watch' => 1, 'blocked' => 2])
                     ->only([$keep->risk_level, $duplicate->risk_level])->sortDesc()->keys()->first(),
             ]);

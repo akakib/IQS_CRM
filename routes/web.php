@@ -185,6 +185,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/my-calls/{list}', 'work')->whereNumber('list')->name('calls.work');
             Route::post('/my-calls/{list}/{item}', 'record')->whereNumber(['list', 'item'])->name('calls.record');
             Route::post('/my-calls/{list}/{item}/skip', 'skip')->whereNumber(['list', 'item'])->name('calls.skip');
+            Route::post('/my-calls/{list}/{item}/touch', 'touch')->whereNumber(['list', 'item'])->name('calls.touch');
         });
         Route::get('/call-proof/{call}', 'proof')->whereNumber('call')->name('calls.proof');
     });

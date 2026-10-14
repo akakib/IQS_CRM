@@ -37,8 +37,6 @@ class CallListService
 
     public const TOPICS = ['product' => 'Product quality', 'delivery' => 'Delivery', 'packaging' => 'Packaging', 'price' => 'Price', 'staff' => 'Staff'];
 
-    public const PROOF_TYPES = ['mp3', 'm4a', 'aac', 'amr', 'ogg', 'oga', 'opus', 'wav', '3gp', '3gpp', 'mp4', 'webm', 'jpg', 'jpeg', 'png', 'webp', 'heic'];
-
     /** No answer or busy: tried again after this long, at most this many times. */
     private const RETRY_HOURS = 3;
 
@@ -56,6 +54,7 @@ class CallListService
     {
         $people = DB::table('customer_past_orders as p')->join('customers as c', 'c.id', '=', 'p.customer_id')
             ->where('p.customer_import_id', $importId)->whereNull('c.deleted_at')->whereNull('c.do_not_call_at')
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('customers as m')->whereColumn('m.merged_into_id', 'c.id')->whereNotNull('m.do_not_call_at'))
             ->when($filter['status'] ?? null, fn ($q, $s) => $q->where('p.status', $s))
             ->when($filter['from'] ?? null, fn ($q, $d) => $q->where('p.ordered_at', '>=', $d.' 00:00:00'))
             ->when($filter['to'] ?? null, fn ($q, $d) => $q->where('p.ordered_at', '<=', $d.' 23:59:59'))
@@ -74,23 +73,59 @@ class CallListService
         return $added;
     }
 
+    /**
+     * Gives held numbers back to the pool. A number already tried keeps its place as a call-back (a promise to
+     * the customer); an untouched one goes behind the numbers nobody has opened yet.
+     */
+    public static function giveBack(\Illuminate\Database\Query\Builder $held): int
+    {
+        $now = now()->format('Y-m-d H:i:s');
+
+        return $held->update([
+            'state' => DB::raw("CASE WHEN attempts > 0 THEN 'later' ELSE 'waiting' END"),
+            'next_at' => DB::raw("CASE WHEN attempts > 0 THEN COALESCE(next_at, '$now') ELSE '$now' END"),
+            'user_id' => null, 'taken_at' => null, 'updated_at' => $now,
+        ]);
+    }
+
+    /** Numbers left open too long (page closed, phone died) go back to the pool. */
+    private function releaseStale(array $listIds): void
+    {
+        if ($listIds) {
+            self::giveBack(DB::table('call_list_items')->whereIn('call_list_id', $listIds)->where('state', 'in_hand')
+                ->where('taken_at', '<', now()->subMinutes(self::HOLD_MINUTES)));
+        }
+    }
+
+    /** Customers who asked not to be called (following merges to the customer that is left). */
+    private function doNotCall(): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('customers')->whereNotNull('do_not_call_at')->select('id');
+    }
+
     /** The number this person is on, or the next one from the pool (taken so nobody else gets it). */
     public function next(int $listId, User $user): ?object
     {
         $now = now();
-        // Left open too long (page closed, phone died): back to the pool.
-        DB::table('call_list_items')->where('call_list_id', $listId)->where('state', 'in_hand')->where('taken_at', '<', $now->copy()->subMinutes(self::HOLD_MINUTES))
-            ->update(['state' => 'waiting', 'user_id' => null, 'taken_at' => null, 'updated_at' => $now]);
+        $this->releaseStale([$listId]);
 
         $mine = DB::table('call_list_items')->where('call_list_id', $listId)->where('state', 'in_hand')->where('user_id', $user->id)->first();
         if ($mine) {
+            // Back on the page: the hold starts again, so it is not handed to someone else while being worked.
+            DB::table('call_list_items')->where('id', $mine->id)->update(['taken_at' => $now]);
+            $mine->taken_at = $now->format('Y-m-d H:i:s');
+
             return $mine;
         }
-        // Call-backs that are due first (a promise to the customer), then the pool, newest buyers first (as filled).
+        // Someone who asked not to be called since the list was made: closed, never handed out.
+        DB::table('call_list_items')->where('call_list_id', $listId)->whereIn('state', ['waiting', 'later'])->whereIn('customer_id', $this->doNotCall())
+            ->update(['state' => 'done', 'outcome' => 'do_not_call', 'done_at' => $now, 'updated_at' => $now]);
+        // Call-backs that are due first (a promise to the customer), then the pool: untouched numbers (newest buyers, as
+        // filled) before ones given back or skipped.
         for ($try = 0; $try < 5; $try++) {
             $id = DB::table('call_list_items')->where('call_list_id', $listId)
                 ->where(fn ($q) => $q->where('state', 'waiting')->orWhere(fn ($l) => $l->where('state', 'later')->where('next_at', '<=', $now)))
-                ->orderByRaw("CASE WHEN state = 'later' THEN 0 ELSE 1 END")->orderBy('next_at')->orderBy('id')->value('id');
+                ->orderByRaw("CASE WHEN state = 'later' THEN 0 ELSE 1 END")->orderByRaw('CASE WHEN next_at IS NULL THEN 0 ELSE 1 END')->orderBy('next_at')->orderBy('id')->value('id');
             if (! $id) {
                 return null;
             }
@@ -105,11 +140,19 @@ class CallListService
         return null;
     }
 
-    /** Gives the number back untouched (Skip): it is not a call and does not count. */
+    /** The caller is working this number (Call tapped): the hold starts again. */
+    public function touch(int $itemId, User $user): void
+    {
+        DB::table('call_list_items')->where('id', $itemId)->where('user_id', $user->id)->where('state', 'in_hand')->update(['taken_at' => now()]);
+    }
+
+    /** Skip: not a call and not counted; the number goes behind the others (an hour later for a call-back). */
     public function release(object $item, User $user): void
     {
-        DB::table('call_list_items')->where('id', $item->id)->where('user_id', $user->id)->where('state', 'in_hand')
-            ->update(['state' => $item->attempts ? 'later' : 'waiting', 'user_id' => null, 'taken_at' => null, 'next_at' => $item->attempts ? now() : null, 'updated_at' => now()]);
+        DB::table('call_list_items')->where('id', $item->id)->where('user_id', $user->id)->where('state', 'in_hand')->update([
+            'state' => $item->attempts ? 'later' : 'waiting', 'user_id' => null, 'taken_at' => null, 'updated_at' => now(),
+            'next_at' => $item->attempts ? now()->addHour() : now(),
+        ]);
     }
 
     /**
@@ -119,7 +162,10 @@ class CallListService
      */
     public function record(object $item, User $user, array $data, ?UploadedFile $proof): void
     {
-        abort_unless($item->state === 'in_hand' && (int) $item->user_id === $user->id, 409, __('This number is no longer with you. Press Next call.'));
+        $gone = ValidationException::withMessages(['outcome' => __('This number is no longer with you (it waited too long and went back to the list). Press Next call.')]);
+        if ($item->state !== 'in_hand' || (int) $item->user_id !== $user->id) {
+            throw $gone;
+        }
         $outcome = $data['outcome'];
         $spoke = in_array($outcome, self::SPOKE, true);
         if ($spoke && ! array_key_exists((int) ($data['satisfaction'] ?? -1), self::SATISFACTION)) {
@@ -128,15 +174,21 @@ class CallListService
         if (! $proof) {
             throw ValidationException::withMessages(['proof' => $spoke ? __('Add the call recording.') : __('Add a screenshot of the call log.')]);
         }
+        // The file is judged by what it is, not by its name: a recording when they spoke, a picture when not.
+        $ext = self::proofExtension($proof, $spoke);
+        if (! $ext) {
+            throw ValidationException::withMessages(['proof' => $spoke ? __('This is not a recording. Add the call recording (m4a, mp3, amr...).') : __('This is not a picture. Add a screenshot of the call log.')]);
+        }
         if ($outcome === 'later' && empty($data['later_at'])) {
             throw ValidationException::withMessages(['later_at' => __('Pick when to call again.')]);
         }
 
         $now = now();
         $attempts = $item->attempts + 1;
-        $path = $proof->storeAs('call-proofs/'.$item->call_list_id, $item->id.'-'.$attempts.'-'.$now->format('YmdHis').'.'.strtolower($proof->getClientOriginalExtension()), 'local');
         $topics = array_intersect_key(array_filter((array) ($data['topics'] ?? []), fn ($v) => in_array($v, ['good', 'bad'], true)), self::TOPICS);
         $satisfaction = $spoke ? (int) $data['satisfaction'] : null;
+        // Work time: from taking the number (or tapping Call) to saving, never more than the hold.
+        $started = Carbon::parse($item->taken_at ?? $now)->max($now->copy()->subMinutes(self::HOLD_MINUTES));
 
         // Where the number goes: tried again later, or finished.
         [$state, $nextAt] = match (true) {
@@ -144,39 +196,67 @@ class CallListService
             in_array($outcome, ['no_answer', 'busy'], true) && $attempts < self::MAX_ATTEMPTS => ['later', $now->copy()->addHours(self::RETRY_HOURS)],
             default => ['done', null],
         };
-        // An order made on this call (from the popup) is linked; else the newest one this person made for the customer while holding it.
+        // An order made on this call (from the popup) is linked; else the newest one made for this customer in the last two hours by this person.
         $orderId = $item->order_id ?? ($outcome === 'ordered' && $item->customer_id
-            ? DB::table('orders')->where('customer_id', $item->customer_id)->where('created_by', $user->id)->where('created_at', '>=', $item->taken_at)->orderByDesc('id')->value('id')
+            ? DB::table('orders')->where('customer_id', $item->customer_id)->where('created_by', $user->id)->where('created_at', '>=', $now->copy()->subHours(2))
+                ->whereNotIn('id', DB::table('call_list_items')->whereNotNull('order_id')->select('order_id'))->orderByDesc('id')->value('id')
             : null);
+        $path = $proof->storeAs('call-proofs/'.$item->call_list_id, $item->id.'-'.$attempts.'-'.$now->format('YmdHis').'.'.$ext, 'local');
 
-        DB::transaction(function () use ($item, $user, $data, $outcome, $satisfaction, $topics, $path, $state, $nextAt, $attempts, $orderId, $now) {
-            DB::table('customer_calls')->insert([
-                'order_id' => $orderId, 'phone' => $item->phone, 'direction' => 'out', 'user_id' => $user->id,
-                'started_at' => $item->taken_at ?? $now, 'ended_at' => $now,
-                'outcome' => match ($outcome) { 'no_answer' => 'no_answer', 'busy' => 'busy', 'wrong' => 'wrong', default => 'answered' },
-                'duration_seconds' => isset($data['seconds']) ? min(7200, max(0, (int) $data['seconds'])) : null,
-                'note' => mb_substr(trim(__(self::OUTCOMES[$outcome]).(empty($data['note']) ? '' : ': '.$data['note'])), 0, 500),
-                'satisfaction' => $satisfaction, 'proof_path' => $path, 'call_list_item_id' => $item->id,
-            ]);
-            DB::table('call_list_items')->where('id', $item->id)->update([
+        DB::transaction(function () use ($item, $user, $data, $outcome, $satisfaction, $topics, $path, $state, $nextAt, $attempts, $orderId, $now, $started, $gone) {
+            // Still with this caller at the moment of saving (not handed on meanwhile).
+            $kept = DB::table('call_list_items')->where('id', $item->id)->where('state', 'in_hand')->where('user_id', $user->id)->update([
                 'state' => $state, 'next_at' => $nextAt, 'attempts' => $attempts, 'outcome' => $outcome,
                 'satisfaction' => $satisfaction ?? $item->satisfaction, 'topics' => $topics ? json_encode($topics) : $item->topics,
                 'note' => empty($data['note']) ? $item->note : mb_substr($data['note'], 0, 500), 'order_id' => $orderId,
-                'user_id' => $user->id, 'taken_at' => null, 'done_at' => $state === 'done' ? $now : null, 'updated_at' => $now,
+                'taken_at' => null, 'done_at' => $state === 'done' ? $now : null, 'updated_at' => $now,
             ]);
+            if (! $kept) {
+                Storage::disk('local')->delete($path);
+                throw $gone;
+            }
+            $note = mb_substr(trim(__(self::OUTCOMES[$outcome]).(empty($data['note']) ? '' : ': '.$data['note'])), 0, 500);
+            $callId = DB::table('customer_calls')->insertGetId([
+                'order_id' => $orderId, 'phone' => $item->phone, 'direction' => 'out', 'user_id' => $user->id,
+                'started_at' => $started, 'ended_at' => $now,
+                'outcome' => match ($outcome) { 'no_answer' => 'no_answer', 'busy' => 'busy', 'wrong' => 'wrong', default => 'answered' },
+                'duration_seconds' => isset($data['seconds']) && $data['seconds'] !== '' ? min(7200, max(0, (int) $data['seconds'])) : null,
+                'note' => $note, 'satisfaction' => $satisfaction, 'proof_path' => $path, 'call_list_item_id' => $item->id,
+            ]);
+            // The order made on the call keeps the call in its own history, as a call made from the order does.
+            if ($orderId && ($order = \App\Models\Order::find($orderId))) {
+                app(\App\Services\Orders\OrderService::class)->note($order, 'call', __('Called from a call list').': '.$note, $user,
+                    ['customer_call_id' => $callId, 'call_outcome' => $outcome, 'satisfaction' => $satisfaction]);
+            }
             if ($outcome === 'do_not_call' && $item->customer_id) {
-                DB::table('customers')->where('id', $item->customer_id)->update(['do_not_call_at' => $now]);
-                // Out of every other list too.
-                DB::table('call_list_items')->where('customer_id', $item->customer_id)->where('id', '!=', $item->id)->whereIn('state', ['waiting', 'later'])
-                    ->update(['state' => 'done', 'outcome' => 'do_not_call', 'done_at' => $now, 'updated_at' => $now]);
+                // On the customer that is left after merges, and out of every list, also a number someone holds now.
+                $ids = [$item->customer_id];
+                for ($id = $item->customer_id, $hop = 0; $hop < 10 && ($m = DB::table('customers')->where('id', $id)->value('merged_into_id')); $hop++) {
+                    $ids[] = $id = $m;
+                }
+                DB::table('customers')->whereIn('id', $ids)->update(['do_not_call_at' => $now]);
+                DB::table('call_list_items')->whereIn('customer_id', $ids)->where('id', '!=', $item->id)->whereIn('state', ['waiting', 'later', 'in_hand'])
+                    ->update(['state' => 'done', 'outcome' => 'do_not_call', 'user_id' => null, 'taken_at' => null, 'done_at' => $now, 'updated_at' => $now]);
             }
         });
     }
 
-    /** An order made in the popup during this call: linked at once. */
-    public function linkOrder(int $itemId, int $orderId, User $user): void
+    /** The file's real type (from its content), as a safe extension; null when it is not what this call needs. */
+    public static function proofExtension(UploadedFile $file, bool $recording): ?string
     {
-        DB::table('call_list_items')->where('id', $itemId)->where('user_id', $user->id)->where('state', 'in_hand')->update(['order_id' => $orderId, 'updated_at' => now()]);
+        $mime = strtolower((string) $file->getMimeType());
+        $audio = ['audio/mp4' => 'm4a', 'audio/x-m4a' => 'm4a', 'audio/m4a' => 'm4a', 'audio/mpeg' => 'mp3', 'audio/mp3' => 'mp3', 'audio/aac' => 'aac', 'audio/x-hx-aac-adts' => 'aac',
+            'audio/amr' => 'amr', 'audio/x-amr' => 'amr', 'audio/ogg' => 'ogg', 'audio/opus' => 'ogg', 'audio/x-wav' => 'wav', 'audio/wav' => 'wav', 'audio/wave' => 'wav',
+            'audio/3gpp' => '3gp', 'video/3gpp' => '3gp', 'video/mp4' => 'm4a', 'audio/webm' => 'webm', 'video/webm' => 'webm'];
+        $image = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/heic' => 'heic', 'image/heif' => 'heic', 'image/gif' => 'gif'];
+
+        return ($recording ? $audio : $image)[$mime] ?? null;
+    }
+
+    /** An order made in the popup during this call: linked at once. Tells whether it was still this person's number. */
+    public function linkOrder(int $itemId, int $orderId, User $user): bool
+    {
+        return DB::table('call_list_items')->where('id', $itemId)->where('user_id', $user->id)->where('state', 'in_hand')->update(['order_id' => $orderId, 'updated_at' => now()]) > 0;
     }
 
     /**
@@ -220,6 +300,7 @@ class CallListService
         $lists = DB::table('call_lists as l')->join('call_list_user as lu', 'lu.call_list_id', '=', 'l.id')
             ->where('lu.user_id', $user->id)->where('l.is_active', true)->orderByDesc('l.id')->get(['l.*']);
         $ids = $lists->pluck('id');
+        $this->releaseStale($ids->all());
         $left = DB::table('call_list_items')->whereIn('call_list_id', $ids)
             ->where(fn ($q) => $q->where('state', 'waiting')->orWhere(fn ($l) => $l->where('state', 'later')->where('next_at', '<=', now()))->orWhere(fn ($h) => $h->where('state', 'in_hand')->where('user_id', $user->id)))
             ->groupBy('call_list_id')->selectRaw('call_list_id, COUNT(*) as n')->pluck('n', 'call_list_id');
@@ -242,5 +323,13 @@ class CallListService
         }
 
         return Storage::disk('local')->exists($call->proof_path) ? $call->proof_path : null;
+    }
+
+    /** The content type for a stored proof, from the extension it was saved with (which came from its real type). */
+    public static function proofMime(string $path): string
+    {
+        return ['m4a' => 'audio/mp4', 'mp3' => 'audio/mpeg', 'aac' => 'audio/aac', 'amr' => 'audio/amr', 'ogg' => 'audio/ogg', 'wav' => 'audio/wav', '3gp' => 'audio/3gpp',
+            'webm' => 'audio/webm', 'jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'heic' => 'image/heic', 'gif' => 'image/gif',
+        ][strtolower(pathinfo($path, PATHINFO_EXTENSION))] ?? 'application/octet-stream';
     }
 }

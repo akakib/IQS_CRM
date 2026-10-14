@@ -89,9 +89,8 @@ class CallListController extends Controller
             ]);
             DB::table('call_list_user')->where('call_list_id', $list)->delete();
             DB::table('call_list_user')->insert(array_map(fn ($u) => ['call_list_id' => $list, 'user_id' => $u], $data['callers']));
-            // Someone taken off the list hands back the number they held.
-            DB::table('call_list_items')->where('call_list_id', $list)->where('state', 'in_hand')->whereNotIn('user_id', $data['callers'])
-                ->update(['state' => 'waiting', 'user_id' => null, 'taken_at' => null, 'updated_at' => now()]);
+            // Someone taken off the list hands back the number they held (a call-back keeps its place).
+            CallListService::giveBack(DB::table('call_list_items')->where('call_list_id', $list)->where('state', 'in_hand')->whereNotIn('user_id', $data['callers']));
         });
 
         return redirect()->route('calls.lists.show', $list)->with('success', __('Saved.'));
@@ -134,13 +133,18 @@ class CallListController extends Controller
             'seconds' => ['nullable', 'integer', 'min:0'],
             'proof' => ['nullable', 'file', 'max:25600'],
         ]);
-        $proof = $request->file('proof');
-        if ($proof && ! in_array(strtolower($proof->getClientOriginalExtension()), CallListService::PROOF_TYPES, true)) {
-            return back()->withErrors(['proof' => __('Use the recording (mp3, m4a, amr...) or a screenshot (jpg, png).')])->withInput();
-        }
-        $this->calls->record($it, $request->user(), $data, $proof);
+        $this->calls->record($it, $request->user(), $data, $request->file('proof'));
 
-        return redirect()->route('calls.work', $row->id)->with('success', __('Saved. Next number below.'));
+        return redirect()->route('calls.work', $row->id)->with('success', __('Saved. Next number below.'))->with('saved_item', $it->id);
+    }
+
+    /** Call tapped: the caller is on this number, so the hold starts again. */
+    public function touch(Request $request, int $list, int $item): \Illuminate\Http\JsonResponse
+    {
+        $this->myList($request->user(), $list);
+        $this->calls->touch($item, $request->user());
+
+        return response()->json(['ok' => true]);
     }
 
     public function skip(Request $request, int $list, int $item): RedirectResponse
@@ -157,7 +161,12 @@ class CallListController extends Controller
     {
         $path = $this->calls->proofPath($call, $request->user()) ?? abort(404);
 
-        return Storage::disk('local')->response($path);
+        // Its own type only, never sniffed, and nothing in it can run.
+        return Storage::disk('local')->response($path, null, [
+            'Content-Type' => CallListService::proofMime($path),
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; img-src 'self'; media-src 'self'; sandbox",
+        ]);
     }
 
     // ---- Helpers -------------------------------------------------------------------------------

@@ -124,7 +124,10 @@ class PersonActivity
         $orderIds = $turns->pluck('order_id')->unique()->values()->all();
         // Calls from a call list are work too: from taking the number to saving the call.
         $listCalls = DB::table('customer_calls')->where('user_id', $userId)->whereNotNull('call_list_item_id')
-            ->where('started_at', '<=', $to)->where('ended_at', '>=', $from)->get(['started_at', 'ended_at']);
+            ->where('started_at', '<=', $to)->where('ended_at', '>=', $from)->orderBy('started_at')->get(['started_at', 'ended_at', 'note', 'phone', 'order_id']);
+        foreach ($listCalls->whereNull('order_id') as $c) { // a call that made an order shows through the order's own call note
+            $add(Carbon::parse($c->started_at), 'call', __('Call list: :n', ['n' => $c->note]), $c->order_id ? (int) $c->order_id : null, null, Carbon::parse($c->ended_at));
+        }
         $busy = $this->free->busy($turns, $this->timeline->events($orderIds), $this->timeline->returns($orderIds), $breaks, $chats->concat($listCalls));
         $free = $this->free->forPerson($userId, $day, $busy, $this->free->waiting($from, $to));
         foreach ($free['segments'] as $s) {

@@ -15,7 +15,7 @@ class Customer extends Model
     protected $fillable = [
         'name', 'primary_phone', 'messenger_psid', 'whatsapp_number', 'risk_level', 'blocked_reason', 'note',
         'orders_count', 'delivered_count', 'returned_count', 'first_order_at', 'marketing_consent', 'consent_at',
-        'merged_into_id', 'created_by',
+        'merged_into_id', 'created_by', 'do_not_call_at',
     ];
 
     protected function casts(): array
@@ -24,6 +24,7 @@ class Customer extends Model
             'marketing_consent' => 'boolean',
             'consent_at' => 'datetime',
             'first_order_at' => 'datetime',
+            'do_not_call_at' => 'datetime',
         ];
     }
 

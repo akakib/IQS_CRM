@@ -27,6 +27,13 @@ class TrackPresence
         if (! $user) {
             return $next($request);
         }
+        if ($user->is_active === false) {
+            // Deactivated: also when a "remember me" cookie logged them in again.
+            auth()->guard('web')->logout();
+            $request->session()->invalidate();
+
+            return $request->expectsJson() ? response()->json(['message' => __('Your account is not active.')], 401) : redirect()->route('login');
+        }
         $route = $request->route()?->getName();
 
         if ($user->current_break_id && ! $request->isMethodSafe() && ! in_array($route, self::ALLOWED_ON_BREAK, true)) {
@@ -35,7 +42,7 @@ class TrackPresence
                 : back()->with('error', __('You are on a break. Press Start work first.'));
         }
 
-        if (! in_array($route, self::BACKGROUND, true) && (! $user->last_seen_at || $user->last_seen_at->lt(now()->subMinute()))) {
+        if (! in_array($route, self::BACKGROUND, true) && ! $request->hasHeader('X-Board') && (! $user->last_seen_at || $user->last_seen_at->lt(now()->subMinute()))) {
             $now = now();
             DB::table('users')->where('id', $user->id)->update(['last_seen_at' => $now]);
             $user->last_seen_at = $now;

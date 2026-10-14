@@ -77,11 +77,13 @@ class ReturnReportController extends Controller
     /** The real reason of a return (it arrives as "not set yet" from the courier). */
     public function reason(Request $request, Order $order): RedirectResponse
     {
+        abort_unless(Order::visibleTo($request->user())->whereKey($order->id)->exists(), 403);
         $data = $request->validate(['reason_id' => ['required', 'integer']]);
         $reason = DB::table('status_reasons')->where('id', $data['reason_id'])->where('reason_type', 'return')->first() ?? abort(422);
         $event = DB::table('order_events')->where('order_id', $order->id)->whereIn('to_status_id', OrderStatus::idsFor(ReturnService::STATES))->orderByDesc('id')->first() ?? abort(422);
         DB::table('order_events')->where('id', $event->id)->update(['reason_id' => $reason->id]);
         app(\App\Services\Orders\OrderService::class)->note($order, 'system', __('Return reason set to :r by :n.', ['r' => __($reason->label_en), 'n' => $request->user()->name]), $request->user());
+        app(\App\Services\Points\PointHooks::class)->returnReasonSet($order->fresh());
 
         return back()->with('success', __(':no: reason saved.', ['no' => $order->order_no]));
     }

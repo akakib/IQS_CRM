@@ -73,9 +73,16 @@ class PointHooks
     {
         return match ($trigger) {
             'order_packed' => ['packer' => $this->labelScanned($order) ? $actor?->id : null],
-            'order_delivered', 'order_partial', 'order_returned' => ['order_moderator' => $order->moderator_id, 'packer' => $this->packer($order)],
+            'order_delivered', 'order_partial', 'order_returned' => ['order_moderator' => $order->confirmed_by ?? $order->moderator_id, 'packer' => $this->packer($order)],
             default => ['order_moderator' => $order->moderator_id, 'actor' => $actor?->id],
         };
+    }
+
+    /** The return reason was set after the parcel came back: the blame rules (sales, packaging) can now match. */
+    public function returnReasonSet(Order $order): void
+    {
+        $this->engine->fire('order_returned', $order, $this->context('order_returned', $order, null), $this->people('order_returned', $order, null));
+        $this->engine->settle($order);
     }
 
     public function claimed(Order $order, User $user): void

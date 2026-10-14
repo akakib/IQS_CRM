@@ -61,7 +61,9 @@ class KpiScorecard
 
         $work = DB::table('order_assignments')->whereBetween('started_at', $range)->groupBy('user_id')
             ->selectRaw("user_id, COUNT(DISTINCT order_id) as taken, SUM(CASE WHEN ended_reason IN ('timeout', 'idle') THEN 1 ELSE 0 END) as released")->get()->keyBy('user_id');
-        $pending = DB::table('orders')->where('status_id', $s('no_answer'))->whereNotNull('moderator_id')
+        // Waiting on the person: No answer, and holds whose follow-up date has passed (a hold is not a quiet way out of a cancel).
+        $pending = DB::table('orders')->whereNotNull('moderator_id')
+            ->where(fn ($q) => $q->where('status_id', $s('no_answer'))->orWhere(fn ($h) => $h->where('status_id', $s('hold'))->whereNotNull('hold_expected_date')->where('hold_expected_date', '<', today()->toDateString())))
             ->groupBy('moderator_id')->selectRaw('moderator_id, COUNT(*) as n')->pluck('n', 'moderator_id');
 
         $ids = array_values(array_unique(array_merge(array_keys($by), $work->keys()->all(), $pending->keys()->all())));

@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 class PersonActivity
 {
     /** No answer this close before a break is flagged: it may have been pressed only to free the hands. */
-    private const NO_ANSWER_BEFORE_BREAK = 120;
+    private const NO_ANSWER_BEFORE_BREAK = 900;
 
     public function __construct(private OrderTimeline $timeline, private FreeTime $free) {}
 

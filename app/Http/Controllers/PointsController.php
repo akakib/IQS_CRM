@@ -211,6 +211,7 @@ class PointsController extends Controller
     {
         $data = $request->validate(['result' => ['required', Rule::in(['call_verified', 'not_called', 'wrong_info'])], 'note' => ['nullable', 'string', 'max:500']]);
         abort_unless($order->moderator_id, 422);
+        abort_if((int) $order->moderator_id === $request->user()->id, 403); // not your own order
         if (DB::table('qa_reviews')->where('order_id', $order->id)->exists()) {
             return back()->with('error', __('This order was already checked.'));
         }

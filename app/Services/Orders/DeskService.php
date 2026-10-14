@@ -411,7 +411,7 @@ class DeskService
         $ids = DB::table('orders as o')->where('o.channel', 'web')->whereNotNull('o.moderator_id')
             ->whereIn('o.status_id', OrderStatus::idsFor(self::ACTIVE))->where('o.assigned_at', '<=', $cutoff)
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_events as e')->whereColumn('e.order_id', 'o.id')->where('e.created_at', '>', $cutoff))
-            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_notes as n')->whereColumn('n.order_id', 'o.id')->whereColumn('n.user_id', 'o.moderator_id')->where('n.created_at', '>', $cutoff))
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('customer_calls as c')->whereColumn('c.order_id', 'o.id')->whereColumn('c.user_id', 'o.moderator_id')->where('c.started_at', '>', $cutoff))
             ->orderBy('o.id')->limit(100)->pluck('o.id');
         foreach ($ids as $id) {
             $this->release((int) $id, 'idle');
@@ -911,8 +911,12 @@ class DeskService
                 app(PointHooks::class)->timerBeaten($order, (int) $log->user_id);
             }
         }
-        if (in_array($to['key'], ['no_answer', 'hold'], true) && ! $order->had_setback) {
-            $set['had_setback'] = true;
+        // A setback = the order really waited in No answer or Hold (10 minutes or more), not a 10-second Hold and Resume.
+        if (in_array($from['key'] ?? null, ['no_answer', 'hold'], true) && ! in_array($to['key'], ['no_answer', 'hold', 'cancelled'], true) && ! $order->had_setback) {
+            $since = DB::table('order_events')->where('order_id', $order->id)->where('to_status_id', $from['id'])->max('created_at');
+            if ($since && \Illuminate\Support\Carbon::parse($since)->lte(now()->subMinutes(10))) {
+                $set['had_setback'] = true;
+            }
         }
         if ($to['key'] !== 'no_answer' && $order->next_call_at !== null) {
             $set['next_call_at'] = null;

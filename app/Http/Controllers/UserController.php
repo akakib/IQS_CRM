@@ -79,6 +79,10 @@ class UserController extends Controller
         if (! $actor->isOwner() && ! $user->is($actor)) {
             unset($data['password'], $data['email']);
         }
+        if ($user->is($actor) && ! $actor->isOwner()) {
+            // Own desk limits and timer are set by someone else.
+            unset($data['desk_limit'], $data['desk_timer_minutes'], $data['desk_extend_minutes'], $data['desk_extend_daily_limit']);
+        }
         $passwordReset = filled($data['password'] ?? null);
         $this->savePhoto($request, $user);
         $this->saveChatChannels($request, $user);
@@ -106,7 +110,7 @@ class UserController extends Controller
      */
     private function saveSalary(Request $request, User $user): void
     {
-        if (! $request->has('monthly_salary') || ! $request->user()->canSeeField('salary')) {
+        if (! $request->has('monthly_salary') || ! $request->user()->canSeeField('salary') || ($user->is($request->user()) && ! $request->user()->isOwner())) {
             return;
         }
         $amount = $request->input('monthly_salary');
@@ -178,6 +182,7 @@ class UserController extends Controller
         $user->forceFill(['left_at' => $user->is_active ? null : now()])->save(); // salary and target count only the days they were here
 
         if (! $user->is_active) {
+            $user->forceFill(['remember_token' => Str::random(60)])->save(); // a remembered login stops working too
             $this->logOutEverywhere($user);
         }
 

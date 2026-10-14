@@ -215,6 +215,7 @@ class TeamController extends Controller
     /** Office days and hours for one person. Sending no day at all returns them to the office default. */
     public function schedule(User $user, Request $request): RedirectResponse
     {
+        abort_if($user->is($request->user()) && ! $request->user()->isOwner(), 403); // not your own shift
         $data = $request->validate([
             'days' => ['array'],
             'days.*.on' => ['nullable', 'boolean'],
@@ -246,6 +247,7 @@ class TeamController extends Controller
             'delivery_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
         $userId = $data['user_id'] ?? null;
+        abort_if((int) $userId === $request->user()->id && ! $request->user()->isOwner(), 403); // not your own target
         $month = today()->startOfMonth()->toDateString(); // from this month on: past months keep their target
         foreach (['delivered_count', 'delivery_rate'] as $metric) {
             $query = DB::table('kpi_targets')->where('metric', $metric)->where('from_month', $month)->when($userId, fn ($q) => $q->where('user_id', $userId), fn ($q) => $q->whereNull('user_id'));

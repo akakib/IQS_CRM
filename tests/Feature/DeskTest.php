@@ -296,7 +296,7 @@ class DeskTest extends TestCase
         $this->assertSame('no_answer', $this->key($a));
         $this->assertTrue($a->fresh()->next_call_at->equalTo(now()->addMinutes(30)));
         $this->assertSame($this->mahim->id, $a->fresh()->moderator_id); // stays with the same moderator
-        $this->assertTrue($a->fresh()->had_setback);
+        $this->assertFalse($a->fresh()->had_setback); // counted only once it waited 10 minutes or more and moves on
         $this->get('/desk?tab=again')->assertSee($a->order_no);
 
         // Pressing again before the return time does nothing: the tries are not burned.
@@ -1044,5 +1044,20 @@ class DeskTest extends TestCase
         $this->get('/packaging')->assertOk()->assertSee('On duty today');
         $this->post('/packaging/shift', ['user_ids' => [$this->rima->id]])->assertSessionHas('success');
         $this->assertDatabaseHas('packer_shifts', ['user_id' => $this->rima->id]);
+    }
+
+    public function test_audit_closes_easy_ways_around_the_numbers(): void
+    {
+        $owner = $this->owner(['name' => 'Boss']);
+        // A manager cannot set their own bonus, target or shift.
+        $manager = \App\Models\User::factory()->create(['name' => 'Mgr']);
+        $manager->roles()->attach($this->role(['staff.view', 'staff.edit', 'settings.edit', 'orders.reassign'], [], 'Mgr')->id);
+        $this->actingAs($manager)->post(route('kpi.targets'), ['user_id' => $manager->id, 'delivered_count' => 1])->assertForbidden();
+        $this->post(route('users.schedule', $manager), ['days' => []])->assertForbidden();
+
+        // A deactivated account is signed out on its next request, remember-me or not.
+        $manager->forceFill(['is_active' => false])->save();
+        $this->get('/dashboard')->assertRedirect(route('login'));
+        $this->assertGuest();
     }
 }

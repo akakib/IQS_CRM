@@ -59,6 +59,7 @@ class ScorecardController extends Controller
             return back()->with('error', __('This month is closed. Reopen it to change a bonus.'));
         }
         abort_unless(DB::table('users')->where('id', $user)->exists(), 404);
+        abort_if($user === $request->user()->id && ! $request->user()->isOwner(), 403); // not your own bonus
         if (($data['amount'] ?? null) === null || $data['amount'] === '') {
             DB::table('staff_bonuses')->where('user_id', $user)->where('month', $month)->delete();
         } else {

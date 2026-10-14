@@ -4,7 +4,10 @@
      after Create the page goes to Order management with the new order open. --}}
 @can('orders.view')
 <div x-data="{ src: '', title: '' }" @order-new.window="src = $event.detail.url || $event.detail; title = $event.detail.title || ''"
-    @message.window="if ($event.origin === location.origin && $event.data?.iqsOrderCreated) location.href = $event.data.url || @js(route('desk.index'))">
+    @message.window="if ($event.origin === location.origin && $event.data?.iqsOrderCreated) {
+        if ($event.data.stay) { src = ''; window.dispatchEvent(new CustomEvent('iqs-order-made', { detail: $event.data })) }
+        else location.href = $event.data.url || @js(route('desk.index'))
+    }">
     <template x-teleport="body">
         <div x-show="src" x-cloak class="fixed inset-0 z-[130] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">
             <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-[92vh] sm:rounded-2xl">

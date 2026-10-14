@@ -57,6 +57,19 @@ class WorkHoursTest extends TestCase
         $this->assertSame(3600, $row['overtime']);
     }
 
+    public function test_calls_from_a_call_list_count_as_worked(): void
+    {
+        // Two calls from a list, 10:00-10:05 and 10:10-10:12: seven minutes of work, never free time.
+        $list = DB::table('call_lists')->insertGetId(['name' => 'L', 'created_at' => now(), 'updated_at' => now()]);
+        $item = DB::table('call_list_items')->insertGetId(['call_list_id' => $list, 'phone' => '01711111111', 'name' => 'A', 'created_at' => now(), 'updated_at' => now()]);
+        foreach ([['10:00', '10:05'], ['10:10', '10:12']] as [$a, $b]) {
+            DB::table('customer_calls')->insert(['phone' => '01711111111', 'direction' => 'out', 'user_id' => $this->mahim->id, 'call_list_item_id' => $item,
+                'started_at' => '2026-10-07 '.$a.':00', 'ended_at' => '2026-10-07 '.$b.':00', 'outcome' => 'answered']);
+        }
+        $row = app(WorkTime::class)->day(today())['people']->firstWhere('id', $this->mahim->id);
+        $this->assertSame(7 * 60, $row['worked']);
+    }
+
     public function test_a_new_week_target_or_salary_counts_from_when_it_was_set_and_the_past_keeps_its_own(): void
     {
         $boss = $this->owner(['name' => 'Boss']);

@@ -107,12 +107,14 @@
                             <li class="relative mb-4 pl-5">
                                 <span class="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-amber-500 ring-2 ring-white"></span>
                                 <p class="text-sm text-gray-900"><span class="font-semibold">{{ $e['at']->format('d M Y') }}</span> · {{ $r->direction === 'in' ? __('Call from customer') : __('Call to customer') }}
-                                    <x-badge color="amber">{{ __(CustomerCallController::OUTCOMES[$r->outcome] ?? $r->outcome) }}</x-badge></p>
+                                    <x-badge color="amber">{{ __(CustomerCallController::OUTCOMES[$r->outcome] ?? $r->outcome) }}</x-badge>
+                                    @if ($r->satisfaction !== null)<x-badge :color="$r->satisfaction < 50 ? 'red' : ($r->satisfaction < 75 ? 'amber' : 'green')">{{ __(':s% satisfied', ['s' => $r->satisfaction]) }}</x-badge>@endif</p>
                                 <p class="mt-0.5 text-xs text-gray-500">
                                     {{ __('By :n', ['n' => $r->by ?? '-']) }}
                                     @if ($r->duration_seconds) · {{ intdiv($r->duration_seconds, 60) }}m {{ $r->duration_seconds % 60 }}s @endif
                                     @if ($r->order_no) · {{ $r->order_no }}@endif
                                     @if ($r->recording_url) · <a href="{{ $r->recording_url }}" target="_blank" rel="noopener" class="text-primary hover:underline">{{ __('Recording') }}</a>@endif
+                                    @if ($r->proof_path && (auth()->id() === $r->user_id || auth()->user()->can('calls.manage'))) · <a href="{{ route('calls.proof', $r->id) }}" target="_blank" rel="noopener" class="text-primary hover:underline">{{ __('Proof') }}</a>@endif
                                 </p>
                                 @if ($r->note)<p class="mt-1 text-sm text-gray-700">{{ $r->note }}</p>@endif
                             </li>

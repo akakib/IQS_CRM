@@ -97,13 +97,16 @@ class WorkTime
             ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))->get(['user_id', 'started_at', 'ended_at', 'counts_as_break'])->groupBy('user_id');
         $chats = DB::table('chat_sessions')->whereIn('user_id', $staff->pluck('id'))->where('started_at', '<=', $until)
             ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $from))->get(['user_id', 'started_at', 'ended_at'])->groupBy('user_id');
+        // Calls from a call list are work too: from taking the number to saving the call.
+        $listCalls = DB::table('customer_calls')->whereIn('user_id', $staff->pluck('id'))->whereNotNull('call_list_item_id')
+            ->where('started_at', '<=', $until)->where('ended_at', '>=', $from)->get(['user_id', 'started_at', 'ended_at'])->groupBy('user_id');
         $chatCounts = DB::table('chat_events')->whereIn('user_id', $staff->pluck('id'))->whereBetween('created_at', [$from, $to])
             ->groupBy('user_id', 'kind')->selectRaw('user_id, kind, COUNT(*) as n')->get()->groupBy('user_id');
         $chatOrders = DB::table('orders')->whereIn('created_by', $staff->pluck('id'))->whereNotNull('chat_channel_id')->whereBetween('created_at', [$from, $to])
             ->groupBy('created_by')->selectRaw('created_by, COUNT(*) as n')->pluck('n', 'created_by');
-        $freeOf = function ($u) use ($days, $open, $allEvents, $allReturns, $nightBreaks, $chats, $waitingSpans, $joined, $from, $to, $until) {
+        $freeOf = function ($u) use ($days, $open, $allEvents, $allReturns, $nightBreaks, $chats, $listCalls, $waitingSpans, $joined, $from, $to, $until) {
             $id = $u->id;
-            $busy = $this->free->busy($open->get($id, collect()), $allEvents, $allReturns, $nightBreaks->get($id, collect()), $chats->get($id, collect()));
+            $busy = $this->free->busy($open->get($id, collect()), $allEvents, $allReturns, $nightBreaks->get($id, collect()), $chats->get($id, collect())->concat($listCalls->get($id, collect())));
             $sum = ['waiting' => 0, 'nothing' => 0];
             foreach ($days->filter(fn ($d) => $joined($u, $d)) as $d) {
                 $f = $this->free->forPerson($id, $d, $busy, $waitingSpans);
@@ -116,7 +119,7 @@ class WorkTime
             $last = $this->calendar->shift($id, $to->copy()->startOfDay());
             $a = max($from->getTimestamp(), $before && $before[1]->gt($from) ? $before[1]->getTimestamp() : 0);
             $b = min(now()->getTimestamp(), max($to->getTimestamp(), $last ? $last[1]->getTimestamp() : 0));
-            $work = FreeTime::clip($this->free->busy($open->get($id, collect()), $allEvents, $allReturns, collect(), $chats->get($id, collect())), $a, $b);
+            $work = FreeTime::clip($this->free->busy($open->get($id, collect()), $allEvents, $allReturns, collect(), $chats->get($id, collect())->concat($listCalls->get($id, collect()))), $a, $b);
             $shifts = [];
             foreach (\Carbon\CarbonPeriod::create($from->copy()->subDay(), $until->copy()->startOfDay()) as $d) {
                 if ($s = $this->calendar->shift($id, Carbon::parse($d))) {

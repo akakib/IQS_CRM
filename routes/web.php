@@ -170,6 +170,24 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/advance-waiver', [OrderController::class, 'askWaiver'])->middleware('can:orders.edit')->name('orders.advance-waiver');
     Route::post('/orders/{order}/advance-waiver/decide', [OrderController::class, 'decideWaiver'])->middleware('can:orders.approve')->name('orders.advance-waiver.decide');
     Route::get('/order-search', [\App\Http\Controllers\OrderSearchController::class, 'index'])->name('orders.search'); // every staff member
+
+    // Call lists: managers make and give them; callers work the ones given to them.
+    Route::controller(\App\Http\Controllers\CallListController::class)->group(function () {
+        Route::middleware('can:calls.manage')->group(function () {
+            Route::get('/call-lists', 'index')->name('calls.lists');
+            Route::get('/call-lists/create', 'create')->name('calls.lists.create');
+            Route::post('/call-lists', 'store')->name('calls.lists.store');
+            Route::get('/call-lists/{list}', 'show')->whereNumber('list')->name('calls.lists.show');
+            Route::put('/call-lists/{list}', 'update')->whereNumber('list')->name('calls.lists.update');
+        });
+        Route::middleware('can:calls.work')->group(function () {
+            Route::get('/my-calls', 'mine')->name('calls.mine');
+            Route::get('/my-calls/{list}', 'work')->whereNumber('list')->name('calls.work');
+            Route::post('/my-calls/{list}/{item}', 'record')->whereNumber(['list', 'item'])->name('calls.record');
+            Route::post('/my-calls/{list}/{item}/skip', 'skip')->whereNumber(['list', 'item'])->name('calls.skip');
+        });
+        Route::get('/call-proof/{call}', 'proof')->whereNumber('call')->name('calls.proof');
+    });
     Route::get('/journey', [\App\Http\Controllers\CustomerJourneyController::class, 'index'])->middleware('can:customers.view')->name('journey.index');
     Route::get('/journey/{customer}', [\App\Http\Controllers\CustomerJourneyController::class, 'show'])->middleware('can:customers.view')->withTrashed()->name('journey.show');
     Route::get('/payments', [\App\Http\Controllers\PaymentController::class, 'index'])->name('payments.index');

@@ -125,6 +125,7 @@ class OrderController extends Controller
             'advance.transaction_id' => ['nullable', 'string', 'max:100'],
             'advance.sender_number' => ['nullable', 'string', 'max:20'],
             'chat_channel_id' => ['nullable', 'integer'],
+            'call_item' => ['nullable', 'integer'],
         ]);
         if (! empty($data['chat_channel_id'])) {
             $chat = app(\App\Services\Work\ChatService::class)->channelsFor($request->user())->firstWhere('id', (int) $data['chat_channel_id']);
@@ -138,11 +139,17 @@ class OrderController extends Controller
         $this->confirmTakenOrder($order->refresh(), $request->user());
 
         $message = __('Order :no created.', ['no' => $order->order_no]);
+        // Taken during a call from a call list: linked to that call, and the caller stays on the call.
+        if (! empty($data['call_item'])) {
+            app(\App\Services\Calls\CallListService::class)->linkOrder((int) $data['call_item'], $order->id, $request->user());
+        }
         // Made from the New order popup (Communication): the page behind it goes to Order management.
         if ($request->boolean('embed')) {
-            session()->flash('success', $message);
+            if (empty($data['call_item'])) {
+                session()->flash('success', $message);
+            }
 
-            return response()->view('orders.create-done', ['order' => $order]);
+            return response()->view('orders.create-done', ['order' => $order, 'stay' => ! empty($data['call_item'])]);
         }
 
         return redirect()->route('orders.show', $order)->with('success', $message);

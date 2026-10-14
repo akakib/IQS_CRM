@@ -23,6 +23,8 @@ return [
         ['Handover', 'handover.index', 'handover.*', 'packaging.view', 'swap'],
         ['Returns', 'returns.index', 'returns.*', 'packaging.view', 'refresh'],
         ['Hotline', 'hotline.index', 'hotline.*', 'hotline.view', 'phone'],
+        ['My calls', 'calls.mine', ['calls.mine', 'calls.work'], 'calls.work', 'phone'],
+        ['Call lists', 'calls.lists', 'calls.lists*', 'calls.manage', 'list'],
         ['Delivery issues', 'issues.index', 'issues.*', 'orders.view', 'alert'],
         ['Payments to check', 'payments.index', 'payments.*', 'payments.verify', 'cash'],
         ['Control room', 'desk.control', 'desk.control', 'orders.reassign', 'monitor'],

@@ -152,6 +152,7 @@
         }">
         @csrf
         @if (request('embed'))<input type="hidden" name="embed" value="1">@endif
+        @if (request('call_item'))<input type="hidden" name="call_item" value="{{ (int) request('call_item') }}">@endif
         <input type="hidden" name="channel" :value="channel">
         <input type="hidden" name="chat_channel_id" :value="chatChannel">
 

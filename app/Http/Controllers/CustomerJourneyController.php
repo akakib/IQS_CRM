@@ -91,7 +91,7 @@ class CustomerJourneyController extends Controller
         $calls = DB::table('customer_calls as c')->leftJoin('users as u', 'u.id', '=', 'c.user_id')->leftJoin('orders as o', 'o.id', '=', 'c.order_id')
             ->where(fn ($w) => $w->whereIn('c.order_id', $orders->pluck('id'))->orWhereIn('c.phone', $phones))
             ->whereNotNull('c.outcome')->orderByDesc('c.started_at')->limit(300)
-            ->get(['c.id', 'c.direction', 'c.started_at', 'c.outcome', 'c.duration_seconds', 'c.recording_url', 'c.note', 'u.name as by', 'o.order_no']);
+            ->get(['c.id', 'c.direction', 'c.started_at', 'c.outcome', 'c.duration_seconds', 'c.recording_url', 'c.note', 'c.satisfaction', 'c.proof_path', 'c.user_id', 'u.name as by', 'o.order_no']);
 
         // Orders brought in from a file (WooCommerce, Pathao...): history only.
         $past = DB::table('customer_past_orders')->where('customer_id', $customer->id)->orderByDesc('ordered_at')->limit(300)->get()

@@ -122,7 +122,10 @@ class PersonActivity
 
         // Free stretches between all of that.
         $orderIds = $turns->pluck('order_id')->unique()->values()->all();
-        $busy = $this->free->busy($turns, $this->timeline->events($orderIds), $this->timeline->returns($orderIds), $breaks, $chats);
+        // Calls from a call list are work too: from taking the number to saving the call.
+        $listCalls = DB::table('customer_calls')->where('user_id', $userId)->whereNotNull('call_list_item_id')
+            ->where('started_at', '<=', $to)->where('ended_at', '>=', $from)->get(['started_at', 'ended_at']);
+        $busy = $this->free->busy($turns, $this->timeline->events($orderIds), $this->timeline->returns($orderIds), $breaks, $chats->concat($listCalls));
         $free = $this->free->forPerson($userId, $day, $busy, $this->free->waiting($from, $to));
         foreach ($free['segments'] as $s) {
             $add($s['from'], 'free', $s['waiting']

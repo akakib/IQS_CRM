@@ -16,6 +16,7 @@ return [
         'payments' => ['verify'],
         'shipping' => ['view', 'create'],
         'hotline' => ['view', 'create'],
+        'calls' => ['work', 'manage'],
         'packaging' => ['view', 'create', 'manage'],
         'attendance' => ['view', 'edit'],
         // Creating/editing roles and giving access is Owner-only (no permission
@@ -35,6 +36,8 @@ return [
         'payments.verify' => 'Check advance payments (TrxID and amount)',
         'staff.delete' => 'Deactivate',
         'customers.import' => 'Import order history (CSV/Excel)',
+        'calls.work' => 'Make calls from the lists given to them',
+        'calls.manage' => 'Make call lists and give them to staff',
         'products.availability' => 'Stock status',
         'points.manage' => 'Manage rules and reviews',
         'packaging.manage' => 'Set on-duty packers',

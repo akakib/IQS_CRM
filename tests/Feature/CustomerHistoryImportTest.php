@@ -223,4 +223,20 @@ DM1CCCCC,Iqbal Store,Nusrat,01912345678,900,900,2026-07-25
         $this->assertEquals(1500, DB::table('customer_past_orders')->where('cn', 'DM1AAAAA')->value('amount'));
         $this->assertSame(3, DB::table('customer_past_orders')->count());
     }
+
+    public function test_uploading_a_file_again_replaces_its_unfinished_draft_and_old_drafts_go(): void
+    {
+        (new CustomerSeeder)->run();
+        $owner = $this->owner();
+        $csv = "phone,name,date
+01712345678,Someone,2025-01-01
+";
+        $this->actingAs($owner)->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('a.csv', $csv)]);
+        $this->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('b.csv', $csv)]);
+        DB::table('customer_imports')->where('file_name', 'b.csv')->update(['created_at' => now()->subDays(2)]);
+        $this->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('a.csv', $csv)]);
+        // a.csv: only the newest draft; b.csv: too old, gone.
+        $this->assertSame(['a.csv'], DB::table('customer_imports')->pluck('file_name')->all());
+        $this->assertSame(1, DB::table('customer_imports')->count());
+    }
 }

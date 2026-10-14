@@ -40,9 +40,15 @@ class CustomerImportController extends Controller
         $path = 'imports/history-'.Str::uuid().'.json';
         Storage::disk('local')->put($path, json_encode([$header, $rows], JSON_UNESCAPED_UNICODE));
         $saved = $this->saved($header);
+        $name = mb_substr($file->getClientOriginalName(), 0, 200);
+        $stale = DB::table('customer_imports')->whereNull('done_at')->where(fn ($q) => $q->where('file_name', $name)->orWhere('created_at', '<', now()->subDay()))->get(['id', 'path']);
+        foreach ($stale as $old) {
+            Storage::disk('local')->delete($old->path);
+        }
+        DB::table('customer_imports')->whereIn('id', $stale->pluck('id'))->delete();
 
         $id = DB::table('customer_imports')->insertGetId([
-            'file_name' => mb_substr($file->getClientOriginalName(), 0, 200), 'path' => $path,
+            'file_name' => $name, 'path' => $path,
             'columns' => json_encode($this->history->columns($header, $rows), JSON_UNESCAPED_UNICODE), 'row_count' => count($rows),
             'source' => $saved['source'], 'mapping' => $saved['mapping'] ? json_encode($saved['mapping'], JSON_UNESCAPED_UNICODE) : null,
             'values' => json_encode($saved['values'], JSON_UNESCAPED_UNICODE),
@@ -157,15 +163,14 @@ class CustomerImportController extends Controller
         $mapping = [];
         $values = ['status' => [], 'medium' => []];
         $source = null;
-        $best = 0;
         foreach (DB::table('import_templates')->orderByDesc('updated_at')->orderByDesc('id')->get() as $t) {
             $m = array_intersect_key(json_decode($t->mapping, true) ?: [], array_flip($header));
             $mapping += array_map(fn ($f) => (string) $f, $m);
             foreach (['status', 'medium'] as $k) {
                 $values[$k] += (json_decode((string) $t->values, true) ?: [])[$k] ?? [];
             }
-            if (count($m) > $best) {
-                [$best, $source] = [count($m), $t->name];
+            if ($t->signature === $this->history->signature($header)) {
+                $source = $t->name;
             }
         }
 

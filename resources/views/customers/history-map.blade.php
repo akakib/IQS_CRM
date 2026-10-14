@@ -14,6 +14,13 @@
             headers: @js($headers), map: @js($map), values: @js(['status' => (object) ($values['status'] ?? []), 'medium' => (object) ($values['medium'] ?? [])]),
             defaultMedium: 'other', source: @js($import->source ?? ''), counts: null, sample: [], error: '', busy: false,
             has(f) { return this.map.includes(f) },
+            pick(i, f) {
+                if (f && ! ['name', 'address'].includes(f)) {
+                    this.map.forEach((m, j) => { if (j !== i && m === f) { this.map[j] = ''; const el = document.querySelector('#history-col-' + j + ' [x-data]'); if (el) Alpine.$data(el).setValue('') } });
+                }
+                this.map[i] = f; this.counts = null;
+            },
+            showResult() { this.$nextTick(() => document.getElementById('history-result')?.scrollIntoView({ behavior: 'smooth', block: 'end' })) },
             body() { const m = {}; this.headers.forEach((h, i) => m[h] = this.map[i]); return { mapping: m, values: this.values, default_medium: this.defaultMedium, source: this.src() } },
             {{-- The confirm dialog submits a form by id; that form runs the import instead. Set up in init so nothing runs on load. --}}
             init() { this.$nextTick(() => { const f = document.getElementById('history-run-form'); if (f) f.submit = () => { this.run() } }) },
@@ -27,7 +34,7 @@
                     return j;
                 } catch (e) { this.error = @js(__('Something went wrong.')); return null } finally { this.busy = false }
             },
-            async check() { if (! this.has('phone') || ! this.has('name')) { this.error = @js(__('Pick the Phone and the Name columns.')); return } const j = await this.send(@js(route('customers.history.preview', $import->id))); if (j) { this.counts = j.counts; this.sample = j.sample } },
+            async check() { if (! this.has('phone') || ! this.has('name')) { this.error = @js(__('Pick the Phone and the Name columns.')); return } const j = await this.send(@js(route('customers.history.preview', $import->id))); if (j) { this.counts = j.counts; this.sample = j.sample } this.showResult() },
             async run() { const j = await this.send(@js(route('customers.history.run', $import->id))); if (j) window.location = j.url },
         }"
         >
@@ -51,7 +58,7 @@
                             @if (in_array($c['header'], $savedKeys, true))<span class="ml-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">{{ __('saved') }}</span>@elseif ($map[$i] !== '')<span class="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">{{ __('auto') }}</span>@endif</p>
                         <p class="truncate text-xs text-gray-400">{{ $c['sample'] !== '' ? __('e.g. :v', ['v' => $c['sample']]) : __('empty') }}</p>
                     </div>
-                    <div @select-change="map[{{ $i }}] = $event.detail; counts = null">
+                    <div id="history-col-{{ $i }}" @select-change="pick({{ $i }}, $event.detail)">
                         <x-simple-select :options="$fieldOptions" :value="$map[$i]" full-width />
                     </div>
                 </div>
@@ -84,7 +91,7 @@
             <x-simple-select :options="$channels" value="other" full-width />
         </div>
 
-        <div class="rounded-2xl border border-gray-200 bg-white p-4">
+        <div id="history-result" class="rounded-2xl border border-gray-200 bg-white p-4">
             <p x-show="error" x-text="error" class="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"></p>
             <p x-show="counts && ! counts.orders && ! counts.updated" x-cloak class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800"
                 x-text="counts && (counts.already || counts.in_iqs) ? @js(__('Nothing new: every order in this file is already here (imported before or booked in IQS).')) : @js(__('Nothing to import. Check the Phone, Name and Date columns.'))"></p>

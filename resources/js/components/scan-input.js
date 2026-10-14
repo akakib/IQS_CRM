@@ -54,9 +54,17 @@ export default function scanInput({ once = false, remember = null, left = null, 
         lastCode: '',
         lastAt: 0,
 
+        // A scanner types a whole code in a few milliseconds; a person needs far longer per key.
+        strokes: [],
+        stroke() { this.strokes.push(Date.now()) },
+
         submit() {
             const c = this.code.trim();
             this.code = '';
+            const s = this.strokes;
+            this.strokes = [];
+            const fast = s.length >= 4 && (s[s.length - 1] - s[0]) / (s.length - 1) < 40;
+            window.iqsScanVia = fast ? 'scanner' : 'typed';
             if (c) this.$dispatch('scan', c);
         },
 
@@ -189,6 +197,7 @@ export default function scanInput({ once = false, remember = null, left = null, 
             if (!code || (code === this.lastCode && now - this.lastAt < 3000)) return;
             this.lastCode = code;
             this.lastAt = now;
+            window.iqsScanVia = 'camera';
             this.$dispatch('scan', code);
             if (once && !remember) this.stopCamera();
         },

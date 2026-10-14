@@ -74,7 +74,39 @@ class ChatService
             DB::table('chat_sessions')->where('id', $c->id)->update(['ended_at' => $end]);
         }
 
-        return $stale->count();
+        return $stale->count() + $this->closeIdle();
+    }
+
+    /** No real work for this long ends Communication, even with the app open. */
+    public const IDLE_MINUTES = 30;
+
+    /** Time allowed after the last action (reading, typing a reply) before the session counts as stopped. */
+    private const GRACE_MINUTES = 10;
+
+    /**
+     * Communication left on with the app open but nothing done: no chat tap, no call, no order action
+     * for IDLE_MINUTES. It ends GRACE_MINUTES after the last real action, so idle time is not worked time.
+     * The next tap turns it on again by itself.
+     */
+    private function closeIdle(): int
+    {
+        $open = DB::table('chat_sessions')->whereNull('ended_at')->where('started_at', '<', now()->subMinutes(self::IDLE_MINUTES))->get(['id', 'user_id', 'started_at']);
+        $closed = 0;
+        foreach ($open as $c) {
+            $last = collect([
+                $c->started_at,
+                DB::table('chat_events')->where('user_id', $c->user_id)->where('created_at', '>=', $c->started_at)->max('created_at'),
+                DB::table('customer_calls')->where('user_id', $c->user_id)->where('started_at', '>=', $c->started_at)->max('started_at'),
+                DB::table('rider_calls')->where('handled_by', $c->user_id)->where('created_at', '>=', $c->started_at)->max('created_at'),
+                DB::table('order_events')->where('user_id', $c->user_id)->where('created_at', '>=', $c->started_at)->max('created_at'),
+            ])->filter()->map(fn ($t) => \Illuminate\Support\Carbon::parse($t))->max();
+            if ($last->lt(now()->subMinutes(self::IDLE_MINUTES))) {
+                DB::table('chat_sessions')->where('id', $c->id)->whereNull('ended_at')->update(['ended_at' => $last->copy()->addMinutes(self::GRACE_MINUTES)]);
+                $closed++;
+            }
+        }
+
+        return $closed;
     }
 
     /** + (message), − (undo, with a reason) or No order (with a reason). */

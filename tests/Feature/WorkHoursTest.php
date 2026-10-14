@@ -150,4 +150,23 @@ class WorkHoursTest extends TestCase
         $this->get(route('work-time.index', ['from' => '2026-10-13', 'to' => '2026-10-14', 'person' => $user->id]))->assertOk()
             ->assertSee('Outside shift')->assertSee('1 confirmed · 1 made')->assertSee('Outside the shift: 1 confirmed, 1 made');
     }
+
+    public function test_communication_left_on_with_nothing_done_stops_counting(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-07 16:00:00'));
+        DB::table('users')->where('id', $this->mahim->id)->update(['last_seen_at' => now()]); // the app is open
+        $channel = DB::table('chat_channels')->insertGetId(['name' => 'Page', 'type' => 'messenger', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $idle = DB::table('chat_sessions')->insertGetId(['user_id' => $this->mahim->id, 'started_at' => '2026-10-07 15:00:00']);
+        DB::table('chat_events')->insert(['user_id' => $this->mahim->id, 'chat_channel_id' => $channel, 'kind' => 'message', 'created_at' => '2026-10-07 15:20:00']);
+
+        app(ChatService::class)->closeStale();
+        // Last real work 15:20, plus 10 minutes: not the hour after.
+        $this->assertSame('2026-10-07 15:30:00', (string) DB::table('chat_sessions')->where('id', $idle)->value('ended_at'));
+
+        // Someone still tapping keeps it on.
+        $busy = DB::table('chat_sessions')->insertGetId(['user_id' => $this->mahim->id, 'started_at' => '2026-10-07 15:00:00']);
+        DB::table('chat_events')->insert(['user_id' => $this->mahim->id, 'chat_channel_id' => $channel, 'kind' => 'message', 'created_at' => '2026-10-07 15:50:00']);
+        app(ChatService::class)->closeStale();
+        $this->assertNull(DB::table('chat_sessions')->where('id', $busy)->value('ended_at'));
+    }
 }

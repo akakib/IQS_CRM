@@ -814,6 +814,12 @@ class DeskService
     public function markUnpacked(Order $order, User $by): void
     {
         $done = DB::table('orders')->where('id', $order->id)->whereNotNull('unpack_needed_at')->update(['unpack_needed_at' => null, 'unpack_packer_id' => null]);
+        if ($done && in_array(OrderStatus::map()[$order->fresh()->status_id]['key'], ['packed', 'ready_for_pickup', 'handed_over', 'in_transit', 'delivered', 'partial_delivered', 'returned'], true)) {
+            // Packed again since (the old box went out as this parcel): nothing goes back on the shelf.
+            $this->systemNote($order->id, __('Box to open cleared by :n: the order was packed again, so nothing went back on the shelf.', ['n' => $by->name]), $by->id);
+
+            return;
+        }
         if ($done) {
             $this->systemNote($order->id, __('Box opened and items put back on the shelf by :n.', ['n' => $by->name]), $by->id);
             app(\App\Services\Catalog\StockService::class)->settleOrder($order, [], 'unpacked', $by); // back on the shelf

@@ -103,12 +103,12 @@
                                         <p class="truncate text-sm font-medium text-gray-800" x-text="c.name"></p>
                                         <p class="truncate text-xs text-gray-500" x-text="c.type"></p>
                                     </div>
-                                    <a :href="c.order_url" @click.prevent="open = false; window.dispatchEvent(new CustomEvent('order-new', { detail: c.order_url + '&embed=1' }))" class="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:border-primary hover:text-primary" title="{{ __('New order from this chat') }}" aria-label="{{ __('New order from this chat') }}">
-                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                                    </a>
                                     <button type="button" @click="ask = { id: c.id, kind: 'undo' }" :disabled="busy || c.messages < 1" class="h-9 w-9 rounded-lg border border-gray-300 text-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40" aria-label="{{ __('Take one back') }}">−</button>
                                     <span class="w-8 text-center text-lg font-semibold tabular-nums text-gray-900" x-text="c.messages"></span>
                                     <button type="button" @click="tap(c)" class="h-9 w-9 rounded-lg bg-primary active:scale-95 text-lg font-semibold text-white hover:bg-primary-dark disabled:opacity-60" aria-label="{{ __('One more message answered') }}">+</button>
+                                    <a :href="c.order_url" @click.prevent="open = false; window.dispatchEvent(new CustomEvent('order-new', { detail: c.order_url + '&embed=1' }))" class="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:border-primary hover:text-primary" title="{{ __('New order from this chat') }}" aria-label="{{ __('New order from this chat') }}">
+                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                    </a>
                                 </div>
                                 {{-- Today's result on its own line, full width, so it never gets cut on a phone. --}}
                                 <div class="mt-2 ml-12 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">

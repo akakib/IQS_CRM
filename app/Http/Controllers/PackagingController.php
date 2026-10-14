@@ -128,9 +128,9 @@ class PackagingController extends Controller
     /** Scan = this order is mine; returns the checklist. */
     public function scan(Request $request, ScanService $scans): JsonResponse
     {
-        $data = $request->validate(['code' => ['required', 'string', 'max:80']]);
+        $data = $request->validate(['code' => ['required', 'string', 'max:80'], 'via' => ['nullable', 'in:camera,scanner,typed']]);
 
-        return response()->json($scans->open($data['code'], $request->user()));
+        return response()->json($scans->open($data['code'], $request->user(), ($data['via'] ?? null) === 'typed'));
     }
 
     /**

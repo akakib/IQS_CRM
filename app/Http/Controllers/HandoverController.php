@@ -70,9 +70,9 @@ class HandoverController extends Controller
     {
         $s = DB::table('handover_sessions')->find($session);
         abort_unless($s && ! $s->closed_at, 422, __('This handover is closed.'));
-        $data = $request->validate(['code' => ['required', 'string', 'max:80']]);
+        $data = $request->validate(['code' => ['required', 'string', 'max:80'], 'via' => ['nullable', 'in:camera,scanner,typed']]);
 
-        return response()->json($scans->handover($session, $data['code'], $request->user()));
+        return response()->json($scans->handover($session, $data['code'], $request->user(), ($data['via'] ?? null) === 'typed'));
     }
 
     /** Manual tab: hand over the ticked parcels without scanning. Each one passes the same checks as a scan. */

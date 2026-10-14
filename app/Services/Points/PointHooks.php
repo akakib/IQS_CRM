@@ -72,7 +72,7 @@ class PointHooks
     private function people(string $trigger, Order $order, ?User $actor): array
     {
         return match ($trigger) {
-            'order_packed' => ['packer' => $actor?->id],
+            'order_packed' => ['packer' => $this->labelScanned($order) ? $actor?->id : null],
             'order_delivered', 'order_partial', 'order_returned' => ['order_moderator' => $order->moderator_id, 'packer' => $this->packer($order)],
             default => ['order_moderator' => $order->moderator_id, 'actor' => $actor?->id],
         };
@@ -210,5 +210,11 @@ class PointHooks
         return DB::table('order_payments')->where('order_id', $order->id)->exists()
             || DB::table('order_events')->where('order_id', $order->id)->where('reason_id', $advanceHold)->exists()
             || DB::table('order_notes')->where('order_id', $order->id)->whereIn('note_type', ['call', 'chat'])->where('body', 'like', '%advance%')->exists();
+    }
+
+    /** The packer opened this order by scanning its label (camera or scanner), not by typing the code. */
+    private function labelScanned(Order $order): bool
+    {
+        return ! (bool) DB::table('scan_logs')->where('order_id', $order->id)->where('station', 'packaging')->where('result', 'ok')->orderByDesc('id')->value('manual');
     }
 }

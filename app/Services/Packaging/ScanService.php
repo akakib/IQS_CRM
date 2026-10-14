@@ -29,7 +29,18 @@ class ScanService
      *
      * @return array{ok: bool, level: string, result: string, message: string, order?: array, checklist?: array}
      */
-    public function open(string $code, User $by): array
+    public function open(string $code, User $by, bool $byHand = false): array
+    {
+        try {
+            $this->byHand = $byHand;
+
+            return $this->openLabel($code, $by);
+        } finally {
+            $this->byHand = false;
+        }
+    }
+
+    private function openLabel(string $code, User $by): array
     {
         [$label, $order, $early] = $this->lookup($code);
         if ($early) {
@@ -114,7 +125,13 @@ class ScanService
         $key = OrderStatus::map()[$order->status_id]['key'];
         if ($key === 'ready_for_packaging') {
             $this->machine->transition($order, 'packed', $by, 'scan');
-            $order->refresh()->forceFill(['packed_version' => $order->current_version])->save();
+            $order->refresh();
+            if ($order->unpack_needed_at) {
+                // An earlier box of this order waited to be opened: packing it again settles it, so it can never be put back later.
+                $order->forceFill(['unpack_needed_at' => null, 'unpack_packer_id' => null]);
+                $this->orders->note($order, 'system', __('Packed again: the earlier box to open is settled by this parcel.'), $by);
+            }
+            $order->forceFill(['packed_version' => $order->current_version])->save();
             $stock = app(\App\Services\Catalog\StockService::class);
             $stock->settleOrder($order, $stock->itemsOf($order), 'unpacked', $by); // off the shelf
 
@@ -147,6 +164,15 @@ class ScanService
 
     /** @return array{ok: bool, level: string, result: string, message: string, order?: array} */
     public function handover(int $sessionId, string $code, User $by, bool $byHand = false): array
+    {
+        try {
+            return $this->handoverLabel($sessionId, $code, $by, $byHand);
+        } finally {
+            $this->byHand = false;
+        }
+    }
+
+    private function handoverLabel(int $sessionId, string $code, User $by, bool $byHand): array
     {
         $this->byHand = $byHand;
         [$label, $order, $early] = $this->lookup($code);

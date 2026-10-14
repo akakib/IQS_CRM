@@ -26,7 +26,7 @@
             return json;
         },
         async scan(code) {
-            try { this.last = await this.post(@js(route('packaging.scan.post')), { code }) }
+            try { this.last = await this.post(@js(route('packaging.scan.post')), { code, via: window.iqsScanVia || null }) }
             catch (e) { this.last = { ok: false, level: 'red', message: e.message } }
             this.list = this.last.checklist ?? null; this.ticked = []; this.holding = false;
             // keep: no checklist to show (refused, already packed), so the camera stays on for the next label.
@@ -225,7 +225,7 @@
                             </div>
                             <p class="mt-2 text-xs text-gray-500">
                                 <template x-if="previews[{{ $o->id }}].label && previews[{{ $o->id }}].label_current">
-                                    <span>{{ __('To start packaging, scan its label:') }} <b class="font-mono text-gray-800" x-text="previews[{{ $o->id }}].label"></b><span x-show="!previews[{{ $o->id }}].label_printed"> · {{ __('not printed yet') }}</span></span>
+                                    <span>{{ __('To start packaging, scan its label.') }}<span x-show="!previews[{{ $o->id }}].label_printed"> · {{ __('not printed yet') }}</span></span>
                                 </template>
                                 <template x-if="previews[{{ $o->id }}].label && !previews[{{ $o->id }}].label_current">
                                     <span class="font-medium text-orange-700">{{ __('The order changed: print the new label, then scan it.') }}</span>

@@ -11,7 +11,7 @@
     x-data="scanInput({ once: {{ $once ? 'true' : 'false' }}, remember: {{ Illuminate\Support\Js::from($remember) }}, left: {{ Illuminate\Support\Js::from($left) }}, doneMessage: {{ Illuminate\Support\Js::from($doneMessage) }} })"
     @scan-result.window="result($event.detail)">
     <div class="flex items-stretch gap-2">
-        <input type="text" x-model="code" @keydown.enter.prevent="submit()" autofocus autocomplete="off" :inputmode="typing ? 'text' : 'none'"
+        <input type="text" x-model="code" @keydown.enter.prevent="submit()" @keydown="$event.key.length === 1 && stroke()" autofocus autocomplete="off" :inputmode="typing ? 'text' : 'none'"
             @blur="setTimeout(() => { if (!camera && document.activeElement === document.body) $el.focus() }, 150)" placeholder="{{ $placeholder }}"
             :class="state === 'ok' ? 'border-green-600 bg-green-50' : (state === 'bad' ? 'border-red-600 bg-red-50' : 'border-gray-300')"
             class="min-w-0 flex-1 rounded-xl border-2 px-4 py-4 text-center font-mono text-lg tracking-wider focus:outline-none">

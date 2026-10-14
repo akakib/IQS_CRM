@@ -386,8 +386,8 @@ class PackagingTest extends TestCase
         $this->assertSame(0.0, $this->dates->fresh()->stock_qty);
         $this->assertSame('out_of_stock', $this->dates->fresh()->availability_status);
 
-        // The box is opened and the item put back: on the shelf again, and back In stock (the count had put it out).
-        DB::table('orders')->where('id', $b->id)->update(['unpack_needed_at' => now()]);
+        // Cancelled after packing: the box is opened and the item put back, on the shelf again and back In stock.
+        DB::table('orders')->where('id', $b->id)->update(['unpack_needed_at' => now(), 'status_id' => OrderStatus::idFor('cancelled')]);
         app(\App\Services\Orders\DeskService::class)->markUnpacked($b->fresh(), $this->packer);
         $this->assertSame(1.0, $this->dates->fresh()->stock_qty);
         $this->assertSame('in_stock', $this->dates->fresh()->availability_status);
@@ -490,5 +490,49 @@ class PackagingTest extends TestCase
 
         // A count can be a part too, and under one whole pack it cannot fill an order.
         $this->actingAs($this->desk)->postJson('/products/stock/'.$this->dates->id, ['qty' => 0.9])->assertOk()->assertJson(['qty' => 0.9, 'status' => 'out_of_stock']);
+    }
+
+    public function test_a_box_to_open_is_settled_when_the_order_is_packed_again(): void
+    {
+        $this->actingAs($this->desk)->postJson('/products/stock/'.$this->dates->id, ['qty' => 5]);
+        $a = $this->booked('01855555555', [['variant_id' => $this->dates->id, 'qty' => 2]]);
+        $this->actingAs($this->packer);
+        $this->packIt($a);
+        $this->assertSame(3.0, $this->dates->fresh()->stock_qty);
+
+        // Taken back after packing, then booked and packed again before anyone opened the old box (the same box went out).
+        DB::table('orders')->where('id', $a->id)->update(['unpack_needed_at' => now(), 'unpack_packer_id' => $this->packer->id, 'status_id' => OrderStatus::idFor('ready_for_packaging'), 'packer_id' => null, 'packed_at' => null]);
+        $this->packIt($a->fresh());
+        $this->assertNull($a->fresh()->unpack_needed_at);
+        $this->assertSame(3.0, $this->dates->fresh()->stock_qty); // taken once, not twice
+
+        // Even if an old entry were left, Unpacked on a parcel that is on its way puts nothing back.
+        DB::table('orders')->where('id', $a->id)->update(['unpack_needed_at' => now()]);
+        app(\App\Services\Orders\DeskService::class)->markUnpacked($a->fresh(), $this->packer);
+        $this->assertSame(3.0, $this->dates->fresh()->stock_qty);
+        $this->assertNull($a->fresh()->unpack_needed_at);
+    }
+
+    public function test_a_label_typed_by_hand_is_marked_and_earns_no_packing_point(): void
+    {
+        (new \Database\Seeders\PointsSeeder)->run();
+        $a = $this->booked('01866666666', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $b = $this->booked('01877777777', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $this->actingAs($this->packer);
+        $items = fn (Order $o) => DB::table('order_items')->where('order_id', $o->id)->pluck('id')->all();
+
+        // The card no longer shows the code to type.
+        $this->getJson("/packaging/orders/{$a->id}")->assertOk();
+        // Typed by hand: it opens, is logged as by hand, and packing it earns no point.
+        $this->postJson('/packaging/scan', ['code' => $this->label($a), 'via' => 'typed'])->assertJson(['ok' => true]);
+        $this->assertSame(1, (int) DB::table('scan_logs')->where('order_id', $a->id)->where('result', 'ok')->value('manual'));
+        $this->postJson("/packaging/orders/{$a->id}/pack", ['items' => $items($a)])->assertJson(['ok' => true]);
+        // Scanned: the usual point.
+        $this->postJson('/packaging/scan', ['code' => $this->label($b), 'via' => 'scanner'])->assertJson(['ok' => true]);
+        $this->postJson("/packaging/orders/{$b->id}/pack", ['items' => $items($b)])->assertJson(['ok' => true]);
+
+        $points = fn (Order $o) => DB::table('point_ledger')->where('user_id', $this->packer->id)->where('order_id', $o->id)->count();
+        $this->assertSame(0, $points($a));
+        $this->assertSame(1, $points($b));
     }
 }

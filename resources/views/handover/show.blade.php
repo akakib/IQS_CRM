@@ -17,7 +17,7 @@
                 last: null, count: {{ $handed->count() }}, total: {{ $total }}, missing: @js($missing->pluck('order_no')->values()),
                 async handle(code) {
                     try {
-                        const r = await fetch(@js(route('handover.scan', $session->id)), { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: JSON.stringify({ code }) });
+                        const r = await fetch(@js(route('handover.scan', $session->id)), { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: JSON.stringify({ code, via: window.iqsScanVia || null }) });
                         this.last = await r.json();
                     } catch (e) { this.last = { ok: false, level: 'red', message: @js(__('Connection problem. Scan again.')) }; }
                     if (this.last.ok) { this.count++; this.missing = this.missing.filter(n => n !== this.last.order?.order_no); }

@@ -11,8 +11,59 @@
     @endif
 
     {{-- ?phone= (a customer called in): the number is filled and looked up at once. --}}
-    <form method="POST" action="{{ route('orders.store') }}" x-ref="form" x-init="$nextTick(() => { if (phone && !@js(old('phone'))) lookup() })"
+    {{-- Clear: the same page again without the draft (fresh=1 drops it). --}}
+    <form method="GET" action="{{ url()->current() }}" id="order-draft-clear">
+        @foreach (request()->except(['fresh']) as $k => $v)@if (is_string($v))<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endif @endforeach
+        <input type="hidden" name="fresh" value="1">
+    </form>
+
+    {{-- A half-typed order is kept in this browser (per chat, for a day) and comes back after a reload; Create order or Clear ends it. --}}
+    <form method="POST" action="{{ route('orders.store') }}" x-ref="form"
+        x-init="$nextTick(() => {
+            if (@js((bool) request('fresh'))) forgetDraft();
+            else if (@js(! $errors->any() && ! request('phone'))) restoreDraft();
+            if (phone && !@js(old('phone'))) lookup();
+            $watch(() => JSON.stringify([channel, chatChannel, phone, name, addressId, zoneId, items, orderDiscount, payMethod, payAmount]), () => saveDraft());
+        })"
+        @input.debounce.400ms="saveDraft()" @select-change="$nextTick(() => saveDraft())" @submit="markSent()"
         x-data="{
+            draftKey: 'iqs-order-draft:' + @js((string) ($chatChannel?->id ?? 'plain')),
+            draftAt: null,
+            plainFields: ['address_line', 'district', 'thana', 'advance[transaction_id]', 'advance[sender_number]', 'customer_note'],
+            field(n) { return this.$refs.form.querySelector(`[name='${n}']`) },
+            saveDraft() {
+                const plain = {};
+                this.plainFields.forEach(n => { const el = this.field(n); if (el) plain[n] = el.value });
+                const empty = !this.items.length && !this.phone && !this.name && !Object.values(plain).some(v => v);
+                try {
+                    if (empty) { localStorage.removeItem(this.draftKey); this.draftAt = null; return }
+                    localStorage.setItem(this.draftKey, JSON.stringify({ at: Date.now(), data: {
+                        channel: this.channel, chatChannel: this.chatChannel, byChat: this.byChat, phone: this.phone, name: this.name,
+                        addressId: this.addressId, zoneId: this.zoneId, items: this.items, orderDiscount: this.orderDiscount,
+                        payMethod: this.payMethod, payAmount: this.payAmount, plain } }));
+                } catch (e) {}
+            },
+            restoreDraft() {
+                let saved = null;
+                try { saved = JSON.parse(localStorage.getItem(this.draftKey) || 'null') } catch (e) {}
+                if (!saved || saved.sent || Date.now() - saved.at > 86400000) { this.forgetDraft(); return }
+                const d = saved.data;
+                ['channel', 'chatChannel', 'byChat', 'phone', 'name', 'addressId', 'zoneId', 'items', 'orderDiscount', 'payMethod', 'payAmount'].forEach(k => { if (d[k] !== undefined) this[k] = d[k] });
+                this.$nextTick(() => {
+                    Object.entries(d.plain || {}).forEach(([n, v]) => {
+                        const el = this.field(n);
+                        if (!el) return;
+                        if (n === 'district') { Alpine.$data(el.closest('[x-data]')).setValue(v) } else { el.value = v }
+                    });
+                    const chat = this.$refs.form.querySelector('[data-draft=chat]');
+                    if (chat) Alpine.$data(chat).setValue(this.chatChannel);
+                    this.recharge();
+                });
+                this.draftAt = new Date(saved.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            },
+            forgetDraft() { try { localStorage.removeItem(this.draftKey) } catch (e) {} this.draftAt = null },
+            {{-- Sent: the draft is not offered again (a form error brings the typed values back by itself). --}}
+            markSent() { try { const s = JSON.parse(localStorage.getItem(this.draftKey) || 'null'); if (s) { s.sent = true; localStorage.setItem(this.draftKey, JSON.stringify(s)) } } catch (e) {} },
             channel: @js(old('channel', $chatChannel?->orderChannel() ?? (array_key_exists((string) request('channel'), \App\Models\Order::manualChannels()) ? request('channel') : ''))),
             chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
             byChat: @js((bool) $chatChannel),
@@ -109,7 +160,7 @@
                     @if ($chatChannels->isNotEmpty())
                         <div class="mb-4">
                             <p class="mb-1 text-sm font-medium text-gray-700">{{ __('From which chat') }}</p>
-                            <x-simple-select :options="['' => __('Not from a chat')] + $chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->name])->all()"
+                            <x-simple-select data-draft="chat" :options="['' => __('Not from a chat')] + $chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->name])->all()"
                                 :value="(string) old('chat_channel_id', $chatChannel?->id ?? '')" full-width class="w-full sm:w-72"
                                 @select-change="chatChannel = $event.detail; const t = @js($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all())[$event.detail]; if (t) { channel = t; byChat = true } else if (byChat) { channel = ''; byChat = false }" />
                             @error('chat_channel_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
@@ -247,8 +298,13 @@
                     <textarea name="customer_note" rows="2" maxlength="500" class="{{ $input }}">{{ old('customer_note') }}</textarea>
                 </x-card>
 
-                <x-button class="w-full" ::disabled="!items.length || !channel">{{ __('Create order') }}</x-button>
+                <p x-show="draftAt" x-cloak class="text-center text-xs text-gray-500">{{ __('Draft kept from') }} <span x-text="draftAt"></span>. {{ __('It stays until the order is created or cleared.') }}</p>
+                <div class="flex gap-2">
+                    <x-button type="button" variant="secondary" class="shrink-0" @click="$dispatch('open-confirm', { id: 'order-draft-clear-confirm', form: 'order-draft-clear' })">{{ __('Clear') }}</x-button>
+                    <x-button class="w-full" ::disabled="!items.length || !channel">{{ __('Create order') }}</x-button>
+                </div>
             </div>
         </div>
     </form>
+    <x-confirm-modal id="order-draft-clear-confirm" :verb="__('Clear')" :message="__('Everything typed in this order is removed.')" />
 </x-dynamic-component>

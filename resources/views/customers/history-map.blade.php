@@ -5,7 +5,7 @@
     $headers = array_column($columns, 'header');
     $map = array_map(fn ($h) => $mapping[$h] ?? '', $headers);
     $countLabels = ['orders' => __('Orders to import'), 'known' => __('Known customers'), 'new' => __('New customers'), 'in_iqs' => __('Already in IQS'),
-        'already' => __('Imported before'), 'skipped' => __('Skipped by status'), 'bad_phone' => __('Bad phone'), 'no_name' => __('No name'), 'bad_date' => __('Bad date')];
+        'updated' => __('Updated (changed since)'), 'already' => __('Imported before, no change'), 'skipped' => __('Skipped by status'), 'bad_phone' => __('Bad phone'), 'no_name' => __('No name'), 'bad_date' => __('Bad date')];
 @endphp
 
 <x-layouts.app :heading="__('Map the columns')">
@@ -36,7 +36,7 @@
         <div class="rounded-2xl border border-gray-200 bg-white p-4">
             <p class="truncate text-sm font-semibold text-gray-900">{{ $import->file_name }}</p>
             <p class="text-xs text-gray-500">{{ trans_choice(':count row|:count rows', $import->row_count, ['count' => $import->row_count]) }}
-                · @if ($fromTemplate){{ __('Matched the saved template :t. Change anything below; the template updates.', ['t' => $import->source]) }}@else{{ __('New file shape. IQS guessed the fields marked auto; check them.') }}@endif</p>
+                · @if ($fromTemplate){{ __('Columns marked saved use what you picked last time for that column name. Change anything; it is remembered.') }}@else{{ __('First time for these columns. IQS guessed the ones marked auto; check them. Your picks are remembered by column name.') }}@endif</p>
             <label class="mt-3 block text-xs font-medium text-gray-700">{{ __('Source name (shown on the journey; the file name if left empty)') }}</label>
             <input type="text" id="history-source" value="{{ $import->source ?? '' }}" autocomplete="off" @input="counts = null" maxlength="80" placeholder="{{ __('WooCommerce, Pathao...') }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
         </div>
@@ -48,7 +48,7 @@
                 <div class="grid grid-cols-1 items-center gap-2 border-t border-gray-100 py-2.5 sm:grid-cols-2">
                     <div class="min-w-0">
                         <p class="truncate text-sm font-medium text-gray-800">{{ $c['header'] }}
-                            @if (! $fromTemplate && $map[$i] !== '')<span class="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">{{ __('auto') }}</span>@endif</p>
+                            @if (in_array($c['header'], $savedKeys, true))<span class="ml-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">{{ __('saved') }}</span>@elseif ($map[$i] !== '')<span class="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">{{ __('auto') }}</span>@endif</p>
                         <p class="truncate text-xs text-gray-400">{{ $c['sample'] !== '' ? __('e.g. :v', ['v' => $c['sample']]) : __('empty') }}</p>
                     </div>
                     <div @select-change="map[{{ $i }}] = $event.detail; counts = null">
@@ -86,7 +86,7 @@
 
         <div class="rounded-2xl border border-gray-200 bg-white p-4">
             <p x-show="error" x-text="error" class="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"></p>
-            <p x-show="counts && ! counts.orders" x-cloak class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800"
+            <p x-show="counts && ! counts.orders && ! counts.updated" x-cloak class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800"
                 x-text="counts && (counts.already || counts.in_iqs) ? @js(__('Nothing new: every order in this file is already here (imported before or booked in IQS).')) : @js(__('Nothing to import. Check the Phone, Name and Date columns.'))"></p>
             <template x-if="counts">
                 <div class="mb-3">
@@ -105,9 +105,9 @@
             </template>
             <div class="flex gap-2">
                 <button type="button" @click="check()" :disabled="busy" class="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">{{ __('Check') }}</button>
-                <button type="button" @click="$dispatch('open-confirm', { id: 'history-run', form: 'history-run-form', label: counts ? counts.orders + ' ' + @js(__('orders')) : '' })" :disabled="busy || ! counts || ! counts.orders"
+                <button type="button" @click="$dispatch('open-confirm', { id: 'history-run', form: 'history-run-form', label: counts ? (counts.orders + counts.updated) + ' ' + @js(__('orders')) : '' })" :disabled="busy || ! counts || ! (counts.orders || counts.updated)"
                     class="flex-[2] rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
-                    x-text="! counts ? @js(__('Check first')) : (counts.orders ? @js(__('Import :n orders')).replace(':n', counts.orders.toLocaleString()) : @js(__('Nothing to import')))"></button>
+                    x-text="! counts ? @js(__('Check first')) : (counts.orders || counts.updated ? @js(__('Import :n new, update :u')).replace(':n', counts.orders.toLocaleString()).replace(':u', counts.updated.toLocaleString()) : @js(__('Nothing to import')))"></button>
             </div>
             <x-confirm-modal id="history-run" :verb="__('Import')" :danger="false" :message="__('These orders go into the customers\' journeys and new numbers become customers. This cannot be undone from here.')" />
             {{-- The confirm dialog submits a form; this one runs the import instead. --}}

@@ -150,7 +150,7 @@ class HistoryImport
     {
         $cols = fn (string $field) => array_keys(array_filter(array_values(array_map(fn ($h) => $mapping[$h] ?? '', $header)), fn ($f) => $f === $field));
         $get = fn (array $row, string $field, string $glue = ' ') => trim(implode($glue, array_filter(array_map(fn ($i) => self::cell((string) ($row[$i] ?? '')), $cols($field)), fn ($v) => $v !== '')));
-        $counts = ['rows' => count($rows), 'orders' => 0, 'known' => 0, 'new' => 0, 'in_iqs' => 0, 'already' => 0, 'bad_phone' => 0, 'no_name' => 0, 'bad_date' => 0, 'skipped' => 0];
+        $counts = ['rows' => count($rows), 'orders' => 0, 'known' => 0, 'new' => 0, 'in_iqs' => 0, 'already' => 0, 'updated' => 0, 'bad_phone' => 0, 'no_name' => 0, 'bad_date' => 0, 'skipped' => 0];
 
         $groups = [];
         foreach ($rows as $n => $row) {
@@ -229,20 +229,25 @@ class HistoryImport
         $before = [];
         foreach (array_chunk($nos, 500) as $chunk) {
             $inIqs += array_flip(Order::whereIn('external_ref', $chunk)->pluck('external_ref')->merge(Order::whereIn('order_no', $chunk)->pluck('order_no'))->map(fn ($v) => (string) $v)->all());
-            $before += array_flip(DB::table('customer_past_orders')->where('source', $source)->whereIn('external_no', $chunk)->pluck('external_no')->all());
+            foreach (DB::table('customer_past_orders')->where('source', $source)->whereIn('external_no', $chunk)->get() as $p) {
+                $before[$p->external_no] = $p;
+            }
         }
         // The same parcel by its CN: booked in IQS, or imported before from any file.
         foreach (array_chunk(array_values(array_filter(array_column($orders, 'cn'))), 500) as $chunk) {
             $cnInIqs = DB::table('shipments')->whereIn('consignment_id', $chunk)->pluck('consignment_id')
                 ->merge(DB::table('shipments')->whereIn('tracking_code', $chunk)->pluck('tracking_code'))->map(fn ($v) => 'cn:'.strtoupper((string) $v));
             $inIqs += array_flip($cnInIqs->all());
-            $before += array_flip(DB::table('customer_past_orders')->whereIn('cn', $chunk)->pluck('cn')->map(fn ($v) => 'cn:'.$v)->all());
+            foreach (DB::table('customer_past_orders')->whereIn('cn', $chunk)->get() as $p) {
+                $before['cn:'.$p->cn] = $p;
+            }
         }
         $known = [];
         foreach (array_chunk(array_values(array_unique(array_column($orders, 'phone'))), 500) as $chunk) {
             $known += DB::table('customer_phones')->whereIn('phone', $chunk)->pluck('customer_id', 'phone')->all();
         }
         $keep = [];
+        $updates = [];
         $newPhones = [];
         foreach ($orders as $o) {
             if (($o['external_no'] !== null && isset($inIqs[$o['external_no']])) || ($o['cn'] && isset($inIqs['cn:'.$o['cn']]))) {
@@ -250,8 +255,18 @@ class HistoryImport
 
                 continue;
             }
-            if (($o['external_no'] !== null && isset($before[$o['external_no']])) || ($o['cn'] && isset($before['cn:'.$o['cn']]))) {
-                $counts['already']++;
+            // Brought in before: the file is newer, so what changed (amount, status...) is updated.
+            $old = ($o['cn'] ? ($before['cn:'.$o['cn']] ?? null) : null) ?? ($o['external_no'] !== null ? ($before[$o['external_no']] ?? null) : null);
+            if ($old) {
+                $new = array_intersect_key($o, array_flip(['ordered_at', 'amount', 'status', 'medium', 'items', 'address']));
+                $changed = array_filter($new, fn ($v, $k) => (string) $v !== (string) $old->{$k} && ! ($k === 'amount' && abs((float) $v - (float) $old->amount) < 0.01)
+                    && ! ($k === 'ordered_at' && substr((string) $v, 0, 16) === substr((string) $old->ordered_at, 0, 16)), ARRAY_FILTER_USE_BOTH);
+                if ($changed) {
+                    $updates[] = ['id' => $old->id] + $changed;
+                    $counts['updated']++;
+                } else {
+                    $counts['already']++;
+                }
 
                 continue;
             }
@@ -262,7 +277,7 @@ class HistoryImport
         $counts['orders'] = count($keep);
         $counts['new'] = count($newPhones);
 
-        return ['orders' => $keep, 'counts' => $counts];
+        return ['orders' => $keep, 'updates' => $updates, 'counts' => $counts];
     }
 
     /** Writes the planned orders, creating customers for numbers IQS has not seen. */
@@ -277,6 +292,9 @@ class HistoryImport
                 DB::table('customer_phones')->insert($chunk->map(fn ($o) => ['customer_id' => $ids[$o['phone']], 'phone' => $o['phone'], 'is_primary' => true, 'created_at' => $now, 'updated_at' => $now])->values()->all());
             }
             $ids = DB::table('customer_phones')->whereIn('phone', $new->pluck('phone'))->pluck('customer_id', 'phone');
+            foreach ($plan['updates'] ?? [] as $u) {
+                DB::table('customer_past_orders')->where('id', $u['id'])->update(array_diff_key($u, ['id' => 1]) + ['updated_at' => $now]);
+            }
             foreach (array_chunk($plan['orders'], 300) as $chunk) {
                 DB::table('customer_past_orders')->insertOrIgnore(array_map(fn ($o) => [
                     'customer_id' => $o['customer_id'] ?? $ids[$o['phone']], 'customer_import_id' => $importId, 'source' => $source,

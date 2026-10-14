@@ -39,12 +39,13 @@ class CustomerImportController extends Controller
         }
         $path = 'imports/history-'.Str::uuid().'.json';
         Storage::disk('local')->put($path, json_encode([$header, $rows], JSON_UNESCAPED_UNICODE));
-        $template = DB::table('import_templates')->where('signature', $this->history->signature($header))->first();
+        $saved = $this->saved($header);
 
         $id = DB::table('customer_imports')->insertGetId([
             'file_name' => mb_substr($file->getClientOriginalName(), 0, 200), 'path' => $path,
             'columns' => json_encode($this->history->columns($header, $rows), JSON_UNESCAPED_UNICODE), 'row_count' => count($rows),
-            'source' => $template?->name, 'mapping' => $template?->mapping, 'values' => $template?->values,
+            'source' => $saved['source'], 'mapping' => $saved['mapping'] ? json_encode($saved['mapping'], JSON_UNESCAPED_UNICODE) : null,
+            'values' => json_encode($saved['values'], JSON_UNESCAPED_UNICODE),
             'created_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
 
@@ -68,12 +69,18 @@ class CustomerImportController extends Controller
             }
         }
 
+        // What was picked before for a column of the same name wins; a guess only fills the rest (and never a field already taken).
+        $saved = array_intersect_key(json_decode((string) $row->mapping, true) ?: [], array_flip($header));
+        $taken = array_filter($saved);
+        $guess = array_map(fn ($f) => $f !== '' && in_array($f, $taken, true) && ! in_array($f, ['name', 'address'], true) ? '' : $f, $this->history->guess($header));
+
         return view('customers.history-map', [
             'import' => $row,
             'columns' => $columns,
-            'mapping' => array_merge($this->history->guess($header), array_intersect_key(json_decode((string) $row->mapping, true) ?: [], array_flip($header))),
+            'mapping' => array_merge($guess, $saved),
+            'savedKeys' => array_keys($saved),
             'values' => $values,
-            'fromTemplate' => (bool) $row->source,
+            'fromTemplate' => $saved !== [],
             'channels' => array_map(fn ($l) => __($l), Order::CHANNELS),
         ]);
     }
@@ -89,6 +96,7 @@ class CustomerImportController extends Controller
 
     public function run(Request $request, int $import): JsonResponse
     {
+        set_time_limit(300); // a lifetime file updates thousands of rows
         [$row, $plan, $data] = $this->plan($request, $import);
         abort_unless($row->preview_hash && hash_equals($row->preview_hash, $this->hash($data)), 422, __('Press Check first; the columns changed since.'));
         $source = $data['source'];
@@ -137,6 +145,31 @@ class CustomerImportController extends Controller
             'recent' => DB::table('customer_past_orders as p')->join('customers as c', 'c.id', '=', 'p.customer_id')->where('p.customer_import_id', $import)
                 ->orderByDesc('p.ordered_at')->limit(10)->get(['c.id', 'c.name', 'p.external_no', 'p.ordered_at', 'p.amount', 'p.status']),
         ]);
+    }
+
+    /**
+     * Mapping learned from earlier imports, by column name: the newest pick for a column of that name.
+     *
+     * @return array{mapping: array<string, string>, values: array, source: ?string}
+     */
+    private function saved(array $header): array
+    {
+        $mapping = [];
+        $values = ['status' => [], 'medium' => []];
+        $source = null;
+        $best = 0;
+        foreach (DB::table('import_templates')->orderByDesc('updated_at')->orderByDesc('id')->get() as $t) {
+            $m = array_intersect_key(json_decode($t->mapping, true) ?: [], array_flip($header));
+            $mapping += array_map(fn ($f) => (string) $f, $m);
+            foreach (['status', 'medium'] as $k) {
+                $values[$k] += (json_decode((string) $t->values, true) ?: [])[$k] ?? [];
+            }
+            if (count($m) > $best) {
+                [$best, $source] = [count($m), $t->name];
+            }
+        }
+
+        return ['mapping' => $mapping, 'values' => $values, 'source' => $source];
     }
 
     private function hash(array $data): string

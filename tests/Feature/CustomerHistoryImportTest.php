@@ -62,7 +62,7 @@ class CustomerHistoryImportTest extends TestCase
         $this->get(route('journey.show', $known))->assertOk()->assertSee('#5521')->assertSee('Imported: WooCommerce')->assertSee('৳890');
         $this->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('woo2.csv', self::WOO)]);
         $second = DB::table('customer_imports')->max('id');
-        $this->get(route('customers.history.map', $second))->assertSee('Matched the saved template WooCommerce');
+        $this->get(route('customers.history.map', $second))->assertSee('saved');
         $this->postJson(route('customers.history.preview', $second), $body)->assertJsonPath('counts.orders', 0)->assertJsonPath('counts.already', 2);
         $this->postJson(route('customers.history.preview', $id), $body); $this->postJson(route('customers.history.run', $id), $body)->assertStatus(422);
 
@@ -187,5 +187,40 @@ DM1BBBBB,Iqbal Store,Antara Das,01764121879,260726MQKJLAG,7/24/2026 16:26
         $this->assertNull(Customer::where('primary_phone', '01812345678')->first()); // created by the import: gone
         $this->assertNotNull($known->fresh());                                        // was here before: stays
         $this->get(route('customers.history.show', $id))->assertSee('taken back')->assertDontSee('Undo this import');
+    }
+
+    public function test_picks_are_remembered_by_column_name_and_a_second_upload_updates_what_changed(): void
+    {
+        (new CustomerSeeder)->run();
+        $owner = $this->owner();
+        $first = "consignment_id,recipient_name,recipient_phone,amount_to_collect,collected_amount,created_at
+DM1AAAAA,Shahin,01326885301,0,1500,2026-07-24
+DM1BBBBB,Antara,01764121879,2180,2180,2026-07-24
+";
+        $this->actingAs($owner)->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('first.csv', $first)]);
+        $id = DB::table('customer_imports')->max('id');
+        // Wrong pick the first time: amount_to_collect (0 for a prepaid parcel).
+        $body = ['source' => 'Pathao', 'mapping' => ['consignment_id' => 'cn', 'recipient_name' => 'name', 'recipient_phone' => 'phone', 'amount_to_collect' => 'amount', 'collected_amount' => '', 'created_at' => 'date']];
+        $this->postJson(route('customers.history.preview', $id), $body);
+        $this->postJson(route('customers.history.run', $id), $body)->assertOk();
+        $this->assertEquals(0, DB::table('customer_past_orders')->where('cn', 'DM1AAAAA')->value('amount'));
+
+        // Another file with more columns: the columns seen before come back as picked (saved), the new one is guessed.
+        $second = "consignment_id,merchant_name,recipient_name,recipient_phone,amount_to_collect,collected_amount,created_at
+DM1AAAAA,Iqbal Store,Shahin,01326885301,0,1500,2026-07-24
+DM1BBBBB,Iqbal Store,Antara,01764121879,2180,2180,2026-07-24
+DM1CCCCC,Iqbal Store,Nusrat,01912345678,900,900,2026-07-25
+";
+        $this->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('second.csv', $second)]);
+        $id2 = DB::table('customer_imports')->max('id');
+        $map = $this->get(route('customers.history.map', $id2))->assertSee('saved')->viewData('mapping');
+        $this->assertSame(['consignment_id' => 'cn', 'merchant_name' => '', 'recipient_name' => 'name', 'recipient_phone' => 'phone', 'amount_to_collect' => 'amount', 'collected_amount' => '', 'created_at' => 'date'], $map);
+
+        // Fix the pick: the parcels brought in before are updated, the new one added.
+        $fixed = ['source' => 'Pathao', 'mapping' => ['amount_to_collect' => '', 'collected_amount' => 'amount'] + $map];
+        $this->postJson(route('customers.history.preview', $id2), $fixed)->assertJsonPath('counts.orders', 1)->assertJsonPath('counts.updated', 1)->assertJsonPath('counts.already', 1);
+        $this->postJson(route('customers.history.run', $id2), $fixed)->assertOk();
+        $this->assertEquals(1500, DB::table('customer_past_orders')->where('cn', 'DM1AAAAA')->value('amount'));
+        $this->assertSame(3, DB::table('customer_past_orders')->count());
     }
 }

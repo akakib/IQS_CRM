@@ -28,12 +28,12 @@ class HistoryImport
     private const GUESS = [
         'phone' => ['billing phone', 'recipient phone', 'customer phone', 'phone', 'mobile', 'contact'],
         'name' => ['billing first name', 'billing last name', 'recipient name', 'customer name', 'full name', 'name'],
-        'order_no' => ['order number', 'order no', 'order id', 'merchant order id', 'invoice'],
+        'order_no' => ['order number', 'order no', 'order id', 'merchant order id', 'consignment id', 'consignment', 'invoice'],
         'date' => ['order date', 'created at', 'date created', 'created', 'date'],
         'amount' => ['order total amount', 'order total', 'collectable amount', 'amount to collect', 'cod amount', 'total amount', 'total', 'amount'],
         'status' => ['order status', 'delivery status', 'status'],
         'medium' => ['utm source', 'order source', 'source', 'channel', 'medium'],
-        'items' => ['item name', 'product name', 'products', 'product', 'item'],
+        'items' => ['item name', 'product name', 'products', 'product', 'item description', 'description'],
         'qty' => ['quantity', 'qty'],
         'address' => ['billing address 1', 'shipping address 1', 'recipient address', 'address', 'billing city', 'city', 'area'],
     ];

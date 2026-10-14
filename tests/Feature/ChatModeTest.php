@@ -89,6 +89,7 @@ class ChatModeTest extends TestCase
         $this->get('/desk')->assertOk()->assertSee('New order')->assertSee('Where did it come from?')->assertSee('WhatsApp 2')->assertSee('Customer called');
         $this->get('/orders/create?channel=phone&embed=1')->assertOk()->assertSee("channel: 'phone'", false);
         // A half-typed order is kept per chat; Clear reopens the form with fresh=1 and the other parameters kept.
+        $this->get('/orders/create?chat_channel='.$wa->id.'&embed=1')->assertSee('pickPlatform(', false)->assertSee('chatPlatforms:', false);
         $this->get('/orders/create?channel=phone&embed=1')->assertSee("iqs-order-draft:", false)->assertSee('id="order-draft-clear"', false)->assertSee('name="fresh" value="1"', false)->assertSee('name="channel" value="phone"', false);
         $this->get('/orders/create?chat_channel='.$wa->id.'&embed=1')->assertOk()->assertSee('From which chat')->assertSee('name="embed"', false)->assertDontSee('Communication channels');
         $this->post('/orders', [

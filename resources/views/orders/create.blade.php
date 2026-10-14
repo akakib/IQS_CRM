@@ -67,6 +67,17 @@
             channel: @js(old('channel', $chatChannel?->orderChannel() ?? (array_key_exists((string) request('channel'), \App\Models\Order::manualChannels()) ? request('channel') : ''))),
             chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
             byChat: @js((bool) $chatChannel),
+            chatPlatforms: @js($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all()),
+            {{-- A platform picked by hand: a chat of another platform is dropped; the only chat of this platform is picked. --}}
+            pickPlatform(key) {
+                this.channel = key;
+                if (this.chatChannel && this.chatPlatforms[this.chatChannel] === key) return;
+                const same = Object.keys(this.chatPlatforms).filter(id => this.chatPlatforms[id] === key);
+                this.chatChannel = same.length === 1 ? same[0] : '';
+                this.byChat = !!this.chatChannel;
+                const sel = this.$refs.form?.querySelector('[data-draft=chat]');
+                if (sel) Alpine.$data(sel).setValue(this.chatChannel);
+            },
             phone: @js(old('phone', (string) request('phone', ''))), name: @js(old('name', '')),
             customer: null, looking: false,
             addressId: @js(old('customer_address_id')), zoneId: @js(old('zone_id')),
@@ -149,7 +160,7 @@
                 <x-card :title="__('Customer')">
                     <div class="mb-4 flex flex-wrap gap-2">
                         @foreach (\App\Models\Order::manualChannels() as $key => $label)
-                            <button type="button" @click="channel = @js($key)" class="rounded-full border px-3 py-1.5 text-sm"
+                            <button type="button" @click="pickPlatform(@js($key))" class="rounded-full border px-3 py-1.5 text-sm"
                                 :class="channel === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ __($label) }}</button>
                         @endforeach
                     </div>

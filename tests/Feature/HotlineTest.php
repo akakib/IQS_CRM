@@ -114,4 +114,20 @@ class HotlineTest extends TestCase
 
         $this->assertDatabaseHas('order_notes', ['order_id' => $this->order->id, 'note_type' => 'rider']);
     }
+
+    public function test_an_issue_waits_for_no_one_who_is_off_work_and_costs_them_nothing(): void
+    {
+        (new \Database\Seeders\PointsSeeder)->run();
+        // 3 AM: outside every shift. The issue goes to the managers by name, not to the person at home.
+        $this->travelTo(today()->setTime(3, 0));
+        $this->actingAs($this->owner())->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'partial', 'note' => 'Night call']);
+        $this->assertNull(DB::table('delivery_issues')->value('assigned_to'));
+
+        // An issue given while at work whose shift then ended: handed to managers, no minus point.
+        DB::table('delivery_issues')->update(['assigned_to' => $this->agent->id, 'sla_due_at' => now()->subMinute()]);
+        Artisan::call('issues:escalate');
+        $this->assertNotNull(DB::table('delivery_issues')->value('escalated_at'));
+        $this->assertSame(0.0, (float) DB::table('point_ledger')->where('user_id', $this->agent->id)->where('points', '<', 0)->sum('points'));
+        $this->assertSame(1, DB::table('order_notes')->where('body', 'Issue still open and its person is off work: sent to managers.')->count());
+    }
 }

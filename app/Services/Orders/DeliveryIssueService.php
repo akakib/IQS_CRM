@@ -31,7 +31,7 @@ class DeliveryIssueService
         $id = DB::table('delivery_issues')->insertGetId([
             'order_id' => $order->id, 'shipment_id' => $shipmentId, 'issue_type' => $type,
             'rider_phone' => Phone::normalize($riderPhone), 'note' => $note, 'opened_by' => $by?->id,
-            'assigned_to' => $order->moderator_id && DB::table('users')->where('id', $order->moderator_id)->where('is_active', true)->exists() ? $order->moderator_id : null, 'sla_due_at' => now()->addMinutes((int) settings('orders.issue_sla_minutes')),
+            'assigned_to' => $handler = $this->whoHandles($order), 'sla_due_at' => now()->addMinutes((int) settings('orders.issue_sla_minutes')),
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
@@ -41,9 +41,9 @@ class DeliveryIssueService
         ]), $by, ['delivery_issue_id' => $id]);
 
         $this->notifications->send('delivery_issue', __(':no: :t', ['no' => $order->order_no, 't' => $label]), trim(($note ?? '').' '.($riderPhone ? __('Rider :p', ['p' => $riderPhone]) : '')), [
-            'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'order_moderator_id' => $order->moderator_id,
+            'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'order_moderator_id' => $handler,
             'group_key' => 'delivery_issue:'.$order->id,
-        ]);
+        ] + ($handler ? [] : ['user_ids' => app(DeskService::class)->managerIds()]));
 
         return $id;
     }
@@ -68,12 +68,23 @@ class DeliveryIssueService
         }
     }
 
+    /**
+     * Who takes an issue now: the order's person when they are at work (active, inside their shift, not on a
+     * break); otherwise nobody by name, so the managers handle it and nobody loses a point for a time they were off.
+     */
+    public function whoHandles(Order $order): ?int
+    {
+        $user = $order->moderator_id ? \App\Models\User::find($order->moderator_id) : null;
+
+        return $user && $user->is_active && ! $user->current_break_id && app(\App\Services\Work\WorkCalendar::class)->isWorking($user->id) ? $user->id : null;
+    }
+
     /** Past-SLA issues go to managers once. @return int how many escalated */
     public function escalate(): int
     {
         $due = DB::table('delivery_issues as i')->join('orders as o', 'o.id', '=', 'i.order_id')
             ->whereNull('i.resolved_at')->whereNull('i.escalated_at')->where('i.sla_due_at', '<=', now())
-            ->get(['i.id', 'i.order_id', 'i.issue_type', 'o.order_no']);
+            ->get(['i.id', 'i.order_id', 'i.issue_type', 'i.assigned_to', 'o.order_no']);
 
         $managers = DB::table('user_roles as ur')->join('roles as r', 'r.id', '=', 'ur.role_id')
             ->whereIn('r.system_key', ['manager', 'owner'])->whereNull('r.deleted_at')->distinct()->pluck('ur.user_id')->all();
@@ -81,8 +92,13 @@ class DeliveryIssueService
         foreach ($due as $i) {
             DB::table('delivery_issues')->where('id', $i->id)->update(['escalated_at' => now(), 'updated_at' => now()]);
             $order = Order::find($i->order_id);
-            $this->orders->note($order, 'rider', __('Issue not handled in time: sent to managers.'), null, ['delivery_issue_id' => $i->id]);
-            app(\App\Services\Points\PointHooks::class)->escalated($order);
+            // A minus point only for someone who had the issue while at work; a shift that ended or a break just hands it on.
+            $person = $i->assigned_to ? \App\Models\User::find($i->assigned_to) : null;
+            $atWork = $person && $person->is_active && ! $person->current_break_id && app(\App\Services\Work\WorkCalendar::class)->isWorking($person->id);
+            $this->orders->note($order, 'rider', $atWork ? __('Issue not handled in time: sent to managers.') : __('Issue still open and its person is off work: sent to managers.'), null, ['delivery_issue_id' => $i->id]);
+            if ($atWork) {
+                app(\App\Services\Points\PointHooks::class)->escalated($order);
+            }
             $this->notifications->send('delivery_issue', __('Overdue: :no :t', ['no' => $i->order_no, 't' => str_replace('_', ' ', $i->issue_type)]), null, [
                 'link' => route('orders.show', $i->order_id), 'subject' => ['order', $i->order_id], 'user_ids' => $managers, 'priority' => 'urgent',
             ]);

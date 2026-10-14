@@ -179,7 +179,7 @@ class CourierUpdateProcessor
         if ($open) {
             return;
         }
-        $owner = $order->moderator_id && DB::table('users')->where('id', $order->moderator_id)->where('is_active', true)->exists() ? $order->moderator_id : null;
+        $owner = app(\App\Services\Orders\DeliveryIssueService::class)->whoHandles($order); // at work now, or the managers
         $id = DB::table('delivery_issues')->insertGetId([
             'order_id' => $order->id, 'shipment_id' => $shipment->id, 'issue_type' => $type, 'note' => $note,
             'opened_by' => null, 'assigned_to' => $owner,

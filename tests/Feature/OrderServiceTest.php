@@ -248,4 +248,26 @@ class OrderServiceTest extends TestCase
         $this->assertContains($claimable->id, $ids);
         $this->assertNotContains($others->id, $ids);
     }
+
+    public function test_a_repeat_order_is_merged_into_the_first_as_one_parcel(): void
+    {
+        $first = $this->make();
+        $nuts = \App\Models\Product::factory()->withVariant(300, ['sku' => 'NUT-9'])->create(['name' => 'Nuts'])->variants()->first();
+        $second = $this->make(['items' => [['variant_id' => $this->variant->id, 'qty' => 1], ['variant_id' => $nuts->id, 'qty' => 2]]]);
+        $merger = app(\App\Services\Orders\OrderMerger::class);
+        $this->assertNull($merger->refusal($second, $first));
+
+        $this->actingAs($this->agent)->post("/orders/{$second->id}/merge", ['into' => $first->id])->assertRedirect(route('orders.show', $first));
+        $first->refresh();
+        $qty = DB::table('order_items')->where('order_id', $first->id)->pluck('qty', 'variant_id')->map(fn ($q) => (float) $q)->all();
+        $this->assertSame([$this->variant->id => 3.0, $nuts->id => 2.0], $qty);
+        $this->assertSame('cancelled', OrderStatus::map()[$second->fresh()->status_id]['key']);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $first->id, 'body' => $second->order_no.' merged into this order by Mahim: its items were added.']);
+
+        // Not twice, and never an order with money of its own.
+        $this->post("/orders/{$second->id}/merge", ['into' => $first->id])->assertSessionHasErrors('merge');
+        $third = $this->make();
+        DB::table('order_payments')->insert(['order_id' => $third->id, 'payment_type' => 'advance', 'method_id' => DB::table('payment_methods')->value('id'), 'amount' => 100, 'status' => 'pending_verification', 'transaction_id' => 'MRG1', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        $this->assertStringContainsString('has a payment', (string) $merger->refusal($third->fresh(), $first->fresh()));
+    }
 }

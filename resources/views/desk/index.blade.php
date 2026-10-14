@@ -361,6 +361,12 @@
                                             <span @class(['block text-xs font-medium', 'text-red-700' => $d->match['items'] === 'same' && $d->match['address'] === 'same', 'text-amber-700' => ! ($d->match['items'] === 'same' && $d->match['address'] === 'same')])>{{ ucfirst(\App\Services\Orders\DuplicateCheck::label($d->match['items'], $d->match['address'])) }}</span>
                                         @endif
                                     </a>
+                                    @if (($d->mergeable ?? false) && auth()->user()->can('orders.edit'))
+                                        <form method="POST" action="{{ route('orders.merge', $order) }}" id="merge-{{ $d->id }}" class="mb-1">@csrf<input type="hidden" name="into" value="{{ $d->id }}">
+                                            <button type="button" class="lockable text-xs font-semibold text-primary hover:underline"
+                                                @click="$dispatch('open-confirm', { id: 'merge-order', form: 'merge-{{ $d->id }}', label: @js($order->order_no.' → '.$d->order_no) })">{{ __('Merge this order into :no', ['no' => $d->order_no]) }}</button>
+                                        </form>
+                                    @endif
                                 @empty
                                     <p class="text-base font-semibold text-gray-900">{{ __('None') }}</p>
                                 @endforelse
@@ -509,6 +515,10 @@
                     @endif
                 </div>
 
+                @if ($order && $detail['duplicates']->contains(fn ($d) => $d->mergeable ?? false))
+                    <x-confirm-modal id="merge-order" :verb="__('Merge')" :danger="false"
+                        :message="__('The items of this order are added to the other order, which then goes out as one parcel. This order is cancelled as a duplicate.')" />
+                @endif
                 @if ($order && $detail['openDuplicates']->isNotEmpty())
                     <x-confirm-modal id="confirm-duplicate" :verb="__('Confirm anyway')" :danger="false"
                         :message="__('This customer has another open order (:list). Confirm books the courier right away: merge them first if they go in one parcel.', ['list' => $detail['openDuplicates']->pluck('order_no')->join(', ')])" />

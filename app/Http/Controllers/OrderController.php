@@ -455,6 +455,17 @@ class OrderController extends Controller
         $this->machine->transition($order, 'confirmed', $user, 'user', null, __('Confirmed in the chat or call it was taken in'));
     }
 
+    /** Two open orders of one customer in one parcel: this order's items go into the other, this one is cancelled. */
+    public function merge(Order $order, Request $request, \App\Services\Orders\OrderMerger $merger): RedirectResponse
+    {
+        $this->authorizeWork($order, $request->user());
+        $data = $request->validate(['into' => ['required', 'integer']]);
+        $into = Order::visibleTo($request->user())->findOrFail($data['into']);
+        $merger->merge($order, $into, $request->user());
+
+        return redirect()->route('orders.show', $into)->with('success', __(':a merged into :b.', ['a' => $order->order_no, 'b' => $into->order_no]));
+    }
+
     private function authorizeWork(Order $order, User $user): void
     {
         abort_unless(Order::visibleTo($user)->whereKey($order->id)->exists(), 403);

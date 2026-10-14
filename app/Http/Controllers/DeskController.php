@@ -404,7 +404,12 @@ class DeskController extends Controller
             $match = app(\App\Services\Orders\DuplicateCheck::class)->compare(
                 $items->whereNotNull('variant_id')->groupBy('variant_id')->map(fn ($r) => $r->sum('qty'))->all(),
                 $order->ship_address.' '.$order->ship_thana, $duplicates->pluck('id')->all());
-            $duplicates->each(fn ($d) => $d->match = $match[$d->id] ?? null);
+            $merger = app(\App\Services\Orders\OrderMerger::class);
+            $twins = \App\Models\Order::whereIn('id', $duplicates->pluck('id'))->get()->keyBy('id');
+            $duplicates->each(function ($d) use ($match, $merger, $twins, $order) {
+                $d->match = $match[$d->id] ?? null;
+                $d->mergeable = isset($twins[$d->id]) && $merger->refusal($order, $twins[$d->id]) === null; // this order can go into that one
+            });
         }
 
         $key = OrderStatus::map()[$order->status_id]['key'];

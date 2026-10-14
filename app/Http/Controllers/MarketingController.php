@@ -104,7 +104,8 @@ class MarketingController extends Controller
 
         $fh = fopen($data['file']->getRealPath(), 'r');
         $map = [];
-        $saved = 0;
+        $ends = null; // "Reporting ends": a row covering several days is not a daily report
+        $days = [];   // date => summed numbers (a file with one row per campaign has several rows per day)
         $skipped = 0;
         while (($row = fgetcsv($fh)) !== false) {
             if ($map === []) {
@@ -122,8 +123,16 @@ class MarketingController extends Controller
 
                     return back()->with('error', __('The file needs a Date (or Day) column and a Spend (or Cost) column.'));
                 }
+                $ends = array_search('reporting ends', $head, true);
+                $ends = $ends === false ? null : $ends;
 
                 continue;
+            }
+            if ($ends !== null && ($row[$ends] ?? '') !== '' && strtotime((string) $row[$ends]) !== strtotime((string) ($row[$map['date']] ?? ''))) {
+                fclose($fh);
+
+                return back()->with('error', __('This report covers several days in one row (:a to :b). Upload it on the Campaigns page, or export from Ads Manager with Breakdown: By time, Day.', [
+                    'a' => $row[$map['date']] ?? '', 'b' => $row[$ends]]));
             }
             $date = strtotime((string) ($row[$map['date']] ?? ''));
             $spend = str_replace([',', '$'], '', (string) ($row[$map['spend_usd']] ?? ''));
@@ -132,14 +141,20 @@ class MarketingController extends Controller
 
                 continue;
             }
-            $m = [];
+            $day = date('Y-m-d', $date);
             foreach ($map as $field => $i) {
-                $m[$field] = str_replace([',', '$'], '', (string) ($row[$i] ?? '0'));
+                if ($field === 'date') {
+                    continue;
+                }
+                $v = str_replace([',', '$'], '', (string) ($row[$i] ?? '0'));
+                $days[$day][$field] = ($days[$day][$field] ?? 0) + (is_numeric($v) ? (float) $v : 0);
             }
-            $this->costs->saveSpend((int) $data['ad_account_id'], date('Y-m-d', $date), $m, 'import');
-            $saved++;
         }
         fclose($fh);
+        foreach ($days as $day => $m) {
+            $this->costs->saveSpend((int) $data['ad_account_id'], $day, $m, 'import');
+        }
+        $saved = count($days);
         $this->costs->rebuild();
         $this->logger->log('ad_spend.imported', ['ad_account', $data['ad_account_id']], null, ['days' => $saved, 'skipped' => $skipped]);
 

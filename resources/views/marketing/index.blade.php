@@ -127,7 +127,7 @@
                 </form>
             </x-card>
 
-            <x-card :title="__('Import CSV')" :subtitle="__('A daily report from Google Ads or Meta. Needs Date (or Day) and Spend (or Cost) columns.')">
+            <x-card :title="__('Import CSV')" :subtitle="__('A daily report from Google Ads or Meta: one row per day (rows of the same day are added up). Needs Date (or Day) and Spend (or Cost) columns. A report for a whole month by campaign goes on the Campaigns page.')">
                 <form method="POST" action="{{ route('marketing.import') }}" enctype="multipart/form-data" class="space-y-2">
                     @csrf
                     <x-simple-select name="ad_account_id" :options="$accountOptions" :value="old('ad_account_id')" :placeholder="__('Choose the ad account')" full-width class="w-full" />

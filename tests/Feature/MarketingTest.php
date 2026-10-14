@@ -206,4 +206,21 @@ class MarketingTest extends TestCase
         $this->post(route('campaigns.import'), ['file' => UploadedFile::fake()->createWithContent('m.csv', $month)])->assertSessionHas('error');
         $this->assertSame(10.0, (float) DB::table('ad_insights')->sum('spend_usd'));
     }
+
+    public function test_daily_import_adds_rows_of_one_day_and_refuses_a_month_report(): void
+    {
+        $this->lot(1000, 120, '2026-09-01');
+        $this->actingAs($this->owner);
+        // One row per campaign for the same day: added up, not the last one only.
+        $daily = "Day,Campaign name,Amount spent (USD)\n2026-09-02,A,10\n2026-09-02,B,5.5\n2026-09-03,A,4\n";
+        $this->post(route('marketing.import'), ['ad_account_id' => $this->account, 'file' => UploadedFile::fake()->createWithContent('d.csv', $daily)])->assertSessionHas('success');
+        $this->assertSame(15.5, (float) DB::table('ad_spend_daily')->where('spend_date', '2026-09-02')->value('spend_usd'));
+        $this->assertSame(4.0, (float) DB::table('ad_spend_daily')->where('spend_date', '2026-09-03')->value('spend_usd'));
+
+        // A month by campaign is refused with the way to do it, and saves nothing.
+        $month = "\"Reporting starts\",\"Reporting ends\",\"Campaign name\",\"Amount spent (USD)\"\n2026-09-01,2026-09-30,A,1582.79\n2026-09-01,2026-09-30,B,0\n";
+        $this->post(route('marketing.import'), ['ad_account_id' => $this->account, 'file' => UploadedFile::fake()->createWithContent('m.csv', $month)])
+            ->assertSessionHas('error');
+        $this->assertNull(DB::table('ad_spend_daily')->where('spend_date', '2026-09-01')->value('spend_usd'));
+    }
 }

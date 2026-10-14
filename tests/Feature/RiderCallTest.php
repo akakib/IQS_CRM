@@ -21,6 +21,8 @@ class RiderCallTest extends TestCase
 
     public function test_a_rider_call_is_found_by_cn_checked_with_the_customer_and_counted_per_rider(): void
     {
+        // Issues go to the moderator only inside their shift: run at a working hour, not whenever the suite runs.
+        $this->travelTo(now()->next('Sunday')->setTime(12, 0));
         (new CatalogSeeder)->run();
         (new CustomerSeeder)->run();
         (new OrderConfigSeeder)->run();

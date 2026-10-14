@@ -33,6 +33,8 @@ class HotlineTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Issues go to the moderator only inside their shift: run at a working hour, not whenever the suite runs.
+        $this->travelTo(now()->next('Sunday')->setTime(12, 0));
         (new CatalogSeeder)->run();
         (new CustomerSeeder)->run();
         (new OrderConfigSeeder)->run();

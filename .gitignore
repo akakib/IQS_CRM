@@ -25,3 +25,6 @@ Homestead.yaml
 Thumbs.db
 /storage/backups
 /storage/debugbar
+
+# throwaway probe tests
+tests/Feature/Tmp*

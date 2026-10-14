@@ -80,12 +80,17 @@ class CustomerJourneyController extends Controller
             ->whereNotNull('c.outcome')->orderByDesc('c.started_at')->limit(300)
             ->get(['c.id', 'c.direction', 'c.started_at', 'c.outcome', 'c.duration_seconds', 'c.recording_url', 'c.note', 'u.name as by', 'o.order_no']);
 
+        // Orders brought in from a file (WooCommerce, Pathao...): history only.
+        $past = DB::table('customer_past_orders')->where('customer_id', $customer->id)->orderByDesc('ordered_at')->limit(300)->get()
+            ->each(fn ($p) => $p->at = Carbon::parse($p->ordered_at));
+
         $events = $orders->map(fn ($o) => ['type' => 'order', 'at' => $o->created_at, 'row' => $o])
+            ->concat($past->map(fn ($p) => ['type' => 'past', 'at' => $p->at, 'row' => $p]))
             ->concat($calls->map(fn ($c) => ['type' => 'call', 'at' => Carbon::parse($c->started_at), 'row' => $c]))
             ->sortByDesc(fn ($e) => $e['at']->getTimestamp())->values();
 
         // Days between one order and the next (oldest to newest).
-        $dates = $orders->pluck('created_at')->sort()->values();
+        $dates = $orders->pluck('created_at')->concat($past->pluck('at'))->sortBy(fn ($d) => $d->getTimestamp())->values();
         $gaps = $dates->slice(1)->values()->map(fn ($d, $i) => $dates[$i]->diffInDays($d));
         $user = $request->user();
 
@@ -94,17 +99,19 @@ class CustomerJourneyController extends Controller
             'events' => $events,
             'statuses' => $statuses,
             'stats' => [
-                'sold' => $orders->sum('sold'),
-                'orders' => $orders->count(),
-                'delivered' => $orders->where('kind', 'delivered')->count(),
-                'returned' => $orders->where('kind', 'returned'),
-                'cancelled' => $orders->where('kind', 'cancelled'),
-                'refunded' => $orders->sum(fn ($o) => (float) $o->refunded),
+                'sold' => $orders->sum('sold') + $past->where('status', 'delivered')->sum('amount'),
+                'orders' => $orders->count() + $past->count(),
+                'delivered' => $orders->where('kind', 'delivered')->count() + $past->where('status', 'delivered')->count(),
+                'returned' => [$orders->where('kind', 'returned')->count() + $past->where('status', 'returned')->count(),
+                    $orders->where('kind', 'returned')->sum('grand_total') + $past->where('status', 'returned')->sum('amount')],
+                'cancelled' => [$orders->where('kind', 'cancelled')->count() + $past->where('status', 'cancelled')->count(),
+                    $orders->where('kind', 'cancelled')->sum('grand_total') + $past->where('status', 'cancelled')->sum('amount')],
+                'refunded' => $orders->sum(fn ($o) => (float) $o->refunded) + $past->where('status', 'refunded')->sum('amount'),
                 'gap' => $gaps->isEmpty() ? null : (int) round($gaps->avg()),
                 'first' => $dates->first(),
                 'last' => $dates->last(),
             ],
-            'channels' => $orders->countBy('channel')->sortDesc(),
+            'channels' => $orders->pluck('channel')->concat($past->map(fn ($p) => $p->medium ?: 'other'))->countBy()->sortDesc(),
             'openable' => $orders->isEmpty() || ! $user->can('orders.view') ? collect() : Order::visibleTo($user)->whereIn('id', $orders->pluck('id'))->pluck('id')->flip(),
             'area' => collect([$orders->first()?->ship_thana, $orders->first()?->ship_district])->filter()->join(', '),
         ]);

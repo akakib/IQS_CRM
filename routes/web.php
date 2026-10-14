@@ -233,6 +233,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/issues/{issue}/resolve', [HotlineController::class, 'resolve'])->whereNumber('issue')->middleware('can:orders.view')->name('issues.resolve');
 
     // Customers
+    Route::middleware('can:customers.import')->controller(\App\Http\Controllers\CustomerImportController::class)->group(function () {
+        Route::get('/customers/history', 'index')->name('customers.history');
+        Route::post('/customers/history', 'store')->name('customers.history.store');
+        Route::get('/customers/history/{import}', 'show')->whereNumber('import')->name('customers.history.show');
+        Route::get('/customers/history/{import}/map', 'map')->whereNumber('import')->name('customers.history.map');
+        Route::post('/customers/history/{import}/preview', 'preview')->whereNumber('import')->name('customers.history.preview');
+        Route::post('/customers/history/{import}/run', 'run')->whereNumber('import')->name('customers.history.run');
+    });
     Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');
     Route::get('/customers/steadfast', [CustomerController::class, 'steadfast'])->middleware('can:customers.view')->name('customers.steadfast');
     Route::post('/customers/{customer}/merge', [CustomerController::class, 'merge'])->middleware('can:customers.edit')->name('customers.merge');

@@ -7,9 +7,14 @@
 <x-layouts.app :heading="__('Customers')">
     <div class="mb-4 flex items-center justify-between gap-3">
         <p class="text-sm text-gray-500">{{ trans_choice(':count customer|:count customers', $customers->total(), ['count' => $customers->total()]) }}</p>
-        @can('customers.create')
-            <x-button :href="route('customers.create')">+ {{ __('New customer') }}</x-button>
-        @endcan
+        <div class="flex gap-2">
+            @can('customers.import')
+                <x-button variant="secondary" :href="route('customers.history')">{{ __('Import order history') }}</x-button>
+            @endcan
+            @can('customers.create')
+                <x-button :href="route('customers.create')">+ {{ __('New customer') }}</x-button>
+            @endcan
+        </div>
     </div>
 
     <x-list.filter-bar :list="$list" :action="route('customers.index')" :placeholder="__('Phone number or name')">

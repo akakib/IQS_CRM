@@ -11,7 +11,7 @@ return [
         'staff' => ['view', 'create', 'edit', 'delete', 'export'],
         'locations' => ['view', 'create', 'edit', 'delete'],
         'products' => ['view', 'create', 'edit', 'delete', 'export', 'availability'],
-        'customers' => ['view', 'create', 'edit', 'delete', 'export'],
+        'customers' => ['view', 'create', 'edit', 'delete', 'export', 'import'],
         'orders' => ['view', 'create', 'edit', 'approve', 'export', 'reassign', 'take'],
         'payments' => ['verify'],
         'shipping' => ['view', 'create'],
@@ -34,6 +34,7 @@ return [
     'action_labels' => [
         'payments.verify' => 'Check advance payments (TrxID and amount)',
         'staff.delete' => 'Deactivate',
+        'customers.import' => 'Import order history (CSV/Excel)',
         'products.availability' => 'Stock status',
         'points.manage' => 'Manage rules and reviews',
         'packaging.manage' => 'Set on-duty packers',

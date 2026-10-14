@@ -6,7 +6,10 @@
     $palette = ['web' => '#16a34a', 'messenger' => '#2563eb', 'whatsapp' => '#22c55e', 'comments' => '#6366f1', 'instagram' => '#db2777',
         'tiktok' => '#111827', 'telegram' => '#0ea5e9', 'phone' => '#f59e0b', 'b2b' => '#7c3aed', 'other' => '#9ca3af'];
     $kind = ['delivered' => ['green', '#16a34a'], 'returned' => ['red', '#dc2626'], 'cancelled' => ['red', '#dc2626'], 'open' => ['blue', '#2563eb']];
-    $lost = $stats['returned']->concat($stats['cancelled']);
+    $lostN = $stats['returned'][0] + $stats['cancelled'][0];
+    $lostAmt = $stats['returned'][1] + $stats['cancelled'][1];
+    $pastKind = ['delivered' => ['#16a34a', 'green', 'Delivered'], 'cancelled' => ['#dc2626', 'red', 'Cancelled'], 'returned' => ['#dc2626', 'red', 'Returned'],
+        'refunded' => ['#dc2626', 'amber', 'Refunded'], 'pending' => ['#9ca3af', 'gray', 'Not finished']];
 @endphp
 
 <x-layouts.app :heading="__('Customer journey')">
@@ -29,12 +32,12 @@
             <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div class="rounded-xl bg-gray-50 p-3"><p class="text-xs text-gray-500">{{ __('Delivered sales') }}</p><p class="mt-0.5 text-lg font-semibold tabular-nums text-gray-900">{{ $tk($stats['sold']) }}</p></div>
                 <div class="rounded-xl bg-gray-50 p-3"><p class="text-xs text-gray-500">{{ __('Orders') }}</p><p class="mt-0.5 text-lg font-semibold tabular-nums text-gray-900">{{ $stats['orders'] }} <span class="text-xs font-normal text-gray-500">{{ __(':d delivered', ['d' => $stats['delivered']]) }}</span></p></div>
-                <div class="rounded-xl bg-gray-50 p-3"><p class="text-xs text-gray-500">{{ __('Cancel / return') }}</p><p class="mt-0.5 text-lg font-semibold tabular-nums {{ $lost->isEmpty() ? 'text-gray-900' : 'text-red-700' }}">{{ $lost->count() }} · {{ $tk($lost->sum('grand_total')) }}</p></div>
+                <div class="rounded-xl bg-gray-50 p-3"><p class="text-xs text-gray-500">{{ __('Cancel / return') }}</p><p class="mt-0.5 text-lg font-semibold tabular-nums {{ $lostN ? 'text-red-700' : 'text-gray-900' }}">{{ $lostN }} · {{ $tk($lostAmt) }}</p></div>
                 <div class="rounded-xl bg-gray-50 p-3"><p class="text-xs text-gray-500">{{ __('Orders every') }}</p><p class="mt-0.5 text-lg font-semibold tabular-nums text-gray-900">{{ $stats['gap'] === null ? '-' : trans_choice(':count day|:count days', $stats['gap'], ['count' => $stats['gap']]) }}</p></div>
             </div>
             <p class="mt-2 text-xs text-gray-500">
-                {{ __(':c cancelled (:a)', ['c' => $stats['cancelled']->count(), 'a' => $tk($stats['cancelled']->sum('grand_total'))]) }}
-                · {{ __(':c returned (:a)', ['c' => $stats['returned']->count(), 'a' => $tk($stats['returned']->sum('grand_total'))]) }}
+                {{ __(':c cancelled (:a)', ['c' => $stats['cancelled'][0], 'a' => $tk($stats['cancelled'][1])]) }}
+                · {{ __(':c returned (:a)', ['c' => $stats['returned'][0], 'a' => $tk($stats['returned'][1])]) }}
                 · {{ __('Refunded :a', ['a' => $tk($stats['refunded'])]) }}
                 @if ($stats['last']) · {{ __('last order :d', ['d' => $stats['last']->diffForHumans()]) }}@endif
             </p>
@@ -85,6 +88,21 @@
                                 <p class="mt-1 text-sm text-gray-700">{{ $r->items->map(fn ($it) => $it->name_snapshot.' × '.\App\Support\Units::qty($it->qty, $it->unit))->join(', ') }}</p>
                                 <p class="mt-0.5 text-xs text-gray-500">{{ __('By :n', ['n' => $r->moderator?->name ?? __('nobody')]) }}@if ($r->source_campaign) · {{ __('ad: :c', ['c' => $r->source_campaign]) }}@endif</p>
                             </li>
+                        @elseif ($e['type'] === 'past')
+                            @php [$dot, $badge, $label] = $pastKind[$r->status] ?? $pastKind['pending']; @endphp
+                            <li class="relative mb-4 pl-5">
+                                <span class="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full ring-2 ring-white" style="background: {{ $dot }}"></span>
+                                <div class="flex items-baseline justify-between gap-2">
+                                    <p class="text-sm text-gray-900"><span class="font-semibold">{{ $r->at->format('d M Y') }}</span>@if ($r->external_no) · <span class="font-mono">#{{ $r->external_no }}</span>@endif</p>
+                                    <p class="shrink-0 text-base font-semibold tabular-nums {{ $r->status === 'delivered' ? 'text-gray-900' : 'text-gray-400 line-through' }}">{{ $tk($r->amount) }}</p>
+                                </div>
+                                <p class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
+                                    <x-badge :color="$badge">{{ __($label) }}</x-badge>
+                                    @if ($r->medium)<span class="rounded-full px-2 py-0.5 text-white" style="background: {{ $palette[$r->medium] ?? '#9ca3af' }}">{{ Order::channelLabel($r->medium) }}</span>@endif
+                                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">{{ __('Imported: :s', ['s' => $r->source]) }}</span>
+                                </p>
+                                @if ($r->items)<p class="mt-1 text-sm text-gray-700">{{ $r->items }}</p>@endif
+                            </li>
                         @else
                             <li class="relative mb-4 pl-5">
                                 <span class="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full bg-amber-500 ring-2 ring-white"></span>
@@ -100,8 +118,8 @@
                             </li>
                         @endif
                         {{-- Days to the next older order. --}}
-                        @php $older = $events->slice($i + 1)->firstWhere('type', 'order'); @endphp
-                        @if ($e['type'] === 'order' && $older)
+                        @php $older = $events->slice($i + 1)->first(fn ($x) => $x['type'] !== 'call'); @endphp
+                        @if ($e['type'] !== 'call' && $older)
                             <li class="-mt-2 mb-3 pl-5 text-xs text-gray-400">{{ trans_choice(':count day later|:count days later', $older['at']->diffInDays($e['at']), ['count' => (int) $older['at']->diffInDays($e['at'])]) }}</li>
                         @endif
                     @endforeach

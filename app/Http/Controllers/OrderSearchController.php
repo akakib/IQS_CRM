@@ -51,12 +51,17 @@ class OrderSearchController extends Controller
                 ->get(['orders.id', 'order_no', 'status_id', 'moderator_id', 'customer_id', 'ship_name', 'ship_phone', 'ship_thana', 'ship_district', 'grand_total', 'cod_amount', 'active_shipment_id', 'created_at', 'channel']);
         }
 
+        // Parcels imported from a courier file (history only), found by their CN.
+        $cn = $q !== '' && ! $tooShort && in_array($by, ['all', 'cn'], true) ? \App\Services\Customers\HistoryImport::cn($q) : null;
+        $past = $cn ? DB::table('customer_past_orders as p')->join('customers as c', 'c.id', '=', 'p.customer_id')->where('p.cn', $cn)
+            ->get(['p.customer_id', 'p.cn', 'p.source', 'p.ordered_at', 'p.amount', 'p.status', 'p.items', 'c.name', 'c.primary_phone']) : collect();
         $ids = $results->pluck('id');
         $user = $request->user();
 
         return view('orders.search', [
             'q' => $q,
             'by' => $by,
+            'past' => $past,
             'tooShort' => $tooShort,
             'results' => $results,
             'statuses' => OrderStatus::map(),

@@ -58,12 +58,28 @@
             </div>
         @elseif ($tooShort)
             <x-empty-state :message="__('Type at least 3 characters.')" />
-        @elseif ($results->isEmpty())
+        @elseif ($results->isEmpty() && $past->isEmpty())
             <div class="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-10 text-center">
                 <p class="text-sm font-medium text-gray-700">{{ __('No order found for :q', ['q' => $q]) }}</p>
                 @if ($by !== 'all')<p class="mt-1 text-sm text-gray-500">{{ __('Searched in :m only.', ['m' => $modes[$by][0]]) }} <a href="{{ route('orders.search', ['q' => $q]) }}" class="text-primary hover:underline">{{ __('Search in All') }}</a></p>@endif
             </div>
         @else
+            @foreach ($past as $p)
+                <div class="mb-3 rounded-2xl border border-gray-200 bg-white p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="font-mono text-base font-semibold text-gray-900">CN {{ $p->cn }}</p>
+                            <p class="text-base text-gray-800">{{ $p->name }} <span class="font-mono text-sm text-gray-500">{{ \App\Support\Permissions\Mask::value($p->primary_phone, 'customer_contact') }}</span></p>
+                        </div>
+                        <p class="text-lg font-semibold tabular-nums text-gray-900">৳{{ number_format((float) $p->amount) }}</p>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500">{{ __('Imported: :s', ['s' => $p->source]) }} · {{ __(\App\Services\Customers\HistoryImport::STATUSES[$p->status] ?? $p->status) }} · {{ \Illuminate\Support\Carbon::parse($p->ordered_at)->format('d M Y') }}@if ($p->items) · {{ $p->items }}@endif</p>
+                    @can('customers.view')
+                        <a href="{{ route('journey.show', $p->customer_id) }}" class="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">{{ __('Customer journey') }}</a>
+                    @endcan
+                </div>
+            @endforeach
+            @if ($results->isNotEmpty())
             <p class="mb-2 px-1 text-xs text-gray-500">{{ trans_choice(':count order found|:count orders found', $results->count(), ['count' => $results->count()]) }}@if ($results->count() === 25) · {{ __('showing the newest 25') }}@endif</p>
             <div class="space-y-3">
                 @foreach ($results as $o)
@@ -129,6 +145,7 @@
                     </div>
                 @endforeach
             </div>
+            @endif
         @endif
     </div>
 </x-layouts.app>

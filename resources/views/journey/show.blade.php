@@ -93,7 +93,7 @@
                             <li class="relative mb-4 pl-5">
                                 <span class="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full ring-2 ring-white" style="background: {{ $dot }}"></span>
                                 <div class="flex items-baseline justify-between gap-2">
-                                    <p class="text-sm text-gray-900"><span class="font-semibold">{{ $r->at->format('d M Y') }}</span>@if ($r->external_no) · <span class="font-mono">#{{ $r->external_no }}</span>@endif</p>
+                                    <p class="text-sm text-gray-900"><span class="font-semibold">{{ $r->at->format('d M Y') }}</span>@if ($r->external_no) · <span class="font-mono">#{{ $r->external_no }}</span>@endif @if ($r->cn) · <span class="font-mono">CN {{ $r->cn }}</span>@endif</p>
                                     <p class="shrink-0 text-base font-semibold tabular-nums {{ $r->status === 'delivered' ? 'text-gray-900' : 'text-gray-400 line-through' }}">{{ $tk($r->amount) }}</p>
                                 </div>
                                 <p class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">

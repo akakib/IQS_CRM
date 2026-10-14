@@ -18,7 +18,7 @@ use ZipArchive;
 class HistoryImport
 {
     public const FIELDS = [
-        'phone' => 'Phone', 'name' => 'Name', 'order_no' => 'Order number', 'date' => 'Order date', 'amount' => 'Amount',
+        'phone' => 'Phone', 'cn' => 'CN (courier consignment)', 'name' => 'Name', 'order_no' => 'Order number', 'date' => 'Order date', 'amount' => 'Amount',
         'status' => 'Status', 'medium' => 'Medium', 'items' => 'Products', 'qty' => 'Quantity', 'address' => 'Address',
     ];
 
@@ -28,7 +28,8 @@ class HistoryImport
     private const GUESS = [
         'phone' => ['billing phone', 'recipient phone', 'customer phone', 'phone', 'mobile', 'contact'],
         'name' => ['billing first name', 'billing last name', 'recipient name', 'customer name', 'full name', 'name'],
-        'order_no' => ['order number', 'order no', 'order id', 'merchant order id', 'consignment id', 'consignment', 'invoice'],
+        'cn' => ['consignment id', 'consignment', 'cn', 'tracking code', 'tracking id', 'tracking'],
+        'order_no' => ['order number', 'order no', 'order id', 'merchant order id', 'invoice'],
         'date' => ['order date', 'created at', 'date created', 'created', 'date'],
         'amount' => ['order total amount', 'order total', 'collectable amount', 'amount to collect', 'cod amount', 'total amount', 'total', 'amount'],
         'status' => ['order status', 'delivery status', 'status'],
@@ -146,14 +147,15 @@ class HistoryImport
     {
         $cols = fn (string $field) => array_keys(array_filter(array_values(array_map(fn ($h) => $mapping[$h] ?? '', $header)), fn ($f) => $f === $field));
         $get = fn (array $row, string $field, string $glue = ' ') => trim(implode($glue, array_filter(array_map(fn ($i) => self::cell((string) ($row[$i] ?? '')), $cols($field)), fn ($v) => $v !== '')));
-        $counts = ['rows' => count($rows), 'orders' => 0, 'known' => 0, 'new' => 0, 'in_iqs' => 0, 'already' => 0, 'bad_phone' => 0, 'bad_date' => 0, 'skipped' => 0];
+        $counts = ['rows' => count($rows), 'orders' => 0, 'known' => 0, 'new' => 0, 'in_iqs' => 0, 'already' => 0, 'bad_phone' => 0, 'no_name' => 0, 'bad_date' => 0, 'skipped' => 0];
 
         $groups = [];
         foreach ($rows as $n => $row) {
             $no = $get($row, 'order_no');
-            $key = $no !== '' ? 'no:'.$no : 'row:'.$n;
+            $cn = self::cn($get($row, 'cn'));
+            $key = $no !== '' ? 'no:'.$no : ($cn ? 'cn:'.$cn : 'row:'.$n);
             if (! isset($groups[$key])) {
-                $groups[$key] = ['no' => $no, 'row' => $row, 'items' => []];
+                $groups[$key] = ['no' => $no, 'cn' => $cn, 'row' => $row, 'items' => []];
             }
             if (($item = $get($row, 'items')) !== '') {
                 $qty = $get($row, 'qty');
@@ -184,6 +186,12 @@ class HistoryImport
 
                 continue;
             }
+            $name = $get($row, 'name');
+            if ($name === '') {
+                $counts['no_name']++;
+
+                continue;
+            }
             $date = $this->date($get($row, 'date'), $dayFirst);
             if (! $date) {
                 $counts['bad_date']++;
@@ -200,8 +208,9 @@ class HistoryImport
             $mediumWord = $get($row, 'medium');
             $orders[] = [
                 'phone' => $phone,
-                'name' => mb_substr($get($row, 'name') ?: __('Customer'), 0, 150),
+                'name' => mb_substr($name, 0, 150),
                 'external_no' => $g['no'] !== '' ? mb_substr($g['no'], 0, 60) : null,
+                'cn' => $g['cn'],
                 'ordered_at' => $date,
                 'amount' => round((float) preg_replace('/[^\d.]/', '', str_replace(',', '', Phone::englishDigits($get($row, 'amount')))), 2),
                 'status' => $status,
@@ -219,6 +228,13 @@ class HistoryImport
             $inIqs += array_flip(Order::whereIn('external_ref', $chunk)->pluck('external_ref')->merge(Order::whereIn('order_no', $chunk)->pluck('order_no'))->map(fn ($v) => (string) $v)->all());
             $before += array_flip(DB::table('customer_past_orders')->where('source', $source)->whereIn('external_no', $chunk)->pluck('external_no')->all());
         }
+        // The same parcel by its CN: booked in IQS, or imported before from any file.
+        foreach (array_chunk(array_values(array_filter(array_column($orders, 'cn'))), 500) as $chunk) {
+            $cnInIqs = DB::table('shipments')->whereIn('consignment_id', $chunk)->pluck('consignment_id')
+                ->merge(DB::table('shipments')->whereIn('tracking_code', $chunk)->pluck('tracking_code'))->map(fn ($v) => 'cn:'.strtoupper((string) $v));
+            $inIqs += array_flip($cnInIqs->all());
+            $before += array_flip(DB::table('customer_past_orders')->whereIn('cn', $chunk)->pluck('cn')->map(fn ($v) => 'cn:'.$v)->all());
+        }
         $known = [];
         foreach (array_chunk(array_values(array_unique(array_column($orders, 'phone'))), 500) as $chunk) {
             $known += DB::table('customer_phones')->whereIn('phone', $chunk)->pluck('customer_id', 'phone')->all();
@@ -226,12 +242,12 @@ class HistoryImport
         $keep = [];
         $newPhones = [];
         foreach ($orders as $o) {
-            if ($o['external_no'] !== null && isset($inIqs[$o['external_no']])) {
+            if (($o['external_no'] !== null && isset($inIqs[$o['external_no']])) || ($o['cn'] && isset($inIqs['cn:'.$o['cn']]))) {
                 $counts['in_iqs']++;
 
                 continue;
             }
-            if ($o['external_no'] !== null && isset($before[$o['external_no']])) {
+            if (($o['external_no'] !== null && isset($before[$o['external_no']])) || ($o['cn'] && isset($before['cn:'.$o['cn']]))) {
                 $counts['already']++;
 
                 continue;
@@ -261,11 +277,19 @@ class HistoryImport
             foreach (array_chunk($plan['orders'], 300) as $chunk) {
                 DB::table('customer_past_orders')->insertOrIgnore(array_map(fn ($o) => [
                     'customer_id' => $o['customer_id'] ?? $ids[$o['phone']], 'customer_import_id' => $importId, 'source' => $source,
-                    'external_no' => $o['external_no'], 'ordered_at' => $o['ordered_at'], 'amount' => $o['amount'], 'status' => $o['status'],
+                    'external_no' => $o['external_no'], 'cn' => $o['cn'], 'ordered_at' => $o['ordered_at'], 'amount' => $o['amount'], 'status' => $o['status'],
                     'medium' => $o['medium'], 'items' => $o['items'], 'address' => $o['address'], 'created_at' => $now, 'updated_at' => $now,
                 ], $chunk));
             }
         });
+    }
+
+    /** A courier CN in one shape, so search finds it: DM240726F65T8N, 123456789. Anything else is no CN. */
+    public static function cn(?string $v): ?string
+    {
+        $v = strtoupper(preg_replace('/\s+/', '', Phone::englishDigits((string) $v)));
+
+        return preg_match('/^[A-Z0-9-]{5,40}$/', $v) ? $v : null;
     }
 
     public function signature(array $header): string

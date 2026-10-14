@@ -1,6 +1,6 @@
 @php
     $labels = ['orders' => __('Orders imported'), 'known' => __('For known customers'), 'new' => __('New customers'), 'in_iqs' => __('Already in IQS'),
-        'already' => __('Imported before'), 'skipped' => __('Skipped by status'), 'bad_phone' => __('Bad phone'), 'bad_date' => __('Bad date')];
+        'already' => __('Imported before'), 'skipped' => __('Skipped by status'), 'bad_phone' => __('Bad phone'), 'no_name' => __('No name'), 'bad_date' => __('Bad date')];
 @endphp
 
 <x-layouts.app :heading="__('Import order history')">
@@ -11,7 +11,7 @@
                 @foreach ($labels as $k => $label)
                     <div class="rounded-xl bg-gray-50 p-3">
                         <p class="text-xs text-gray-500">{{ $label }}</p>
-                        <p class="mt-0.5 text-lg font-semibold tabular-nums {{ in_array($k, ['bad_phone', 'bad_date'], true) && ($result[$k] ?? 0) ? 'text-red-700' : 'text-gray-900' }}">{{ number_format($result[$k] ?? 0) }}</p>
+                        <p class="mt-0.5 text-lg font-semibold tabular-nums {{ in_array($k, ['bad_phone', 'no_name', 'bad_date'], true) && ($result[$k] ?? 0) ? 'text-red-700' : 'text-gray-900' }}">{{ number_format($result[$k] ?? 0) }}</p>
                     </div>
                 @endforeach
             </div>

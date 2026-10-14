@@ -111,4 +111,37 @@ class CustomerHistoryImportTest extends TestCase
         $this->assertSame(['01326885301', '2026-07-24 16:27:00', 'returned'], [$s[0]['phone'], $s[0]['ordered_at'], $s[0]['status']]);
         $this->assertSame('2026-07-08 09:05:00', $s[1]['ordered_at']);
     }
+
+    public function test_cn_is_kept_in_one_shape_and_found_by_search_name_is_a_must(): void
+    {
+        (new CustomerSeeder)->run();
+        $owner = $this->owner();
+        $csv = "consignment_id,recipient_name,recipient_phone,created_at
+ dm240726f65t8n ,Shahin Raza,01326885301,2026-07-24
+,No Cn Person,01326885302,2026-07-25
+DM2407BBB,,01326885303,2026-07-25
+";
+        $this->actingAs($owner)->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('pathao.csv', $csv)]);
+        $id = DB::table('customer_imports')->value('id');
+        $this->get(route('customers.history.map', $id))->assertSee('CN (courier consignment)');
+        $body = ['source' => 'Pathao', 'mapping' => ['consignment_id' => 'cn', 'recipient_name' => 'name', 'recipient_phone' => 'phone', 'created_at' => 'date']];
+        $this->postJson(route('customers.history.preview', $id), ['source' => 'Pathao', 'mapping' => ['consignment_id' => 'cn', 'recipient_phone' => 'phone', 'created_at' => 'date']])
+            ->assertStatus(422)->assertJsonPath('message', 'Pick the Name column.');
+        $this->postJson(route('customers.history.run', $id), $body)->assertOk();
+        $this->assertSame(['DM240726F65T8N', null], DB::table('customer_past_orders')->orderBy('id')->pluck('cn')->all()); // no CN is fine, no name is not
+        $this->assertSame(1, DB::table('customer_imports')->where('id', $id)->value('result') ? json_decode(DB::table('customer_imports')->where('id', $id)->value('result'), true)['no_name'] : 0);
+
+        $customer = DB::table('customer_past_orders')->where('cn', 'DM240726F65T8N')->value('customer_id');
+        $this->get('/journey?q='.urlencode('dm240726f65t8n'))->assertRedirect(route('journey.show', $customer));
+        $this->get(route('journey.show', $customer))->assertSee('CN DM240726F65T8N');
+        $this->get('/order-search?by=cn&q=DM240726F65T8N')->assertSee('Imported: Pathao')->assertSee('Shahin Raza')->assertDontSee('No order found');
+
+        // The same parcel from another file is not brought in twice.
+        $this->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('again.csv', "cn,name,phone,date
+DM240726F65T8N,Shahin Raza,01326885301,2026-07-24
+")]);
+        $again = DB::table('customer_imports')->max('id');
+        $this->postJson(route('customers.history.preview', $again), ['source' => 'Other', 'mapping' => ['cn' => 'cn', 'name' => 'name', 'phone' => 'phone', 'date' => 'date']])
+            ->assertJsonPath('counts.orders', 0)->assertJsonPath('counts.already', 1);
+    }
 }

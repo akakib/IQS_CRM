@@ -34,7 +34,16 @@ class CustomerJourneyController extends Controller
                 if ($id && ($c = Customer::find($id))) {
                     return redirect()->route('journey.show', $c->merged_into_id ?: $c->id);
                 }
-            } else {
+            } elseif ($cn = \App\Services\Customers\HistoryImport::cn($q)) {
+                // A courier CN: an imported parcel, or one booked in IQS.
+                $id = DB::table('customer_past_orders')->where('cn', $cn)->value('customer_id')
+                    ?? DB::table('shipments as s')->join('orders as o', 'o.id', '=', 's.order_id')
+                        ->where(fn ($w) => $w->where('s.consignment_id', $cn)->orWhere('s.tracking_code', $cn))->value('o.customer_id');
+                if ($id && ($c = Customer::find($id))) {
+                    return redirect()->route('journey.show', $c->merged_into_id ?: $c->id);
+                }
+            }
+            if (! isset($phone) || ! $phone) {
                 $customers = Customer::whereNull('merged_into_id')
                     ->where(fn ($w) => $w->where('name', 'like', $q.'%')->orWhere('name', 'like', '% '.$q.'%'))
                     ->orderByDesc('orders_count')->limit(25)->get(['id', 'name', 'primary_phone', 'orders_count', 'delivered_count', 'returned_count']);

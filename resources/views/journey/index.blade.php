@@ -7,7 +7,7 @@
             <div class="flex gap-2">
                 <div class="relative min-w-0 flex-1">
                     <svg class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
-                    <input type="search" name="q" value="{{ $q }}" autofocus autocomplete="off" placeholder="{{ __('Phone number or customer name') }}"
+                    <input type="search" name="q" value="{{ $q }}" autofocus autocomplete="off" placeholder="{{ __('Phone, CN or customer name') }}"
                         class="w-full rounded-xl border border-gray-300 py-3.5 pl-11 pr-4 text-base focus:border-primary focus:outline-none">
                 </div>
                 <x-button class="shrink-0 px-5">{{ __('Search') }}</x-button>

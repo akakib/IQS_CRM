@@ -135,6 +135,9 @@ class CustomerImportController extends Controller
         if (($used['phone'] ?? 0) !== 1) {
             abort(422, __('Pick exactly one Phone column.'));
         }
+        if (! ($used['name'] ?? 0)) {
+            abort(422, __('Pick the Name column.'));
+        }
         foreach ($used as $field => $n) {
             if ($n > 1 && ! in_array($field, ['name', 'address'], true)) {
                 abort(422, __(':f is picked for two columns.', ['f' => __(HistoryImport::FIELDS[$field])]));

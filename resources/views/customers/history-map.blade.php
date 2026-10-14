@@ -5,7 +5,7 @@
     $headers = array_column($columns, 'header');
     $map = array_map(fn ($h) => $mapping[$h] ?? '', $headers);
     $countLabels = ['orders' => __('Orders to import'), 'known' => __('Known customers'), 'new' => __('New customers'), 'in_iqs' => __('Already in IQS'),
-        'already' => __('Imported before'), 'skipped' => __('Skipped by status'), 'bad_phone' => __('Bad phone'), 'bad_date' => __('Bad date')];
+        'already' => __('Imported before'), 'skipped' => __('Skipped by status'), 'bad_phone' => __('Bad phone'), 'no_name' => __('No name'), 'bad_date' => __('Bad date')];
 @endphp
 
 <x-layouts.app :heading="__('Map the columns')">
@@ -18,13 +18,13 @@
             async send(url) {
                 this.error = ''; this.busy = true;
                 try {
-                    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: JSON.stringify(this.body()) });
+                    const r = await fetch(url + '?source=' + encodeURIComponent(this.$refs.src.value.trim()), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: JSON.stringify(this.body()) });
                     const j = await r.json();
                     if (! r.ok) { this.error = j.message || @js(__('Something went wrong.')); return null }
                     return j;
                 } catch (e) { this.error = @js(__('Something went wrong.')); return null } finally { this.busy = false }
             },
-            async check() { if (! this.$refs.src.value.trim()) { this.error = @js(__('Give this file a source name, like WooCommerce or Pathao.')); return } const j = await this.send(@js(route('customers.history.preview', $import->id))); if (j) { this.counts = j.counts; this.sample = j.sample } },
+            async check() { if (! this.has('phone') || ! this.has('name')) { this.error = @js(__('Pick the Phone and the Name columns.')); return } if (! this.$refs.src.value.trim()) { this.error = @js(__('Give this file a source name, like WooCommerce or Pathao.')); return } const j = await this.send(@js(route('customers.history.preview', $import->id))); if (j) { this.counts = j.counts; this.sample = j.sample } },
             async run() { const j = await this.send(@js(route('customers.history.run', $import->id))); if (j) window.location = j.url },
         }"
         x-init="$refs.rf.submit = () => run()">
@@ -40,7 +40,7 @@
 
         <div class="rounded-2xl border border-gray-200 bg-white p-4">
             <p class="text-sm font-semibold text-gray-900">{{ __('Your columns and what they are') }}</p>
-            <p class="mb-2 text-xs text-gray-500">{{ __('Phone is a must. Name and Address may take two columns (first and last name). Rows with the same order number become one order.') }}</p>
+            <p class="mb-2 text-xs text-gray-500">{{ __('Phone and Name are a must. CN and Order number only if the file has them. Name and Address may take two columns (first and last name). Rows with the same order number or CN become one order.') }}</p>
             @foreach ($columns as $i => $c)
                 <div class="grid grid-cols-1 items-center gap-2 border-t border-gray-100 py-2.5 sm:grid-cols-2">
                     <div class="min-w-0">
@@ -88,7 +88,7 @@
                     <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                         @foreach ($countLabels as $k => $label)
                             <div class="rounded-xl bg-gray-50 p-2.5"><p class="text-[11px] text-gray-500">{{ $label }}</p>
-                                <p class="text-base font-semibold tabular-nums" :class="@js(in_array($k, ['bad_phone', 'bad_date'], true)) && counts.{{ $k }} ? 'text-red-700' : 'text-gray-900'" x-text="counts.{{ $k }}.toLocaleString()"></p></div>
+                                <p class="text-base font-semibold tabular-nums" :class="@js(in_array($k, ['bad_phone', 'no_name', 'bad_date'], true)) && counts.{{ $k }} ? 'text-red-700' : 'text-gray-900'" x-text="counts.{{ $k }}.toLocaleString()"></p></div>
                         @endforeach
                     </div>
                     <div class="mt-2 space-y-1">

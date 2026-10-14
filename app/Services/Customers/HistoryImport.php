@@ -41,7 +41,7 @@ class HistoryImport
     private const WORDS = [
         'delivered' => ['completed', 'complete', 'delivered', 'paid'],
         'cancelled' => ['cancelled', 'canceled', 'cancel', 'failed', 'trash'],
-        'returned' => ['returned', 'return'],
+        'returned' => ['returned', 'return', 'paid return', 'partial return'],
         'refunded' => ['refunded', 'refund'],
         'pending' => ['processing', 'pending', 'on-hold', 'on hold', 'in transit', 'hold', 'partial'],
     ];
@@ -60,7 +60,18 @@ class HistoryImport
         }
         $width = count($header);
 
-        return [$header, array_map(fn ($r) => array_slice(array_pad(array_map(fn ($v) => trim((string) $v), $r), $width, ''), 0, $width), $rows)];
+        return [$header, array_map(fn ($r) => array_slice(array_pad(array_map(fn ($v) => self::cell((string) $v), $r), $width, ''), 0, $width), $rows)];
+    }
+
+    /** Excel keeps numbers as numbers: 1.326885301E9 is a phone (1326885301), 1.0 is 1. */
+    private static function cell(string $v): string
+    {
+        $v = trim($v);
+        if (preg_match('/^\d+(\.\d+)?E\+?\d+$/i', $v)) {
+            return sprintf('%.0f', (float) $v);
+        }
+
+        return preg_match('/^\d+\.0+$/', $v) ? substr($v, 0, strpos($v, '.')) : $v;
     }
 
     /** Per column: a sample and its distinct values (when few), for the mapping screen. */
@@ -134,7 +145,7 @@ class HistoryImport
     public function plan(array $header, array $rows, array $mapping, array $values, ?string $defaultMedium, string $source): array
     {
         $cols = fn (string $field) => array_keys(array_filter(array_values(array_map(fn ($h) => $mapping[$h] ?? '', $header)), fn ($f) => $f === $field));
-        $get = fn (array $row, string $field, string $glue = ' ') => trim(implode($glue, array_filter(array_map(fn ($i) => $row[$i] ?? '', $cols($field)), fn ($v) => $v !== '')));
+        $get = fn (array $row, string $field, string $glue = ' ') => trim(implode($glue, array_filter(array_map(fn ($i) => self::cell((string) ($row[$i] ?? '')), $cols($field)), fn ($v) => $v !== '')));
         $counts = ['rows' => count($rows), 'orders' => 0, 'known' => 0, 'new' => 0, 'in_iqs' => 0, 'already' => 0, 'bad_phone' => 0, 'bad_date' => 0, 'skipped' => 0];
 
         $groups = [];
@@ -150,6 +161,20 @@ class HistoryImport
             }
         }
 
+        // 7/24/2026 or 24/7/2026: a number above 12 in the file says which comes first (day first when unsure).
+        $dayFirst = true;
+        foreach ($rows as $row) {
+            if (preg_match('#^(\d{1,2})[/.-](\d{1,2})[/.-]\d{4}#', $get($row, 'date'), $m)) {
+                if ((int) $m[1] > 12) {
+                    break;
+                }
+                if ((int) $m[2] > 12) {
+                    $dayFirst = false;
+                    break;
+                }
+            }
+        }
+
         $orders = [];
         foreach ($groups as $g) {
             $row = $g['row'];
@@ -159,7 +184,7 @@ class HistoryImport
 
                 continue;
             }
-            $date = $this->date($get($row, 'date'));
+            $date = $this->date($get($row, 'date'), $dayFirst);
             if (! $date) {
                 $counts['bad_date']++;
 
@@ -248,26 +273,27 @@ class HistoryImport
         return hash('sha256', implode('|', array_map('strtolower', $header)));
     }
 
-    private function date(string $v): ?string
+    private function date(string $v, bool $dayFirst = true): ?string
     {
-        $v = trim(Phone::englishDigits($v));
+        $v = trim(str_replace(',', ' ', Phone::englishDigits($v)));
         if ($v === '') {
             return null;
         }
         if (is_numeric($v) && (float) $v > 20000 && (float) $v < 80000) { // an Excel date number
             return Carbon::create(1899, 12, 30)->addSeconds((int) round((float) $v * 86400))->format('Y-m-d H:i:s');
         }
-        foreach (['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d', 'd/m/Y H:i:s', 'd/m/Y H:i', 'd/m/Y g:i A', 'd/m/Y', 'd-m-Y H:i', 'd-m-Y', 'd.m.Y', 'j M Y', 'M j, Y', 'F j, Y', 'j M Y g:i A', 'M j, Y g:i a'] as $f) {
-            $d = \DateTime::createFromFormat('!'.$f, $v);
-            $e = \DateTime::getLastErrors();
-            if ($d && (! $e || ($e['warning_count'] === 0 && $e['error_count'] === 0))) {
-                return (int) $d->format('Y') > 2000 && (int) $d->format('Y') < 2100 ? $d->format('Y-m-d H:i:s') : null;
+        // 24/07/2026 16:27 (or 07/24/2026 when the file puts the month first)
+        if (preg_match('#^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\s*(.*)$#', $v, $m)) {
+            [$d, $mo] = $dayFirst ? [(int) $m[1], (int) $m[2]] : [(int) $m[2], (int) $m[1]];
+            if (! checkdate($mo, $d, (int) $m[3])) {
+                return null;
             }
+            $v = sprintf('%04d-%02d-%02d %s', $m[3], $mo, $d, $m[4]);
         }
         try {
-            $d = Carbon::parse($v);
+            $date = Carbon::parse(trim($v));
 
-            return $d->year > 2000 && $d->year < 2100 ? $d->format('Y-m-d H:i:s') : null;
+            return $date->year > 2000 && $date->year < 2100 ? $date->format('Y-m-d H:i:s') : null;
         } catch (\Throwable) {
             return null;
         }

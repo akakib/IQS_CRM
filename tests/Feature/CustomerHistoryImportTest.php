@@ -97,4 +97,18 @@ class CustomerHistoryImportTest extends TestCase
         $this->assertSame('messenger', $p->medium);
         $this->assertSame('Nusrat Jahan', Customer::find($p->customer_id)->name);
     }
+
+    public function test_excel_numbers_month_first_dates_and_paid_return(): void
+    {
+        $owner = $this->owner();
+        $csv = "recipient_phone,recipient_name,created_at,quantity,transfer_status\n1.326885301E9,A,\"7/24/2026, 16:27\",1.0,Paid Return\n1.926885301E9,B,\"7/8/2026, 09:05\",1.0,Delivered\n";
+        $this->actingAs($owner)->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('p.csv', $csv)]);
+        $id = DB::table('customer_imports')->value('id');
+        $r = $this->postJson(route('customers.history.preview', $id), ['source' => 'Pathao', 'default_medium' => 'web',
+            'mapping' => ['recipient_phone' => 'phone', 'recipient_name' => 'name', 'created_at' => 'date', 'quantity' => 'qty', 'transfer_status' => 'status']]);
+        $this->assertSame(2, $r->json('counts.orders'));
+        $s = $r->json('sample');
+        $this->assertSame(['01326885301', '2026-07-24 16:27:00', 'returned'], [$s[0]['phone'], $s[0]['ordered_at'], $s[0]['status']]);
+        $this->assertSame('2026-07-08 09:05:00', $s[1]['ordered_at']);
+    }
 }

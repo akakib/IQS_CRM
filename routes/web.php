@@ -236,6 +236,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:customers.import')->controller(\App\Http\Controllers\CustomerImportController::class)->group(function () {
         Route::get('/customers/history', 'index')->name('customers.history');
         Route::post('/customers/history', 'store')->name('customers.history.store');
+        Route::get('/customers/history/sample', 'sample')->name('customers.history.sample');
         Route::get('/customers/history/{import}', 'show')->whereNumber('import')->name('customers.history.show');
         Route::get('/customers/history/{import}/map', 'map')->whereNumber('import')->name('customers.history.map');
         Route::post('/customers/history/{import}/preview', 'preview')->whereNumber('import')->name('customers.history.preview');

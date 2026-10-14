@@ -27,6 +27,14 @@ class CustomerImportController extends Controller
         ]);
     }
 
+    public function sample(): \Symfony\Component\HttpFoundation\Response
+    {
+        return response(HistoryImport::sampleXlsx(), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="iqs-orders-sample.xlsx"',
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $request->validate(['file' => ['required', 'file', 'max:10240', 'mimes:csv,txt,xlsx']]);
@@ -87,6 +95,9 @@ class CustomerImportController extends Controller
             'savedKeys' => array_keys($saved),
             'values' => $values,
             'fromTemplate' => $saved !== [],
+            // Our own sample file: every column is known, so the check runs by itself and the columns stay folded.
+            'isSample' => array_diff(array_map('strtolower', $header), array_map('strtolower', HistoryImport::SAMPLE[0])) === []
+                && count(array_intersect(array_map('strtolower', $header), ['name', 'phone'])) === 2,
             'channels' => array_map(fn ($l) => __($l), Order::CHANNELS),
         ]);
     }

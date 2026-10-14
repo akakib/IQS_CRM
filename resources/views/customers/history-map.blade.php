@@ -23,7 +23,8 @@
             showResult() { this.$nextTick(() => document.getElementById('history-result')?.scrollIntoView({ behavior: 'smooth', block: 'end' })) },
             body() { const m = {}; this.headers.forEach((h, i) => m[h] = this.map[i]); return { mapping: m, values: this.values, default_medium: this.defaultMedium, source: this.src() } },
             {{-- The confirm dialog submits a form by id; that form runs the import instead. Set up in init so nothing runs on load. --}}
-            init() { this.$nextTick(() => { const f = document.getElementById('history-run-form'); if (f) f.submit = () => { this.run() } }) },
+            isSample: @js($isSample), showCols: @js(! $isSample),
+            init() { this.$nextTick(() => { const f = document.getElementById('history-run-form'); if (f) f.submit = () => { this.run() } }); if (this.isSample) this.check() },
             src() { return (document.getElementById('history-source')?.value || '').trim() },
             async send(url) {
                 this.error = ''; this.busy = true;
@@ -48,7 +49,12 @@
             <input type="text" id="history-source" value="{{ $import->source ?? '' }}" autocomplete="off" @input="counts = null" maxlength="80" placeholder="{{ __('WooCommerce, Pathao...') }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
         </div>
 
-        <div class="rounded-2xl border border-gray-200 bg-white p-4">
+        <div x-show="isSample && ! showCols" x-cloak class="rounded-2xl border border-gray-200 bg-white p-4">
+            <p class="text-sm font-semibold text-gray-900">{{ __('Sample file: the columns are matched by themselves') }}</p>
+            <p class="mt-1 text-xs text-gray-500">{{ __('Name, Phone, CN, Address, Products, Amount, Date and Status.') }} <button type="button" @click="showCols = true" class="text-primary hover:underline">{{ __('Change columns') }}</button></p>
+        </div>
+
+        <div x-show="showCols" class="rounded-2xl border border-gray-200 bg-white p-4">
             <p class="text-sm font-semibold text-gray-900">{{ __('Your columns and what they are') }}</p>
             <p class="mb-2 text-xs text-gray-500">{{ __('Phone and Name are a must. CN and Order number only if the file has them. Name and Address may take two columns (first and last name). Rows with the same order number or CN become one order.') }}</p>
             @foreach ($columns as $i => $c)

@@ -239,4 +239,37 @@ DM1CCCCC,Iqbal Store,Nusrat,01912345678,900,900,2026-07-25
         $this->assertSame(['a.csv'], DB::table('customer_imports')->pluck('file_name')->all());
         $this->assertSame(1, DB::table('customer_imports')->count());
     }
+
+    public function test_the_sample_file_round_trips_with_no_mapping_to_do(): void
+    {
+        (new CustomerSeeder)->run();
+        $owner = $this->owner();
+        $xlsx = $this->actingAs($owner)->get('/customers/history/sample')->assertOk()->assertHeader('content-disposition', 'attachment; filename="iqs-orders-sample.xlsx"')->getContent();
+        $path = tempnam(sys_get_temp_dir(), 's').'.xlsx';
+        file_put_contents($path, $xlsx);
+        // Read back by our own reader: header and the example row.
+        [$header, $rows] = app(\App\Services\Customers\HistoryImport::class)->read($path, 'xlsx');
+        $this->assertSame(['Name', 'Phone', 'CN', 'Address', 'Products', 'Amount', 'Date', 'Status'], $header);
+        $this->assertSame('Rahima Akter', $rows[0][0]);
+
+        // Filled in (CSV is fine too): every column known, an empty date and status, the example row skipped for its fake phone.
+        $csv = "Name,Phone,CN,Address,Products,Amount,Date,Status
+Rahima Akter,01XXXXXXXXX,DM1,x,y,1,2026-07-24,Delivered
+Karim Uddin,+8801712345678,,Road 1,Ajwa 1 kg,900,,
+Nusrat,০১৯১২৩৪৫৬৭৮,DM2BBBBB,Feni,Honey,1200,24/07/2026,Returned
+";
+        $this->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('iqs-orders-sample.csv', $csv)]);
+        $id = DB::table('customer_imports')->value('id');
+        $view = $this->get(route('customers.history.map', $id))->assertOk()->assertSee('Sample file');
+        $this->assertTrue($view->viewData('isSample'));
+        $this->assertSame(['Name' => 'name', 'Phone' => 'phone', 'CN' => 'cn', 'Address' => 'address', 'Products' => 'items', 'Amount' => 'amount', 'Date' => 'date', 'Status' => 'status'], $view->viewData('mapping'));
+        $body = ['source' => '', 'mapping' => $view->viewData('mapping')];
+        $this->postJson(route('customers.history.preview', $id), $body)->assertJsonPath('counts.orders', 2)->assertJsonPath('counts.bad_phone', 1)->assertJsonPath('counts.skipped', 0);
+        $this->postJson(route('customers.history.run', $id), $body)->assertOk();
+        $karim = DB::table('customer_past_orders')->where('amount', 900)->first();
+        $this->assertSame('delivered', $karim->status);                       // empty status
+        $this->assertSame(now()->format('Y-m-d'), substr($karim->ordered_at, 0, 10)); // empty date
+        $this->assertSame('01712345678', \App\Models\Customer::find($karim->customer_id)->primary_phone);
+        $this->assertSame('2026-07-24', substr(DB::table('customer_past_orders')->where('cn', 'DM2BBBBB')->value('ordered_at'), 0, 10));
+    }
 }

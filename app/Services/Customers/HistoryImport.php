@@ -195,14 +195,15 @@ class HistoryImport
 
                 continue;
             }
-            $date = $this->date($get($row, 'date'), $dayFirst);
+            $rawDate = $get($row, 'date');
+            $date = $rawDate === '' ? now()->format('Y-m-d H:i:s') : $this->date($rawDate, $dayFirst);
             if (! $date) {
                 $counts['bad_date']++;
 
                 continue;
             }
             $statusWord = $get($row, 'status');
-            $status = $cols('status') ? ($values['status'][$statusWord] ?? $this->guessValue('status', $statusWord)) : 'delivered';
+            $status = $cols('status') && $statusWord !== '' ? ($values['status'][$statusWord] ?? $this->guessValue('status', $statusWord)) : 'delivered';
             if ($status === 'skip') {
                 $counts['skipped']++;
 
@@ -311,6 +312,38 @@ class HistoryImport
         $v = strtoupper(preg_replace('/\s+/', '', Phone::englishDigits((string) $v)));
 
         return preg_match('/^[A-Z0-9-]{5,40}$/', $v) ? $v : null;
+    }
+
+    /** The sample file to fill in: our own column names, one example row (its phone is not real, so it never imports). */
+    public const SAMPLE = [
+        ['Name', 'Phone', 'CN', 'Address', 'Products', 'Amount', 'Date', 'Status'],
+        ['Rahima Akter', '01XXXXXXXXX', 'DM240726F65T8N', 'House 12, Road 5, Mirpur, Dhaka', 'Medjool Dates 1 kg x 2, Honey 500 g', '1250', '2026-07-24', 'Delivered'],
+    ];
+
+    /** A small .xlsx (a zip of XML) with the sample rows, written without any package. */
+    public static function sampleXlsx(): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'iqs');
+        $zip = new ZipArchive;
+        $zip->open($path, ZipArchive::OVERWRITE);
+        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+        $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+        $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Orders" sheetId="1" r:id="rId1"/></sheets></workbook>');
+        $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+        $rows = '';
+        foreach (self::SAMPLE as $r => $cells) {
+            $rows .= '<row r="'.($r + 1).'">';
+            foreach ($cells as $c => $v) {
+                $rows .= '<c r="'.chr(65 + $c).($r + 1).'" t="inlineStr"><is><t>'.htmlspecialchars($v, ENT_XML1).'</t></is></c>';
+            }
+            $rows .= '</row>';
+        }
+        $zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="8" width="24" customWidth="1"/></cols><sheetData>'.$rows.'</sheetData></worksheet>');
+        $zip->close();
+        $bytes = file_get_contents($path);
+        unlink($path);
+
+        return $bytes;
     }
 
     public function signature(array $header): string

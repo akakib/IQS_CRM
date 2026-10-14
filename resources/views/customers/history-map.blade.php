@@ -16,7 +16,7 @@
             has(f) { return this.map.includes(f) },
             body() { const m = {}; this.headers.forEach((h, i) => m[h] = this.map[i]); return { mapping: m, values: this.values, default_medium: this.defaultMedium, source: this.src() } },
             {{-- The confirm dialog submits a form by id; that form runs the import instead. Set up in init so nothing runs on load. --}}
-            init() { this.$refs.rf.submit = () => { this.run() } },
+            init() { this.$nextTick(() => { const f = document.getElementById('history-run-form'); if (f) f.submit = () => { this.run() } }) },
             src() { return (document.getElementById('history-source')?.value || '').trim() },
             async send(url) {
                 this.error = ''; this.busy = true;
@@ -109,7 +109,7 @@
             </div>
             <x-confirm-modal id="history-run" :verb="__('Import')" :danger="false" :message="__('These orders go into the customers\' journeys and new numbers become customers. This cannot be undone from here.')" />
             {{-- The confirm dialog submits a form; this one runs the import instead. --}}
-            <form id="history-run-form" x-ref="rf" class="hidden"></form>
+            <form id="history-run-form" class="hidden"></form>
         </div>
     </div>
 </x-layouts.app>

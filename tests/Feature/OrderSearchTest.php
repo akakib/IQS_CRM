@@ -42,18 +42,18 @@ class OrderSearchTest extends TestCase
         // A packer with no order permissions at all.
         $packer = User::factory()->create(['name' => 'Packer']);
         $packer->roles()->attach($this->role(['packaging.view'], [], 'Packer')->id);
-        $this->actingAs($packer)->get('/order-search')->assertOk()->assertSee('Type an order number')->assertDontSee($order->order_no);
+        $this->actingAs($packer)->get('/order-search')->assertOk()->assertSee('Find any order')->assertDontSee($order->order_no);
         foreach ([$order->order_no, substr($order->order_no, 2), '01712345678', $cn, 'Karim', 'Uddin'] as $q) {
             $this->get('/order-search?q='.urlencode($q))->assertOk()->assertSee($order->order_no)->assertSee('Ajwa Dates');
         }
         // Search in one field only: a name is not found under CN or Phone.
         $this->get('/order-search?by=name&q=Karim')->assertSee($order->order_no);
-        $this->get('/order-search?by=cn&q=Karim')->assertSee('No order found');
+        $this->get('/order-search?by=cn&q=Karim')->assertSee('No order found for');
         $this->get('/order-search?by=phone&q=01712345678')->assertSee($order->order_no);
         $this->get('/order-search?by=cn&q='.$cn)->assertSee($order->order_no);
-        $this->get('/order-search?by=phone&q='.$cn)->assertSee('No order found');
+        $this->get('/order-search?by=phone&q='.$cn)->assertSee('No order found for');
         $this->get('/order-search?q=ka')->assertSee('Type at least 3 characters');
-        $this->get('/order-search?q=Nobody')->assertSee('No order found');
+        $this->get('/order-search?q=Nobody')->assertSee('No order found for');
         // They see it, but the order page is not a link for them.
         $this->get('/order-search?q='.$order->order_no)->assertDontSee(route('orders.show', $order), false);
         $this->actingAs($owner)->get('/order-search?q='.$order->order_no)->assertSee(route('orders.show', $order), false);

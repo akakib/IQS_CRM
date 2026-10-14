@@ -240,6 +240,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers/history/{import}/map', 'map')->whereNumber('import')->name('customers.history.map');
         Route::post('/customers/history/{import}/preview', 'preview')->whereNumber('import')->name('customers.history.preview');
         Route::post('/customers/history/{import}/run', 'run')->whereNumber('import')->name('customers.history.run');
+        Route::post('/customers/history/{import}/undo', 'undo')->whereNumber('import')->name('customers.history.undo');
     });
     Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');
     Route::get('/customers/steadfast', [CustomerController::class, 'steadfast'])->middleware('can:customers.view')->name('customers.steadfast');

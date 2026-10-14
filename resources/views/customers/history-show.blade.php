@@ -6,6 +6,9 @@
 <x-layouts.app :heading="__('Import order history')">
     <div class="mx-auto max-w-3xl space-y-4">
         <a href="{{ route('customers.history') }}" class="inline-block text-sm text-primary hover:underline">{{ __('Back to imports') }}</a>
+        @if ($import->undone_at)
+            <p class="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{{ __('This import was taken back on :d. Its orders and the customers it created are gone.', ['d' => \Illuminate\Support\Carbon::parse($import->undone_at)->format('d M, g:i A')]) }}</p>
+        @endif
         <x-card :title="$import->file_name" :subtitle="__(':s · :n rows · by :b', ['s' => $import->source, 'n' => $import->row_count, 'b' => $import->by ?? '-'])">
             <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 @foreach ($labels as $k => $label)
@@ -16,7 +19,17 @@
                 @endforeach
             </div>
         </x-card>
-        @if ($recent->isNotEmpty())
+        @if ($import->done_at && ! $import->undone_at)
+            <div class="rounded-2xl border border-gray-200 bg-white p-4">
+                <p class="text-sm text-gray-700">{{ __('Wrong columns? Take this import back and upload the file again.') }}</p>
+                <form method="POST" action="{{ route('customers.history.undo', $import->id) }}" id="history-undo" class="mt-3">@csrf
+                    <button type="button" class="rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50"
+                        @click="$dispatch('open-confirm', { id: 'history-undo-confirm', form: 'history-undo', label: @js($import->file_name) })">{{ __('Undo this import') }}</button>
+                </form>
+                <x-confirm-modal id="history-undo-confirm" :verb="__('Undo')" :message="__('Removes the orders this import brought in, and the customers it created that have no other orders. Customers who already had orders stay.')" />
+            </div>
+        @endif
+        @if ($recent->isNotEmpty() && ! $import->undone_at)
             <x-card :title="__('Some of them')">
                 @foreach ($recent as $p)
                     <a href="{{ route('journey.show', $p->id) }}" class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm last:border-0 hover:bg-gray-50">

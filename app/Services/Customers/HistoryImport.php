@@ -272,7 +272,7 @@ class HistoryImport
             $now = now();
             $new = collect($plan['orders'])->whereNull('customer_id')->unique('phone');
             foreach ($new->chunk(300) as $chunk) {
-                DB::table('customers')->insert($chunk->map(fn ($o) => ['name' => $o['name'], 'primary_phone' => $o['phone'], 'created_by' => $userId, 'created_at' => $now, 'updated_at' => $now])->values()->all());
+                DB::table('customers')->insert($chunk->map(fn ($o) => ['name' => $o['name'], 'primary_phone' => $o['phone'], 'created_by' => $userId, 'customer_import_id' => $importId, 'created_at' => $now, 'updated_at' => $now])->values()->all());
                 $ids = DB::table('customers')->whereIn('primary_phone', $chunk->pluck('phone'))->pluck('id', 'primary_phone');
                 DB::table('customer_phones')->insert($chunk->map(fn ($o) => ['customer_id' => $ids[$o['phone']], 'phone' => $o['phone'], 'is_primary' => true, 'created_at' => $now, 'updated_at' => $now])->values()->all());
             }

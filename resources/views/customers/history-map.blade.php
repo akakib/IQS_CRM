@@ -15,6 +15,8 @@
             defaultMedium: 'other', source: @js($import->source ?? ''), counts: null, sample: [], error: '', busy: false,
             has(f) { return this.map.includes(f) },
             body() { const m = {}; this.headers.forEach((h, i) => m[h] = this.map[i]); return { mapping: m, values: this.values, default_medium: this.defaultMedium, source: this.src() } },
+            {{-- The confirm dialog submits a form by id; that form runs the import instead. Set up in init so nothing runs on load. --}}
+            init() { this.$refs.rf.submit = () => { this.run() } },
             src() { return (document.getElementById('history-source')?.value || '').trim() },
             async send(url) {
                 this.error = ''; this.busy = true;
@@ -28,7 +30,7 @@
             async check() { if (! this.has('phone') || ! this.has('name')) { this.error = @js(__('Pick the Phone and the Name columns.')); return } const j = await this.send(@js(route('customers.history.preview', $import->id))); if (j) { this.counts = j.counts; this.sample = j.sample } },
             async run() { const j = await this.send(@js(route('customers.history.run', $import->id))); if (j) window.location = j.url },
         }"
-        x-init="$refs.rf.submit = () => run()">
+        >
         <a href="{{ route('customers.history') }}" class="inline-block text-sm text-primary hover:underline">{{ __('Back to imports') }}</a>
 
         <div class="rounded-2xl border border-gray-200 bg-white p-4">

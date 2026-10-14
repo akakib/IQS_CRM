@@ -48,7 +48,7 @@ class CustomerHistoryImportTest extends TestCase
             ->assertJsonPath('counts.bad_phone', 1)->assertJsonPath('counts.skipped', 1);
         $this->assertSame(0, DB::table('customer_past_orders')->count()); // a preview writes nothing
 
-        $this->postJson(route('customers.history.run', $id), $body)->assertOk()->assertJsonPath('url', route('customers.history.show', $id));
+        $this->postJson(route('customers.history.preview', $id), $body); $this->postJson(route('customers.history.run', $id), $body)->assertOk()->assertJsonPath('url', route('customers.history.show', $id));
         $rahima = DB::table('customer_past_orders')->where('external_no', '5521')->first();
         $this->assertSame($known->id, $rahima->customer_id);
         $this->assertSame('Medjool Dates 1kg, Honey 500g × 2', $rahima->items);
@@ -64,7 +64,7 @@ class CustomerHistoryImportTest extends TestCase
         $second = DB::table('customer_imports')->max('id');
         $this->get(route('customers.history.map', $second))->assertSee('Matched the saved template WooCommerce');
         $this->postJson(route('customers.history.preview', $second), $body)->assertJsonPath('counts.orders', 0)->assertJsonPath('counts.already', 2);
-        $this->postJson(route('customers.history.run', $id), $body)->assertStatus(422);
+        $this->postJson(route('customers.history.preview', $id), $body); $this->postJson(route('customers.history.run', $id), $body)->assertStatus(422);
 
         // Without the permission, no import.
         $mod = User::factory()->create();
@@ -90,7 +90,7 @@ class CustomerHistoryImportTest extends TestCase
         $id = DB::table('customer_imports')->value('id');
         $body = ['source' => 'Pathao', 'default_medium' => 'messenger',
             'mapping' => ['Recipient Phone' => 'phone', 'Recipient Name' => 'name', 'Created' => 'date', 'Collectable Amount' => 'amount']];
-        $this->postJson(route('customers.history.run', $id), $body)->assertOk();
+        $this->postJson(route('customers.history.preview', $id), $body); $this->postJson(route('customers.history.run', $id), $body)->assertOk();
         $p = DB::table('customer_past_orders')->first();
         $this->assertSame('2025-02-12', substr($p->ordered_at, 0, 10)); // Excel day number 45700
         $this->assertSame('delivered', $p->status);                       // no status column: delivered
@@ -127,7 +127,7 @@ DM2407BBB,,01326885303,2026-07-25
         $body = ['source' => 'Pathao', 'mapping' => ['consignment_id' => 'cn', 'recipient_name' => 'name', 'recipient_phone' => 'phone', 'created_at' => 'date']];
         $this->postJson(route('customers.history.preview', $id), ['source' => 'Pathao', 'mapping' => ['consignment_id' => 'cn', 'recipient_phone' => 'phone', 'created_at' => 'date']])
             ->assertStatus(422)->assertJsonPath('message', 'Pick the Name column.');
-        $this->postJson(route('customers.history.run', $id), $body)->assertOk();
+        $this->postJson(route('customers.history.preview', $id), $body); $this->postJson(route('customers.history.run', $id), $body)->assertOk();
         $this->assertSame(['DM240726F65T8N', null], DB::table('customer_past_orders')->orderBy('id')->pluck('cn')->all()); // no CN is fine, no name is not
         $this->assertSame(1, DB::table('customer_imports')->where('id', $id)->value('result') ? json_decode(DB::table('customer_imports')->where('id', $id)->value('result'), true)['no_name'] : 0);
 
@@ -157,7 +157,35 @@ DM1BBBBB,Iqbal Store,Antara Das,01764121879,260726MQKJLAG,7/24/2026 16:26
         $id = DB::table('customer_imports')->value('id');
         $guess = $this->get(route('customers.history.map', $id))->viewData('mapping');
         $this->assertSame(['consignment_id' => 'cn', 'merchant_name' => '', 'recipient_name' => 'name', 'recipient_phone' => 'phone', 'invoice_id' => '', 'created_at' => 'date'], $guess);
-        $this->postJson(route('customers.history.run', $id), ['source' => '', 'mapping' => $guess])->assertOk();
+        $this->postJson(route('customers.history.preview', $id), ['source' => '', 'mapping' => $guess]); $this->postJson(route('customers.history.run', $id), ['source' => '', 'mapping' => $guess])->assertOk();
         $this->assertSame(['1st 300', '1st 300'], DB::table('customer_past_orders')->pluck('source')->all()); // two parcels, named after the file
+    }
+
+    public function test_nothing_imports_without_the_checked_mapping_and_an_import_can_be_undone(): void
+    {
+        (new CustomerSeeder)->run();
+        $owner = $this->owner();
+        $known = Customer::create(['name' => 'Old Customer', 'primary_phone' => '01712345678']);
+        DB::table('customer_phones')->insert(['customer_id' => $known->id, 'phone' => '01712345678', 'is_primary' => true]);
+        $csv = "phone,name,date
+01712345678,Old Customer,2025-01-01
+01812345678,New One,2025-01-02
+";
+        $this->actingAs($owner)->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('a.csv', $csv)]);
+        $id = DB::table('customer_imports')->value('id');
+        $body = ['source' => 'Sheet', 'mapping' => ['phone' => 'phone', 'name' => 'name', 'date' => 'date']];
+
+        $this->postJson(route('customers.history.run', $id), $body)->assertStatus(422); // never checked
+        $this->postJson(route('customers.history.preview', $id), $body)->assertOk();
+        $this->postJson(route('customers.history.run', $id), ['source' => 'Other'] + $body)->assertStatus(422); // changed since the check
+        $this->postJson(route('customers.history.run', $id), $body)->assertOk();
+        $this->assertSame(2, DB::table('customer_past_orders')->count());
+        $this->get(route('customers.history.show', $id))->assertSee('Undo this import');
+
+        $this->post(route('customers.history.undo', $id))->assertRedirect(route('customers.history.show', $id));
+        $this->assertSame(0, DB::table('customer_past_orders')->count());
+        $this->assertNull(Customer::where('primary_phone', '01812345678')->first()); // created by the import: gone
+        $this->assertNotNull($known->fresh());                                        // was here before: stays
+        $this->get(route('customers.history.show', $id))->assertSee('taken back')->assertDontSee('Undo this import');
     }
 }

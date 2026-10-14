@@ -81,6 +81,8 @@ class CustomerImportController extends Controller
     public function preview(Request $request, int $import): JsonResponse
     {
         [$row, $plan, $data] = $this->plan($request, $import);
+        // Import runs only with exactly what was checked here.
+        DB::table('customer_imports')->where('id', $row->id)->update(['preview_hash' => $this->hash($data), 'updated_at' => now()]);
 
         return response()->json(['counts' => $plan['counts'], 'sample' => array_slice($plan['orders'], 0, 5)]);
     }
@@ -88,6 +90,7 @@ class CustomerImportController extends Controller
     public function run(Request $request, int $import): JsonResponse
     {
         [$row, $plan, $data] = $this->plan($request, $import);
+        abort_unless($row->preview_hash && hash_equals($row->preview_hash, $this->hash($data)), 422, __('Press Check first; the columns changed since.'));
         $source = $data['source'];
         $this->history->import($plan, $row->id, $source, $request->user()->id);
         $header = array_column(json_decode($row->columns, true), 'header');
@@ -105,6 +108,24 @@ class CustomerImportController extends Controller
         return response()->json(['url' => route('customers.history.show', $row->id)]);
     }
 
+    /** Takes an import back: its orders, and the customers it created that have nothing else in IQS. */
+    public function undo(int $import): RedirectResponse
+    {
+        $row = DB::table('customer_imports')->find($import) ?? abort(404);
+        abort_unless($row->done_at && ! $row->undone_at, 422, __('Nothing to undo.'));
+        DB::transaction(function () use ($row) {
+            DB::table('customer_past_orders')->where('customer_import_id', $row->id)->delete();
+            DB::table('customers')->where('customer_import_id', $row->id)
+                ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('orders')->whereColumn('orders.customer_id', 'customers.id'))
+                ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('customer_past_orders as p')->whereColumn('p.customer_id', 'customers.id'))
+                ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('customers as m')->whereColumn('m.merged_into_id', 'customers.id'))
+                ->delete();
+            DB::table('customer_imports')->where('id', $row->id)->update(['undone_at' => now(), 'updated_at' => now()]);
+        });
+
+        return redirect()->route('customers.history.show', $row->id)->with('status', __('Import taken back.'));
+    }
+
     public function show(int $import): View
     {
         $row = DB::table('customer_imports as i')->leftJoin('users as u', 'u.id', '=', 'i.created_by')->where('i.id', $import)
@@ -116,6 +137,11 @@ class CustomerImportController extends Controller
             'recent' => DB::table('customer_past_orders as p')->join('customers as c', 'c.id', '=', 'p.customer_id')->where('p.customer_import_id', $import)
                 ->orderByDesc('p.ordered_at')->limit(10)->get(['c.id', 'c.name', 'p.external_no', 'p.ordered_at', 'p.amount', 'p.status']),
         ]);
+    }
+
+    private function hash(array $data): string
+    {
+        return hash('sha256', json_encode([$data['mapping'], $data['values'] ?? [], $data['default_medium'] ?? null, $data['source']]));
     }
 
     /** @return array{0: object, 1: array, 2: array} */

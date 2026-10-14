@@ -34,7 +34,7 @@
                             <p class="truncate text-base font-medium text-gray-900">{{ $c->name }}</p>
                             <p class="font-mono text-sm text-gray-500">{{ Mask::value($c->primary_phone, 'customer_contact') }}</p>
                         </div>
-                        <p class="shrink-0 text-right text-xs text-gray-500">{{ trans_choice(':count order|:count orders', $c->orders_count, ['count' => $c->orders_count]) }}<br>{{ __(':d delivered', ['d' => $c->delivered_count]) }}</p>
+                        <p class="shrink-0 text-right text-xs text-gray-500">{{ trans_choice(':count order|:count orders', $c->orders_count + $c->past_count, ['count' => $c->orders_count + $c->past_count]) }}<br>{{ __(':d delivered', ['d' => $c->delivered_count + $c->past_delivered]) }}</p>
                     </a>
                 @endforeach
             </div>

@@ -12,7 +12,7 @@
     <div class="mx-auto max-w-3xl space-y-4"
         x-data="{
             headers: @js($headers), map: @js($map), values: @js(['status' => (object) ($values['status'] ?? []), 'medium' => (object) ($values['medium'] ?? [])]),
-            defaultMedium: 'other', source: @js($import->source ?? ''), counts: null, sample: [], error: '', busy: false,
+            defaultMedium: @js($defaultMedium), source: @js($import->source ?? ''), counts: null, sample: [], error: '', busy: false,
             has(f) { return this.map.includes(f) },
             pick(i, f) {
                 if (f && ! ['name', 'address'].includes(f)) {
@@ -94,7 +94,7 @@
 
         <div x-show="! has('medium')" class="rounded-2xl border border-gray-200 bg-white p-4" @select-change="defaultMedium = $event.detail; counts = null">
             <p class="mb-2 text-sm font-semibold text-gray-900">{{ __('No medium column: where did these orders come from?') }}</p>
-            <x-simple-select :options="$channels" value="other" full-width />
+            <x-simple-select :options="$channels" :value="$defaultMedium" full-width />
         </div>
 
         <div id="history-result" class="rounded-2xl border border-gray-200 bg-white p-4">

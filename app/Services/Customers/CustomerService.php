@@ -120,6 +120,8 @@ class CustomerService
             if (\Illuminate\Support\Facades\Schema::hasTable('orders')) {
                 DB::table('orders')->where('customer_id', $duplicate->id)->update(['customer_id' => $keep->id]);
             }
+            // Imported order history goes with the person too.
+            DB::table('customer_past_orders')->where('customer_id', $duplicate->id)->update(['customer_id' => $keep->id]);
 
             $keep->update([
                 'orders_count' => $keep->orders_count + $duplicate->orders_count,

@@ -120,7 +120,8 @@
                         {{-- Days to the next older order. --}}
                         @php $older = $events->slice($i + 1)->first(fn ($x) => $x['type'] !== 'call'); @endphp
                         @if ($e['type'] !== 'call' && $older)
-                            <li class="-mt-2 mb-3 pl-5 text-xs text-gray-400">{{ trans_choice(':count day later|:count days later', $older['at']->diffInDays($e['at']), ['count' => (int) $older['at']->diffInDays($e['at'])]) }}</li>
+                            @php($days = (int) $older['at']->diffInDays($e['at']))
+                            <li class="-mt-2 mb-3 pl-5 text-xs text-gray-400">{{ trans_choice(':count day later|:count days later', $days, ['count' => $days]) }}</li>
                         @endif
                     @endforeach
                 </ol>

@@ -26,7 +26,7 @@ class HistoryImport
 
     /** Header words that point to a field, most specific first. */
     private const GUESS = [
-        'phone' => ['billing phone', 'recipient phone', 'customer phone', 'phone', 'mobile', 'contact'],
+        'phone' => ['billing phone', 'recipient phone', 'customer phone', 'phone number', 'contact number', 'phone', 'mobile', 'contact'],
         'name' => ['billing first name', 'billing last name', 'recipient name', 'customer name', 'receiver name', 'full name', 'name'],
         'cn' => ['consignment id', 'consignment', 'cn', 'tracking code', 'tracking id', 'tracking'],
         'order_no' => ['order number', 'order no', 'order id', 'merchant order id', 'invoice'],
@@ -40,12 +40,21 @@ class HistoryImport
     ];
 
     private const WORDS = [
-        'delivered' => ['completed', 'complete', 'delivered', 'paid'],
+        'delivered' => ['completed', 'complete', 'delivered', 'paid', 'partial delivery', 'partially delivered', 'partial'],
         'cancelled' => ['cancelled', 'canceled', 'cancel', 'failed', 'trash'],
         'returned' => ['returned', 'return', 'paid return', 'partial return'],
         'refunded' => ['refunded', 'refund'],
-        'pending' => ['processing', 'pending', 'on-hold', 'on hold', 'in transit', 'hold', 'partial'],
+        'pending' => ['processing', 'pending', 'on-hold', 'on hold', 'in transit', 'hold'],
     ];
+
+    /** Word stems tried inside a longer phrase ("Pickup Cancelled", "Partial Delivery"), in this order. */
+    private const STEMS = [
+        'returned' => ['return'], 'refunded' => ['refund'], 'cancelled' => ['cancel', 'fail'],
+        'delivered' => ['deliver', 'complete'], 'pending' => ['pending', 'process', 'transit', 'hold'],
+    ];
+
+    /** The most rows one file may have; a longer file is refused, never cut silently. */
+    private const MAX_ROWS = 50000;
 
     /** @return array{0: list<string>, 1: list<list<string>>} header row and data rows */
     public function read(string $path, string $ext): array
@@ -55,9 +64,17 @@ class HistoryImport
         if (count($rows) < 2) {
             throw new RuntimeException(__('The file has no rows under the header.'));
         }
+        if (count($rows) > self::MAX_ROWS + 1) {
+            throw new RuntimeException(__('The file has more than :n rows. Split it and import the parts.', ['n' => number_format(self::MAX_ROWS)]));
+        }
         $header = array_map(fn ($h) => trim(preg_replace('/^\xEF\xBB\xBF/', '', (string) $h)), array_shift($rows));
+        $seen = [];
         foreach ($header as $i => $h) {
-            $header[$i] = $h === '' ? __('Column :n', ['n' => $i + 1]) : $h;
+            $h = $h === '' ? __('Column :n', ['n' => $i + 1]) : $h;
+            // Two columns with one name would share one mapping: number the repeats.
+            $key = mb_strtolower($h);
+            $seen[$key] = ($seen[$key] ?? 0) + 1;
+            $header[$i] = $seen[$key] > 1 ? $h.' ('.$seen[$key].')' : $h;
         }
         $width = count($header);
 
@@ -68,7 +85,8 @@ class HistoryImport
     private static function cell(string $v): string
     {
         $v = trim($v);
-        if (preg_match('/^\d+(\.\d+)?E\+?\d+$/i', $v)) {
+        // Expand only when nothing was cut: 1.326885301E9 is exact, 8.80133E+12 lost digits and stays as it is (a bad phone, not a wrong one).
+        if (preg_match('/^\d+(?:\.(\d+))?E\+?(\d+)$/i', $v, $m) && strlen($m[1] ?? '') >= (int) $m[2]) {
             return sprintf('%.0f', (float) $v);
         }
 
@@ -98,7 +116,8 @@ class HistoryImport
                     // One-word guesses that are easy to mistake match the whole header only (invoice_id is a payout invoice, not an order).
                     $exact = in_array($w, ['invoice', 'cn', 'tracking', 'name'], true);
                     if ($map[$header[$i]] === '' && ($h === $w || (! $exact && str_contains($h, $w))) && ! ($field === 'amount' && str_contains($h, 'item'))
-                        && ! ($field === 'name' && preg_match('/merchant|store|shop|product|item|hub|zone|file|user|sender/', $h))) {
+                        && ! ($field === 'name' && preg_match('/merchant|store|shop|product|item|hub|zone|file|user|sender/', $h))
+                        && ! ($field === 'phone' && str_contains($h, 'name'))) {
                         $map[$header[$i]] = $field;
                         $taken++;
                         if ($taken >= (in_array($field, ['name'], true) ? 2 : 1)) {
@@ -120,6 +139,13 @@ class HistoryImport
             foreach (self::WORDS as $status => $list) {
                 if (in_array($w, $list, true)) {
                     return $status;
+                }
+            }
+            foreach (self::STEMS as $status => $stems) {
+                foreach ($stems as $stem) {
+                    if (preg_match('/\b'.preg_quote($stem, '/').'/', $w)) {
+                        return $status;
+                    }
                 }
             }
 
@@ -144,7 +170,7 @@ class HistoryImport
     /**
      * Rows to orders, checked against what is already in IQS. Nothing is written.
      *
-     * @return array{orders: list<array>, counts: array<string, int>}
+     * @return array{orders: list<array>, updates: list<array>, restore: list<int>, counts: array<string, int>}
      */
     public function plan(array $header, array $rows, array $mapping, array $values, ?string $defaultMedium, string $source): array
     {
@@ -152,12 +178,20 @@ class HistoryImport
         $get = fn (array $row, string $field, string $glue = ' ') => trim(implode($glue, array_filter(array_map(fn ($i) => self::cell((string) ($row[$i] ?? '')), $cols($field)), fn ($v) => $v !== '')));
         $counts = ['rows' => count($rows), 'orders' => 0, 'known' => 0, 'new' => 0, 'in_iqs' => 0, 'already' => 0, 'updated' => 0, 'bad_phone' => 0, 'no_name' => 0, 'bad_date' => 0, 'skipped' => 0];
 
+        // One order per order number, else per CN, else per row (a row is then known by its content).
         $groups = [];
+        $cnOwner = [];
         foreach ($rows as $n => $row) {
             $no = $get($row, 'order_no');
             $cn = self::cn($get($row, 'cn'));
             $key = $no !== '' ? 'no:'.$no : ($cn ? 'cn:'.$cn : 'row:'.$n);
             if (! isset($groups[$key])) {
+                // One CN is one parcel: a second order claiming it in the same file keeps its order but not the CN.
+                if ($cn && isset($cnOwner[$cn]) && $cnOwner[$cn] !== $key) {
+                    $cn = null;
+                } elseif ($cn) {
+                    $cnOwner[$cn] = $key;
+                }
                 $groups[$key] = ['no' => $no, 'cn' => $cn, 'row' => $row, 'items' => []];
             }
             if (($item = $get($row, 'items')) !== '') {
@@ -166,11 +200,15 @@ class HistoryImport
             }
         }
 
-        // 7/24/2026 or 24/7/2026: a number above 12 in the file says which comes first (day first when unsure).
-        $dayFirst = true;
+        // 24/7/2026 or 7/24/2026: a number above 12 decides; otherwise Pathao's "7/24/2026, 16:27" shape is month first, anything else day first.
+        $dayFirst = null;
+        $commaShape = false;
         foreach ($rows as $row) {
-            if (preg_match('#^(\d{1,2})[/.-](\d{1,2})[/.-]\d{4}#', $get($row, 'date'), $m)) {
+            $d = $get($row, 'date');
+            if (preg_match('#^(\d{1,2})[/.-](\d{1,2})[/.-]\d{4}#', $d, $m)) {
+                $commaShape = $commaShape || (bool) preg_match('#^\d{1,2}/\d{1,2}/\d{4},\s*\d#', $d);
                 if ((int) $m[1] > 12) {
+                    $dayFirst = true;
                     break;
                 }
                 if ((int) $m[2] > 12) {
@@ -179,6 +217,7 @@ class HistoryImport
                 }
             }
         }
+        $dayFirst ??= ! $commaShape;
 
         $orders = [];
         foreach ($groups as $g) {
@@ -210,60 +249,85 @@ class HistoryImport
                 continue;
             }
             $mediumWord = $get($row, 'medium');
+            $amountRaw = $get($row, 'amount');
+            $items = mb_substr(implode(', ', array_unique($g['items'])), 0, 1000) ?: null;
             $orders[] = [
                 'phone' => $phone,
                 'name' => mb_substr($name, 0, 150),
                 'external_no' => $g['no'] !== '' ? mb_substr($g['no'], 0, 60) : null,
                 'cn' => $g['cn'],
+                // Neither number nor CN: the row is known by what it says (the raw date, so an empty date is the same row tomorrow too).
+                'row_key' => $g['no'] === '' && ! $g['cn'] ? sha1(implode('|', [$phone, $rawDate, $amountRaw, (string) $items, mb_strtolower($name)])) : null,
                 'ordered_at' => $date,
-                'amount' => round((float) preg_replace('/[^\d.]/', '', str_replace(',', '', Phone::englishDigits($get($row, 'amount')))), 2),
+                'amount' => round((float) preg_replace('/[^\d.]/', '', str_replace(',', '', Phone::englishDigits($amountRaw))), 2),
                 'status' => $status,
                 'medium' => $mediumWord !== '' ? ($values['medium'][$mediumWord] ?? $this->guessValue('medium', $mediumWord)) : $defaultMedium,
-                'items' => mb_substr(implode(', ', array_unique($g['items'])), 0, 1000) ?: null,
+                'items' => $items,
                 'address' => mb_substr($get($row, 'address', ', '), 0, 500) ?: null,
             ];
         }
 
-        // Already in IQS (a website order carries the website's number) or brought in before.
-        $nos = array_values(array_filter(array_column($orders, 'external_no')));
+        // Already in IQS (a website order carries the website's number), or brought in before from any file.
         $inIqs = [];
         $before = [];
-        foreach (array_chunk($nos, 500) as $chunk) {
-            $inIqs += array_flip(Order::whereIn('external_ref', $chunk)->pluck('external_ref')->merge(Order::whereIn('order_no', $chunk)->pluck('order_no'))->map(fn ($v) => (string) $v)->all());
-            foreach (DB::table('customer_past_orders')->where('source', $source)->whereIn('external_no', $chunk)->get() as $p) {
-                $before[$p->external_no] = $p;
+        foreach (array_chunk(array_values(array_unique(array_filter(array_column($orders, 'external_no')))), 500) as $chunk) {
+            $inIqs += array_flip(Order::whereIn('external_ref', $chunk)->pluck('external_ref')->merge(Order::whereIn('order_no', $chunk)->pluck('order_no'))->map(fn ($v) => 'no:'.$v)->all());
+            foreach (DB::table('customer_past_orders')->whereIn('external_no', $chunk)->orderBy('id')->get() as $p) {
+                $before['no:'.$p->external_no] ??= $p;
             }
         }
-        // The same parcel by its CN: booked in IQS, or imported before from any file.
-        foreach (array_chunk(array_values(array_filter(array_column($orders, 'cn'))), 500) as $chunk) {
-            $cnInIqs = DB::table('shipments')->whereIn('consignment_id', $chunk)->pluck('consignment_id')
-                ->merge(DB::table('shipments')->whereIn('tracking_code', $chunk)->pluck('tracking_code'))->map(fn ($v) => 'cn:'.strtoupper((string) $v));
-            $inIqs += array_flip($cnInIqs->all());
+        foreach (array_chunk(array_values(array_unique(array_filter(array_column($orders, 'cn')))), 500) as $chunk) {
+            $inIqs += array_flip(DB::table('shipments')->whereIn('consignment_id', $chunk)->pluck('consignment_id')
+                ->merge(DB::table('shipments')->whereIn('tracking_code', $chunk)->pluck('tracking_code'))->map(fn ($v) => 'cn:'.strtoupper((string) $v))->all());
             foreach (DB::table('customer_past_orders')->whereIn('cn', $chunk)->get() as $p) {
                 $before['cn:'.$p->cn] = $p;
             }
         }
-        $known = [];
-        foreach (array_chunk(array_values(array_unique(array_column($orders, 'phone'))), 500) as $chunk) {
-            $known += DB::table('customer_phones')->whereIn('phone', $chunk)->pluck('customer_id', 'phone')->all();
+        foreach (array_chunk(array_values(array_unique(array_filter(array_column($orders, 'row_key')))), 500) as $chunk) {
+            foreach (DB::table('customer_past_orders')->whereIn('row_key', $chunk)->get() as $p) {
+                $before['row:'.$p->row_key] = $p;
+            }
         }
+
+        [$known, $restore] = $this->owners(array_values(array_unique(array_column($orders, 'phone'))));
         $keep = [];
         $updates = [];
+        $knownPhones = [];
         $newPhones = [];
+        $seenRows = [];
+        $cnTaken = array_flip(array_keys(array_filter($before, fn ($k) => str_starts_with($k, 'cn:'), ARRAY_FILTER_USE_KEY)));
         foreach ($orders as $o) {
-            if (($o['external_no'] !== null && isset($inIqs[$o['external_no']])) || ($o['cn'] && isset($inIqs['cn:'.$o['cn']]))) {
+            if (($o['external_no'] !== null && isset($inIqs['no:'.$o['external_no']])) || ($o['cn'] && isset($inIqs['cn:'.$o['cn']]))) {
                 $counts['in_iqs']++;
 
                 continue;
             }
-            // Brought in before: the file is newer, so what changed (amount, status...) is updated.
-            $old = ($o['cn'] ? ($before['cn:'.$o['cn']] ?? null) : null) ?? ($o['external_no'] !== null ? ($before[$o['external_no']] ?? null) : null);
+            if ($o['row_key'] && isset($seenRows[$o['row_key']])) {
+                $counts['already']++; // the same row twice in one file
+
+                continue;
+            }
+            if ($o['row_key']) {
+                $seenRows[$o['row_key']] = true;
+            }
+            // Brought in before: the file is newer, so what changed is updated, and a CN or number it lacked is filled in.
+            $old = ($o['cn'] ? ($before['cn:'.$o['cn']] ?? null) : null)
+                ?? ($o['external_no'] !== null ? ($before['no:'.$o['external_no']] ?? null) : null)
+                ?? ($o['row_key'] ? ($before['row:'.$o['row_key']] ?? null) : null);
             if ($old) {
-                $new = array_intersect_key($o, array_flip(['ordered_at', 'amount', 'status', 'medium', 'items', 'address']));
-                $changed = array_filter($new, fn ($v, $k) => (string) $v !== (string) $old->{$k} && ! ($k === 'amount' && abs((float) $v - (float) $old->amount) < 0.01)
+                $fields = ['ordered_at', 'amount', 'status', 'medium', 'items', 'address'];
+                if ($o['cn'] && ! $old->cn && ! isset($cnTaken['cn:'.$o['cn']])) {
+                    $fields[] = 'cn';
+                }
+                if ($o['external_no'] !== null && $old->external_no === null) {
+                    $fields[] = 'external_no';
+                }
+                $new = array_intersect_key($o, array_flip($fields));
+                $changed = array_filter($new, fn ($v, $k) => $v !== null && (string) $v !== (string) $old->{$k}
+                    && ! ($k === 'amount' && abs((float) $v - (float) $old->amount) < 0.01)
                     && ! ($k === 'ordered_at' && substr((string) $v, 0, 16) === substr((string) $old->ordered_at, 0, 16)), ARRAY_FILTER_USE_BOTH);
                 if ($changed) {
-                    $updates[] = ['id' => $old->id] + $changed;
+                    $updates[] = ['id' => $old->id, 'old' => array_intersect_key((array) $old, $changed)] + $changed;
                     $counts['updated']++;
                 } else {
                     $counts['already']++;
@@ -272,37 +336,91 @@ class HistoryImport
                 continue;
             }
             $o['customer_id'] = $known[$o['phone']] ?? null;
-            $o['customer_id'] ? $counts['known']++ : $newPhones[$o['phone']] = true;
+            if ($o['customer_id']) {
+                $knownPhones[$o['phone']] = true;
+            } else {
+                $newPhones[$o['phone']] = true;
+            }
             $keep[] = $o;
         }
         $counts['orders'] = count($keep);
+        $counts['known'] = count($knownPhones);
         $counts['new'] = count($newPhones);
 
-        return ['orders' => $keep, 'updates' => $updates, 'counts' => $counts];
+        return ['orders' => $keep, 'updates' => $updates, 'restore' => array_values(array_intersect_key($restore, $knownPhones)), 'counts' => $counts];
     }
 
-    /** Writes the planned orders, creating customers for numbers IQS has not seen. */
-    public function import(array $plan, int $importId, string $source, ?int $userId): void
+    /**
+     * Who owns each phone: a customer's own number first, then a primary phone, following merges to the
+     * customer that is left. A customer deleted by hand is brought back when the file has their orders.
+     *
+     * @return array{0: array<string, int>, 1: array<string, int>} phone => customer id, phone => id to restore
+     */
+    private function owners(array $phones): array
     {
-        DB::transaction(function () use ($plan, $importId, $source, $userId) {
+        $owner = [];
+        foreach (array_chunk($phones, 500) as $chunk) {
+            foreach (DB::table('customers')->whereIn('primary_phone', $chunk)->get(['id', 'primary_phone as phone']) as $r) {
+                $owner[$r->phone] = $r->id;
+            }
+            foreach (DB::table('customer_phones')->whereIn('phone', $chunk)->get(['customer_id', 'phone']) as $r) {
+                $owner[$r->phone] = $r->customer_id; // the customer's own number wins over a primary phone left on an old row
+            }
+        }
+        $rows = DB::table('customers')->whereIn('id', array_unique(array_values($owner)))->get(['id', 'merged_into_id', 'deleted_at'])->keyBy('id');
+        $known = [];
+        $restore = [];
+        foreach ($owner as $phone => $id) {
+            for ($hop = 0; $hop < 10 && ($c = $rows[$id] ?? DB::table('customers')->find($id, ['id', 'merged_into_id', 'deleted_at'])) && $c->merged_into_id; $hop++) {
+                $id = $c->merged_into_id;
+            }
+            $c = $rows[$id] ?? DB::table('customers')->find($id, ['id', 'merged_into_id', 'deleted_at']);
+            if (! $c) {
+                continue;
+            }
+            $known[$phone] = $c->id;
+            if ($c->deleted_at && ! $c->merged_into_id) {
+                $restore[$phone] = $c->id;
+            }
+        }
+
+        return [$known, $restore];
+    }
+
+    /**
+     * Writes the planned orders, creating customers for numbers IQS has not seen.
+     *
+     * @return array{inserted: int, changes: array<int, array>} rows really written, and what the updates overwrote (for Undo)
+     */
+    public function import(array $plan, int $importId, string $source, ?int $userId): array
+    {
+        return DB::transaction(function () use ($plan, $importId, $source, $userId) {
             $now = now();
+            if ($plan['restore'] ?? []) {
+                DB::table('customers')->whereIn('id', $plan['restore'])->update(['deleted_at' => null, 'updated_at' => $now]);
+            }
             $new = collect($plan['orders'])->whereNull('customer_id')->unique('phone');
             foreach ($new->chunk(300) as $chunk) {
                 DB::table('customers')->insert($chunk->map(fn ($o) => ['name' => $o['name'], 'primary_phone' => $o['phone'], 'created_by' => $userId, 'customer_import_id' => $importId, 'created_at' => $now, 'updated_at' => $now])->values()->all());
                 $ids = DB::table('customers')->whereIn('primary_phone', $chunk->pluck('phone'))->pluck('id', 'primary_phone');
-                DB::table('customer_phones')->insert($chunk->map(fn ($o) => ['customer_id' => $ids[$o['phone']], 'phone' => $o['phone'], 'is_primary' => true, 'created_at' => $now, 'updated_at' => $now])->values()->all());
+                DB::table('customer_phones')->insertOrIgnore($chunk->map(fn ($o) => ['customer_id' => $ids[$o['phone']], 'phone' => $o['phone'], 'is_primary' => true, 'created_at' => $now, 'updated_at' => $now])->values()->all());
             }
-            $ids = DB::table('customer_phones')->whereIn('phone', $new->pluck('phone'))->pluck('customer_id', 'phone');
+            $ids = DB::table('customers')->whereIn('primary_phone', $new->pluck('phone'))->where('customer_import_id', $importId)->pluck('id', 'primary_phone');
+            $changes = [];
             foreach ($plan['updates'] ?? [] as $u) {
-                DB::table('customer_past_orders')->where('id', $u['id'])->update(array_diff_key($u, ['id' => 1]) + ['updated_at' => $now]);
+                $changes[$u['id']] = $u['old'];
+                DB::table('customer_past_orders')->where('id', $u['id'])->update(array_diff_key($u, ['id' => 1, 'old' => 1]) + ['updated_at' => $now]);
             }
+            $inserted = 0;
             foreach (array_chunk($plan['orders'], 300) as $chunk) {
-                DB::table('customer_past_orders')->insertOrIgnore(array_map(fn ($o) => [
+                $inserted += DB::table('customer_past_orders')->insertOrIgnore(array_map(fn ($o) => [
                     'customer_id' => $o['customer_id'] ?? $ids[$o['phone']], 'customer_import_id' => $importId, 'source' => $source,
-                    'external_no' => $o['external_no'], 'cn' => $o['cn'], 'ordered_at' => $o['ordered_at'], 'amount' => $o['amount'], 'status' => $o['status'],
-                    'medium' => $o['medium'], 'items' => $o['items'], 'address' => $o['address'], 'created_at' => $now, 'updated_at' => $now,
+                    'external_no' => $o['external_no'], 'cn' => $o['cn'], 'row_key' => $o['row_key'], 'ordered_at' => $o['ordered_at'], 'amount' => $o['amount'],
+                    'status' => $o['status'], 'medium' => $o['medium'], 'items' => $o['items'], 'address' => $o['address'], 'created_at' => $now, 'updated_at' => $now,
                 ], $chunk));
             }
+
+            return ['inserted' => $inserted, 'changes' => $changes];
         });
     }
 
@@ -311,13 +429,13 @@ class HistoryImport
     {
         $v = strtoupper(preg_replace('/\s+/', '', Phone::englishDigits((string) $v)));
 
-        return preg_match('/^[A-Z0-9-]{5,40}$/', $v) ? $v : null;
+        return preg_match('/^[A-Z0-9-]{5,40}$/', $v) && preg_match('/\d/', $v) ? $v : null;
     }
 
     /** The sample file to fill in: our own column names, one example row (its phone is not real, so it never imports). */
     public const SAMPLE = [
-        ['Name', 'Phone', 'CN', 'Address', 'Products', 'Amount', 'Date', 'Status'],
-        ['Rahima Akter', '01XXXXXXXXX', 'DM240726F65T8N', 'House 12, Road 5, Mirpur, Dhaka', 'Medjool Dates 1 kg x 2, Honey 500 g', '1250', '2026-07-24', 'Delivered'],
+        ['Name', 'CN', 'Phone', 'Address', 'Products', 'Amount', 'Date', 'Status'],
+        ['Rahima Akter', 'DM240726F65T8N', '01XXXXXXXXX', 'House 12, Road 5, Mirpur, Dhaka', 'Medjool Dates 1 kg x 2, Honey 500 g', '1250', '2026-07-24', 'Delivered'],
     ];
 
     /** A small .xlsx (a zip of XML) with the sample rows, written without any package. */
@@ -380,14 +498,26 @@ class HistoryImport
     /** @return list<list<string>> */
     private function csv(string $path): array
     {
-        $fh = fopen($path, 'r') ?: throw new RuntimeException(__('The file could not be read.'));
-        $first = (string) fgets($fh);
-        rewind($fh);
+        $raw = @file_get_contents($path);
+        if ($raw === false) {
+            throw new RuntimeException(__('The file could not be read.'));
+        }
+        // Excel saves "CSV" in the Windows code page and "Unicode Text" as UTF-16: make it UTF-8 first.
+        if (str_starts_with($raw, "\xFF\xFE") || str_starts_with($raw, "\xFE\xFF")) {
+            $raw = mb_convert_encoding(substr($raw, 2), 'UTF-8', str_starts_with($raw, "\xFF\xFE") ? 'UTF-16LE' : 'UTF-16BE');
+        } elseif (! mb_check_encoding($raw, 'UTF-8')) {
+            $raw = mb_convert_encoding($raw, 'UTF-8', 'Windows-1252');
+        }
+        $raw = preg_replace('/\r\n?/', "\n", $raw);
+        $first = strtok($raw, "\n") ?: '';
         $sep = collect([',', ';', "\t"])->sortByDesc(fn ($s) => substr_count($first, $s))->first();
+        $fh = fopen('php://temp', 'r+');
+        fwrite($fh, $raw);
+        rewind($fh);
         $rows = [];
         while (($r = fgetcsv($fh, 0, $sep, '"', '')) !== false) {
             $rows[] = $r;
-            if (count($rows) > 50001) {
+            if (count($rows) > self::MAX_ROWS + 1) {
                 break;
             }
         }
@@ -403,23 +533,25 @@ class HistoryImport
         if ($zip->open($path) !== true) {
             throw new RuntimeException(__('The Excel file could not be opened. Save it again as .xlsx or CSV.'));
         }
+        // Some writers prefix every element (<x:row>): drop element prefixes so plain names work.
+        $plain = fn (string|false $x) => $x === false ? false : preg_replace('/(<\/?)[A-Za-z][\w.-]*:(?=[A-Za-z])/', '$1', $x);
         $shared = [];
-        if (($xml = $zip->getFromName('xl/sharedStrings.xml')) !== false) {
+        if (($xml = $plain($zip->getFromName('xl/sharedStrings.xml'))) !== false) {
             foreach (simplexml_load_string($xml)->si as $si) {
                 $shared[] = isset($si->t) ? (string) $si->t : implode('', array_map(fn ($r) => (string) $r->t, iterator_to_array($si->r, false)));
             }
         }
         $sheet = 'xl/worksheets/sheet1.xml';
-        if (($wb = $zip->getFromName('xl/workbook.xml')) && ($rels = $zip->getFromName('xl/_rels/workbook.xml.rels'))) {
-            $wbx = simplexml_load_string($wb);
-            $rid = (string) $wbx->sheets->sheet[0]->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships')['id'];
+        if (($wb = $zip->getFromName('xl/workbook.xml')) && ($rels = $plain($zip->getFromName('xl/_rels/workbook.xml.rels')))
+            && preg_match('/<(?:\w+:)?sheet\b[^>]*\b(?:\w+:)?id="([^"]+)"/', $wb, $sm)) {
+            $rid = $sm[1];
             foreach (simplexml_load_string($rels)->Relationship as $rel) {
                 if ((string) $rel['Id'] === $rid) {
                     $sheet = 'xl/'.ltrim(str_replace('/xl/', '', (string) $rel['Target']), '/');
                 }
             }
         }
-        $xml = $zip->getFromName($sheet);
+        $xml = $plain($zip->getFromName($sheet));
         $zip->close();
         if ($xml === false) {
             throw new RuntimeException(__('The Excel file has no sheet.'));
@@ -427,11 +559,14 @@ class HistoryImport
         $rows = [];
         foreach (simplexml_load_string($xml)->sheetData->row as $row) {
             $cells = [];
+            $next = 1;
             foreach ($row->c as $c) {
                 $col = 0;
-                foreach (str_split(preg_replace('/\d/', '', (string) $c['r'])) as $ch) {
+                foreach (str_split(preg_replace('/[^A-Z]/', '', strtoupper((string) $c['r']))) as $ch) {
                     $col = $col * 26 + (ord($ch) - 64);
                 }
+                $col = $col ?: $next; // a cell without a reference follows the one before it
+                $next = $col + 1;
                 $type = (string) $c['t'];
                 $cells[$col - 1] = match ($type) {
                     's' => $shared[(int) $c->v] ?? '',
@@ -444,7 +579,7 @@ class HistoryImport
                 $line[] = $cells[$i] ?? '';
             }
             $rows[] = $line;
-            if (count($rows) > 50001) {
+            if (count($rows) > self::MAX_ROWS + 1) {
                 break;
             }
         }

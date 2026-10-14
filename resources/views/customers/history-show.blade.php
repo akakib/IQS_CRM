@@ -26,16 +26,17 @@
                     <button type="button" class="rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50"
                         @click="$dispatch('open-confirm', { id: 'history-undo-confirm', form: 'history-undo', label: @js($import->file_name) })">{{ __('Undo this import') }}</button>
                 </form>
-                <x-confirm-modal id="history-undo-confirm" :verb="__('Undo')" :message="__('Removes the orders this import brought in, and the customers it created that have no other orders. Customers who already had orders stay.')" />
+                <x-confirm-modal id="history-undo-confirm" :verb="__('Undo')" :message="__('Removes the orders this import brought in, and the customers it created that have no other orders. Customers who already had orders stay, and what it changed on earlier parcels is put back.')" />
             </div>
         @endif
         @if ($recent->isNotEmpty() && ! $import->undone_at)
             <x-card :title="__('Some of them')">
                 @foreach ($recent as $p)
-                    <a href="{{ route('journey.show', $p->id) }}" class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm last:border-0 hover:bg-gray-50">
-                        <span class="min-w-0"><span class="block truncate font-medium text-gray-800">{{ $p->name }}</span><span class="text-xs text-gray-500">{{ $p->external_no ?? '-' }} · {{ \Illuminate\Support\Carbon::parse($p->ordered_at)->format('d M Y') }} · {{ __(\App\Services\Customers\HistoryImport::STATUSES[$p->status] ?? $p->status) }}</span></span>
+                    @php $tag = auth()->user()->can('customers.view') ? 'a' : 'div'; @endphp
+                    <{{ $tag }} @if ($tag === 'a') href="{{ route('journey.show', $p->id) }}" @endif class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm last:border-0 hover:bg-gray-50">
+                        <span class="min-w-0"><span class="block truncate font-medium text-gray-800">{{ $p->name }}</span><span class="text-xs text-gray-500">{{ $p->cn ?? $p->external_no ?? '-' }} · {{ \Illuminate\Support\Carbon::parse($p->ordered_at)->format('d M Y') }} · {{ __(\App\Services\Customers\HistoryImport::STATUSES[$p->status] ?? $p->status) }}</span></span>
                         <span class="shrink-0 font-semibold tabular-nums">৳{{ number_format((float) $p->amount) }}</span>
-                    </a>
+                    </{{ $tag }}>
                 @endforeach
             </x-card>
         @endif

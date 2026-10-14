@@ -46,6 +46,12 @@ class OrderSearchTest extends TestCase
         foreach ([$order->order_no, substr($order->order_no, 2), '01712345678', $cn, 'Karim', 'Uddin'] as $q) {
             $this->get('/order-search?q='.urlencode($q))->assertOk()->assertSee($order->order_no)->assertSee('Ajwa Dates');
         }
+        // Search in one field only: a name is not found under CN or Phone.
+        $this->get('/order-search?by=name&q=Karim')->assertSee($order->order_no);
+        $this->get('/order-search?by=cn&q=Karim')->assertSee('No order found');
+        $this->get('/order-search?by=phone&q=01712345678')->assertSee($order->order_no);
+        $this->get('/order-search?by=cn&q='.$cn)->assertSee($order->order_no);
+        $this->get('/order-search?by=phone&q='.$cn)->assertSee('No order found');
         $this->get('/order-search?q=ka')->assertSee('Type at least 3 characters');
         $this->get('/order-search?q=Nobody')->assertSee('No order found');
         // They see it, but the order page is not a link for them.

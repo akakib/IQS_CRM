@@ -1,13 +1,24 @@
 @php use App\Support\Permissions\Mask; @endphp
 
 <x-layouts.app :heading="__('Order search')">
-    <form method="GET" action="{{ route('orders.search') }}" class="mb-4 flex gap-2">
+    <form method="GET" action="{{ route('orders.search') }}" class="mb-4 space-y-2" x-data="{ by: @js($by) }">
+        {{-- Search in: only the picked field (All looks at every one). --}}
+        <input type="hidden" name="by" :value="by">
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="text-gray-500">{{ __('Search in') }}</span>
+            @foreach (['all' => __('All'), 'cn' => __('CN'), 'phone' => __('Phone'), 'name' => __('Name')] as $key => $label)
+                <button type="button" @click="by = @js($key); $nextTick(() => { if ($root.querySelector('[name=q]').value.trim()) $root.submit() })"
+                    class="rounded-full border px-3 py-1.5" :class="by === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-50'">{{ $label }}</button>
+            @endforeach
+        </div>
+        <div class="flex gap-2">
         <input type="search" name="q" value="{{ $q }}" autofocus autocomplete="off" placeholder="{{ __('Order number, phone, CN or customer name') }}"
             class="min-w-0 flex-1 rounded-lg border border-gray-300 px-4 py-3 text-base focus:border-primary focus:outline-none">
         <x-button class="shrink-0">{{ __('Search') }}</x-button>
         @if ($q !== '')
             <a href="{{ route('orders.search') }}" class="flex shrink-0 items-center rounded-lg border border-gray-300 px-4 text-sm text-gray-600 hover:bg-gray-50">{{ __('Clear') }}</a>
         @endif
+        </div>
     </form>
 
     @if ($q === '')

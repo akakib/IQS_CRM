@@ -20,6 +20,7 @@ class OrderSearchController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $by = in_array($request->query('by'), ['all', 'cn', 'phone', 'name'], true) ? $request->query('by') : 'all';
         $results = collect();
         $tooShort = $q !== '' && mb_strlen($q) < 3;
 
@@ -30,14 +31,22 @@ class OrderSearchController extends Controller
             if (preg_match('/^\d{4,7}$/', $q)) {
                 $orderNo = 'IQ'.$q; // the number without IQ
             }
+            $cnMatch = fn ($w) => $w->orWhereIn('orders.id', DB::table('shipments')->select('order_id')->where('consignment_id', $digits ?: $q)->orWhere('tracking_code', $q));
+            $nameMatch = fn ($w) => $w->orWhere('ship_name', 'like', $q.'%')->orWhere('ship_name', 'like', '% '.$q.'%');
+            $phoneMatch = fn ($w) => $w->orWhere('ship_phone', $phone ?: $q)->orWhere('ship_alt_phone', $phone ?: $q);
             $results = Order::query()
                 ->with(['items:id,order_id,name_snapshot,qty,unit', 'moderator:id,name'])
-                ->where(fn ($w) => $w
-                    ->where('order_no', $orderNo)
-                    ->when($phone, fn ($w) => $w->orWhere('ship_phone', $phone)->orWhere('ship_alt_phone', $phone))
-                    ->when(strlen($digits) >= 6, fn ($w) => $w->orWhereIn('orders.id', DB::table('shipments')->select('order_id')->where('consignment_id', $digits)))
-                    ->orWhereIn('orders.id', DB::table('shipments')->select('order_id')->where('tracking_code', $q))
-                    ->when(! $phone && strlen($digits) < 6, fn ($w) => $w->orWhere('ship_name', 'like', $q.'%')->orWhere('ship_name', 'like', '% '.$q.'%')))
+                ->where(fn ($w) => match ($by) {
+                    'cn' => $cnMatch($w),
+                    'phone' => $phoneMatch($w),
+                    'name' => $nameMatch($w),
+                    // All: the order number, then whatever the text looks like.
+                    default => $w->where('order_no', $orderNo)
+                        ->when($phone, $phoneMatch)
+                        ->when(strlen($digits) >= 6, $cnMatch)
+                        ->orWhereIn('orders.id', DB::table('shipments')->select('order_id')->where('tracking_code', $q))
+                        ->when(! $phone && strlen($digits) < 6, $nameMatch),
+                })
                 ->orderByDesc('orders.id')->limit(25)
                 ->get(['orders.id', 'order_no', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'ship_thana', 'ship_district', 'grand_total', 'cod_amount', 'active_shipment_id', 'created_at', 'channel']);
         }
@@ -47,6 +56,7 @@ class OrderSearchController extends Controller
 
         return view('orders.search', [
             'q' => $q,
+            'by' => $by,
             'tooShort' => $tooShort,
             'results' => $results,
             'statuses' => OrderStatus::map(),

@@ -19,7 +19,7 @@ class OrderSearchController extends Controller
 {
     public function index(Request $request): View
     {
-        $q = trim((string) $request->query('q', ''));
+        $q = trim(Phone::englishDigits((string) $request->query('q', '')));
         $by = in_array($request->query('by'), ['all', 'cn', 'phone', 'name'], true) ? $request->query('by') : 'all';
         $results = collect();
         $tooShort = $q !== '' && mb_strlen($q) < 3;
@@ -48,7 +48,7 @@ class OrderSearchController extends Controller
                         ->when(! $phone && strlen($digits) < 6, $nameMatch),
                 })
                 ->orderByDesc('orders.id')->limit(25)
-                ->get(['orders.id', 'order_no', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'ship_thana', 'ship_district', 'grand_total', 'cod_amount', 'active_shipment_id', 'created_at', 'channel']);
+                ->get(['orders.id', 'order_no', 'status_id', 'moderator_id', 'customer_id', 'ship_name', 'ship_phone', 'ship_thana', 'ship_district', 'grand_total', 'cod_amount', 'active_shipment_id', 'created_at', 'channel']);
         }
 
         $ids = $results->pluck('id');

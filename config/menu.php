@@ -30,6 +30,7 @@ return [
     'catalog' => ['Catalog', [
         ['Products', 'products.index', ['products.index', 'products.create', 'products.edit', 'products.import*', 'categories.*'], 'products.view', 'tag'],
         ['Customers', 'customers.index', 'customers.*', 'customers.view', 'users'],
+        ['Customer journey', 'journey.index', 'journey.*', 'customers.view', 'search'],
     ]],
     'analysis' => ['Analysis', [
         ['KPI', 'kpi.index', 'kpi.*', null, 'chart'],

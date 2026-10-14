@@ -170,6 +170,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/advance-waiver', [OrderController::class, 'askWaiver'])->middleware('can:orders.edit')->name('orders.advance-waiver');
     Route::post('/orders/{order}/advance-waiver/decide', [OrderController::class, 'decideWaiver'])->middleware('can:orders.approve')->name('orders.advance-waiver.decide');
     Route::get('/order-search', [\App\Http\Controllers\OrderSearchController::class, 'index'])->name('orders.search'); // every staff member
+    Route::get('/journey', [\App\Http\Controllers\CustomerJourneyController::class, 'index'])->middleware('can:customers.view')->name('journey.index');
+    Route::get('/journey/{customer}', [\App\Http\Controllers\CustomerJourneyController::class, 'show'])->middleware('can:customers.view')->name('journey.show');
     Route::get('/payments', [\App\Http\Controllers\PaymentController::class, 'index'])->name('payments.index');
     Route::post('/payments/decide', [\App\Http\Controllers\PaymentController::class, 'decide'])->name('payments.decide');
     Route::get('/payments/cod', [\App\Http\Controllers\CodPayoutController::class, 'index'])->name('cod.index');

@@ -121,6 +121,9 @@
                                     · {{ $o->created_at->format('d M Y, g:i A') }}
                                     · {{ __('With') }} {{ $o->moderator?->name ?? __('nobody') }}
                                 </p>
+                                @can('customers.view')
+                                    <a href="{{ route('journey.show', $o->customer_id) }}" class="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">{{ __('Customer journey') }}</a>
+                                @endcan
                             </div>
                         </div>
                     </div>

@@ -10,6 +10,7 @@
         <div class="flex items-center gap-2">
             @can('customers.edit')
                 @if ($canSeeContact)<x-button variant="secondary" :href="route('customers.edit', $customer)">{{ __('Edit') }}</x-button>@endif
+                <x-button variant="secondary" :href="route('journey.show', $customer)">{{ __('Journey') }}</x-button>
                 <x-button type="button" variant="secondary" @click="$dispatch('open-modal', 'merge')">{{ __('Merge duplicate') }}</x-button>
             @endcan
         </div>

@@ -44,8 +44,9 @@ class CampaignController extends Controller
 
         $message = __(':n rows imported, :s skipped.', ['n' => $r['rows'], 's' => $r['skipped']])
             .($r['days'] ? ' '.__('Daily spend filled for :d account-days.', ['d' => $r['days']]) : '')
-            .($r['unknown_accounts'] ? ' '.__('Unknown ad account ids (add them first): :ids', ['ids' => implode(', ', $r['unknown_accounts'])]) : '');
+            .($r['unknown_accounts'] ? ' '.__('Unknown ad account ids (add them first): :ids', ['ids' => implode(', ', $r['unknown_accounts'])]) : '')
+            .($r['overlaps'] ? ' '.__(':n rows skipped: those ads are already in for those days in the other form (daily or a whole period). Use one form per period.', ['n' => $r['overlaps']]) : '');
 
-        return back()->with($r['unknown_accounts'] ? 'error' : 'success', $message);
+        return back()->with($r['unknown_accounts'] || $r['overlaps'] ? 'error' : 'success', $message);
     }
 }

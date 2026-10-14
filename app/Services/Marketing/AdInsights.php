@@ -31,7 +31,7 @@ class AdInsights
         $accounts = DB::table('ad_accounts')->get(['id', 'external_id'])
             ->mapWithKeys(fn ($a) => [preg_replace('/^act_/', '', (string) $a->external_id) => $a->id]);
 
-        $out = ['rows' => 0, 'skipped' => 0, 'days' => 0, 'unknown_accounts' => []];
+        $out = ['rows' => 0, 'skipped' => 0, 'days' => 0, 'unknown_accounts' => [], 'overlaps' => 0];
         $daily = [];
         DB::transaction(function () use ($fh, $col, $accountId, $accounts, $by, &$out, &$daily) {
             while (($row = fgetcsv($fh)) !== false) {
@@ -58,6 +58,17 @@ class AdInsights
                 $end = $col['day'] === null && $get('ends') && strtotime($get('ends')) ? date('Y-m-d', strtotime($get('ends'))) : null;
                 $ids = [$get('campaign_id'), $get('adset_id'), $get('ad_id')];
                 $key = sha1(array_filter($ids) ? implode('|', $ids) : implode('|', [$campaign, $get('adset_name'), $get('ad_name')]));
+                $periodEnd = $col['day'] === null && $get('ends') && strtotime($get('ends')) ? date('Y-m-d', strtotime($get('ends'))) : $day;
+                $twice = DB::table('ad_insights')->where('ad_account_id', $account)->where('row_key', $key)
+                    ->where('day', '<=', $periodEnd)->whereRaw('COALESCE(period_end, day) >= ?', [$day])
+                    ->where(fn ($q) => $col['day'] === null ? $q->whereNull('period_end')->orWhere('day', '!=', $day) : $q->whereNotNull('period_end'))
+                    ->exists();
+                if ($twice) {
+                    $out['overlaps']++;
+                    $out['skipped']++;
+
+                    continue;
+                }
                 $m = [
                     'spend_usd' => $this->num($get('spend')), 'results' => $this->num($get('results')),
                     'impressions' => (int) $this->num($get('impressions')), 'reach' => (int) $this->num($get('reach')),
@@ -114,7 +125,7 @@ class AdInsights
 
         return DB::table('ad_insights as i')
             ->leftJoin('ad_spend_daily as sd', fn ($j) => $j->on('sd.ad_account_id', '=', 'i.ad_account_id')->on('sd.spend_date', '=', 'i.day'))
-            ->where('i.day', '>=', $from)->whereRaw('COALESCE(i.period_end, i.day) <= ?', [$to])
+            ->where('i.day', '<=', $to)->whereRaw('COALESCE(i.period_end, i.day) >= ?', [$from])
             ->when($accountId, fn ($q) => $q->where('i.ad_account_id', $accountId))
             ->groupBy($group)
             ->selectRaw(implode(', ', $group).", SUM(i.spend_usd) as spend_usd,

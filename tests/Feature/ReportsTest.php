@@ -189,4 +189,18 @@ class ReportsTest extends TestCase
         $this->deliveredOrder();
         $this->artisan('reports:owner-summary')->assertSuccessful();
     }
+
+    public function test_audit_money_fixes(): void
+    {
+        // Ad cost in Analysis is the whole spend of the period, also the share of orders not settled.
+        DB::table('ad_cost_days')->insert(['day' => today()->toDateString(), 'bdt_cost' => 10000, 'orders' => 100, 'per_order' => 100, 'updated_at' => now()]);
+        $this->deliveredOrder();
+        $this->assertEqualsWithDelta(10000, app(OrderProfit::class)->totals(today()->toDateString(), today()->toDateString())['ad_cost'], 0.01);
+
+        // Someone who left before the month gets no days, so no salary, in it.
+        $left = User::factory()->create(['name' => 'Gone', 'created_at' => '2026-01-01', 'left_at' => today()->startOfMonth()->subDays(10)]);
+        $start = today()->startOfMonth();
+        $end = \Illuminate\Support\Carbon::parse($left->left_at)->endOfDay();
+        $this->assertLessThan(0, (int) $start->diffInDays($end->copy()->startOfDay(), false) + 1);
+    }
 }

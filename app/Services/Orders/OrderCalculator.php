@@ -46,6 +46,7 @@ class OrderCalculator
         // Verified money, plus a small advance that counts before its check (see payments.trust_up_to).
         $advance = (float) DB::table('order_payments')->where('order_id', $order->id)->whereIn('payment_type', ['advance', 'adjustment'])
             ->where(fn ($q) => $q->where('status', 'verified')->orWhere(fn ($q) => $q->where('status', 'pending_verification')->where('counts_now', true)))->sum('amount');
+        $checked = (float) DB::table('order_payments')->where('order_id', $order->id)->whereIn('payment_type', ['advance', 'adjustment'])->where('status', 'verified')->sum('amount');
         $refunded = (float) DB::table('order_payments')->where('order_id', $order->id)
             ->where('status', 'verified')->where('payment_type', 'refund')->sum('amount');
 
@@ -54,7 +55,7 @@ class OrderCalculator
         $closed = in_array(\App\Models\OrderStatus::map()[$order->status_id]['key'] ?? null, ['cancelled', 'returned'], true);
         $order->advance_verified = round($advance, 2);
         $order->cod_amount = round(max(0, $grand - $advance), 2);
-        $order->refund_due = round(max(0, $advance - ($closed ? 0 : $grand) - $refunded), 2);
+        $order->refund_due = round(max(0, $checked - ($closed ? 0 : $grand) - $refunded), 2);
         $order->payment_status = match (true) {
             $order->refund_due > 0 => 'refund_due',
             $closed && $refunded > 0 => 'refunded',

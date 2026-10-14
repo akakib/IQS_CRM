@@ -375,4 +375,22 @@ class AdvanceHoldTest extends TestCase
         $this->assertSame('0.00', $half->fresh()->refund_due);
         $this->assertEquals(400 - ((float) $half->grand_total - $paid), $balance());
     }
+
+    public function test_only_checked_money_is_owed_back_and_an_open_order_can_be_settled(): void
+    {
+        $sm = app(OrderStateMachine::class);
+        $cancel = (int) DB::table('status_reasons')->where('reason_type', 'cancel')->value('id');
+        // A small advance counts at once but is not checked yet: cancelling does not make it owed back.
+        $a = $this->web(7);
+        app(OrderService::class)->addPayment($a, ['method_id' => $this->bkash(), 'amount' => 100, 'transaction_id' => 'TR1', 'payment_type' => 'advance'], $this->admin);
+        $sm->transition($a->fresh(), 'cancelled', $this->admin, 'user', $cancel);
+        $this->assertSame('0.00', $a->fresh()->refund_due);
+
+        // Paid more than an edit left on an open order: owed back, and it can be kept as credit without cancelling.
+        $b = $this->web(8);
+        app(OrderService::class)->addPayment($b, ['method_id' => $this->bkash(), 'amount' => (float) $b->grand_total + 50, 'transaction_id' => 'TR2', 'status' => 'verified', 'payment_type' => 'advance'], $this->admin);
+        $this->assertSame('50.00', $b->fresh()->refund_due);
+        $this->actingAs($this->admin)->post("/payments/refunds/{$b->id}/credit", ['amount' => 50])->assertSessionHas('success');
+        $this->assertSame('0.00', $b->fresh()->refund_due);
+    }
 }

@@ -301,13 +301,17 @@ class OrderService
     public function verifyPayment(Order $order, int $paymentId, bool $approve, User $by): void
     {
         DB::transaction(function () use ($order, $paymentId, $approve, $by) {
-            // Two people pressing Verify at once: the row is locked, the second one waits, then finds it already checked.
+            // Two people pressing Verify at once: the order, then the row, is locked; the second one waits, then finds it already checked.
+            Order::whereKey($order->id)->lockForUpdate()->first();
             $payment = DB::table('order_payments')->where('id', $paymentId)->where('order_id', $order->id)->lockForUpdate()->first();
             abort_unless($payment, 404);
             if ($payment->status !== 'pending_verification') {
                 throw ValidationException::withMessages(['payment' => __('This payment was already checked by :n.', [
                     'n' => DB::table('users')->where('id', $payment->verified_by)->value('name') ?? __('someone else'),
                 ])]);
+            }
+            if (! $approve && DB::table('order_payments')->where('order_id', $order->id)->where('payment_type', 'refund')->where('status', 'verified')->exists()) {
+                throw ValidationException::withMessages(['payment' => __('Money was already given back on this order. Check it with a manager before rejecting the payment.')]);
             }
             $oldCod = (float) $order->fresh()->cod_amount;
             DB::table('order_payments')->where('id', $paymentId)->where('status', 'pending_verification')->update([

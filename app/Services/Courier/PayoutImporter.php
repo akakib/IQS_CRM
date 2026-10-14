@@ -36,6 +36,10 @@ class PayoutImporter
             throw ValidationException::withMessages(['file' => __('No parcel rows were found in the file.')]);
         }
 
+        if ($reference && DB::table('courier_payouts')->where('reference', $reference)->exists()) {
+            throw ValidationException::withMessages(['file' => __('A statement with this reference was uploaded already.')]);
+        }
+
         return DB::transaction(function () use ($rows, $fileName, $paidOn, $reference, $by) {
             $payoutId = DB::table('courier_payouts')->insertGetId(['paid_on' => $paidOn, 'reference' => $reference, 'file_name' => mb_substr($fileName, 0, 190),
                 'uploaded_by' => $by->id, 'created_at' => now(), 'updated_at' => now()]);
@@ -78,7 +82,8 @@ class PayoutImporter
             'tracking' => $find(fn ($h) => str_contains($h, 'tracking')),
             'invoice' => $find(fn ($h) => str_contains($h, 'invoice')),
             'collected' => $find(fn ($h) => str_contains($h, 'collect') || (str_contains($h, 'cod') && ! str_contains($h, 'charge') && ! str_contains($h, 'fee'))),
-            'charge' => $find(fn ($h) => str_contains($h, 'charge') || str_contains($h, 'fee')),
+            'charge' => $find(fn ($h) => str_contains($h, 'delivery') && (str_contains($h, 'charge') || str_contains($h, 'fee')))
+                ?? $find(fn ($h) => (str_contains($h, 'charge') || str_contains($h, 'fee')) && ! str_contains($h, 'cod')),
         ];
         if (($col['cn'] ?? $col['tracking'] ?? $col['invoice']) === null || $col['collected'] === null) {
             throw ValidationException::withMessages(['file' => __('The file needs a consignment id (or tracking code or invoice) column and a collected amount column. Columns found: :c', ['c' => implode(', ', array_filter($header))])]);

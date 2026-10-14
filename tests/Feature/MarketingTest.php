@@ -187,4 +187,23 @@ class MarketingTest extends TestCase
 
         $this->post(route('campaigns.import'), ['file' => UploadedFile::fake()->createWithContent('bad.csv', "Name,Cost\nA,1\n")])->assertSessionHasErrors('file');
     }
+
+    public function test_an_advance_covers_lots_and_one_ad_is_not_counted_twice(): void
+    {
+        $this->actingAs($this->owner);
+        // Opening advance 10,000; lot 1 8,000 due 5 Oct is covered, lot 2 12,000 due 20 Oct is the next due.
+        DB::table('ad_vendors')->where('id', $this->vendor)->update(['opening_balance' => -10000, 'opening_on' => '2026-09-01']);
+        $this->post(route('usd-lots.store'), ['vendor_id' => $this->vendor, 'purchased_on' => '2026-09-02', 'usd' => 80, 'rate' => 100, 'due_date' => '2026-10-05']);
+        $this->post(route('usd-lots.store'), ['vendor_id' => $this->vendor, 'purchased_on' => '2026-09-03', 'usd' => 120, 'rate' => 100, 'due_date' => '2026-10-20']);
+        $v = app(AdCostService::class)->vendorBalances()->firstWhere('id', $this->vendor);
+        $this->assertSame([10000.0, '2026-10-20'], [$v->due, $v->next_due]);
+
+        // The same ad as day rows, then as a whole-month row: the month row is refused, not added.
+        DB::table('ad_accounts')->where('id', $this->account)->update(['external_id' => 'act_5']);
+        $daily = "Account ID,Campaign name,Ad name,Day,Amount spent (USD),Results\n5,C1,A1,2026-10-01,10,2\n";
+        $this->post(route('campaigns.import'), ['file' => UploadedFile::fake()->createWithContent('d.csv', $daily)]);
+        $month = "Account ID,Campaign name,Ad name,Reporting starts,Reporting ends,Amount spent (USD),Results\n5,C1,A1,2026-10-01,2026-10-31,300,60\n";
+        $this->post(route('campaigns.import'), ['file' => UploadedFile::fake()->createWithContent('m.csv', $month)])->assertSessionHas('error');
+        $this->assertSame(10.0, (float) DB::table('ad_insights')->sum('spend_usd'));
+    }
 }

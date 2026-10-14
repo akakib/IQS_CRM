@@ -80,7 +80,7 @@ class MonthlyScorecard
             $start = $u->created_at ? max($from->copy(), $u->created_at->copy()->startOfDay()) : $from->copy();
             $end = $u->left_at ? min($monthEnd->copy(), \Illuminate\Support\Carbon::parse($u->left_at)->endOfDay()) : $monthEnd->copy();
 
-            return [$u->id => max(0, min($daysIn, (int) $start->diffInDays($end->copy()->startOfDay(), true) + 1))];
+            return [$u->id => max(0, min($daysIn, (int) $start->diffInDays($end->copy()->startOfDay(), false) + 1))];
         });
         // Everyone has a target (their own, else the default), even with no ended order yet.
         $targets = KpiScorecard::targetsFor($from->toDateString()); // the targets of that month, not today's

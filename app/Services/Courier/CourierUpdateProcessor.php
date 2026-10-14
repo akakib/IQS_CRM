@@ -119,7 +119,13 @@ class CourierUpdateProcessor
                 : null;
             $this->machine->transition($order, $target, null, 'webhook', $reasonId, $u->message);
 
-            $collected = $target === 'returned' ? 0 : ($u->codAmount ?? (float) $shipment->cod_amount);
+            // Partly delivered without an amount from the courier: unknown (the payout statement fills it), never the full COD.
+            $collected = match (true) {
+                $target === 'returned' => 0,
+                $u->codAmount !== null => $u->codAmount,
+                $target === 'partial_delivered' => null,
+                default => (float) $shipment->cod_amount,
+            };
             DB::table('shipments')->where('id', $shipment->id)->update(['final_at' => now(), 'collected_amount' => $collected]);
             DB::table('customers')->where('id', $order->customer_id)->update(
                 $target === 'returned' ? ['returned_count' => DB::raw('returned_count + 1')] : ['delivered_count' => DB::raw('delivered_count + 1')]

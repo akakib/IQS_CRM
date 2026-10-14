@@ -104,9 +104,6 @@ class RefundService
     private function locked(Order $order, float $amount): Order
     {
         $order = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
-        if (! in_array(OrderStatus::map()[$order->status_id]['key'], self::CLOSED, true)) {
-            throw ValidationException::withMessages(['amount' => __('Only a cancelled or returned order is refunded.')]);
-        }
         if ($amount <= 0 || round($amount, 2) > round((float) $order->refund_due, 2)) {
             throw ValidationException::withMessages(['amount' => __('Owed on this order: ৳:a.', ['a' => number_format((float) $order->refund_due, 2)])]);
         }

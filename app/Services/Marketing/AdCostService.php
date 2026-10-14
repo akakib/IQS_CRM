@@ -74,7 +74,7 @@ class AdCostService
             $v->advance = max(0.0, -$balance);
             $v->next_due = null;
             if ($v->due > 0) {
-                $left = $v->paid - max(0, $v->opening); // what payments still cover after the opening
+                $left = $v->paid - $v->opening; // payments (and an opening advance) cover the opening debt first, then lots
                 foreach ($mine as $lot) {
                     $left -= (float) $lot->bdt_total;
                     if ($left < -0.005) {

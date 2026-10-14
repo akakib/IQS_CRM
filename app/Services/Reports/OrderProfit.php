@@ -41,7 +41,7 @@ class OrderProfit
             ->whereBetween('created_at', [$from.' 00:00:00', $to.' 23:59:59'])
             ->groupBy('order_id')->selectRaw('order_id, MAX(created_at) as final_at');
 
-        $collected = 'COALESCE(s.collected_amount, o.cod_amount)';
+        $collected = 'COALESCE(s.payout_collected, s.collected_amount, o.cod_amount)';
         $isDelivered = "o.status_id IN ($in)";
         $cogs = '(SELECT COALESCE(SUM(i.qty * COALESCE(i.cost_price_snapshot, 0)), 0) FROM order_items i WHERE i.order_id = o.id)';
         $share = "CASE WHEN o.grand_total > 0 THEN ($collected + o.advance_verified) / o.grand_total ELSE 1 END";
@@ -77,6 +77,10 @@ class OrderProfit
             ->selectRaw('COUNT(*) as orders, SUM(delivered) as delivered, SUM(revenue) as revenue, SUM(cogs) as cogs, SUM(delivery) as delivery, SUM(cod_fee) as cod_fee, SUM(packaging) as packaging, SUM(returns) as returns, SUM(ad_cost) as ad_cost')
             ->first();
         $r = array_map(fn ($v) => (float) $v, (array) $t);
+        if (! $channel) {
+            // Every taka spent on ads in the period, including the share of orders cancelled or still on the way.
+            $r['ad_cost'] = (float) DB::table('ad_cost_days')->whereBetween('day', [$from, $to])->sum('bdt_cost');
+        }
         $r['profit_before_ads'] = $r['revenue'] - $r['cogs'] - $r['delivery'] - $r['cod_fee'] - $r['packaging'] - $r['returns'];
         $r['profit'] = $r['profit_before_ads'] - $r['ad_cost'];
         $r['orders'] = (int) $r['orders'];

@@ -228,7 +228,7 @@ class PackagingController extends Controller
             'batch' => $row,
             'lines' => $batches->pickList($batch),
             'orders' => Order::where('batch_id', $batch)->with('items:id,order_id,name_snapshot,qty,unit')
-                ->get(['id', 'order_no', 'status_id', 'stock_issue_flag', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag']),
+                ->get(['id', 'order_no', 'status_id', 'stock_issue_flag', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address']),
             'statuses' => OrderStatus::map(),
         ]);
     }

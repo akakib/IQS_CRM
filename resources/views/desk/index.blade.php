@@ -357,6 +357,9 @@
                                 @forelse ($detail['duplicates'] as $d)
                                     <a href="{{ route('orders.show', $d->id) }}" class="block text-sm text-gray-800 hover:text-primary">
                                         <span class="font-mono">{{ $d->order_no }}</span> · {{ $money($d->grand_total) }} · <span style="color: {{ $statuses[$d->status_id]['color'] }}">{{ __($statuses[$d->status_id]['name']) }}</span>
+                                        @if ($d->match ?? null)
+                                            <span @class(['block text-xs font-medium', 'text-red-700' => $d->match['items'] === 'same' && $d->match['address'] === 'same', 'text-amber-700' => ! ($d->match['items'] === 'same' && $d->match['address'] === 'same')])>{{ ucfirst(\App\Services\Orders\DuplicateCheck::label($d->match['items'], $d->match['address'])) }}</span>
+                                        @endif
                                     </a>
                                 @empty
                                     <p class="text-base font-semibold text-gray-900">{{ __('None') }}</p>

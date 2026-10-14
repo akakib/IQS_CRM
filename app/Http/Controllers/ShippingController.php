@@ -23,12 +23,12 @@ class ShippingController extends Controller
         $find = fn ($w) => $w->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('order_no', strtoupper($q))->orWhere('ship_district', 'like', '%'.$q.'%')
             ->orWhere('ship_thana', 'like', '%'.$q.'%')->when($digits, fn ($d) => $d->orWhere('ship_phone', 'like', $digits.'%'))));
         $orders = Order::query()
-            ->select(['id', 'order_no', 'channel', 'status_id', 'ship_name', 'ship_thana', 'ship_district', 'cod_amount', 'total_weight_g', 'confirmed_at', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag'])
+            ->select(['id', 'order_no', 'channel', 'status_id', 'ship_name', 'ship_thana', 'ship_district', 'cod_amount', 'total_weight_g', 'confirmed_at', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address'])
             ->where('status_id', OrderStatus::idFor('confirmed'))->tap($find)
             ->orderBy('confirmed_at')->paginate($list->perPage, ['*'], 'ready_page')->withQueryString()->fragment('book');
 
         $booked = Order::query()
-            ->select(['id', 'order_no', 'status_id', 'ship_name', 'cod_amount', 'label_version', 'current_version', 'packed_version', 'edited_after_pack', 'is_duplicate_flag', 'active_shipment_id'])
+            ->select(['id', 'order_no', 'status_id', 'ship_name', 'cod_amount', 'label_version', 'current_version', 'packed_version', 'edited_after_pack', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'active_shipment_id'])
             ->where('status_id', OrderStatus::idFor('ready_for_packaging'))->tap($find)->orderByDesc('id')
             ->paginate($list->perPage, ['*'], 'booked_page')->withQueryString()->fragment('booked');
         $consignments = DB::table('shipments')->whereIn('id', $booked->pluck('active_shipment_id')->filter())->pluck('consignment_id', 'id');

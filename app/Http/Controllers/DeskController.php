@@ -85,7 +85,7 @@ class DeskController extends Controller
             ->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('orders.id')
             ->forPage($page, self::PER_PAGE)
             ->get(['orders.id', 'order_no', 'ship_name', 'ship_thana', 'ship_district', 'grand_total', 'channel', 'status_id', 'orders.created_at', 'assigned_at',
-                'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'is_duplicate_flag', 'packer_id', 'packed_at',
+                'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packer_id', 'packed_at',
                 'pk.name as packer_name', 'pk.photo_path as packer_photo']);
         $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ['tab' => $tab]]);
 
@@ -400,6 +400,12 @@ class DeskController extends Controller
         // (Open ones get a warning on Confirm: the courier is booked right away.)
         $duplicates = DB::table('orders')->where('customer_id', $order->customer_id)->where('id', '!=', $order->id)
             ->where('created_at', '>=', now()->subDays(7))->orderByDesc('id')->limit(5)->get(['id', 'order_no', 'status_id', 'grand_total', 'created_at']);
+        if ($duplicates->isNotEmpty()) {
+            $match = app(\App\Services\Orders\DuplicateCheck::class)->compare(
+                $items->whereNotNull('variant_id')->groupBy('variant_id')->map(fn ($r) => $r->sum('qty'))->all(),
+                $order->ship_address.' '.$order->ship_thana, $duplicates->pluck('id')->all());
+            $duplicates->each(fn ($d) => $d->match = $match[$d->id] ?? null);
+        }
 
         $key = OrderStatus::map()[$order->status_id]['key'];
         $heldBy = null;

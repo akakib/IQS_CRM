@@ -218,10 +218,23 @@ class OrderServiceTest extends TestCase
 
     public function test_repeat_order_within_window_is_flagged_as_possible_duplicate(): void
     {
-        $this->make();
+        $first = $this->make();
         $second = $this->make();
 
         $this->assertTrue($second->is_duplicate_flag);
+        // It says which order and how it compares: same items, same address = most likely a real duplicate.
+        $this->assertSame([$first->order_no, 'same', 'same'], [$second->duplicate_of_no, $second->duplicate_items, $second->duplicate_address]);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $second->id, 'body' => 'Possible duplicate of '.$first->order_no.' (same items, same address). Same customer, open order in the last 24 hours.']);
+
+        // A different product to another address: still flagged, but it says so.
+        $other = \App\Models\Product::factory()->withVariant(300, ['sku' => 'OTHER-1'])->create(['name' => 'Nuts']);
+        $third = $this->make(['address_line' => 'Road 9, Mirpur', 'items' => [['variant_id' => $other->variants()->first()->id, 'qty' => 1]]]);
+        $this->assertSame([$second->order_no, 'other', 'other'], [$third->duplicate_of_no, $third->duplicate_items, $third->duplicate_address]);
+        // Some of the same items (one product the same, one more added).
+        $fourth = $this->make(['items' => [['variant_id' => $this->variant->id, 'qty' => 2], ['variant_id' => $other->variants()->first()->id, 'qty' => 1]]]);
+        $this->assertSame('some', $fourth->duplicate_items);
+
+        $this->actingAs($this->owner())->get('/orders?tab=all')->assertOk()->assertSee('of '.$first->order_no.': same items, same address')->assertSee('different items, different address');
     }
 
     public function test_own_scope_sees_own_and_claimable_orders_only(): void

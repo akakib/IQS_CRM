@@ -47,7 +47,7 @@ class OrderController extends Controller
         // Large, fast-growing list: simple pagination (no COUNT), indexed filters.
         $orders = Order::query()->visibleTo($user)
             ->select(['id', 'order_no', 'channel', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'grand_total', 'cod_amount',
-                'is_duplicate_flag', 'packed_version', 'current_version', 'edited_after_pack', 'created_at'])
+                'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packed_version', 'current_version', 'edited_after_pack', 'created_at'])
             ->with('moderator:id,name')
             ->when($tab === 'take', fn ($w) => app(\App\Services\Orders\DeskService::class)->whereWaiting($w))
             ->when($tab === 'mine', fn ($w) => $w->where('moderator_id', $user->id)->whereNotIn('status_id', $finals))

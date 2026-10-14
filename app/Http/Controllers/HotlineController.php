@@ -25,7 +25,7 @@ class HotlineController extends Controller
             $digits = preg_replace('/\D/', '', $q);
             $phone = Phone::normalize($q);
             $results = Order::query()
-                ->select(['orders.id', 'order_no', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'cod_amount', 'created_at', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag'])
+                ->select(['orders.id', 'order_no', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'cod_amount', 'created_at', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address'])
                 ->with('moderator:id,name')
                 ->where(fn ($w) => $w
                     ->where('order_no', strtoupper($q))

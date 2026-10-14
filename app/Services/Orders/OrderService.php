@@ -63,9 +63,14 @@ class OrderService
             }
 
             $isChat = $data['channel'] !== 'web';
-            $duplicate = DB::table('orders')->where('customer_id', $customer->id)
+            // The customer's latest open order in the window: which one, and are items and address the same?
+            $twin = DB::table('orders')->where('customer_id', $customer->id)
                 ->whereNotIn('status_id', OrderStatus::idsFor(['cancelled', 'delivered', 'returned', 'partial_delivered']))
-                ->where('created_at', '>=', now()->subHours((int) settings('orders.duplicate_window_hours')))->exists();
+                ->where('created_at', '>=', now()->subHours((int) settings('orders.duplicate_window_hours')))->orderByDesc('id')->first(['id', 'order_no']);
+            $duplicate = (bool) $twin;
+            $match = $twin ? app(DuplicateCheck::class)->compare(
+                collect($items)->filter(fn ($i) => $i['variant_id'] ?? null)->groupBy('variant_id')->map(fn ($r) => $r->sum('qty'))->all(),
+                $address->address_line.' '.$address->thana, [$twin->id])[$twin->id] : null;
 
             $order = Order::create([
                 'channel' => $data['channel'],
@@ -90,6 +95,9 @@ class OrderService
                 'fbc' => $data['fbc'] ?? null,
                 'source_campaign' => $data['source_campaign'] ?? null,
                 'is_duplicate_flag' => $duplicate,
+                'duplicate_of_no' => $twin?->order_no,
+                'duplicate_items' => $match['items'] ?? null,
+                'duplicate_address' => $match['address'] ?? null,
             ] + $totals + ['cod_amount' => $totals['grand_total']]);
 
             $order->forceFill(['order_no' => 'IQ'.(10000 + $order->id)])->save();
@@ -102,7 +110,9 @@ class OrderService
             ]);
             $this->note($order, 'system', __('Order created via :ch:by.', ['ch' => $data['channel'], 'by' => $by ? ' '.__('by :n', ['n' => $by->name]) : '']), $by);
             if ($duplicate) {
-                $this->note($order, 'system', __('Same customer already has an open order in the last :h hours. Check for a duplicate.', ['h' => settings('orders.duplicate_window_hours')]), null);
+                $this->note($order, 'system', __('Possible duplicate of :no (:m). Same customer, open order in the last :h hours.', [
+                    'no' => $twin->order_no, 'm' => DuplicateCheck::label($match['items'] ?? null, $match['address'] ?? null), 'h' => settings('orders.duplicate_window_hours'),
+                ]), null);
             }
 
             if ($isChat && $by) {

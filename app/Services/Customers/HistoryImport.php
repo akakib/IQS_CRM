@@ -84,11 +84,16 @@ class HistoryImport
     /** "Address: House 12, Mirpur" or "Name: Rahima" from a hand-filled sheet: the label at the front is not part of the value. */
     public static function unlabel(string $v): string
     {
-        $label = '(?:(?:customer|recipient|receiver|billing|shipping|delivery|full|alt|alternate|other|contact|ship(?:ping)?|home|office)\s*)?'
-            .'(?:name|addr(?:ess)?|phone|mobile|number|no|cell|contact|products?|items?|amount|total|price|note|area|zone|district|thana|cn|tracking|consignment'
-            .'|order(?:\s*(?:no|number|id))?|নাম|ঠিকানা|ফোন|মোবাইল|নম্বর|নাম্বার|পণ্য|টাকা|দাম|এলাকা)';
+        $who = "(?:customer|cust|client|buyer|recipient|receiver|billing|shipping|ship|delivery|present|permanent|first|last|full|alt|alternate|other|contact|home|office|order"
+            .'|গ্রাহক(?:ের)?|কাস্টমার|ক্রেতা(?:র)?|প্রাপক(?:ের)?|ডেলিভারি|পণ্যের|অর্ডার)';
+        $what = '(?:name|add(?:ress|r|rs)?|adress|adrs|phone|ph|mobile|mob|tel|number|cell|contact|products?|items?|qty|quantity|amount|total|price|note|city|invoice|status'
+            .'|source|channel|medium|date|time|cn|tracking|consignment|order'
+            .'|নাম|ঠিকানা|ফোন|মোবাইল|নম্বর|নাম্বার|নং|পণ্য|পরিমাণ|টাকা|দাম|তারিখ|শহর)';
+        $tail = '(?:\s*(?:name|no\.?|number|id|code|date|address|নাম|নং))?';
+        // "Customer Name:", "Tracking ID:", "Customer's:", "নাম:", then the colon, then an optional dash ("Name:- Rahima").
+        $pattern = "/^\s*(?:$who(?:'s)?\s*)?(?:$what$tail|$who(?:'s)?)\s*[:：ঃ]\s*(?:[-–]\s*)?/iu";
 
-        return trim(preg_replace('/^\s*'.$label.'\s*[:：ঃ]\s*/iu', '', $v, 1));
+        return trim(preg_replace($pattern, '', $v, 1));
     }
 
     /** Excel keeps numbers as numbers: 1.326885301E9 is a phone (1326885301), 1.0 is 1. */
@@ -186,6 +191,7 @@ class HistoryImport
     {
         $cols = fn (string $field) => array_keys(array_filter(array_values(array_map(fn ($h) => $mapping[$h] ?? '', $header)), fn ($f) => $f === $field));
         $get = fn (array $row, string $field, string $glue = ' ') => trim(implode($glue, array_filter(array_map(fn ($i) => self::unlabel(self::cell((string) ($row[$i] ?? ''))), $cols($field)), fn ($v) => $v !== '')));
+        $getRaw = fn (array $row, string $field, string $glue = ' ') => trim(implode($glue, array_filter(array_map(fn ($i) => self::cell((string) ($row[$i] ?? '')), $cols($field)), fn ($v) => $v !== '')));
         $counts = ['rows' => count($rows), 'orders' => 0, 'known' => 0, 'new' => 0, 'in_iqs' => 0, 'already' => 0, 'updated' => 0, 'bad_phone' => 0, 'no_name' => 0, 'bad_date' => 0, 'skipped' => 0];
 
         // One order per order number, else per CN, else per row (a row is then known by its content).
@@ -202,11 +208,15 @@ class HistoryImport
                 } elseif ($cn) {
                     $cnOwner[$cn] = $key;
                 }
-                $groups[$key] = ['no' => $no, 'cn' => $cn, 'row' => $row, 'items' => []];
+                $groups[$key] = ['no' => $no, 'cn' => $cn, 'row' => $row, 'items' => [], 'items_raw' => []];
             }
             if (($item = $get($row, 'items')) !== '') {
                 $qty = $get($row, 'qty');
                 $groups[$key]['items'][] = $item.($qty !== '' && $qty !== '1' ? ' × '.$qty : '');
+            }
+            if (($item = $getRaw($row, 'items')) !== '') { // as the key of a row imported before labels were stripped
+                $qty = $getRaw($row, 'qty');
+                $groups[$key]['items_raw'][] = $item.($qty !== '' && $qty !== '1' ? ' × '.$qty : '');
             }
         }
 
@@ -234,6 +244,9 @@ class HistoryImport
             $row = $g['row'];
             $phones = Phone::extract($get($row, 'phone', ' / '));
             $phone = $phones[0] ?? null;
+            // The same row from before labels were stripped is still known (its key was made from the raw cells).
+            $rawKey = fn () => sha1(implode('|', [$phone, $getRaw($row, 'date'), $getRaw($row, 'amount'),
+                (string) (mb_substr(implode(', ', array_unique($g['items_raw'])), 0, 1000) ?: null), mb_strtolower($getRaw($row, 'name'))]));
             if (! $phone) {
                 $counts['bad_phone']++;
 
@@ -262,6 +275,8 @@ class HistoryImport
             $mediumWord = $get($row, 'medium');
             $amountRaw = $get($row, 'amount');
             $items = mb_substr(implode(', ', array_unique($g['items'])), 0, 1000) ?: null;
+            // The first figure in the cell: "Tk. 1,250", "1250+60", "Advance 200, COD 1050" give 1250, 1250, 200.
+            $amount = preg_match('/\d[\d,]*(?:\.\d+)?/', Phone::englishDigits($amountRaw), $am) ? round((float) str_replace(',', '', $am[0]), 2) : 0.0;
             $orders[] = [
                 'phone' => $phone,
                 'other_phones' => array_slice($phones, 1, 2),
@@ -269,9 +284,10 @@ class HistoryImport
                 'external_no' => $g['no'] !== '' ? mb_substr($g['no'], 0, 60) : null,
                 'cn' => $g['cn'],
                 // Neither number nor CN: the row is known by what it says (the raw date, so an empty date is the same row tomorrow too).
-                'row_key' => $g['no'] === '' && ! $g['cn'] ? sha1(implode('|', [$phone, $rawDate, $amountRaw, (string) $items, mb_strtolower($name)])) : null,
+                'row_key' => $g['no'] === '' && ! $g['cn'] ? sha1(implode('|', [$phone, $rawDate, number_format($amount, 2, '.', ''), (string) $items, mb_strtolower($name)])) : null,
+                'row_key_old' => $g['no'] === '' && ! $g['cn'] ? $rawKey() : null,
                 'ordered_at' => $date,
-                'amount' => round((float) preg_replace('/[^\d.]/', '', str_replace(',', '', Phone::englishDigits($amountRaw))), 2),
+                'amount' => $amount,
                 'status' => $status,
                 'medium' => $mediumWord !== '' ? ($values['medium'][$mediumWord] ?? $this->guessValue('medium', $mediumWord)) : $defaultMedium,
                 'items' => $items,
@@ -295,15 +311,40 @@ class HistoryImport
                 $before['cn:'.$p->cn] = $p;
             }
         }
-        foreach (array_chunk(array_values(array_unique(array_filter(array_column($orders, 'row_key')))), 500) as $chunk) {
+        foreach (array_chunk(array_values(array_unique(array_filter(array_merge(array_column($orders, 'row_key'), array_column($orders, 'row_key_old'))))), 500) as $chunk) {
             foreach (DB::table('customer_past_orders')->whereIn('row_key', $chunk)->get() as $p) {
                 $before['row:'.$p->row_key] = $p;
             }
         }
 
-        [$known, $restore] = $this->owners(array_values(array_unique(array_column($orders, 'phone'))));
+        // Who owns any number in the row; rows of one file that share a number are one person.
+        [$known, $restore] = $this->owners(array_values(array_unique(array_merge(array_column($orders, 'phone'), ...array_column($orders, 'other_phones')))));
+        $groupOf = [];
+        foreach ($orders as &$o) {
+            $numbers = array_merge([$o['phone']], $o['other_phones']);
+            foreach ($numbers as $nb) {
+                if (isset($known[$nb])) {
+                    $o['customer_id'] = $known[$nb];
+                    break;
+                }
+            }
+            $primary = $o['phone'];
+            foreach ($numbers as $nb) {
+                if (isset($groupOf[$nb])) {
+                    $primary = $groupOf[$nb];
+                    break;
+                }
+            }
+            foreach ($numbers as $nb) {
+                $groupOf[$nb] ??= $primary;
+            }
+            $o['phone'] = $primary;
+            $o['other_phones'] = array_values(array_diff(array_unique($numbers), [$primary]));
+        }
+        unset($o);
         $keep = [];
         $updates = [];
+        $phonesToAdd = [];
         $knownPhones = [];
         $newPhones = [];
         $seenRows = [];
@@ -325,9 +366,16 @@ class HistoryImport
             // Brought in before: the file is newer, so what changed is updated, and a CN or number it lacked is filled in.
             $old = ($o['cn'] ? ($before['cn:'.$o['cn']] ?? null) : null)
                 ?? ($o['external_no'] !== null ? ($before['no:'.$o['external_no']] ?? null) : null)
-                ?? ($o['row_key'] ? ($before['row:'.$o['row_key']] ?? null) : null);
+                ?? ($o['row_key'] ? ($before['row:'.$o['row_key']] ?? $before['row:'.$o['row_key_old']] ?? null) : null);
             if ($old) {
+                // A second number the newer file carries goes on the customer too.
+                foreach ($o['other_phones'] as $nb) {
+                    $phonesToAdd[$nb] = (int) $old->customer_id;
+                }
                 $fields = ['ordered_at', 'amount', 'status', 'medium', 'items', 'address'];
+                if ($o['row_key'] && $old->row_key !== $o['row_key']) {
+                    $fields[] = 'row_key'; // made from the raw cells before; now from the clean ones
+                }
                 if ($o['cn'] && ! $old->cn && ! isset($cnTaken['cn:'.$o['cn']])) {
                     $fields[] = 'cn';
                 }
@@ -347,7 +395,7 @@ class HistoryImport
 
                 continue;
             }
-            $o['customer_id'] = $known[$o['phone']] ?? null;
+            $o['customer_id'] ??= null;
             if ($o['customer_id']) {
                 $knownPhones[$o['phone']] = true;
             } else {
@@ -359,7 +407,7 @@ class HistoryImport
         $counts['known'] = count($knownPhones);
         $counts['new'] = count($newPhones);
 
-        return ['orders' => $keep, 'updates' => $updates, 'restore' => array_values(array_intersect_key($restore, $knownPhones)), 'counts' => $counts];
+        return ['orders' => $keep, 'updates' => $updates, 'phones' => $phonesToAdd, 'restore' => array_values(array_intersect_key($restore, $knownPhones)), 'counts' => $counts];
     }
 
     /**
@@ -420,6 +468,7 @@ class HistoryImport
             $ids = DB::table('customers')->whereIn('primary_phone', $new->pluck('phone'))->where('customer_import_id', $importId)->pluck('id', 'primary_phone');
             $others = collect($plan['orders'])->filter(fn ($o) => $o['other_phones'] ?? [])
                 ->flatMap(fn ($o) => array_map(fn ($p) => ['customer_id' => $o['customer_id'] ?? $ids[$o['phone']], 'phone' => $p, 'is_primary' => false, 'created_at' => $now, 'updated_at' => $now], $o['other_phones']))
+                ->concat(collect($plan['phones'] ?? [])->map(fn ($cid, $p) => ['customer_id' => $cid, 'phone' => $p, 'is_primary' => false, 'created_at' => $now, 'updated_at' => $now])->values())
                 ->unique('phone')->values();
             foreach ($others->chunk(300) as $chunk) {
                 DB::table('customer_phones')->insertOrIgnore($chunk->all()); // a number that belongs to someone already stays theirs

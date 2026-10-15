@@ -374,4 +374,60 @@ Nusrat,০১৯১২৩৪৫৬৭৮,DM2BBBBB,Feni,Honey,1200,24/07/2026,Ret
         // The second number finds the same customer.
         $this->get('/journey?q=01812345678')->assertRedirect(route('journey.show', $c->id));
     }
+
+    public function test_phone_and_label_review_fixes(): void
+    {
+        $x = fn ($v) => \App\Support\Phone::extract($v);
+        // Every prefix shape, glued or spaced, is the same number.
+        foreach (['+88001712345678', '88001712345678', '0088001712345678', '08801712345678', '+88 1712345678'] as $in) {
+            $this->assertSame(['01712345678'], $x($in), $in);
+        }
+        $this->assertSame(['01712345678', '01812345678'], $x('+88001712345678 / +88001812345678'));
+        // A number a digit short is never completed by a stray digit after it.
+        foreach (['0171234567 x2', '0171234567 2 pcs', '0171234567 / 1', '0171234567 1/5/2026', '+880 171234567 8'] as $in) {
+            $this->assertSame([], $x($in), $in);
+        }
+        $this->assertSame(['01812345678'], $x('1. 0171234567 2. 01812345678'));
+        $this->assertSame(['01712345678'], $x('01712345678 / 0181234567 (husband, 2nd)'));
+        $this->assertSame(['01712345678', '01812345678'], $x('1. 01712345678 2. 01812345678'));
+        $this->assertSame(['01712345678'], $x('+880 1712 345678 2 pcs'));
+
+        $u = fn ($v) => \App\Services\Customers\HistoryImport::unlabel($v);
+        foreach ([
+            'Name:- Rahima Akter' => 'Rahima Akter', 'Address :- House 12, Mirpur' => 'House 12, Mirpur', 'Product name: Dates 1 kg' => 'Dates 1 kg',
+            'Tracking ID: DM1AAAAA' => 'DM1AAAAA', 'Consignment ID: DM1AAAAA' => 'DM1AAAAA', 'Order No.: 5521' => '5521', 'Phone No: 01712345678' => '01712345678',
+            'গ্রাহকের নাম: রহিমা' => 'রহিমা', 'ক্রেতার নামঃ রহিমা' => 'রহিমা', 'ডেলিভারি ঠিকানা: বাসা ১২' => 'বাসা ১২', 'Date: 24/07/2026' => '24/07/2026',
+            'Customer: Rahima' => 'Rahima', "Customer's Name: Rahima" => 'Rahima', 'Present Address: Feni' => 'Feni', 'Qty: 2' => '2', 'Adress: House 12' => 'House 12',
+            'Add: House 12' => 'House 12', 'Status: Delivered' => 'Delivered', 'Invoice: 5521' => '5521',
+            // Address content keeps its words.
+            'Thana: Sonagazi, Dist: Feni' => 'Thana: Sonagazi, Dist: Feni', 'Zone: 4, Mirpur' => 'Zone: 4, Mirpur', 'No: 12, Road 5' => 'No: 12, Road 5', 'District: Dhaka' => 'District: Dhaka',
+        ] as $in => $out) {
+            $this->assertSame($out, $u($in), $in);
+        }
+
+        (new CustomerSeeder)->run();
+        $this->actingAs($this->owner());
+        $m = ['Name' => 'name', 'Phone' => 'phone', 'Date' => 'date', 'Amount' => 'amount', 'Products' => 'items'];
+        // "Tk. 1250" is 1250; one person on two rows with a shared number is one customer with both numbers; a date with a label imports.
+        $csv = "Name,Phone,Date,Amount,Products\nSumi,01512345678 / 01612345678,Date: 2026-07-01,Tk. 1250,Dates\nSumi,01612345678 / 01712345678,2026-07-05,\"1,250+60\",Honey\n";
+        $this->importCsv('two.csv', $csv, $m);
+        $sumi = Customer::where('primary_phone', '01512345678')->first();
+        $this->assertSame(1, Customer::whereIn('primary_phone', ['01512345678', '01612345678', '01712345678'])->count());
+        $this->assertEqualsCanonicalizing(['01512345678', '01612345678', '01712345678'], DB::table('customer_phones')->where('customer_id', $sumi->id)->pluck('phone')->all());
+        $this->assertEqualsCanonicalizing([1250.0, 1250.0], DB::table('customer_past_orders')->where('customer_id', $sumi->id)->pluck('amount')->map(fn ($a) => (float) $a)->all());
+        $this->assertSame('2026-07-01', substr(DB::table('customer_past_orders')->where('customer_id', $sumi->id)->orderBy('ordered_at')->value('ordered_at'), 0, 10));
+
+        // A re-import carrying a new second number adds it to the known customer.
+        $this->importCsv('again.csv', "Name,Phone,Date,Amount,Products\nSumi,01512345678 / 01912345678,2026-07-01,1250,Dates\n", $m);
+        $this->assertContains('01912345678', DB::table('customer_phones')->where('customer_id', $sumi->id)->pluck('phone')->all());
+        $this->assertSame(2, DB::table('customer_past_orders')->where('customer_id', $sumi->id)->count());
+
+        // A keyless row imported before labels were stripped is still known by its old key.
+        $old = DB::table('customer_past_orders')->where('customer_id', $sumi->id)->orderBy('ordered_at')->first();
+        $rawKey = sha1(implode('|', ['01512345678', '2026-07-01', '1250', 'Products: Dates', 'name: sumi']));
+        DB::table('customer_past_orders')->where('id', $old->id)->update(['row_key' => $rawKey, 'items' => 'Products: Dates']);
+        $this->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('legacy.csv', "Name,Phone,Date,Amount,Products\nName: Sumi,01512345678,2026-07-01,1250,Products: Dates\n")]);
+        $id = (int) DB::table('customer_imports')->max('id');
+        $this->postJson(route('customers.history.preview', $id), ['source' => '', 'mapping' => $m])->assertJsonPath('counts.orders', 0)->assertJsonPath('counts.updated', 1);
+    }
 }

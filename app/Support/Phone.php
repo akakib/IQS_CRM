@@ -18,9 +18,8 @@ final class Phone
     public static function normalize(?string $input): ?string
     {
         $digits = preg_replace('/\D/', '', self::englishDigits((string) $input));
-        // The international 00, then the country code written as 880 or 88, with or without the 0 after it.
-        $digits = preg_replace('/^00(?=88)/', '', $digits);
-        $digits = preg_replace('/^880?(?=0?1[3-9]\d{8}$)/', '', $digits);
+        // The international 00 (or a stray 0), then the country code written as 880 or 88, with or without the 0 after it.
+        $digits = preg_replace('/^(?:00|0)?880?(?=0?1[3-9]\d{8}$)/', '', $digits);
         if (preg_match('/^1[3-9]\d{8}$/', $digits)) {
             $digits = '0'.$digits;
         }
@@ -54,18 +53,33 @@ final class Phone
             $text = substr($text, 0, strpos($text, '.'));
         }
 
-        // Runs of digits, left to right: a number is the shortest string of neighbouring runs that makes one
-        // ("+880 1712 345678" is three runs, "01712345678 01812345678" is two numbers).
+        // Runs of digits, left to right. A run of 10 or more digits is a whole number as the writer typed it: right,
+        // or wrong and left alone (never completed by a stray digit after it). A short run ("+880", "01712") takes the
+        // runs after it until a number appears; once ten digits are reached with no number, it is given up.
         preg_match_all('/\d+/', $text, $m);
         $runs = $m[0];
         $found = [];
         for ($i = 0, $n = count($runs); $i < $n; $i++) {
+            if (strlen($runs[$i]) >= 10) {
+                if (($p = self::normalize($runs[$i])) !== null) {
+                    $found[] = $p;
+                }
+
+                continue;
+            }
             $joined = '';
-            for ($j = $i; $j < $n && strlen($joined.$runs[$j]) <= 15; $j++) {
+            for ($j = $i; $j < $n; $j++) {
+                // A stray one- or two-digit run never completes a number that is nearly whole ("171234567 8").
+                if ($j > $i && strlen($joined) >= 8 && strlen($runs[$j]) <= 2) {
+                    break;
+                }
                 $joined .= $runs[$j];
                 if (($p = self::normalize($joined)) !== null) {
                     $found[] = $p;
                     $i = $j;
+                    break;
+                }
+                if (strlen($joined) >= 10) {
                     break;
                 }
             }

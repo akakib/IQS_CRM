@@ -46,30 +46,33 @@ class MoveCallProofsToDrive extends Command
 
     private function move(GoogleDriveService $service, GoogleDrive $drive): void
     {
-        $calls = DB::table('customer_calls as c')->whereNotNull('c.proof_path')->whereNull('c.proof_drive_id')
-            ->leftJoin('users as u', 'u.id', '=', 'c.user_id')
-            ->orderBy('c.id')->limit(max(1, (int) $this->option('limit')))
-            ->get(['c.id', 'c.phone', 'c.started_at', 'c.proof_path', 'u.name as by']);
+        $limit = max(1, (int) $this->option('limit'));
+        $customer = DB::table('customer_calls as c')->whereNotNull('c.proof_path')->whereNull('c.proof_drive_id')
+            ->leftJoin('users as u', 'u.id', '=', 'c.user_id')->orderBy('c.id')->limit($limit)
+            ->get(['c.id', 'c.phone', 'c.started_at as at', 'c.proof_path', 'c.proof_name', 'u.name as by'])->map(fn ($r) => ['customer_calls', $r]);
+        $rider = DB::table('rider_calls as c')->whereNotNull('c.proof_path')->whereNull('c.proof_drive_id')
+            ->leftJoin('users as u', 'u.id', '=', 'c.handled_by')->orderBy('c.id')->limit($limit)
+            ->get(['c.id', 'c.rider_phone as phone', 'c.created_at as at', 'c.proof_path', 'c.proof_name', 'u.name as by'])->map(fn ($r) => ['rider_calls', $r]);
         $moved = 0;
-        foreach ($calls as $call) {
+        foreach ($customer->concat($rider)->take($limit) as [$table, $call]) {
             if (! Storage::disk('local')->exists($call->proof_path)) {
-                DB::table('customer_calls')->where('id', $call->id)->update(['proof_drive_id' => self::MISSING]);
+                DB::table($table)->where('id', $call->id)->update(['proof_drive_id' => self::MISSING]);
 
                 continue;
             }
-            $ext = strtolower(pathinfo($call->proof_path, PATHINFO_EXTENSION));
-            $recording = str_starts_with(\App\Services\Calls\CallListService::proofMime($call->proof_path), 'audio/');
+            $mime = \App\Services\Calls\CallListService::proofMime($call->proof_path);
+            $folder = $table === 'rider_calls' ? 'riders' : (str_starts_with($mime, 'audio/') ? 'records' : 'screenshots');
             // "01712345678 2026-10-15 17-40 Karim #123.m4a": findable in Drive by number, day or caller.
-            $name = trim($call->phone.' '.\Illuminate\Support\Carbon::parse($call->started_at)->format('Y-m-d H-i').' '.($call->by ?? '')).' #'.$call->id.'.'.$ext;
+            $name = trim(($call->phone ?? '').' '.\Illuminate\Support\Carbon::parse($call->at)->format('Y-m-d H-i').' '.($call->by ?? '')).' #'.($table === 'rider_calls' ? 'R' : '').$call->id.'.'.strtolower(pathinfo($call->proof_path, PATHINFO_EXTENSION));
             try {
-                $file = $service->upload($drive, $recording ? 'records' : 'screenshots', $name,
-                    \App\Services\Calls\CallListService::proofMime($call->proof_path), Storage::disk('local')->get($call->proof_path));
+                $file = $service->upload($drive, $folder, $name, $mime, Storage::disk('local')->get($call->proof_path),
+                    $call->proof_name ? 'Picked on the phone: '.$call->proof_name : null);
             } catch (RuntimeException $e) {
-                Log::error('Call proof to Drive failed', ['call' => $call->id, 'error' => $e->getMessage()]);
+                Log::error('Call proof to Drive failed', ['table' => $table, 'call' => $call->id, 'error' => $e->getMessage()]);
 
                 break; // Drive is not taking files now: the rest wait for the next run
             }
-            DB::table('customer_calls')->where('id', $call->id)->update(['proof_drive_id' => $file['id']]);
+            DB::table($table)->where('id', $call->id)->update(['proof_drive_id' => $file['id']]);
             Storage::disk('local')->delete($call->proof_path);
             $moved++;
         }

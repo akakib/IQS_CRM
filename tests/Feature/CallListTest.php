@@ -54,6 +54,16 @@ class CallListTest extends TestCase
         Customer::where('primary_phone', '01755555555')->update(['do_not_call_at' => now()]);
     }
 
+    private int $files = 0;
+
+    /** Each file different (the same file cannot prove two calls). */
+    private function fakeFile(string $name, int $kb, ?string $mime = null): UploadedFile
+    {
+        $file = UploadedFile::fake()->createWithContent($name, str_repeat('x', $kb).' '.++$this->files);
+
+        return $mime ? $file->mimeType($mime) : $file;
+    }
+
     private function makeList(array $callers, array $extra = []): int
     {
         $this->actingAs($this->owner)->post(route('calls.lists.store'), $extra + [
@@ -101,7 +111,7 @@ class CallListTest extends TestCase
         $list = $this->makeList([$this->rakin]);
         $this->actingAs($this->rakin)->get(route('calls.work', $list));
         $item = $this->item($this->rakin, $list);
-        $rec = fn () => UploadedFile::fake()->create('call.m4a', 300, 'audio/mp4');
+        $rec = fn () => $this->fakeFile('call.m4a', 300, 'audio/mp4');
 
         // Talked: how satisfied and the recording are a must.
         $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'proof' => $rec()])->assertSessionHasErrors('satisfaction');
@@ -130,7 +140,7 @@ class CallListTest extends TestCase
     public function test_no_answer_comes_back_later_three_times_and_do_not_call_is_kept(): void
     {
         $list = $this->makeList([$this->rakin]);
-        $shot = fn () => UploadedFile::fake()->image('log.png');
+        $shot = fn () => UploadedFile::fake()->image('log.png', 10 + ++$this->files, 10);
         $this->actingAs($this->rakin)->get(route('calls.work', $list));
         $item = $this->item($this->rakin, $list);
 
@@ -152,15 +162,15 @@ class CallListTest extends TestCase
         // Call later: a time is a must.
         $this->get(route('calls.work', $list));
         $next = $this->item($this->rakin, $list);
-        $this->post(route('calls.record', [$list, $next->id]), ['outcome' => 'later', 'satisfaction' => 75, 'proof' => UploadedFile::fake()->create('c.mp3', 10, 'audio/mpeg')])->assertSessionHasErrors('later_at');
-        $this->post(route('calls.record', [$list, $next->id]), ['outcome' => 'later', 'satisfaction' => 75, 'later_at' => now()->addDay()->format('Y-m-d\TH:i'), 'proof' => UploadedFile::fake()->create('c.mp3', 10, 'audio/mpeg')]);
+        $this->post(route('calls.record', [$list, $next->id]), ['outcome' => 'later', 'satisfaction' => 75, 'proof' => $this->fakeFile('c.mp3', 10, 'audio/mpeg')])->assertSessionHasErrors('later_at');
+        $this->post(route('calls.record', [$list, $next->id]), ['outcome' => 'later', 'satisfaction' => 75, 'later_at' => now()->addDay()->format('Y-m-d\TH:i'), 'proof' => $this->fakeFile('c.mp3', 10, 'audio/mpeg')]);
         $this->assertSame('later', DB::table('call_list_items')->find($next->id)->state);
 
         // Do not call again: kept on the customer, out of every list, never in a new one.
         $this->get(route('calls.work', $list));
         $third = $this->item($this->rakin, $list);
         $other = $this->makeList([$this->pranta]);
-        $this->actingAs($this->rakin)->post(route('calls.record', [$list, $third->id]), ['outcome' => 'do_not_call', 'satisfaction' => 0, 'proof' => UploadedFile::fake()->create('c.amr', 10)]);
+        $this->actingAs($this->rakin)->post(route('calls.record', [$list, $third->id]), ['outcome' => 'do_not_call', 'satisfaction' => 0, 'proof' => $this->fakeFile('c.amr', 10)]);
         $this->assertNotNull(Customer::find($third->customer_id)->do_not_call_at);
         $this->assertSame('done', DB::table('call_list_items')->where('call_list_id', $other)->where('customer_id', $third->customer_id)->value('state'));
         $again = $this->makeList([$this->pranta]);
@@ -169,7 +179,7 @@ class CallListTest extends TestCase
         // A file that is neither a recording nor a picture is refused.
         $this->actingAs($this->pranta)->get(route('calls.work', $again));
         $p = $this->item($this->pranta, $again);
-        $this->post(route('calls.record', [$again, $p->id]), ['outcome' => 'no_answer', 'proof' => UploadedFile::fake()->create('x.exe', 10)])->assertSessionHasErrors('proof');
+        $this->post(route('calls.record', [$again, $p->id]), ['outcome' => 'no_answer', 'proof' => $this->fakeFile('x.exe', 10)])->assertSessionHasErrors('proof');
     }
 
     public function test_an_order_taken_on_the_call_is_linked_and_the_caller_stays(): void
@@ -189,7 +199,7 @@ class CallListTest extends TestCase
         $orderId = (int) DB::table('orders')->max('id');
         $this->assertSame($orderId, DB::table('call_list_items')->find($item->id)->order_id);
 
-        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'ordered', 'satisfaction' => 100, 'proof' => UploadedFile::fake()->create('c.m4a', 10)]);
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'ordered', 'satisfaction' => 100, 'proof' => $this->fakeFile('c.m4a', 10)]);
         $this->assertSame($orderId, DB::table('customer_calls')->value('order_id'));
         $this->actingAs($this->owner)->get(route('calls.lists.show', $list))->assertSee('Orders from calls');
         $this->assertSame(1, app(\App\Services\Calls\CallListService::class)->progress(DB::table('call_lists')->find($list))['orders']);
@@ -215,7 +225,7 @@ class CallListTest extends TestCase
     public function test_review_fixes_pool_order_holds_and_do_not_call(): void
     {
         $list = $this->makeList([$this->rakin, $this->pranta]);
-        $rec = fn () => UploadedFile::fake()->create('c.m4a', 10, 'audio/mp4');
+        $rec = fn () => $this->fakeFile('c.m4a', 10, 'audio/mp4');
 
         // Skip puts the number behind the others: the caller gets a different one next.
         $this->actingAs($this->rakin)->get(route('calls.work', $list));
@@ -269,8 +279,8 @@ class CallListTest extends TestCase
         file_put_contents($path, '<html><body><script>alert(1)</script></body></html>');
         $html = new UploadedFile($path, 'log.jpg', 'image/jpeg', null, true);
         $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'no_answer', 'proof' => $html])->assertSessionHasErrors('proof');
-        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 100, 'proof' => UploadedFile::fake()->image('log.png')])->assertSessionHasErrors('proof');
-        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 100, 'proof' => UploadedFile::fake()->create('call.m4a', 10, 'audio/mp4'), 'seconds' => 300]);
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 100, 'proof' => UploadedFile::fake()->image('log.png', 10 + ++$this->files, 10)])->assertSessionHasErrors('proof');
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 100, 'proof' => $this->fakeFile('call.m4a', 10, 'audio/mp4'), 'seconds' => 300]);
 
         $call = DB::table('customer_calls')->first();
         $this->assertStringEndsWith('.m4a', $call->proof_path);
@@ -287,7 +297,7 @@ class CallListTest extends TestCase
         $item = $this->item($this->rakin, $list);
         // Taken in the morning and saved after hours: never more than the 30-minute hold counts as work.
         DB::table('call_list_items')->where('id', $item->id)->update(['taken_at' => now()->subHours(9)]);
-        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'busy', 'proof' => UploadedFile::fake()->image('log.png')]);
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'busy', 'proof' => UploadedFile::fake()->image('log.png', 10 + ++$this->files, 10)]);
         $call = DB::table('customer_calls')->first();
         $this->assertLessThanOrEqual(30 * 60, strtotime($call->ended_at) - strtotime($call->started_at));
 

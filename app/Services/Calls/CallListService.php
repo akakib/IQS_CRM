@@ -174,14 +174,12 @@ class CallListService
         if (! $proof) {
             throw ValidationException::withMessages(['proof' => $spoke ? __('Add the call recording.') : __('Add a screenshot of the call log.')]);
         }
-        // The file is judged by what it is, not by its name: a recording when they spoke, a picture when not.
-        $ext = self::proofExtension($proof, $spoke);
-        if (! $ext) {
-            throw ValidationException::withMessages(['proof' => $spoke ? __('This is not a recording. Add the call recording (m4a, mp3, amr...).') : __('This is not a picture. Add a screenshot of the call log.')]);
-        }
         if ($outcome === 'later' && empty($data['later_at'])) {
             throw ValidationException::withMessages(['later_at' => __('Pick when to call again.')]);
         }
+
+        // A recording when they spoke, a picture when not; never a file used for another call, nor one of another number.
+        $checked = app(CallProof::class)->check($proof, $spoke, [$item->phone], $data['proof_modified'] ?? null, ! empty($data['proof_old_ok']));
 
         $now = now();
         $attempts = $item->attempts + 1;
@@ -201,9 +199,9 @@ class CallListService
             ? DB::table('orders')->where('customer_id', $item->customer_id)->where('created_by', $user->id)->where('created_at', '>=', $now->copy()->subHours(2))
                 ->whereNotIn('id', DB::table('call_list_items')->whereNotNull('order_id')->select('order_id'))->orderByDesc('id')->value('id')
             : null);
-        $path = $proof->storeAs('call-proofs/'.$item->call_list_id, $item->id.'-'.$attempts.'-'.$now->format('YmdHis').'.'.$ext, 'local');
+        $path = CallProof::store($proof, 'call-proofs/'.$item->call_list_id, $item->id.'-'.$attempts.'-'.$now->format('YmdHis'), $checked['ext']);
 
-        DB::transaction(function () use ($item, $user, $data, $outcome, $satisfaction, $topics, $path, $state, $nextAt, $attempts, $orderId, $now, $started, $gone) {
+        DB::transaction(function () use ($item, $user, $data, $outcome, $satisfaction, $topics, $path, $checked, $state, $nextAt, $attempts, $orderId, $now, $started, $gone) {
             // Still with this caller at the moment of saving (not handed on meanwhile).
             $kept = DB::table('call_list_items')->where('id', $item->id)->where('state', 'in_hand')->where('user_id', $user->id)->update([
                 'state' => $state, 'next_at' => $nextAt, 'attempts' => $attempts, 'outcome' => $outcome,
@@ -221,8 +219,8 @@ class CallListService
                 'started_at' => $started, 'ended_at' => $now,
                 'outcome' => match ($outcome) { 'no_answer' => 'no_answer', 'busy' => 'busy', 'wrong' => 'wrong', default => 'answered' },
                 'duration_seconds' => isset($data['seconds']) && $data['seconds'] !== '' ? min(7200, max(0, (int) $data['seconds'])) : null,
-                'note' => $note, 'satisfaction' => $satisfaction, 'proof_path' => $path, 'call_list_item_id' => $item->id,
-            ]);
+                'note' => $note, 'satisfaction' => $satisfaction, 'call_list_item_id' => $item->id,
+            ] + CallProof::columns($path, $checked));
             // The order made on the call keeps the call in its own history, as a call made from the order does.
             if ($orderId && ($order = \App\Models\Order::find($orderId))) {
                 app(\App\Services\Orders\OrderService::class)->note($order, 'call', __('Called from a call list').': '.$note, $user,
@@ -312,26 +310,6 @@ class CallListService
             $l->left = (int) ($left[$l->id] ?? 0);
             $l->today = (int) ($today[$l->id] ?? 0);
         });
-    }
-
-    /**
-     * Proof files are private: only the caller who made the call and managers may open them.
-     * The file is on the server until it moves to Google Drive (then drive_id is set).
-     *
-     * @return ?object{path: string, drive_id: ?string}
-     */
-    public function proofFile(int $callId, User $user): ?object
-    {
-        $call = DB::table('customer_calls')->find($callId, ['user_id', 'proof_path', 'proof_drive_id']);
-        if (! $call?->proof_path || ($call->user_id !== $user->id && ! $user->can('calls.manage'))) {
-            return null;
-        }
-        $drive = $call->proof_drive_id && $call->proof_drive_id !== \App\Console\Commands\MoveCallProofsToDrive::MISSING ? $call->proof_drive_id : null;
-        if (! $drive && ! Storage::disk('local')->exists($call->proof_path)) {
-            return null;
-        }
-
-        return (object) ['path' => $call->proof_path, 'drive_id' => $drive];
     }
 
     /** The content type for a stored proof, from the extension it was saved with (which came from its real type). */

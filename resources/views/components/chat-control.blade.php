@@ -19,7 +19,7 @@
         on: @js((bool) $chatSession), since: @js($chatSession ? \Illuminate\Support\Carbon::parse($chatSession->started_at)->format('g:i A') : null),
         open: false, data: null, ask: null, busy: false, error: null,
         tab: @js($hasChannels ? 'chats' : 'calls'),
-        q: '', found: null, finding: false, rider: '', riderPhone: '', claim: null, verdict: null, action: null, note: '', rmin: '', rsec: '', rurl: '', saved: null,
+        q: '', found: null, finding: false, rider: '', riderPhone: '', claim: null, verdict: null, action: null, note: '', rmin: '', rsec: '', saved: null,
         headers() { return { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } },
         async call(url, body) {
             this.busy = true; this.error = null;
@@ -53,11 +53,13 @@
             if (!this.found?.found) return;
             this.busy = true; this.error = null;
             try {
-                const r = await fetch(@js(route('rider-calls.store')), { method: 'POST', headers: this.headers(), body: JSON.stringify({ order_id: this.found.id, rider_name: this.rider, rider_phone: this.riderPhone, claim: this.claim, verdict: this.verdict, action: this.action, note: this.note, minutes: this.rmin, seconds: this.rsec, recording_url: this.rurl }) });
+                const fd = window.iqsFormData({ order_id: this.found.id, rider_name: this.rider, rider_phone: this.riderPhone, claim: this.claim, verdict: this.verdict, action: this.action, note: this.note, minutes: this.rmin, seconds: this.rsec });
+                window.iqsAddProof(fd, 'proof-rider');
+                const r = await fetch(@js(route('rider-calls.store')), { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: fd });
                 const j = await r.json();
                 if (!r.ok) { this.error = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')); return }
                 this.saved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.on = true;
-                this.q = ''; this.found = null; this.claim = null; this.verdict = null; this.action = null; this.note = ''; this.rmin = ''; this.rsec = ''; this.rurl = '';
+                this.q = ''; this.found = null; this.claim = null; this.verdict = null; this.action = null; this.note = ''; this.rmin = ''; this.rsec = ''; window.dispatchEvent(new CustomEvent('proof-clear', { detail: 'proof-rider' }));
             } catch (e) { this.error = @js(__('No connection. Try again.')) } finally { this.busy = false }
         },
     }" @chat-open.window="show()">
@@ -131,7 +133,7 @@
 
                     {{-- A customer phoned in: find them by number, pick the order it is about (or none), why they called. --}}
                     <div x-show="tab === 'calls'" x-cloak class="space-y-3" x-data="{
-                            cq: '', cfound: null, cfinding: false, corder: null, creason: null, cmin: '', csec: '', curl: '', cnote: '', csaved: null, cnew: null, cerror: null, csaving: false,
+                            cq: '', cfound: null, cfinding: false, corder: null, creason: null, cmin: '', csec: '', cnote: '', csaved: null, cnew: null, cerror: null, csaving: false,
                             async cfind() {
                                 if (!this.cq.trim()) return;
                                 this.cfinding = true; this.cfound = null; this.corder = null; this.csaved = null; this.cnew = null; this.cerror = null;
@@ -147,11 +149,13 @@
                                 if (!this.creason) { this.cerror = @js(__('Pick why they called.')); return }
                                 this.csaving = true;
                                 try {
-                                    const r = await fetch(@js(route('customer-calls.incoming')), { method: 'POST', headers: headers(), body: JSON.stringify({ phone: this.cfound?.phone || this.cq, order_id: this.corder, reason: this.creason, minutes: this.cmin, seconds: this.csec, recording_url: this.curl, note: this.cnote }) });
+                                    const fd = window.iqsFormData({ phone: this.cfound?.phone || this.cq, order_id: this.corder, reason: this.creason, minutes: this.cmin, seconds: this.csec, note: this.cnote });
+                                    window.iqsAddProof(fd, 'proof-in');
+                                    const r = await fetch(@js(route('customer-calls.incoming')), { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: fd });
                                     const j = await r.json();
                                     if (!r.ok) { this.cerror = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')); return }
                                     this.csaved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.cnew = j.new_order_url; on = true;
-                                    this.cq = ''; this.cfound = null; this.corder = null; this.creason = null; this.cmin = ''; this.csec = ''; this.curl = ''; this.cnote = '';
+                                    this.cq = ''; this.cfound = null; this.corder = null; this.creason = null; this.cmin = ''; this.csec = ''; this.cnote = ''; window.dispatchEvent(new CustomEvent('proof-clear', { detail: 'proof-in' }));
                                 } catch (e) { this.cerror = @js(__('No connection. Try again.')) } finally { this.csaving = false }
                             },
                         }">
@@ -193,7 +197,7 @@
                                     <span class="text-gray-400">:</span>
                                     <input type="number" min="0" max="59" x-model="csec" placeholder="{{ __('sec') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
                                 </div>
-                                <input type="url" x-model="curl" placeholder="{{ __('Recording link (Google Drive)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                                <x-call-proof id="proof-in" size="sm" />
                                 <input type="text" x-model="cnote" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
                                 <button type="button" @click="csave()" :disabled="csaving" class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-60">{{ __('Save call') }}</button>
                             </div>
@@ -254,7 +258,7 @@
                                     <span class="text-gray-400">:</span>
                                     <input type="number" min="0" max="59" x-model="rsec" placeholder="{{ __('sec') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
                                 </div>
-                                <input type="url" x-model="rurl" placeholder="{{ __('Recording link (Google Drive)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                                <x-call-proof id="proof-rider" size="sm" />
                                 <input x-model="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
                                 <button type="button" @click="saveCall()" :disabled="busy || !claim || !verdict || !action" class="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50">{{ __('Save rider call') }}</button>
                             </div>

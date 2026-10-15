@@ -6,7 +6,7 @@
 
 @php($visible = auth()->user()->canSeeField('customer_contact'))
 
-<div x-data="phoneDial({{ \Illuminate\Support\Js::from($visible ? $phone : '') }}, {{ \Illuminate\Support\Js::from($orderId) }}, {{ \Illuminate\Support\Js::from(['start' => route('customer-calls.start'), 'finish' => route('customer-calls.finish', 0)]) }})" {{ $attributes }}>
+<div x-data="phoneDial({{ \Illuminate\Support\Js::from($visible ? $phone : '') }}, {{ \Illuminate\Support\Js::from($orderId) }}, {{ \Illuminate\Support\Js::from(['start' => route('customer-calls.start'), 'finish' => route('customer-calls.finish', 0), 'proof' => 'proof-order-'.$orderId]) }})" {{ $attributes }}>
     @if ($visible)
         <a href="tel:{{ $phone }}" @click="started()" class="block font-mono text-xl font-semibold tracking-wide text-gray-900 hover:text-primary">{{ $phone }}</a>
         @if ($alt)<a href="tel:{{ $alt }}" @click="started()" class="block font-mono text-sm text-gray-500 hover:text-primary">{{ $alt }}</a>@endif
@@ -34,7 +34,7 @@
                     <span class="text-gray-400">:</span>
                     <input type="number" min="0" max="59" x-model="form.seconds" placeholder="{{ __('sec') }}" class="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
                 </div>
-                <input type="url" x-model="form.recording_url" placeholder="{{ __('Recording link (Google Drive)') }}" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none">
+                <x-call-proof :id="'proof-order-'.$orderId" size="sm" />
                 <input type="text" x-model="form.note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none">
                 <p x-show="error" x-cloak class="text-xs text-red-600" x-text="error"></p>
                 <div class="flex items-center gap-2">

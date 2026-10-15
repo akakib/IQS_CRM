@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderStatus;
+use App\Services\Calls\CallProof;
 use App\Services\Orders\OrderService;
 use App\Services\Work\ChatService;
 use App\Support\Phone;
@@ -52,14 +53,15 @@ class CustomerCallController extends Controller
             'recording_url' => ['nullable', 'url:http,https', 'max:500'], 'note' => ['nullable', 'string', 'max:500'],
         ]);
         $duration = ($data['minutes'] ?? null) !== null || ($data['seconds'] ?? null) !== null ? (int) ($data['minutes'] ?? 0) * 60 + (int) ($data['seconds'] ?? 0) : null;
+        $proof = app(CallProof::class)->take($request, [$row->phone], 'call-proofs/order', (string) $call);
         DB::table('customer_calls')->where('id', $call)->update([
             'outcome' => $data['outcome'], 'duration_seconds' => $duration, 'recording_url' => $data['recording_url'] ?? null, 'note' => $data['note'] ?? null,
-        ]);
+        ] + $proof);
         if ($row->order_id && ($order = Order::find($row->order_id))) {
             $line = __('Called').($duration !== null ? ' ('.intdiv($duration, 60).':'.str_pad((string) ($duration % 60), 2, '0', STR_PAD_LEFT).')' : '')
                 .': '.__(self::OUTCOMES[$data['outcome']]).(! empty($data['note']) ? ' · '.$data['note'] : '');
             $this->orders->note($order, 'call', $line, $request->user(),
-                ['customer_call_id' => $call, 'recording_url' => $data['recording_url'] ?? null, 'call_outcome' => $data['outcome']]);
+                ['customer_call_id' => $call, 'recording_url' => $data['recording_url'] ?? null, 'call_outcome' => $data['outcome'], 'proof_call' => $proof ? $call : null]);
         }
 
         return response()->json(['message' => __('Call saved.')]);
@@ -103,14 +105,15 @@ class CustomerCallController extends Controller
         }
         $order = ! empty($data['order_id']) ? Order::visibleTo($request->user())->find($data['order_id']) : null;
         $duration = ($data['minutes'] ?? null) !== null || ($data['seconds'] ?? null) !== null ? (int) ($data['minutes'] ?? 0) * 60 + (int) ($data['seconds'] ?? 0) : null;
+        $proof = app(CallProof::class)->take($request, [$phone], 'call-proofs/in', $phone);
         $id = DB::table('customer_calls')->insertGetId([
             'order_id' => $order?->id, 'phone' => $phone, 'direction' => 'in', 'user_id' => $request->user()->id, 'started_at' => now(),
             'outcome' => $data['reason'], 'duration_seconds' => $duration, 'recording_url' => $data['recording_url'] ?? null, 'note' => $data['note'] ?? null,
-        ]);
+        ] + $proof);
         if ($order) {
             $line = __('Customer called').($duration !== null ? ' ('.intdiv($duration, 60).':'.str_pad((string) ($duration % 60), 2, '0', STR_PAD_LEFT).')' : '')
                 .': '.__(self::REASONS_IN[$data['reason']]).(! empty($data['note']) ? ' · '.$data['note'] : '');
-            $this->orders->note($order, 'call', $line, $request->user(), ['customer_call_id' => $id, 'recording_url' => $data['recording_url'] ?? null, 'direction' => 'in']);
+            $this->orders->note($order, 'call', $line, $request->user(), ['customer_call_id' => $id, 'recording_url' => $data['recording_url'] ?? null, 'direction' => 'in', 'proof_call' => $proof ? $id : null]);
         }
         app(ChatService::class)->start($request->user()); // talking to a customer counts as work
 

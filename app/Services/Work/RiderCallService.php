@@ -65,7 +65,7 @@ class RiderCallService
     }
 
     /** @param array{order_id: int, rider_name?: ?string, rider_phone?: ?string, claim: string, verdict?: ?string, action?: ?string, note?: ?string} $d */
-    public function record(User $by, array $d): int
+    public function record(User $by, array $d, array $proof = []): int
     {
         $order = Order::find($d['order_id']) ?? throw ValidationException::withMessages(['order_id' => __('Find the parcel first.')]);
         foreach (['claim' => self::CLAIMS, 'verdict' => self::VERDICTS, 'action' => self::ACTIONS] as $field => $allowed) {
@@ -97,10 +97,10 @@ class RiderCallService
             'note' => $d['note'] ?? null, 'delivery_issue_id' => $issueId, 'handled_by' => $by->id, 'created_at' => now(),
             'duration_seconds' => ($d['minutes'] ?? null) !== null || ($d['seconds'] ?? null) !== null ? (int) ($d['minutes'] ?? 0) * 60 + (int) ($d['seconds'] ?? 0) : null,
             'recording_url' => $d['recording_url'] ?? null,
-        ]);
+        ] + $proof);
         $this->orders->note($order, 'rider', __('Rider call:rider: :c · checked with the customer: :v · :a', [
             'rider' => $name !== '' ? ' '.$name : '', 'c' => __(self::CLAIMS[$d['claim']]), 'v' => __(self::VERDICTS[$d['verdict']]), 'a' => __(self::ACTIONS[$d['action']]),
-        ]).(! empty($d['note']) ? ' · '.$d['note'] : ''), $by, ['rider_call_id' => $id, 'recording_url' => $d['recording_url'] ?? null]);
+        ]).(! empty($d['note']) ? ' · '.$d['note'] : ''), $by, ['rider_call_id' => $id, 'recording_url' => $d['recording_url'] ?? null, 'proof_rider_call' => $proof ? $id : null]);
         // Hotline work counts as work, like chats.
         $this->chat->start($by);
 

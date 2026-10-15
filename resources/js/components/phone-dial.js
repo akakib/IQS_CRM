@@ -1,7 +1,7 @@
 // <x-phone-dial>: copy the number, or show a QR code so a PC user can scan
 // it with their phone and call. The QR library loads only when first opened.
 // With an order: tapping, copying or opening the QR logs a call starting, and
-// "After the call" saves how it went, how long, and the recording's link.
+// "After the call" saves how it went, how long, and the recording or screenshot.
 export default function phoneDial(phone, orderId = null, urls = {}) {
     const token = () => document.querySelector('meta[name=csrf-token]').content;
 
@@ -17,7 +17,7 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
         starting: null,
         saved: '',
         error: '',
-        form: { outcome: '', minutes: '', seconds: '', recording_url: '', note: '' },
+        form: { outcome: '', minutes: '', seconds: '', note: '' },
 
         // keepalive: the request still goes out when the tel: link hands over to the dialer.
         started() {
@@ -40,10 +40,13 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
             try {
                 if (!this.callId) await (this.starting || this.started());
                 if (!this.callId) { this.error = 'Could not start the call log. Check the connection.'; return; }
+                // With the recording or screenshot (multipart, so PATCH rides on POST).
+                const fd = window.iqsFormData({ ...this.form, _method: 'PATCH' });
+                window.iqsAddProof(fd, urls.proof);
                 const r = await fetch(urls.finish.replace(/\/0$/, '/' + this.callId), {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': token() },
-                    body: JSON.stringify(this.form),
+                    method: 'POST',
+                    headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token() },
+                    body: fd,
                 });
                 const d = await r.json();
                 if (!r.ok) { this.error = Object.values(d.errors || {})[0]?.[0] || d.message || 'Could not save.'; return; }
@@ -51,7 +54,8 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
                 this.after = false;
                 this.callId = null;
                 this.starting = null;
-                this.form = { outcome: '', minutes: '', seconds: '', recording_url: '', note: '' };
+                this.form = { outcome: '', minutes: '', seconds: '', note: '' };
+                window.dispatchEvent(new CustomEvent('proof-clear', { detail: urls.proof }));
             } catch {
                 this.error = 'Could not save. Check the connection.';
             } finally {

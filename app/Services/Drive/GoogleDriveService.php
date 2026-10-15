@@ -18,7 +18,7 @@ class GoogleDriveService
 {
     public const SCOPE = 'openid email https://www.googleapis.com/auth/drive.file';
 
-    public const FOLDERS = ['root' => 'IQS CRM by T5', 'records' => 'Call Record', 'screenshots' => 'Call SS'];
+    public const FOLDERS = ['root' => 'IQS CRM by T5', 'records' => 'Call Record', 'screenshots' => 'Call SS', 'riders' => 'Rider Calls'];
 
     private const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
@@ -86,10 +86,10 @@ class GoogleDriveService
     }
 
     /** @return array{id: string, name: string} */
-    public function upload(GoogleDrive $drive, string $folder, string $name, string $mime, string $contents): array
+    public function upload(GoogleDrive $drive, string $folder, string $name, string $mime, string $contents, ?string $description = null): array
     {
         $parent = $this->folders($drive)[$folder] ?? throw new RuntimeException('Unknown folder.');
-        $send = fn (string $parent) => $this->api($drive)->withBody($this->multipart(['name' => $name, 'parents' => [$parent]], $mime, $contents, $boundary = 'iqs'.bin2hex(random_bytes(12))), 'multipart/related; boundary='.$boundary)
+        $send = fn (string $parent) => $this->api($drive)->withBody($this->multipart(array_filter(['name' => $name, 'parents' => [$parent], 'description' => $description]), $mime, $contents, $boundary = 'iqs'.bin2hex(random_bytes(12))), 'multipart/related; boundary='.$boundary)
             ->post('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name');
         $r = $send($parent);
         if ($r->status() === 404) { // the folder was deleted in Drive: make the folders again once
@@ -117,7 +117,10 @@ class GoogleDriveService
             return $have;
         }
         $root = $this->folder($drive, self::FOLDERS['root'], null);
-        $have = ['root' => $root, 'records' => $this->folder($drive, self::FOLDERS['records'], $root), 'screenshots' => $this->folder($drive, self::FOLDERS['screenshots'], $root)];
+        $have = ['root' => $root];
+        foreach (array_diff_key(self::FOLDERS, ['root' => 1]) as $key => $name) {
+            $have[$key] = $this->folder($drive, $name, $root);
+        }
         $drive->update(['folders' => $have]);
 
         return $have;

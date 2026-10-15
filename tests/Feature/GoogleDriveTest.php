@@ -73,11 +73,11 @@ class GoogleDriveTest extends TestCase
         $drive = $drive->fresh();
         $this->assertTrue($drive->isConnected());
         $this->assertSame('files@example.com', $drive->account_email);
-        $this->assertSame(['root' => 'folder1', 'records' => 'folder2', 'screenshots' => 'folder3'], $drive->folders);
+        $this->assertSame(['root' => 'folder1', 'records' => 'folder2', 'screenshots' => 'folder3', 'riders' => 'folder4'], $drive->folders);
 
         $this->post('/settings/google-drive/test')->assertSessionHas('success');
         $this->assertTrue($drive->fresh()->test_ok);
-        $this->assertSame(3, $made); // folders are made once, not on every upload
+        $this->assertSame(4, $made); // folders are made once, not on every upload
         $this->get('/settings/google-drive')->assertSee('Last test passed')->assertSee('files@example.com')->assertDontSee('top-secret-value');
 
         $this->post('/settings/google-drive/disconnect')->assertSessionHas('success');
@@ -125,7 +125,7 @@ class GoogleDriveTest extends TestCase
         Http::assertNothingSent();
         $this->assertNull(\DB::table('customer_calls')->where('id', $rec)->value('proof_drive_id'));
 
-        GoogleDrive::current()->update(['client_id' => self::ID, 'client_secret' => 's', 'refresh_token' => 'rt', 'folders' => ['root' => 'R', 'records' => 'REC', 'screenshots' => 'SS']]);
+        GoogleDrive::current()->update(['client_id' => self::ID, 'client_secret' => 's', 'refresh_token' => 'rt', 'folders' => ['root' => 'R', 'records' => 'REC', 'screenshots' => 'SS', 'riders' => 'RID']]);
         $down = true;
 
         // Drive fails: the files stay on the server and are tried again later.
@@ -168,6 +168,14 @@ class GoogleDriveTest extends TestCase
         $this->assertNull(\DB::table('customer_calls')->where('id', $busy)->value('proof_drive_id'));
         $lock->release();
         \DB::table('customer_calls')->where('id', $busy)->delete();
+
+        // A rider call's file goes to its own folder.
+        \Illuminate\Support\Facades\Storage::disk('local')->put('rider-proofs/r.m4a', 'RIDER');
+        $riderCall = \DB::table('rider_calls')->insertGetId(['rider_phone' => '01899999999', 'claim' => 'no_answer', 'handled_by' => $caller->id, 'created_at' => '2026-10-15 18:00:00', 'proof_path' => 'rider-proofs/r.m4a']);
+        $this->artisan('calls:proofs-to-drive')->assertSuccessful();
+        $this->assertSame(['01899999999 2026-10-15 18-00 Rakin #R'.$riderCall.'.m4a', 'RID'], end($sent));
+        $this->assertNotNull(\DB::table('rider_calls')->find($riderCall)->proof_drive_id);
+        $sent = array_slice($sent, 0, 2);
 
         // Running again moves nothing more.
         $this->artisan('calls:proofs-to-drive')->assertSuccessful();

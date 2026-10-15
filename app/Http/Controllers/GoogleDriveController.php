@@ -22,8 +22,8 @@ class GoogleDriveController extends Controller
             'drive' => GoogleDrive::current(),
             'redirectUri' => GoogleDriveService::redirectUri(),
             'folders' => GoogleDriveService::FOLDERS,
-            'waiting' => \Illuminate\Support\Facades\DB::table('customer_calls')->whereNotNull('proof_path')->whereNull('proof_drive_id')->count(),
-            'inDrive' => \Illuminate\Support\Facades\DB::table('customer_calls')->whereNotNull('proof_drive_id')->where('proof_drive_id', '!=', \App\Console\Commands\MoveCallProofsToDrive::MISSING)->count(),
+            'waiting' => $this->waiting(),
+            'inDrive' => collect(['customer_calls', 'rider_calls'])->sum(fn ($t) => \Illuminate\Support\Facades\DB::table($t)->whereNotNull('proof_drive_id')->where('proof_drive_id', '!=', \App\Console\Commands\MoveCallProofsToDrive::MISSING)->count()),
         ]);
     }
 
@@ -95,7 +95,7 @@ class GoogleDriveController extends Controller
     public function move(): RedirectResponse
     {
         @set_time_limit(300);
-        $waiting = fn () => \Illuminate\Support\Facades\DB::table('customer_calls')->whereNotNull('proof_path')->whereNull('proof_drive_id')->count();
+        $waiting = fn () => $this->waiting();
         $before = $waiting();
         \Illuminate\Support\Facades\Artisan::call('calls:proofs-to-drive', ['--limit' => 50]);
         $left = $waiting();
@@ -107,6 +107,11 @@ class GoogleDriveController extends Controller
             $left > 0 => __(':m moved to Drive, :l still waiting. Press Move now again.', ['m' => $moved, 'l' => $left]),
             default => __(':m moved to Drive. Nothing is waiting now.', ['m' => $moved]),
         });
+    }
+
+    private function waiting(): int
+    {
+        return collect(['customer_calls', 'rider_calls'])->sum(fn ($t) => \Illuminate\Support\Facades\DB::table($t)->whereNotNull('proof_path')->whereNull('proof_drive_id')->count());
     }
 
     public function disconnect(ActivityLogger $logger): RedirectResponse

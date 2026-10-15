@@ -15,6 +15,7 @@
                     <li>{{ $folders['root'] }}</li>
                     <li class="pl-4">{{ $folders['records'] }}</li>
                     <li class="pl-4">{{ $folders['screenshots'] }}</li>
+                    <li class="pl-4">{{ $folders['riders'] }}</li>
                 </ul>
                 <p class="mt-4 text-sm text-gray-700">{{ __(':n call files in Drive.', ['n' => number_format($inDrive)]) }}
                     @if ($waiting) {{ __(':n waiting on the server.', ['n' => number_format($waiting)]) }} @endif</p>

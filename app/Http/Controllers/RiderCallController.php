@@ -29,7 +29,9 @@ class RiderCallController extends Controller
             'minutes' => ['nullable', 'integer', 'min:0', 'max:300'], 'seconds' => ['nullable', 'integer', 'min:0', 'max:59'],
             'recording_url' => ['nullable', 'url:http,https', 'max:500'],
         ]);
-        $this->calls->record($request->user(), $data);
+        $order = \App\Models\Order::find($data['order_id']);
+        $proof = app(\App\Services\Calls\CallProof::class)->take($request, array_filter([$data['rider_phone'] ?? null, $order?->ship_phone, $order?->ship_alt_phone]), 'rider-proofs', (string) $data['order_id']);
+        $this->calls->record($request->user(), $data, $proof);
 
         return response()->json(['message' => __('Rider call saved.'), 'today' => DB::table('rider_calls')->where('handled_by', $request->user()->id)->where('created_at', '>=', today())->count()]);
     }

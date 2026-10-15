@@ -191,8 +191,10 @@ Route::middleware('auth')->group(function () {
             Route::post('/my-calls/{list}/{item}/skip', 'skip')->whereNumber(['list', 'item'])->name('calls.skip');
             Route::post('/my-calls/{list}/{item}/touch', 'touch')->whereNumber(['list', 'item'])->name('calls.touch');
         });
-        Route::get('/call-proof/{call}', 'proof')->whereNumber('call')->name('calls.proof');
     });
+    Route::get('/call-proof/{call}', [\App\Http\Controllers\CallListController::class, 'proof'])->whereNumber('call')->name('calls.proof');
+    Route::get('/rider-call-proof/{call}', fn (\Illuminate\Http\Request $request, int $call) => app(\App\Services\Calls\CallProof::class)->response('rider_calls', $call, $request->user()))
+        ->whereNumber('call')->name('rider-calls.proof');
     Route::get('/journey', [\App\Http\Controllers\CustomerJourneyController::class, 'index'])->middleware('can:customers.view')->name('journey.index');
     Route::get('/journey/{customer}', [\App\Http\Controllers\CustomerJourneyController::class, 'show'])->middleware('can:customers.view')->withTrashed()->name('journey.show');
     Route::get('/payments', [\App\Http\Controllers\PaymentController::class, 'index'])->name('payments.index');

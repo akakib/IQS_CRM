@@ -92,7 +92,7 @@
                             if (e.detail.linked) this.outcome = 'ordered';
                         });
                         // A recording for a talk, a picture for no answer: a file picked for the other kind is dropped.
-                        this.$watch('outcome', (v, old) => { if (old && this.spokeOf(v) !== this.spokeOf(old)) { this.file = ''; this.$refs.proof.value = '' } });
+                        this.$watch('outcome', (v, old) => { if (old && this.spokeOf(v) !== this.spokeOf(old)) window.dispatchEvent(new CustomEvent('proof-clear', { detail: 'proof-list' })) });
                         @if (session('saved_item')) try { localStorage.removeItem('iqs-call-note-{{ (int) session('saved_item') }}') } catch (e) {} @endif
                     },
                     laterIn(h) { const d = new Date(Date.now() + h * 3600000); this.laterAt = this.local(d) },
@@ -157,16 +157,8 @@
                     </div>
                 </div>
 
-                <div x-show="outcome" x-cloak>
-                    <p class="mb-2 text-sm font-semibold text-gray-900" x-text="spoke() ? @js(__('Call recording')) : @js(__('Screenshot of the call log'))"></p>
-                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed px-3 py-3" :class="file ? 'border-green-500 bg-green-50' : 'border-gray-300'">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg" :class="file ? 'bg-green-600 text-white' : 'bg-gray-100'" x-text="file ? '✓' : '+'"></span>
-                        <span class="min-w-0">
-                            <span class="block text-sm font-medium text-gray-900" x-text="file || (spoke() ? @js(__('Add the recording')) : @js(__('Add the screenshot')))"></span>
-                            <span class="block text-xs text-gray-500">{{ __('From your phone: the newest one is on top.') }}</span>
-                        </span>
-                        <input type="file" name="proof" x-ref="proof" class="sr-only" :accept="spoke() ? 'audio/*,.m4a,.amr,.mp3,.aac,.ogg,.opus,.wav,.3gp' : 'image/*'" @change="file = $event.target.files[0]?.name || ''">
-                    </label>
+                <div x-show="outcome" x-cloak @proof-changed="file = $event.detail.name">
+                    <x-call-proof id="proof-list" kind="spoke() ? 'audio' : 'image'" :title="'spoke() ? '.\Illuminate\Support\Js::from(__('Call recording')).' : '.\Illuminate\Support\Js::from(__('Screenshot of the call log'))" />
                 </div>
 
                 <div x-show="outcome" x-cloak>

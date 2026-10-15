@@ -4,13 +4,13 @@
 @endphp
 
 <x-layouts.app :heading="__('Import order history')">
-    <div class="mx-auto max-w-3xl space-y-4">
+    <div class="mx-auto max-w-6xl space-y-4">
         <a href="{{ route('customers.history') }}" class="inline-block text-sm text-primary hover:underline">{{ __('Back to imports') }}</a>
         @if ($import->undone_at)
             <p class="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{{ __('This import was taken back on :d. Its orders and the customers it created are gone.', ['d' => \Illuminate\Support\Carbon::parse($import->undone_at)->format('d M, g:i A')]) }}</p>
         @endif
         <x-card :title="$import->file_name" :subtitle="__(':s · :n rows · by :b', ['s' => $import->source, 'n' => $import->row_count, 'b' => $import->by ?? '-'])">
-            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
                 @foreach ($labels as $k => $label)
                     <div class="rounded-xl bg-gray-50 p-3">
                         <p class="text-xs text-gray-500">{{ $label }}</p>
@@ -59,7 +59,7 @@
                     <p class="mt-4 rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">{{ __('No order matches.') }}</p>
                 @else
                     {{-- Phone: cards. --}}
-                    <div class="mt-3 space-y-2 md:hidden">
+                    <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:hidden">
                         @foreach ($orders as $p)
                             <div class="rounded-xl border border-gray-100 p-3">
                                 <div class="flex items-start justify-between gap-2">
@@ -75,8 +75,8 @@
                         @endforeach
                     </div>
                     {{-- Wider screens: a table. --}}
-                    <div class="mt-3 hidden overflow-x-auto md:block">
-                        <table class="w-full text-sm">
+                    <div class="-mx-4 mt-3 hidden overflow-x-auto px-4 lg:block">
+                        <table class="w-full min-w-[56rem] text-sm">
                             <thead><tr class="border-b border-gray-200 text-left text-xs text-gray-500">
                                 <th class="py-2 pr-3 font-medium">{{ __('Customer') }}</th><th class="py-2 pr-3 font-medium">{{ __('Phone') }}</th><th class="py-2 pr-3 font-medium">{{ __('CN') }}</th>
                                 <th class="py-2 pr-3 font-medium">{{ __('Date') }}</th><th class="py-2 pr-3 font-medium">{{ __('Products') }}</th><th class="py-2 pr-3 font-medium">{{ __('Status') }}</th><th class="py-2 text-right font-medium">{{ __('Amount') }}</th>

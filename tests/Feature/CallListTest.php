@@ -137,6 +137,36 @@ class CallListTest extends TestCase
         $this->assertNotSame($item->id, $this->item($this->rakin, $list)->id);
     }
 
+    public function test_callers_see_their_own_call_history_only(): void
+    {
+        $list = $this->makeList([$this->rakin, $this->pranta]);
+        // Rakin talks to one customer, Pranto gets no answer from another.
+        $this->actingAs($this->rakin)->get(route('calls.work', $list));
+        $mine = $this->item($this->rakin, $list);
+        $this->post(route('calls.record', [$list, $mine->id]), ['outcome' => 'answered', 'satisfaction' => 75, 'note' => 'Liked the dates', 'proof' => $this->fakeFile('c.m4a', 20, 'audio/mp4'), 'seconds' => 70]);
+        $this->actingAs($this->pranta)->get(route('calls.work', $list));
+        $theirs = $this->item($this->pranta, $list);
+        $this->post(route('calls.record', [$list, $theirs->id]), ['outcome' => 'no_answer', 'proof' => UploadedFile::fake()->image('log.png', 33, 10)]);
+
+        $this->actingAs($this->rakin)->get(route('calls.mine'))->assertOk()
+            ->assertSee('My call history')->assertSee($mine->name)->assertSee('Talked: Liked the dates')->assertDontSee($theirs->name)
+            ->assertSee('Calls today')->assertSee('Play call');
+        $this->get(route('calls.mine', ['result' => 'no_answer']))->assertSee('No call matches.');
+        $this->get(route('calls.mine', ['day' => 'yesterday']))->assertSee('No call matches.');
+        $this->get(route('calls.mine', ['q' => '+88 '.$mine->phone, 'day' => 'today']))->assertSee($mine->name);
+
+        // The details: only their own calls, and only numbers they called.
+        $d = $this->getJson(route('calls.mine.item', $mine->id))->assertOk()->json();
+        $this->assertSame([1, 'Talked: Liked the dates', '1:10'], [count($d['calls']), $d['calls'][0]['note'], $d['calls'][0]['duration']]);
+        $this->getJson(route('calls.mine.item', $theirs->id))->assertNotFound();
+
+        // Put off for later: it shows when it comes back.
+        $this->get(route('calls.work', $list));
+        $later = $this->item($this->rakin, $list);
+        $this->post(route('calls.record', [$list, $later->id]), ['outcome' => 'later', 'satisfaction' => 50, 'later_at' => now()->addDay()->format('Y-m-d\TH:i'), 'proof' => $this->fakeFile('d.m4a', 20, 'audio/mp4')]);
+        $this->get(route('calls.mine'))->assertSee('Call-backs')->assertSee('Comes back');
+    }
+
     public function test_managers_see_every_number_filter_them_and_open_each_call(): void
     {
         $list = $this->makeList([$this->rakin]);

@@ -13,7 +13,7 @@
         <div class="rounded-2xl bg-primary px-4 py-3 text-white">
             <div class="flex items-baseline justify-between text-sm">
                 <span>{{ __('Today :n of :t', ['n' => $today, 't' => $list->daily_target]) }}</span>
-                <a href="{{ route('calls.mine') }}" class="text-xs text-white/80 underline">{{ __('My calls') }}</a>
+                <a href="{{ route('calls.mine') }}#history" class="text-xs text-white/80 underline">{{ __('My call history') }}</a>
             </div>
             <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-white/25"><div class="h-full rounded-full bg-green-300" style="width: {{ $w }}%"></div></div>
             <p class="mt-1 text-xs text-white/80">{{ trans_choice(':count number left|:count numbers left', $left, ['count' => number_format($left)]) }}</p>

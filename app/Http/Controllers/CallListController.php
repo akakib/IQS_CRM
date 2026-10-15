@@ -122,12 +122,31 @@ class CallListController extends Controller
     /** One number of a list, for the details popup: where it stands, every call on it with its file, and the order taken. */
     public function item(Request $request, int $list, int $item): \Illuminate\Http\JsonResponse
     {
-        $it = DB::table('call_list_items as i')->leftJoin('orders as o', 'o.id', '=', 'i.order_id')->leftJoin('users as u', 'u.id', '=', 'i.user_id')
-            ->where('i.call_list_id', $list)->where('i.id', $item)->first(['i.*', 'o.order_no', 'o.grand_total', 'u.name as holder']) ?? abort(404);
+        return $this->itemJson($this->itemRow($item, $list), $request->user(), null);
+    }
+
+    /** A number the caller has called, for their own history: only their own calls on it. */
+    public function myItem(Request $request, int $item): \Illuminate\Http\JsonResponse
+    {
         $user = $request->user();
+        abort_unless(DB::table('customer_calls')->where('call_list_item_id', $item)->where('user_id', $user->id)->exists(), 404);
+
+        return $this->itemJson($this->itemRow($item), $user, $user->id);
+    }
+
+    private function itemRow(int $item, ?int $list = null): object
+    {
+        return DB::table('call_list_items as i')->leftJoin('orders as o', 'o.id', '=', 'i.order_id')->leftJoin('users as u', 'u.id', '=', 'i.user_id')
+            ->when($list, fn ($q) => $q->where('i.call_list_id', $list))->where('i.id', $item)
+            ->first(['i.*', 'o.order_no', 'o.grand_total', 'u.name as holder']) ?? abort(404);
+    }
+
+    private function itemJson(object $it, User $user, ?int $onlyBy): \Illuminate\Http\JsonResponse
+    {
         $see = $user->canSeeField('customer_contact');
         $when = fn ($t) => $t ? \Illuminate\Support\Carbon::parse($t)->format('d M Y, g:i A') : null;
-        $calls = DB::table('customer_calls as cc')->leftJoin('users as u', 'u.id', '=', 'cc.user_id')->where('cc.call_list_item_id', $it->id)->orderByDesc('cc.id')
+        $calls = DB::table('customer_calls as cc')->leftJoin('users as u', 'u.id', '=', 'cc.user_id')->where('cc.call_list_item_id', $it->id)
+            ->when($onlyBy, fn ($q) => $q->where('cc.user_id', $onlyBy))->orderByDesc('cc.id')
             ->get(['cc.id', 'cc.started_at', 'cc.ended_at', 'cc.duration_seconds', 'cc.note', 'cc.satisfaction', 'cc.proof_path', 'cc.proof_name', 'cc.proof_old', 'u.name as by']);
         $n = $calls->count();
 
@@ -181,9 +200,56 @@ class CallListController extends Controller
 
     // ---- Callers -------------------------------------------------------------------------------
 
+    /** Days the caller can look back over in their own history. */
+    public const DAYS = ['all' => 'All days', 'today' => 'Today', 'yesterday' => 'Yesterday', '7' => 'Last 7 days', '30' => 'Last 30 days'];
+
+    /** How a call went, as kept on each call. */
+    public const CALL_RESULTS = ['answered' => 'Talked', 'no_answer' => 'No answer', 'busy' => 'Busy or off', 'wrong' => 'Wrong number'];
+
     public function mine(Request $request): View
     {
-        return view('calls.mine', ['lists' => $this->calls->mine($request->user())]);
+        $user = $request->user();
+        $f = [
+            'q' => trim((string) $request->query('q', '')),
+            'day' => array_key_exists($d = (string) $request->query('day', 'all'), self::DAYS) ? $d : 'all',
+            'list' => ctype_digit($l = (string) $request->query('list', '')) ? $l : '',
+            'result' => array_key_exists($r = (string) $request->query('result', ''), self::CALL_RESULTS) ? $r : '',
+        ];
+        // Only this person's own calls from the lists.
+        $base = fn () => DB::table('customer_calls as cc')->join('call_list_items as i', 'i.id', '=', 'cc.call_list_item_id')->where('cc.user_id', $user->id);
+        $calls = $base()->join('call_lists as l', 'l.id', '=', 'i.call_list_id')->leftJoin('orders as o', 'o.id', '=', 'i.order_id')
+            ->when($f['q'] !== '', function ($q) use ($f) {
+                $phone = \App\Support\Phone::normalize($f['q']);
+                $q->where(fn ($w) => $phone ? $w->where('i.phone', $phone) : $w->where('i.name', 'like', '%'.$f['q'].'%')->orWhere('i.phone', 'like', '%'.preg_replace('/\D/', '', $f['q']).'%'));
+            })
+            ->when($f['day'] === 'today', fn ($q) => $q->where('cc.started_at', '>=', today()))
+            ->when($f['day'] === 'yesterday', fn ($q) => $q->whereBetween('cc.started_at', [today()->subDay(), today()]))
+            ->when(in_array($f['day'], ['7', '30'], true), fn ($q) => $q->where('cc.started_at', '>=', today()->subDays((int) $f['day'] - 1)))
+            ->when($f['list'] !== '', fn ($q) => $q->where('i.call_list_id', (int) $f['list']))
+            ->when($f['result'] !== '', fn ($q) => $q->where('cc.outcome', $f['result']))
+            ->orderByDesc('cc.id')
+            ->select(['cc.id', 'cc.started_at', 'cc.duration_seconds', 'cc.note', 'cc.satisfaction', 'cc.outcome', 'cc.proof_path', 'cc.proof_name', 'cc.proof_old',
+                'i.id as item_id', 'i.name', 'i.phone', 'l.name as list', 'o.order_no'])
+            ->paginate(25)->withQueryString()->fragment('history');
+        $today = $base()->where('cc.started_at', '>=', today());
+
+        return view('calls.mine', [
+            'lists' => $this->calls->mine($user),
+            'calls' => $calls,
+            'filters' => $f,
+            'today' => [
+                'calls' => (clone $today)->count(),
+                'talked' => (clone $today)->where('cc.outcome', 'answered')->count(),
+                'orders' => (clone $today)->whereNotNull('i.order_id')->distinct()->count('i.order_id'),
+                'satisfaction' => ($s = (clone $today)->whereNotNull('cc.satisfaction')->avg('cc.satisfaction')) === null ? null : (int) round($s),
+            ],
+            // Numbers this person put off for later: when each comes back.
+            'callBacks' => DB::table('call_list_items as i')->join('call_lists as l', 'l.id', '=', 'i.call_list_id')->where('i.state', 'later')
+                ->whereExists(fn ($e) => $e->selectRaw('1')->from('customer_calls as cc')->whereColumn('cc.call_list_item_id', 'i.id')->where('cc.user_id', $user->id))
+                ->orderBy('i.next_at')->limit(10)->get(['i.id', 'i.name', 'i.phone', 'i.next_at', 'l.name as list']),
+            'myLists' => $base()->join('call_lists as l', 'l.id', '=', 'i.call_list_id')->distinct()->orderBy('l.name')->pluck('l.name', 'l.id')->all(),
+            'seePhone' => $user->canSeeField('customer_contact'),
+        ]);
     }
 
     public function work(Request $request, int $list): View|RedirectResponse

@@ -81,6 +81,16 @@ class HistoryImport
         return [$header, array_map(fn ($r) => array_slice(array_pad(array_map(fn ($v) => self::cell((string) $v), $r), $width, ''), 0, $width), $rows)];
     }
 
+    /** "Address: House 12, Mirpur" or "Name: Rahima" from a hand-filled sheet: the label at the front is not part of the value. */
+    public static function unlabel(string $v): string
+    {
+        $label = '(?:(?:customer|recipient|receiver|billing|shipping|delivery|full|alt|alternate|other|contact|ship(?:ping)?|home|office)\s*)?'
+            .'(?:name|addr(?:ess)?|phone|mobile|number|no|cell|contact|products?|items?|amount|total|price|note|area|zone|district|thana|cn|tracking|consignment'
+            .'|order(?:\s*(?:no|number|id))?|নাম|ঠিকানা|ফোন|মোবাইল|নম্বর|নাম্বার|পণ্য|টাকা|দাম|এলাকা)';
+
+        return trim(preg_replace('/^\s*'.$label.'\s*[:：ঃ]\s*/iu', '', $v, 1));
+    }
+
     /** Excel keeps numbers as numbers: 1.326885301E9 is a phone (1326885301), 1.0 is 1. */
     private static function cell(string $v): string
     {
@@ -175,7 +185,7 @@ class HistoryImport
     public function plan(array $header, array $rows, array $mapping, array $values, ?string $defaultMedium, string $source): array
     {
         $cols = fn (string $field) => array_keys(array_filter(array_values(array_map(fn ($h) => $mapping[$h] ?? '', $header)), fn ($f) => $f === $field));
-        $get = fn (array $row, string $field, string $glue = ' ') => trim(implode($glue, array_filter(array_map(fn ($i) => self::cell((string) ($row[$i] ?? '')), $cols($field)), fn ($v) => $v !== '')));
+        $get = fn (array $row, string $field, string $glue = ' ') => trim(implode($glue, array_filter(array_map(fn ($i) => self::unlabel(self::cell((string) ($row[$i] ?? ''))), $cols($field)), fn ($v) => $v !== '')));
         $counts = ['rows' => count($rows), 'orders' => 0, 'known' => 0, 'new' => 0, 'in_iqs' => 0, 'already' => 0, 'updated' => 0, 'bad_phone' => 0, 'no_name' => 0, 'bad_date' => 0, 'skipped' => 0];
 
         // One order per order number, else per CN, else per row (a row is then known by its content).
@@ -222,7 +232,8 @@ class HistoryImport
         $orders = [];
         foreach ($groups as $g) {
             $row = $g['row'];
-            $phone = Phone::normalize($get($row, 'phone'));
+            $phones = Phone::extract($get($row, 'phone', ' / '));
+            $phone = $phones[0] ?? null;
             if (! $phone) {
                 $counts['bad_phone']++;
 
@@ -253,6 +264,7 @@ class HistoryImport
             $items = mb_substr(implode(', ', array_unique($g['items'])), 0, 1000) ?: null;
             $orders[] = [
                 'phone' => $phone,
+                'other_phones' => array_slice($phones, 1, 2),
                 'name' => mb_substr($name, 0, 150),
                 'external_no' => $g['no'] !== '' ? mb_substr($g['no'], 0, 60) : null,
                 'cn' => $g['cn'],
@@ -406,6 +418,12 @@ class HistoryImport
                 DB::table('customer_phones')->insertOrIgnore($chunk->map(fn ($o) => ['customer_id' => $ids[$o['phone']], 'phone' => $o['phone'], 'is_primary' => true, 'created_at' => $now, 'updated_at' => $now])->values()->all());
             }
             $ids = DB::table('customers')->whereIn('primary_phone', $new->pluck('phone'))->where('customer_import_id', $importId)->pluck('id', 'primary_phone');
+            $others = collect($plan['orders'])->filter(fn ($o) => $o['other_phones'] ?? [])
+                ->flatMap(fn ($o) => array_map(fn ($p) => ['customer_id' => $o['customer_id'] ?? $ids[$o['phone']], 'phone' => $p, 'is_primary' => false, 'created_at' => $now, 'updated_at' => $now], $o['other_phones']))
+                ->unique('phone')->values();
+            foreach ($others->chunk(300) as $chunk) {
+                DB::table('customer_phones')->insertOrIgnore($chunk->all()); // a number that belongs to someone already stays theirs
+            }
             $changes = [];
             foreach ($plan['updates'] ?? [] as $u) {
                 $changes[$u['id']] = $u['old'];

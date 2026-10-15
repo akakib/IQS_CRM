@@ -348,4 +348,30 @@ Nusrat,০১৯১২৩৪৫৬৭৮,DM2BBBBB,Feni,Honey,1200,24/07/2026,Ret
         $this->assertSame(['amount_to_collect' => 'amount', 'collected_amount' => ''], array_intersect_key($view->viewData('mapping'), ['amount_to_collect' => 1, 'collected_amount' => 1]));
         $this->assertSame('messenger', $view->viewData('defaultMedium'));
     }
+
+    public function test_phones_and_labels_in_hand_filled_cells_are_cleaned(): void
+    {
+        $this->assertSame(['01712345678', '01812345678'], \App\Support\Phone::extract('+880 1712-345678 / 01812345678 (husband)'));
+        $this->assertSame(['01712345678'], \App\Support\Phone::extract('Phone: ০১৭১২ ৩৪৫ ৬৭৮'));
+        $this->assertSame([], \App\Support\Phone::extract('017123456788')); // a digit too many is not guessed at
+        $this->assertSame([], \App\Support\Phone::extract('8.80133E+12'));  // digits lost by Excel
+        $h = \App\Services\Customers\HistoryImport::class;
+        $this->assertSame('House 12, Road 5, Mirpur', $h::unlabel('Address: House 12, Road 5, Mirpur'));
+        $this->assertSame('Rahima Akter', $h::unlabel('Customer Name : Rahima Akter'));
+        $this->assertSame('রহিমা', $h::unlabel('নাম: রহিমা'));
+        $this->assertSame('Road: 5, Block B', $h::unlabel('Road: 5, Block B')); // not a label
+        $this->assertSame('10:30 delivery', $h::unlabel('10:30 delivery'));
+
+        (new CustomerSeeder)->run();
+        $this->actingAs($this->owner());
+        $csv = "Name,Phone,Address,Products,Date\n\"Name: Rahima Akter\",\"01712-345678 / 01812345678\",\"Address: House 12, Mirpur\",\"Products: Dates 1 kg\",2026-07-01\n";
+        $this->importCsv('hand.csv', $csv, ['Name' => 'name', 'Phone' => 'phone', 'Address' => 'address', 'Products' => 'items', 'Date' => 'date']);
+        $c = Customer::where('primary_phone', '01712345678')->first();
+        $this->assertSame('Rahima Akter', $c->name);
+        $this->assertSame(['01712345678', '01812345678'], DB::table('customer_phones')->where('customer_id', $c->id)->orderByDesc('is_primary')->pluck('phone')->all());
+        $p = DB::table('customer_past_orders')->where('customer_id', $c->id)->first();
+        $this->assertSame(['House 12, Mirpur', 'Dates 1 kg'], [$p->address, $p->items]);
+        // The second number finds the same customer.
+        $this->get('/journey?q=01812345678')->assertRedirect(route('journey.show', $c->id));
+    }
 }

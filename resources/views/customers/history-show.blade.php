@@ -191,7 +191,9 @@
                     open(d) {
                         this.action = d.action; this.title = d.title; this.save = d.save || @js(__('Save'));
                         this.fields = { ...d.fields }; this.bad = d.bad || null; this.errors = {};
-                        this.$nextTick(() => { Alpine.$data(this.$refs.status).setValue(this.fields.status); this.$dispatch('open-modal', 'import-row-edit') });
+                        this.$dispatch('open-modal', 'import-row-edit');
+                        // The status dropdown lives inside the popup (its own component): found by id, not by ref.
+                        this.$nextTick(() => { const el = document.getElementById('import-row-status'); if (el) Alpine.$data(el).setValue(this.fields.status) });
                     },
                     async send() {
                         this.busy = true; this.errors = {};
@@ -220,7 +222,7 @@
                         <label class="block">
                             <span class="text-xs text-gray-500">{{ __('Status') }}</span>
                             <div @select-change="fields.status = $event.detail">
-                                <x-simple-select x-ref="status" :options="$editStatuses" value="delivered" full-width class="mt-0.5" />
+                                <x-simple-select id="import-row-status" :options="$editStatuses" value="delivered" full-width class="mt-0.5" />
                             </div>
                         </label>
                     </div>

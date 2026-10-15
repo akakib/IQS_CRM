@@ -318,6 +318,13 @@ class CustomerHistoryImportTest extends TestCase
         $this->assertEquals(1250, $p->amount);
         $this->assertSame('Rahima Akter', Customer::find($rahima->customer_id)->name);
 
+        // Only a day typed keeps the time of day, so the order keeps its place in a list sorted by date.
+        DB::table('customer_past_orders')->where('id', $rahima->id)->update(['ordered_at' => '2026-07-24 14:05:09']);
+        $edit($rahima->id, ['name' => 'Rahima Akter', 'phone' => '01711111111', 'cn' => 'DM200001', 'date' => '2026-07-24'])->assertOk();
+        $this->assertSame('2026-07-24 14:05:09', (string) DB::table('customer_past_orders')->find($rahima->id)->ordered_at);
+        $edit($rahima->id, ['name' => 'Rahima Akter', 'phone' => '01711111111', 'cn' => 'DM200001', 'date' => '2026-07-20'])->assertOk();
+        $this->assertSame('2026-07-20 14:05:09', (string) DB::table('customer_past_orders')->find($rahima->id)->ordered_at);
+
         // Wrong values are refused with the field named.
         $edit($rahima->id, ['name' => 'R', 'phone' => '017111'])->assertStatus(422)->assertJsonValidationErrors('phone');
         $edit($rahima->id, ['name' => 'R', 'phone' => '01711111111', 'cn' => 'DM200002'])->assertStatus(422)->assertJsonValidationErrors('cn');

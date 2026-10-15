@@ -33,9 +33,14 @@ class ImportedOrders
         if ($cn && DB::table('customer_past_orders')->where('cn', $cn)->where('id', '!=', $past->id)->exists()) {
             throw ValidationException::withMessages(['cn' => __('Another imported order already has this CN.')]);
         }
-        $date = trim((string) ($data['date'] ?? '')) === '' ? $past->ordered_at : $this->history->readDate((string) $data['date']);
+        $typed = trim((string) ($data['date'] ?? ''));
+        $date = $typed === '' ? $past->ordered_at : $this->history->readDate($typed);
         if (! $date) {
             throw ValidationException::withMessages(['date' => __('The date is not readable (write 2026-07-24 or 24/07/2026).')]);
+        }
+        // Only a day typed (no time): the order keeps its time of day, so it stays where it was in the list.
+        if ($typed !== '' && ! preg_match('/\d{1,2}:\d{2}/', $typed)) {
+            $date = substr($date, 0, 10).substr((string) $past->ordered_at, 10);
         }
         $name = HistoryImport::unlabel(trim($data['name']));
         if ($name === '') {

@@ -84,6 +84,9 @@ class CallProof
         return ['proof_path' => $path, 'proof_name' => $checked['name'], 'proof_size' => $checked['size'], 'proof_hash' => $checked['hash'], 'proof_old' => $checked['old']];
     }
 
+    /** Where files fetched from Drive are kept for a day while they are being listened to. */
+    public const CACHE = 'proof-cache';
+
     /** Who made each kind of call. */
     public const TABLES = ['customer_calls' => 'user_id', 'rider_calls' => 'handled_by'];
 
@@ -116,18 +119,22 @@ class CallProof
             'X-Content-Type-Options' => 'nosniff',
             'Content-Security-Policy' => "default-src 'none'; img-src 'self'; media-src 'self'; sandbox",
         ];
-        if (! $file->drive_id) {
-            return \Illuminate\Support\Facades\Storage::disk('local')->response($file->path, null, $headers);
-        }
-        try {
-            $body = app(\App\Services\Drive\GoogleDriveService::class)->download(\App\Models\GoogleDrive::current(), $file->drive_id);
-        } catch (\RuntimeException) {
-            abort(503, __('The file is in Google Drive, but Drive did not give it back now. If Drive was disconnected, connect it again in Settings.'));
+        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+        $path = $file->path;
+        if ($file->drive_id) {
+            // From Drive once, then kept on the server for a day: the player can jump around without fetching it again.
+            $path = self::CACHE.'/'.$file->drive_id.'.'.strtolower(pathinfo($file->path, PATHINFO_EXTENSION));
+            if (! $disk->exists($path)) {
+                try {
+                    $disk->put($path, app(\App\Services\Drive\GoogleDriveService::class)->download(\App\Models\GoogleDrive::current(), $file->drive_id));
+                } catch (\RuntimeException) {
+                    abort(503, __('The file is in Google Drive, but Drive did not give it back now. If Drive was disconnected, connect it again in Settings.'));
+                }
+            }
         }
 
-        return response()->stream(function () use ($body) {
-            echo $body;
-        }, 200, $headers + ['Content-Length' => strlen($body), 'Cache-Control' => 'private, max-age=3600']);
+        // A file response: sent in parts as the player asks (starts at once, and the player can jump to any point).
+        return response()->file($disk->path($path), $headers + ['Cache-Control' => 'private, max-age=3600']);
     }
 
     /** Checks and keeps an optional proof sent with a call; the columns to save (none without a file). */

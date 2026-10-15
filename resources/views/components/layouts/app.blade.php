@@ -71,6 +71,7 @@
 
         <main class="flex-1 p-4 md:p-6">
             <x-toaster />
+            <x-call-player />
             {{ $slot }}
         </main>
     </div>

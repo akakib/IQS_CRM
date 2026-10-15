@@ -76,7 +76,7 @@
                         @if ($c->note)<span class="block text-xs text-gray-500">{{ $c->note }}</span>@endif
                     </td>
                     <td class="text-right tabular-nums">{{ $mmss($c->duration_seconds) }}</td>
-                    <td>@if ($c->recording_url)<a href="{{ $c->recording_url }}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">{{ __('Open') }}</a>@elseif ($c->proof_path)<a href="{{ route('calls.proof', $c->id) }}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">{{ __('Open') }}</a>@if ($c->proof_old) <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">{{ __('Earlier file') }}</span>@endif @if ($c->proof_name)<span class="block max-w-[14rem] truncate text-xs text-gray-400" title="{{ $c->proof_name }}">{{ $c->proof_name }}</span>@endif @else<span class="text-gray-400">-</span>@endif</td>
+                    <td>@if ($c->recording_url)<a href="{{ $c->recording_url }}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">{{ __('Open') }}</a>@elseif ($c->proof_path)<x-play-call :call="$c" :title="$c->phone" :sub="$c->person.' · '.\Illuminate\Support\Carbon::parse($c->started_at)->format('d M, g:i A')" />@if ($c->proof_old) <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">{{ __('Earlier file') }}</span>@endif @if ($c->proof_name)<span class="block max-w-[14rem] truncate text-xs text-gray-400" title="{{ $c->proof_name }}">{{ $c->proof_name }}</span>@endif @else<span class="text-gray-400">-</span>@endif</td>
                 </tr>
             @endforeach
         </x-list.table>
@@ -84,7 +84,7 @@
             @foreach ($calls as $c)
                 <x-record-card :title="($c->direction === 'in' ? __('In') : __('Out')).' · '.$c->phone" :subtitle="$c->person.' · '.\Illuminate\Support\Carbon::parse($c->started_at)->format('d M, g:i A')">
                     <x-slot:footer>{{ $c->outcome ? __($labels[$c->outcome] ?? $c->outcome) : __('Not filled in') }} · {{ $mmss($c->duration_seconds) }}@if ($c->order_no) · {{ $c->order_no }}@endif
-                        @if ($c->recording_url)<a href="{{ $c->recording_url }}" target="_blank" rel="noopener" class="block text-primary hover:underline">{{ __('Open recording') }}</a>@elseif ($c->proof_path)<a href="{{ route('calls.proof', $c->id) }}" target="_blank" rel="noopener" class="block text-primary hover:underline">{{ __('Open recording') }}</a>@if ($c->proof_old)<span class="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">{{ __('Earlier file') }}</span>@endif @if ($c->proof_name)<span class="block truncate text-xs text-gray-400">{{ __('Picked: :n', ['n' => $c->proof_name]) }}</span>@endif @endif</x-slot:footer>
+                        @if ($c->recording_url)<a href="{{ $c->recording_url }}" target="_blank" rel="noopener" class="block text-primary hover:underline">{{ __('Open recording') }}</a>@elseif ($c->proof_path)<x-play-call :call="$c" :title="$c->phone" :sub="$c->person.' · '.\Illuminate\Support\Carbon::parse($c->started_at)->format('d M, g:i A')" class="mt-1" />@if ($c->proof_old)<span class="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">{{ __('Earlier file') }}</span>@endif @if ($c->proof_name)<span class="block truncate text-xs text-gray-400">{{ __('Picked: :n', ['n' => $c->proof_name]) }}</span>@endif @endif</x-slot:footer>
                 </x-record-card>
             @endforeach
         </x-list.cards>

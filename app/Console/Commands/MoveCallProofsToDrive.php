@@ -79,5 +79,11 @@ class MoveCallProofsToDrive extends Command
         if ($moved) {
             $this->info("Moved {$moved} file(s) to Drive.");
         }
+        // Files fetched from Drive to be listened to go after a day.
+        foreach (Storage::disk('local')->files(\App\Services\Calls\CallProof::CACHE) as $cached) {
+            if (Storage::disk('local')->lastModified($cached) < now()->subDay()->getTimestamp()) {
+                Storage::disk('local')->delete($cached);
+            }
+        }
     }
 }

@@ -36,9 +36,11 @@
                 <p class="break-words text-sm text-gray-800">{{ $entry->body }}</p>
                 @php
                     $meta = ! empty($entry->meta) ? (json_decode($entry->meta, true) ?: []) : [];
-                    $recording = $meta['recording_url'] ?? (! empty($meta['proof_call']) ? route('calls.proof', $meta['proof_call']) : (! empty($meta['proof_rider_call']) ? route('rider-calls.proof', $meta['proof_rider_call']) : null));
+                    $recording = $meta['recording_url'] ?? null;
+                    $uploaded = ! empty($meta['proof_call']) ? route('calls.proof', $meta['proof_call']) : (! empty($meta['proof_rider_call']) ? route('rider-calls.proof', $meta['proof_rider_call']) : null);
                 @endphp
-                @if ($recording)<a href="{{ $recording }}" target="_blank" rel="noopener" class="text-xs font-medium text-primary hover:underline">{{ __('Call recording') }}</a>@endif
+                @if ($uploaded)<x-play-call :url="$uploaded" :title="$entry->body" :sub="$entry->user ?? ''" class="mt-1" />
+                @elseif ($recording)<a href="{{ $recording }}" target="_blank" rel="noopener" class="text-xs font-medium text-primary hover:underline">{{ __('Call recording') }}</a>@endif
                 <p class="mt-0.5 text-xs text-gray-400">{{ $entry->user ?? __('System') }} · {{ \Illuminate\Support\Carbon::parse($entry->created_at)->format($withYear ? 'd M Y, g:i A' : 'd M, g:i A') }}</p>
             </div>
         </li>

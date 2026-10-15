@@ -60,7 +60,7 @@
                     <span class="min-w-0"><span class="font-medium text-gray-900">{{ $c->name }}</span> <span class="text-gray-600">{{ $c->note }}</span>
                         @if ($c->satisfaction !== null)<x-badge :color="$c->satisfaction < 50 ? 'red' : ($c->satisfaction < 75 ? 'amber' : 'green')">{{ $c->satisfaction }}%</x-badge>@endif</span>
                     <span class="shrink-0 text-xs text-gray-500">{{ $c->by }} · {{ \Illuminate\Support\Carbon::parse($c->started_at)->format('d M, g:i A') }}
-                        @if ($c->proof_path) · <a href="{{ route('calls.proof', $c->id) }}" target="_blank" rel="noopener" class="text-primary hover:underline">{{ __('Proof') }}</a>@endif</span>
+                        @if ($c->proof_path) <x-play-call :call="$c" :title="$c->name" :sub="($c->by ?? '').' · '.\Illuminate\Support\Carbon::parse($c->started_at)->format('d M, g:i A')" class="ml-1" />@endif</span>
                 </div>
             @empty
                 <p class="text-sm text-gray-500">{{ __('No calls yet.') }}</p>

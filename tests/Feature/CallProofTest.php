@@ -85,7 +85,7 @@ class CallProofTest extends TestCase
         $id = $this->actingAs($owner)->postJson(route('customer-calls.start'), ['order_id' => $order->id])->json('id');
         $this->post(route('customer-calls.finish', $id), ['_method' => 'PATCH', 'outcome' => array_key_first(\App\Http\Controllers\CustomerCallController::OUTCOMES), 'proof' => $this->rec('01712345678.m4a')], $this->headers())->assertOk();
         $this->assertNotNull(DB::table('customer_calls')->find($id)->proof_path);
-        $this->get(route('orders.show', $order))->assertSee(route('calls.proof', $id), false);
+        $this->get(route('orders.show', $order))->assertSee('Play call');
 
         // Rider call: the rider's or the customer's number may be in the name.
         $rider = ['order_id' => $order->id, 'rider_name' => 'Jamal', 'rider_phone' => '01899999999', 'claim' => 'no_answer', 'verdict' => array_key_first(\App\Services\Work\RiderCallService::VERDICTS), 'action' => 'solved'];

@@ -143,7 +143,8 @@ class GoogleDriveTest extends TestCase
         // Still opens from IQS for the caller and managers, with its own type; never for others.
         $caller->roles()->attach($this->role(['calls.work'], [], 'Caller')->id);
         $res = $this->actingAs($caller)->get(route('calls.proof', $rec))->assertOk()->assertHeader('Content-Type', 'audio/mp4')->assertHeader('X-Content-Type-Options', 'nosniff');
-        $this->assertSame('AUDIO-FROM-DRIVE', $res->streamedContent());
+        $this->assertSame('AUDIO-FROM-DRIVE', file_get_contents($res->baseResponse->getFile()->getPathname()));
+        $this->get(route('calls.proof', $rec), ['Range' => 'bytes=0-4'])->assertStatus(206); // in parts, so the player can jump
         $this->actingAs($owner)->get(route('calls.proof', $rec))->assertOk();
         $this->actingAs($other)->get(route('calls.proof', $rec))->assertNotFound();
         $this->actingAs($owner)->get(route('calls.proof', $shot))->assertStatus(503); // Drive did not give it back

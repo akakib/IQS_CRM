@@ -114,7 +114,7 @@
                                     @if ($r->duration_seconds) · {{ intdiv($r->duration_seconds, 60) }}m {{ $r->duration_seconds % 60 }}s @endif
                                     @if ($r->order_no) · {{ $r->order_no }}@endif
                                     @if ($r->recording_url) · <a href="{{ $r->recording_url }}" target="_blank" rel="noopener" class="text-primary hover:underline">{{ __('Recording') }}</a>@endif
-                                    @if ($r->proof_path && (auth()->id() === $r->user_id || auth()->user()->can('calls.manage'))) · <a href="{{ route('calls.proof', $r->id) }}" target="_blank" rel="noopener" class="text-primary hover:underline" title="{{ $r->proof_name ? __('Picked: :n', ['n' => $r->proof_name]) : '' }}">{{ __('Proof') }}</a>@if ($r->proof_old) <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">{{ __('Earlier file') }}</span>@endif @endif
+                                    @if ($r->proof_path && (auth()->id() === $r->user_id || auth()->user()->can('calls.manage'))) · <x-play-call :call="$r" :title="$customer->name ?? ''" :sub="($r->by ?? '').' · '.\Illuminate\Support\Carbon::parse($r->started_at)->format('d M, g:i A')" />@if ($r->proof_old) <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">{{ __('Earlier file') }}</span>@endif @endif
                                 </p>
                                 @if ($r->note)<p class="mt-1 text-sm text-gray-700">{{ $r->note }}</p>@endif
                             </li>

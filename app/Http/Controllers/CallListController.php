@@ -74,7 +74,7 @@ class CallListController extends Controller
             'assigned' => DB::table('call_list_user')->where('call_list_id', $list)->pluck('user_id')->all(),
             'recent' => DB::table('customer_calls as cc')->join('call_list_items as i', 'i.id', '=', 'cc.call_list_item_id')->leftJoin('users as u', 'u.id', '=', 'cc.user_id')
                 ->where('i.call_list_id', $list)->orderByDesc('cc.id')->limit(30)
-                ->get(['cc.id', 'cc.started_at', 'cc.note', 'cc.satisfaction', 'cc.proof_path', 'cc.duration_seconds', 'i.name', 'i.customer_id', 'u.name as by']),
+                ->get(['cc.id', 'cc.started_at', 'cc.note', 'cc.satisfaction', 'cc.proof_path', 'cc.proof_name', 'cc.proof_old', 'cc.duration_seconds', 'i.name', 'i.customer_id', 'u.name as by']),
         ]);
     }
 

@@ -150,6 +150,25 @@ class GoogleDriveTest extends TestCase
         $this->get(route('calls.proof', $gone))->assertNotFound();
         $this->get('/settings/google-drive')->assertSee('2 call files in Drive.');
 
+        // Move now: nothing waits, so it says so.
+        $this->post('/settings/google-drive/move')->assertSessionHas('success', 'Nothing is waiting: every call file is in Drive.');
+        \Illuminate\Support\Facades\Storage::disk('local')->put('call-proofs/1/c.m4a', 'MORE');
+        $more = $call('call-proofs/1/c.m4a');
+        $this->get('/settings/google-drive')->assertSee('1 waiting on the server.')->assertSee('Move now');
+        $this->post('/settings/google-drive/move')->assertSessionHas('success', '1 moved to Drive. Nothing is waiting now.');
+        $this->assertSame('d3', \DB::table('customer_calls')->where('id', $more)->value('proof_drive_id'));
+        $sent = array_slice($sent, 0, 2);
+
+        // Another mover already busy: this run leaves the files alone.
+        \Illuminate\Support\Facades\Storage::disk('local')->put('call-proofs/1/d.m4a', 'X');
+        $busy = $call('call-proofs/1/d.m4a');
+        $lock = \Illuminate\Support\Facades\Cache::lock('calls:proofs-to-drive', 600);
+        $lock->get();
+        $this->artisan('calls:proofs-to-drive')->assertSuccessful();
+        $this->assertNull(\DB::table('customer_calls')->where('id', $busy)->value('proof_drive_id'));
+        $lock->release();
+        \DB::table('customer_calls')->where('id', $busy)->delete();
+
         // Running again moves nothing more.
         $this->artisan('calls:proofs-to-drive')->assertSuccessful();
         $this->assertCount(2, $sent);

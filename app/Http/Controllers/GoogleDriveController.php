@@ -91,6 +91,24 @@ class GoogleDriveController extends Controller
         }
     }
 
+    /** Moves the call files still waiting on the server now (no need to wait for the next saved call). */
+    public function move(): RedirectResponse
+    {
+        @set_time_limit(300);
+        $waiting = fn () => \Illuminate\Support\Facades\DB::table('customer_calls')->whereNotNull('proof_path')->whereNull('proof_drive_id')->count();
+        $before = $waiting();
+        \Illuminate\Support\Facades\Artisan::call('calls:proofs-to-drive', ['--limit' => 50]);
+        $left = $waiting();
+        $moved = $before - $left;
+
+        return to_route('settings.google-drive')->with($moved > 0 || $before === 0 ? 'success' : 'error', match (true) {
+            $before === 0 => __('Nothing is waiting: every call file is in Drive.'),
+            $moved === 0 => __('No file moved. Press Test upload to see what Drive says.'),
+            $left > 0 => __(':m moved to Drive, :l still waiting. Press Move now again.', ['m' => $moved, 'l' => $left]),
+            default => __(':m moved to Drive. Nothing is waiting now.', ['m' => $moved]),
+        });
+    }
+
     public function disconnect(ActivityLogger $logger): RedirectResponse
     {
         $drive = GoogleDrive::current();

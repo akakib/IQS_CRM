@@ -30,6 +30,22 @@ class MoveCallProofsToDrive extends Command
         if (! $drive?->isConnected() || ! $drive->hasKeys()) {
             return self::SUCCESS;
         }
+        // One mover at a time (after a call is saved, the Move now button, the scheduler), so no file goes up twice.
+        $lock = \Illuminate\Support\Facades\Cache::lock('calls:proofs-to-drive', 600);
+        if (! $lock->get()) {
+            return self::SUCCESS;
+        }
+        try {
+            $this->move($service, $drive);
+        } finally {
+            $lock->release();
+        }
+
+        return self::SUCCESS;
+    }
+
+    private function move(GoogleDriveService $service, GoogleDrive $drive): void
+    {
         $calls = DB::table('customer_calls as c')->whereNotNull('c.proof_path')->whereNull('c.proof_drive_id')
             ->leftJoin('users as u', 'u.id', '=', 'c.user_id')
             ->orderBy('c.id')->limit(max(1, (int) $this->option('limit')))
@@ -60,7 +76,5 @@ class MoveCallProofsToDrive extends Command
         if ($moved) {
             $this->info("Moved {$moved} file(s) to Drive.");
         }
-
-        return self::SUCCESS;
     }
 }

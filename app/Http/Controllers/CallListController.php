@@ -134,6 +134,8 @@ class CallListController extends Controller
             'proof' => ['nullable', 'file', 'max:25600'],
         ]);
         $this->calls->record($it, $request->user(), $data, $request->file('proof'));
+        // No cron on staging: the file goes to Drive right after the caller gets the next page (cron, where it runs, catches the rest).
+        dispatch(fn () => \Illuminate\Support\Facades\Artisan::call('calls:proofs-to-drive', ['--limit' => 5]))->afterResponse();
 
         return redirect()->route('calls.work', $row->id)->with('success', __('Saved. Next number below.'))->with('saved_item', $it->id);
     }

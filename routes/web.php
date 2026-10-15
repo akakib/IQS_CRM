@@ -395,6 +395,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/settings/google-drive/connect', [\App\Http\Controllers\GoogleDriveController::class, 'connect'])->name('settings.google-drive.connect');
         Route::get('/settings/google-drive/callback', [\App\Http\Controllers\GoogleDriveController::class, 'callback'])->name('settings.google-drive.callback');
         Route::post('/settings/google-drive/test', [\App\Http\Controllers\GoogleDriveController::class, 'test'])->name('settings.google-drive.test');
+        Route::post('/settings/google-drive/move', [\App\Http\Controllers\GoogleDriveController::class, 'move'])->name('settings.google-drive.move');
         Route::post('/settings/google-drive/disconnect', [\App\Http\Controllers\GoogleDriveController::class, 'disconnect'])->name('settings.google-drive.disconnect');
         Route::get('/settings/couriers', [\App\Http\Controllers\CourierAccountController::class, 'index'])->name('settings.couriers');
         Route::post('/settings/couriers', [\App\Http\Controllers\CourierAccountController::class, 'store'])->name('settings.couriers.store');

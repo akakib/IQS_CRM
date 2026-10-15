@@ -22,9 +22,14 @@ class CustomerJourneyTest extends TestCase
 
     public function test_phone_forms_all_normalise(): void
     {
-        foreach (['01712345678', '+880 1712-345678', '8801712345678', '008801712345678', '1712345678', '০১৭১২৩৪৫৬৭৮', '+৮৮০১৭১২৩৪৫৬৭৮'] as $in) {
+        foreach (['01712345678', '+880 1712-345678', '8801712345678', '008801712345678', '1712345678', '০১৭১২৩৪৫৬৭৮', '+৮৮০১৭১২৩৪৫৬৭৮',
+            '+880 01712345678', '+88 1712345678', '88 01712345678', '0088 01712345678', '+0 1712345678', '(+88) 017 1234 5678'] as $in) {
             $this->assertSame('01712345678', Phone::normalize($in), $in);
         }
+        foreach (['017123456788', '0171234567', '8812345678', '02-9876543', '88017123456'] as $in) {
+            $this->assertNull(Phone::normalize($in), $in); // a digit too many or too few is never guessed at
+        }
+        $this->assertSame('01881234567', Phone::normalize('01881234567')); // a real 018 number keeps its 88
     }
 
     public function test_journey_shows_orders_sales_and_losses(): void

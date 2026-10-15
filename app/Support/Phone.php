@@ -11,17 +11,19 @@ final class Phone
         return strtr($input, ['০' => '0', '১' => '1', '২' => '2', '৩' => '3', '৪' => '4', '৫' => '5', '৬' => '6', '৭' => '7', '৮' => '8', '৯' => '9']);
     }
 
-    /** +880 1712-345678, 008801712345678, 8801712345678, 01712345678, 1712345678, ০১৭১২৩৪৫৬৭৮ -> 01712345678; anything else -> null. */
+    /**
+     * One shape for every way a number is written: 01712345678, 1712345678 (no 0), +880 1712-345678, +880 01712345678,
+     * +88 1712345678, 88 01712345678, 0088 01712345678, 008801712345678, ০১৭১২৩৪৫৬৭৮ -> 01712345678; anything else -> null.
+     */
     public static function normalize(?string $input): ?string
     {
         $digits = preg_replace('/\D/', '', self::englishDigits((string) $input));
-
-        $digits = match (true) {
-            str_starts_with($digits, '008801') && strlen($digits) === 15 => substr($digits, 4),
-            str_starts_with($digits, '8801') && strlen($digits) === 13 => substr($digits, 2),
-            str_starts_with($digits, '1') && strlen($digits) === 10 => '0'.$digits,
-            default => $digits,
-        };
+        // The international 00, then the country code written as 880 or 88, with or without the 0 after it.
+        $digits = preg_replace('/^00(?=88)/', '', $digits);
+        $digits = preg_replace('/^880?(?=0?1[3-9]\d{8}$)/', '', $digits);
+        if (preg_match('/^1[3-9]\d{8}$/', $digits)) {
+            $digits = '0'.$digits;
+        }
 
         return preg_match('/^01[3-9]\d{8}$/', $digits) ? $digits : null;
     }

@@ -157,16 +157,28 @@ class CallListController extends Controller
     }
 
     /** The recording or screenshot of one call: the caller and managers only. */
-    public function proof(Request $request, int $call): StreamedResponse
+    public function proof(Request $request, int $call): \Symfony\Component\HttpFoundation\Response
     {
-        $path = $this->calls->proofPath($call, $request->user()) ?? abort(404);
-
+        $file = $this->calls->proofFile($call, $request->user()) ?? abort(404);
         // Its own type only, never sniffed, and nothing in it can run.
-        return Storage::disk('local')->response($path, null, [
-            'Content-Type' => CallListService::proofMime($path),
+        $headers = [
+            'Content-Type' => CallListService::proofMime($file->path),
             'X-Content-Type-Options' => 'nosniff',
             'Content-Security-Policy' => "default-src 'none'; img-src 'self'; media-src 'self'; sandbox",
-        ]);
+        ];
+        if (! $file->drive_id) {
+            return Storage::disk('local')->response($file->path, null, $headers);
+        }
+        // In Google Drive: fetched through IQS, so the Drive file is never shared with anyone.
+        try {
+            $body = app(\App\Services\Drive\GoogleDriveService::class)->download(\App\Models\GoogleDrive::current(), $file->drive_id);
+        } catch (\RuntimeException $e) {
+            abort(503, __('The file is in Google Drive, but Drive did not give it back now. If Drive was disconnected, connect it again in Settings.'));
+        }
+
+        return response()->stream(function () use ($body) {
+            echo $body;
+        }, 200, $headers + ['Content-Length' => strlen($body), 'Cache-Control' => 'private, max-age=3600']);
     }
 
     // ---- Helpers -------------------------------------------------------------------------------

@@ -85,6 +85,76 @@ class GoogleDriveTest extends TestCase
         $this->assertSame(self::ID, $drive->fresh()->client_id); // keys stay for the next connect
     }
 
+    public function test_call_files_move_to_drive_and_still_open_from_iqs(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $owner = $this->owner();
+        $caller = User::factory()->create(['name' => 'Rakin']);
+        $other = User::factory()->create();
+        $call = fn (string $path) => \DB::table('customer_calls')->insertGetId(['phone' => '01711111111', 'direction' => 'out', 'user_id' => $caller->id,
+            'started_at' => '2026-10-15 17:40:00', 'outcome' => 'answered', 'proof_path' => $path]);
+        \Illuminate\Support\Facades\Storage::disk('local')->put('call-proofs/1/a.m4a', 'AUDIO');
+        \Illuminate\Support\Facades\Storage::disk('local')->put('call-proofs/1/b.png', 'PNG');
+        $rec = $call('call-proofs/1/a.m4a');
+        $shot = $call('call-proofs/1/b.png');
+        $gone = $call('call-proofs/1/lost.m4a'); // its server file was already gone
+
+        $sent = [];
+        $down = false;
+        Http::fake(function ($request) use (&$sent, &$down) {
+            $u = $request->url();
+            if (str_starts_with($u, 'https://oauth2.googleapis.com/token')) {
+                return Http::response(['access_token' => 'at', 'expires_in' => 3600]);
+            }
+            if (str_starts_with($u, 'https://www.googleapis.com/upload/')) {
+                if ($down) {
+                    return Http::response(['error' => ['message' => 'Backend Error']], 500);
+                }
+                preg_match('/"name":"([^"]+)","parents":\["(\w+)"\]/', $request->body(), $m);
+                $sent[] = [stripslashes($m[1] ?? ''), $m[2] ?? ''];
+                return Http::response(['id' => 'd'.count($sent), 'name' => $m[1] ?? '']);
+            }
+            if (str_starts_with($u, 'https://www.googleapis.com/drive/v3/files/d1')) {
+                return Http::response('AUDIO-FROM-DRIVE');
+            }
+            return Http::response(['error' => ['message' => 'nope']], 404);
+        });
+
+        // Not connected: nothing moves, the files keep opening from the server.
+        $this->artisan('calls:proofs-to-drive')->assertSuccessful();
+        Http::assertNothingSent();
+        $this->assertNull(\DB::table('customer_calls')->where('id', $rec)->value('proof_drive_id'));
+
+        GoogleDrive::current()->update(['client_id' => self::ID, 'client_secret' => 's', 'refresh_token' => 'rt', 'folders' => ['root' => 'R', 'records' => 'REC', 'screenshots' => 'SS']]);
+        $down = true;
+
+        // Drive fails: the files stay on the server and are tried again later.
+        $this->artisan('calls:proofs-to-drive')->assertSuccessful();
+        $this->assertNull(\DB::table('customer_calls')->where('id', $rec)->value('proof_drive_id'));
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists('call-proofs/1/a.m4a');
+
+        $down = false;
+        $this->artisan('calls:proofs-to-drive')->assertSuccessful();
+        $this->assertSame([['01711111111 2026-10-15 17-40 Rakin #'.$rec.'.m4a', 'REC'], ['01711111111 2026-10-15 17-40 Rakin #'.$shot.'.png', 'SS']], $sent);
+        $this->assertSame('d1', \DB::table('customer_calls')->where('id', $rec)->value('proof_drive_id'));
+        $this->assertSame('missing', \DB::table('customer_calls')->where('id', $gone)->value('proof_drive_id'));
+        \Illuminate\Support\Facades\Storage::disk('local')->assertMissing('call-proofs/1/a.m4a'); // removed only after Drive had it
+
+        // Still opens from IQS for the caller and managers, with its own type; never for others.
+        $caller->roles()->attach($this->role(['calls.work'], [], 'Caller')->id);
+        $res = $this->actingAs($caller)->get(route('calls.proof', $rec))->assertOk()->assertHeader('Content-Type', 'audio/mp4')->assertHeader('X-Content-Type-Options', 'nosniff');
+        $this->assertSame('AUDIO-FROM-DRIVE', $res->streamedContent());
+        $this->actingAs($owner)->get(route('calls.proof', $rec))->assertOk();
+        $this->actingAs($other)->get(route('calls.proof', $rec))->assertNotFound();
+        $this->actingAs($owner)->get(route('calls.proof', $shot))->assertStatus(503); // Drive did not give it back
+        $this->get(route('calls.proof', $gone))->assertNotFound();
+        $this->get('/settings/google-drive')->assertSee('2 call files in Drive.');
+
+        // Running again moves nothing more.
+        $this->artisan('calls:proofs-to-drive')->assertSuccessful();
+        $this->assertCount(2, $sent);
+    }
+
     public function test_only_access_managers_reach_it(): void
     {
         $user = User::factory()->create();

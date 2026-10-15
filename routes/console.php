@@ -31,6 +31,9 @@ Schedule::command('courier:resync')->everyThirtyMinutes()->withoutOverlapping(20
 // Product changes -> website (one-way), with retry/backoff inside.
 Schedule::command('channel-sync:run')->everyMinute()->withoutOverlapping(5);
 
+// Call recordings and screenshots: server -> Google Drive (waits on the server while Drive is not connected).
+Schedule::command('calls:proofs-to-drive')->everyMinute()->withoutOverlapping(10);
+
 // Access already stops at expires_at; this only clears the expired rows.
 Schedule::command('permissions:prune-expired')->hourly();
 

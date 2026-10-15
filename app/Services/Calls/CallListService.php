@@ -314,15 +314,24 @@ class CallListService
         });
     }
 
-    /** Proof files are private: only the caller who made the call and managers may open them. */
-    public function proofPath(int $callId, User $user): ?string
+    /**
+     * Proof files are private: only the caller who made the call and managers may open them.
+     * The file is on the server until it moves to Google Drive (then drive_id is set).
+     *
+     * @return ?object{path: string, drive_id: ?string}
+     */
+    public function proofFile(int $callId, User $user): ?object
     {
-        $call = DB::table('customer_calls')->find($callId, ['user_id', 'proof_path']);
+        $call = DB::table('customer_calls')->find($callId, ['user_id', 'proof_path', 'proof_drive_id']);
         if (! $call?->proof_path || ($call->user_id !== $user->id && ! $user->can('calls.manage'))) {
             return null;
         }
+        $drive = $call->proof_drive_id && $call->proof_drive_id !== \App\Console\Commands\MoveCallProofsToDrive::MISSING ? $call->proof_drive_id : null;
+        if (! $drive && ! Storage::disk('local')->exists($call->proof_path)) {
+            return null;
+        }
 
-        return Storage::disk('local')->exists($call->proof_path) ? $call->proof_path : null;
+        return (object) ['path' => $call->proof_path, 'drive_id' => $drive];
     }
 
     /** The content type for a stored proof, from the extension it was saved with (which came from its real type). */

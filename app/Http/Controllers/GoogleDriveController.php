@@ -22,6 +22,8 @@ class GoogleDriveController extends Controller
             'drive' => GoogleDrive::current(),
             'redirectUri' => GoogleDriveService::redirectUri(),
             'folders' => GoogleDriveService::FOLDERS,
+            'waiting' => \Illuminate\Support\Facades\DB::table('customer_calls')->whereNotNull('proof_path')->whereNull('proof_drive_id')->count(),
+            'inDrive' => \Illuminate\Support\Facades\DB::table('customer_calls')->whereNotNull('proof_drive_id')->where('proof_drive_id', '!=', \App\Console\Commands\MoveCallProofsToDrive::MISSING)->count(),
         ]);
     }
 

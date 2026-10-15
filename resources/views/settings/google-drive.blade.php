@@ -1,7 +1,7 @@
 @php($input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none')
 
 <x-layouts.app :heading="__('Google Drive')">
-    <p class="mb-4 text-sm text-gray-500">{{ __('Call recordings and call screenshots will be kept in the business Google Drive. IQS makes its own folders there and can see only the files it puts in them.') }}</p>
+    <p class="mb-4 text-sm text-gray-500">{{ __('Call recordings go to "Call Record" and call-log screenshots to "Call SS" in the business Google Drive, within a minute of saving the call. IQS makes its own folders there and can see only the files it puts in them. Files still open from IQS for the caller and managers.') }}</p>
 
     <div class="grid gap-6 lg:grid-cols-2">
         <x-card :title="__('Connection')">
@@ -16,6 +16,8 @@
                     <li class="pl-4">{{ $folders['records'] }}</li>
                     <li class="pl-4">{{ $folders['screenshots'] }}</li>
                 </ul>
+                <p class="mt-4 text-sm text-gray-700">{{ __(':n call files in Drive.', ['n' => number_format($inDrive)]) }}
+                    @if ($waiting) {{ __(':n waiting on the server; they move within a few minutes.', ['n' => number_format($waiting)]) }} @endif</p>
                 @if ($drive->tested_at)
                     <div class="mt-4 rounded-lg border p-3 text-sm {{ $drive->test_ok ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700' }}">
                         <p class="font-semibold">{{ $drive->test_ok ? __('Last test passed') : __('Last test failed') }} · {{ $drive->tested_at->format('d M, h:i A') }}</p>

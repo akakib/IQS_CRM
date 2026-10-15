@@ -390,6 +390,12 @@ Route::middleware('auth')->group(function () {
         Route::put('/settings/website-api/{account}', [\App\Http\Controllers\WebsiteApiController::class, 'update'])->whereNumber('account')->name('settings.website-api.update');
         Route::post('/settings/website-api/{account}/check', [\App\Http\Controllers\WebsiteApiController::class, 'check'])->whereNumber('account')->name('settings.website-api.check');
         Route::post('/settings/website-api/pull', [\App\Http\Controllers\WebsiteApiController::class, 'pull'])->name('settings.website-api.pull');
+        Route::get('/settings/google-drive', [\App\Http\Controllers\GoogleDriveController::class, 'index'])->name('settings.google-drive');
+        Route::post('/settings/google-drive', [\App\Http\Controllers\GoogleDriveController::class, 'save'])->name('settings.google-drive.save');
+        Route::post('/settings/google-drive/connect', [\App\Http\Controllers\GoogleDriveController::class, 'connect'])->name('settings.google-drive.connect');
+        Route::get('/settings/google-drive/callback', [\App\Http\Controllers\GoogleDriveController::class, 'callback'])->name('settings.google-drive.callback');
+        Route::post('/settings/google-drive/test', [\App\Http\Controllers\GoogleDriveController::class, 'test'])->name('settings.google-drive.test');
+        Route::post('/settings/google-drive/disconnect', [\App\Http\Controllers\GoogleDriveController::class, 'disconnect'])->name('settings.google-drive.disconnect');
         Route::get('/settings/couriers', [\App\Http\Controllers\CourierAccountController::class, 'index'])->name('settings.couriers');
         Route::post('/settings/couriers', [\App\Http\Controllers\CourierAccountController::class, 'store'])->name('settings.couriers.store');
         Route::put('/settings/couriers/{account}', [\App\Http\Controllers\CourierAccountController::class, 'update'])->whereNumber('account')->name('settings.couriers.update');

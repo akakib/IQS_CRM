@@ -35,7 +35,7 @@
                         <span class="text-xs text-gray-500">{{ $i->source ?? __('Not mapped yet') }} · {{ $i->by }} · {{ \Illuminate\Support\Carbon::parse($i->created_at)->format('d M, g:i A') }}</span>
                     </span>
                     <span class="shrink-0 text-right text-xs">
-                        @if ($i->done_at)<span class="text-green-700">{{ __(':n orders', ['n' => $r['orders'] ?? 0]) }}</span>@else<span class="text-amber-700">{{ __('Finish mapping') }}</span>@endif
+                        @if ($i->undone_at)<span class="text-gray-400 line-through">{{ __(':n orders', ['n' => $r['orders'] ?? 0]) }}</span><span class="block text-amber-700">{{ __('Taken back') }}</span>@else<span class="text-green-700">{{ __(':n orders', ['n' => $r['orders'] ?? 0]) }}</span>@endif
                     </span>
                 </a>
             @empty

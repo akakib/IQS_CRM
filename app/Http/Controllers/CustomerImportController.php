@@ -20,7 +20,7 @@ class CustomerImportController extends Controller
     {
         return view('customers.history-import', [
             'imports' => DB::table('customer_imports as i')->leftJoin('users as u', 'u.id', '=', 'i.created_by')->whereNotNull('i.done_at')
-                ->orderByDesc('i.id')->limit(15)->get(['i.id', 'i.file_name', 'i.source', 'i.row_count', 'i.result', 'i.done_at', 'i.created_at', 'u.name as by']),
+                ->orderByDesc('i.id')->limit(15)->get(['i.id', 'i.file_name', 'i.source', 'i.row_count', 'i.result', 'i.done_at', 'i.undone_at', 'i.created_at', 'u.name as by']),
         ]);
     }
 
@@ -177,9 +177,11 @@ class CustomerImportController extends Controller
     {
         $row = DB::table('customer_imports')->find($import) ?? abort(404);
         abort_unless($row->done_at && ! $row->undone_at, 422, __('This import was taken back.'));
-        $orders->edit($row, $past, $this->rowData($request), $request->user());
+        $note = $orders->edit($row, $past, $this->rowData($request), $request->user());
+        // Shown on the page after it reloads.
+        session()->flash($note ? 'error' : 'success', $note ?? __('Saved.'));
 
-        return response()->json(['message' => __('Saved.')]);
+        return response()->json(['message' => $note ?? __('Saved.')]);
     }
 
     /** Orders of this import deleted: the ticked ones, or one. */

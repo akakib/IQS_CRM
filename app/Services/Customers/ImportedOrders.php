@@ -19,7 +19,8 @@ class ImportedOrders
     /**
      * @param  array{name: string, phone: string, cn?: ?string, address?: ?string, items?: ?string, amount?: ?string, date?: ?string, status: string}  $data
      */
-    public function edit(object $import, int $pastId, array $data, User $user): void
+    /** @return ?string a note when the name could not be changed here (an IQS customer with orders of their own) */
+    public function edit(object $import, int $pastId, array $data, User $user): ?string
     {
         $past = DB::table('customer_past_orders')->where('customer_import_id', $import->id)->find($pastId) ?? abort(404, __('That order is not in this import.'));
         $phone = Phone::extract($data['phone'])[0] ?? null;
@@ -47,7 +48,8 @@ class ImportedOrders
             throw ValidationException::withMessages(['name' => __('The name is a must.')]);
         }
 
-        DB::transaction(function () use ($import, $past, $data, $phone, $cn, $date, $name, $user) {
+        return DB::transaction(function () use ($import, $past, $data, $phone, $cn, $date, $name, $user) {
+            $note = null;
             $now = now();
             $customerId = $this->owner($phone);
             if (! $customerId) {
@@ -55,9 +57,18 @@ class ImportedOrders
                 $customerId = DB::table('customers')->insertGetId(['name' => mb_substr($name, 0, 150), 'primary_phone' => $phone, 'created_by' => $user->id,
                     'customer_import_id' => $import->id, 'created_at' => $now, 'updated_at' => $now]);
                 DB::table('customer_phones')->insertOrIgnore(['customer_id' => $customerId, 'phone' => $phone, 'is_primary' => true, 'created_at' => $now, 'updated_at' => $now]);
-            } elseif ((int) DB::table('customers')->where('id', $customerId)->value('customer_import_id') === (int) $import->id) {
-                // The name is changed only on a customer this import made (never on one IQS already had).
-                DB::table('customers')->where('id', $customerId)->update(['name' => mb_substr($name, 0, 150), 'updated_at' => $now]);
+            } else {
+                // The name lives on the customer. It is changed here unless they are an IQS customer with orders of
+                // their own: then it is changed on the customer's page, and the person is told.
+                $current = DB::table('customers')->where('id', $customerId)->first(['name', 'customer_import_id']);
+                $hasOrders = DB::table('orders')->where('customer_id', $customerId)->exists();
+                if ($current->name !== $name) {
+                    if ($current->customer_import_id || ! $hasOrders) {
+                        DB::table('customers')->where('id', $customerId)->update(['name' => mb_substr($name, 0, 150), 'updated_at' => $now]);
+                    } else {
+                        $note = __('Saved, but the name stays ":n": this customer has orders in IQS, so change the name on their customer page.', ['n' => $current->name]);
+                    }
+                }
             }
             DB::table('customer_past_orders')->where('id', $past->id)->update([
                 'customer_id' => $customerId, 'cn' => $cn, 'ordered_at' => $date,
@@ -68,6 +79,8 @@ class ImportedOrders
             if ((int) $past->customer_id !== $customerId) {
                 $this->dropEmptyCustomers($import, [(int) $past->customer_id]);
             }
+
+            return $note;
         });
     }
 

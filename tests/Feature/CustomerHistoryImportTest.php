@@ -332,11 +332,23 @@ class CustomerHistoryImportTest extends TestCase
         $edit($rahima->id, ['name' => 'R', 'phone' => '01711111111', 'date' => 'someday'])->assertStatus(422)->assertJsonValidationErrors('date');
         $edit($rahima->id, ['name' => 'Name:', 'phone' => '01711111111'])->assertStatus(422)->assertJsonValidationErrors('name');
 
-        // A phone of a customer IQS already has: the order moves to them, their name is not touched, and the empty customer the import made goes.
+        // A customer from an earlier import is renamed too (the name is on the customer), and found by the new name.
+        $nusrat = DB::table('customer_past_orders')->where('cn', 'DM200003')->first();
+        DB::table('customers')->where('id', $nusrat->customer_id)->update(['customer_import_id' => null]);
+        $edit($nusrat->id, ['name' => 'Nusrat Jahan 45', 'phone' => '01733333333', 'cn' => 'DM200003'])->assertOk()->assertJsonPath('message', 'Saved.');
+        $this->assertSame('Nusrat Jahan 45', Customer::find($nusrat->customer_id)->name);
+        $this->get(route('customers.history.show', [$id, 'q' => 'Nusrat Jahan 45']))->assertSee('Nusrat Jahan 45');
+
+        // A phone of a customer IQS already has: the order moves to them, and the empty customer the import made goes.
         $karim = DB::table('customer_past_orders')->where('cn', 'DM200002')->first();
-        $edit($karim->id, ['name' => 'Karim Renamed', 'phone' => '+880 1799-999999', 'cn' => 'DM200002'])->assertOk();
+        $edit($karim->id, ['name' => 'Already Here', 'phone' => '+880 1799-999999', 'cn' => 'DM200002'])->assertOk();
         $this->assertSame($iqs->id, DB::table('customer_past_orders')->find($karim->id)->customer_id);
+        // An IQS customer with orders of their own keeps the name, and the person is told why.
+        (new \Database\Seeders\OrderConfigSeeder)->run();
+        DB::table('orders')->insert(['order_no' => 'IQ1', 'customer_id' => $iqs->id, 'status_id' => DB::table('order_statuses')->value('id'), 'channel' => 'phone', 'ship_name' => 'x', 'ship_phone' => '01799999999', 'ship_address' => 'x', 'created_at' => now(), 'updated_at' => now()]);
+        $edit($karim->id, ['name' => 'Karim Renamed', 'phone' => '01799999999', 'cn' => 'DM200002'])->assertOk()->assertJsonPath('message', fn ($m) => str_contains($m, 'name stays "Already Here"'));
         $this->assertSame('Already Here', $iqs->fresh()->name);
+        DB::table('orders')->delete();
         $this->assertNull(Customer::where('primary_phone', '01722222222')->first());
         // A new number: a new customer, made by this import.
         $edit($karim->id, ['name' => 'Karim New', 'phone' => '01744444444', 'cn' => 'DM200002'])->assertOk();

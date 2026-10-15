@@ -550,6 +550,12 @@ class HistoryImport
         return hash('sha256', implode('|', array_map('strtolower', $header)));
     }
 
+    /** A date typed by hand: day first, except Pathao's "7/24/2026, 16:27" shape. */
+    public function readDate(string $v): ?string
+    {
+        return $this->date($v, ! preg_match('#^\s*\d{1,2}/\d{1,2}/\d{4},\s*\d#', $v));
+    }
+
     private function date(string $v, bool $dayFirst = true): ?string
     {
         $v = trim(str_replace(',', ' ', Phone::englishDigits($v)));

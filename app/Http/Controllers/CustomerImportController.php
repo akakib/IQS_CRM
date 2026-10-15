@@ -122,42 +122,90 @@ class CustomerImportController extends Controller
         return redirect()->route('customers.history.show', $row->id)->with('status', __('Import taken back.'));
     }
 
-    /** A row that did not come in, fixed on the result page: imported into this same import (so Undo takes it back too). */
-    public function fixRow(Request $request, int $import, int $index): RedirectResponse
+    /** A row that did not come in, fixed in the popup: imported into this same import (so Undo takes it back too). */
+    public function fixRow(Request $request, int $import, int $index): \Illuminate\Http\JsonResponse
     {
         [$row, $result, $problem] = $this->problem($import, $index);
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:150'], 'phone' => ['required', 'string', 'max:60'], 'cn' => ['nullable', 'string', 'max:40'],
-            'address' => ['nullable', 'string', 'max:500'], 'items' => ['nullable', 'string', 'max:1000'], 'amount' => ['nullable', 'string', 'max:30'],
-            'date' => ['nullable', 'string', 'max:40'], 'status' => ['required', \Illuminate\Validation\Rule::in(['delivered', 'returned', 'cancelled', 'refunded', 'pending'])],
-        ]);
-        if (! \App\Support\Phone::extract($data['phone'])) {
-            return back()->withErrors(['fix_'.$index => __('This phone is not a full mobile number (11 digits starting 01).')])->withInput();
-        }
+        $data = $this->rowData($request);
         $header = ['Name', 'CN', 'Phone', 'Address', 'Products', 'Amount', 'Date', 'Status'];
         $mapping = ['Name' => 'name', 'CN' => 'cn', 'Phone' => 'phone', 'Address' => 'address', 'Products' => 'items', 'Amount' => 'amount', 'Date' => 'date', 'Status' => 'status'];
         $line = [$data['name'], $data['cn'] ?? '', $data['phone'], $data['address'] ?? '', $data['items'] ?? '', $data['amount'] ?? '', $data['date'] ?? '', $data['status']];
         $plan = $this->history->plan($header, [$line], $mapping, ['status' => [$data['status'] => $data['status']]], $row->default_medium ?: 'other', $row->source);
         if ($plan['problems']) {
-            $why = ['bad_phone' => __('The phone is not usable.'), 'no_name' => __('The name is empty.'), 'bad_date' => __('The date is not readable (write 2026-07-24 or 24/07/2026, or leave it empty).')];
-
-            return back()->withErrors(['fix_'.$index => $why[$plan['problems'][0]['why']] ?? __('This row cannot come in.')])->withInput();
+            [$field, $why] = match ($plan['problems'][0]['why']) {
+                'bad_phone' => ['phone', __('This phone is not a full mobile number (11 digits starting 01).')],
+                'no_name' => ['name', __('The name is a must.')],
+                'bad_date' => ['date', __('The date is not readable (write 2026-07-24 or 24/07/2026, or leave it empty).')],
+                default => ['status', __('This row cannot come in.')],
+            };
+            throw \Illuminate\Validation\ValidationException::withMessages([$field => $why]);
         }
         $written = $this->history->import($plan, $row->id, $row->source, $request->user()->id);
-        $message = $written['inserted'] ? __('Row :n came in.', ['n' => $problem['line']])
-            : __('Row :n is already in IQS (an order with the same CN, number or details), so it was not added again.', ['n' => $problem['line']]);
-        $this->dropProblem($row, $result, $index, $written['inserted']);
+        $this->dropProblems($row, $result, [$index], $written['inserted']);
 
-        return back()->with('success', $message);
+        return response()->json(['message' => $written['inserted'] ? __('Row :n came in.', ['n' => $problem['line']])
+            : __('Row :n is already in IQS (an order with the same CN, number or details), so it was not added again.', ['n' => $problem['line']])]);
     }
 
     /** A row that did not come in, taken off the list (it stays out). */
     public function deleteRow(int $import, int $index): RedirectResponse
     {
         [$row, $result] = $this->problem($import, $index);
-        $this->dropProblem($row, $result, $index, 0);
+        $this->dropProblems($row, $result, [$index], 0);
 
         return back()->with('success', __('Row removed from the list.'));
+    }
+
+    /** Several rows that did not come in (or all of them) taken off the list. */
+    public function deleteRows(Request $request, int $import): RedirectResponse
+    {
+        $row = DB::table('customer_imports')->find($import) ?? abort(404);
+        abort_unless($row->done_at && ! $row->undone_at, 422, __('This import was taken back.'));
+        $result = json_decode((string) $row->result, true) ?: [];
+        $all = array_keys($result['problems'] ?? []);
+        $picked = $request->boolean('all') ? $all : array_values(array_intersect($all, array_map('intval', (array) $request->input('rows', []))));
+        if (! $picked) {
+            return back()->withErrors(['rows' => __('Tick the rows to delete first.')]);
+        }
+        $this->dropProblems($row, $result, $picked, 0);
+
+        return back()->with('success', trans_choice(':count row removed from the list.|:count rows removed from the list.', count($picked), ['count' => count($picked)]));
+    }
+
+    /** One order of this import, changed in the popup. */
+    public function editOrder(Request $request, int $import, int $past, \App\Services\Customers\ImportedOrders $orders): \Illuminate\Http\JsonResponse
+    {
+        $row = DB::table('customer_imports')->find($import) ?? abort(404);
+        abort_unless($row->done_at && ! $row->undone_at, 422, __('This import was taken back.'));
+        $orders->edit($row, $past, $this->rowData($request), $request->user());
+
+        return response()->json(['message' => __('Saved.')]);
+    }
+
+    /** Orders of this import deleted: the ticked ones, or one. */
+    public function deleteOrders(Request $request, int $import, \App\Services\Customers\ImportedOrders $orders): RedirectResponse
+    {
+        $row = DB::table('customer_imports')->find($import) ?? abort(404);
+        abort_unless($row->done_at && ! $row->undone_at, 422, __('This import was taken back.'));
+        $ids = array_map('intval', (array) $request->input('orders', []));
+        if (! $ids) {
+            return back()->withErrors(['orders' => __('Tick the orders to delete first.')]);
+        }
+        $n = $orders->delete($row, $ids);
+        $result = json_decode((string) $row->result, true) ?: [];
+        $result['orders'] = max(0, (int) ($result['orders'] ?? 0) - $n);
+        DB::table('customer_imports')->where('id', $row->id)->update(['result' => json_encode($result, JSON_UNESCAPED_UNICODE), 'updated_at' => now()]);
+
+        return back()->with('success', trans_choice(':count order deleted.|:count orders deleted.', $n, ['count' => $n]));
+    }
+
+    private function rowData(Request $request): array
+    {
+        return $request->validate([
+            'name' => ['required', 'string', 'max:150'], 'phone' => ['required', 'string', 'max:60'], 'cn' => ['nullable', 'string', 'max:40'],
+            'address' => ['nullable', 'string', 'max:500'], 'items' => ['nullable', 'string', 'max:1000'], 'amount' => ['nullable', 'string', 'max:30'],
+            'date' => ['nullable', 'string', 'max:40'], 'status' => ['required', \Illuminate\Validation\Rule::in(['delivered', 'returned', 'cancelled', 'refunded', 'pending'])],
+        ]);
     }
 
     /** @return array{0: object, 1: array, 2: array} */
@@ -171,12 +219,15 @@ class CustomerImportController extends Controller
         return [$row, $result, $problem];
     }
 
-    /** Off the list; its count goes down, and a row that came in counts as imported. */
-    private function dropProblem(object $row, array $result, int $index, int $inserted): void
+    /** Off the list; their counts go down, and a row that came in counts as imported. */
+    private function dropProblems(object $row, array $result, array $indexes, int $inserted): void
     {
-        $why = $result['problems'][$index]['why'];
-        array_splice($result['problems'], $index, 1);
-        $result[$why] = max(0, (int) ($result[$why] ?? 0) - 1);
+        foreach ($indexes as $index) {
+            $why = $result['problems'][$index]['why'];
+            $result[$why] = max(0, (int) ($result[$why] ?? 0) - 1);
+            unset($result['problems'][$index]);
+        }
+        $result['problems'] = array_values($result['problems']);
         $result['orders'] = (int) ($result['orders'] ?? 0) + $inserted;
         DB::table('customer_imports')->where('id', $row->id)->update(['result' => json_encode($result, JSON_UNESCAPED_UNICODE), 'updated_at' => now()]);
     }
@@ -201,7 +252,7 @@ class CustomerImportController extends Controller
             ->when($sort === 'new', fn ($w) => $w->orderByDesc('p.ordered_at'))->when($sort === 'old', fn ($w) => $w->orderBy('p.ordered_at'))
             ->when($sort === 'high', fn ($w) => $w->orderByDesc('p.amount'))->when($sort === 'low', fn ($w) => $w->orderBy('p.amount'))
             ->when($sort === 'name', fn ($w) => $w->orderBy('c.name'))->orderBy('p.id')
-            ->select(['c.id', 'c.name', 'c.primary_phone', 'p.external_no', 'p.cn', 'p.ordered_at', 'p.amount', 'p.status', 'p.items', 'p.address'])
+            ->select(['c.id', 'c.name', 'c.primary_phone', 'p.id as past_id', 'p.external_no', 'p.cn', 'p.ordered_at', 'p.amount', 'p.status', 'p.items', 'p.address'])
             ->paginate(25)->withQueryString();
         $result = json_decode((string) $row->result, true) ?: [];
 

@@ -259,29 +259,102 @@ class CustomerHistoryImportTest extends TestCase
         $this->assertSame('Customer 01', $this->get(route('customers.history.show', [$id, 'sort' => 'low']))->viewData('orders')->first()->name);
     }
 
-    public function test_a_row_left_out_is_fixed_or_deleted_on_the_result_page(): void
+    public function test_a_row_left_out_is_fixed_in_the_popup_or_deleted_one_ticked_or_all(): void
     {
         $csv = "Name,CN,Phone,Address,Products,Amount,Date,Status\nGood,DM100001,01711111111,Road 1,Dates,500,2026-07-01,Delivered\n"
-            ."Short Phone,DM100002,0172222222,Road 2,Honey,800,2026-07-02,Delivered\nNo Date,DM100003,01733333333,Road 3,Ajwa,900,32/13/2026,Returned\n";
+            ."Short Phone,DM100002,0172222222,Road 2,Honey,800,2026-07-02,Delivered\nBad Date,DM100003,01733333333,Road 3,Ajwa,900,32/13/2026,Returned\n"
+            ."Excel Lost,DM100004,1.71533078E9,Road 4,Dates,700,2026-07-04,Delivered\n,DM100005,01755555555,Road 5,Dates,600,2026-07-05,Delivered\n";
         $id = $this->upload('fix.csv', $csv);
-        $page = $this->get(route('customers.history.show', $id))->assertSee('Rows that did not come in (2)')->assertSee('Save and bring it in');
-        $this->assertSame(['bad_phone', 'bad_date'], array_column($page->viewData('problems'), 'why'));
+        $page = $this->get(route('customers.history.show', $id))->assertSee('Rows that did not come in (4)')->assertSee('Delete all')->assertSee('Save and bring it in', false);
+        $this->assertSame(['bad_phone', 'bad_date', 'bad_phone', 'no_name'], array_column($page->viewData('problems'), 'why'));
+        $first = $page->viewData('problems')[0];
+        $this->assertSame(['DM100002', 'Honey', '800', '2026-07-02'], [$first['cn'], $first['items'], $first['amount'], $first['date']]);
 
-        // Still wrong: told why, nothing in.
-        $this->post(route('customers.history.fix', [$id, 0]), ['_row' => 0, 'name' => 'Short Phone', 'phone' => '0172222222', 'status' => 'delivered'])->assertSessionHasErrors('fix_0');
-        // Fixed: comes into this import with what was in the file.
-        $this->post(route('customers.history.fix', [$id, 0]), ['_row' => 0, 'name' => 'Short Phone', 'phone' => '01722222222', 'cn' => 'DM100002', 'address' => 'Road 2', 'items' => 'Honey', 'amount' => '800', 'date' => '2026-07-02', 'status' => 'delivered'])
-            ->assertSessionHas('success');
-        $p = DB::table('customer_past_orders')->where('cn', 'DM100002')->first();
-        $this->assertSame([$id, 'Honey', '2026-07-02'], [$p->customer_import_id, $p->items, substr($p->ordered_at, 0, 10)]);
+        $fix = fn (int $k, array $f) => $this->postJson(route('customers.history.fix', [$id, $k]), $f + ['status' => 'delivered']);
+        // Still wrong: the wrong field is named, nothing comes in.
+        $fix(0, ['name' => 'Short Phone', 'phone' => '0172222222'])->assertStatus(422)->assertJsonValidationErrors('phone');
+        $fix(1, ['name' => 'Bad Date', 'phone' => '01733333333', 'date' => '32/13/2026'])->assertStatus(422)->assertJsonValidationErrors('date');
+        $fix(3, ['name' => '', 'phone' => '01755555555'])->assertStatus(422)->assertJsonValidationErrors('name');
+        $fix(0, ['name' => 'X', 'phone' => '01722222222', 'status' => 'nonsense'])->assertStatus(422)->assertJsonValidationErrors('status');
+        $this->assertSame(1, DB::table('customer_past_orders')->count());
+        // Fixed: it comes into this import; a CN already in IQS is not added twice.
+        $fix(0, ['name' => 'Short Phone', 'phone' => '01722222222', 'cn' => 'DM100002', 'items' => 'Honey', 'amount' => '800', 'date' => '2026-07-02'])->assertOk()->assertJsonPath('message', 'Row 3 came in.');
+        $this->assertSame($id, DB::table('customer_past_orders')->where('cn', 'DM100002')->value('customer_import_id'));
         $r = $this->counts($id);
-        $this->assertSame([2, 0, 1], [$r['orders'], $r['bad_phone'], count($r['problems'])]);
+        $this->assertSame([2, 1, 3], [$r['orders'], $r['bad_phone'], count($r['problems'])]);
+        $fix(0, ['name' => 'Again', 'phone' => '01733333333', 'cn' => 'DM100001', 'date' => '2026-07-03'])->assertOk()->assertJsonPath('message', fn ($m) => str_contains($m, 'already in IQS'));
+        $this->assertSame([2, 2], [$this->counts($id)['orders'], count($this->counts($id)['problems'])]);
+        // An index that is gone is refused.
+        $fix(9, ['name' => 'X', 'phone' => '01799999999'])->assertNotFound();
 
-        // Delete takes the other off the list.
-        $this->delete(route('customers.history.drop', [$id, 0]))->assertSessionHas('success');
-        $this->assertSame([[], 0], [$this->counts($id)['problems'], $this->counts($id)['bad_date']]);
-        // Undo takes back the fixed row too.
+        // Delete ticked, then the rest with Delete all.
+        $this->post(route('customers.history.drop-many', $id), ['rows' => [1]])->assertSessionHas('success');
+        $this->assertSame(['bad_phone'], array_column($this->counts($id)['problems'], 'why'));
+        $this->post(route('customers.history.drop-many', $id), ['rows' => []])->assertSessionHasErrors('rows');
+        $this->post(route('customers.history.drop-many', $id), ['all' => 1])->assertSessionHas('success');
+        $this->assertSame([[], 0, 0], [$this->counts($id)['problems'], $this->counts($id)['bad_phone'], $this->counts($id)['no_name']]);
+
+        // Undo takes back the fixed row too, and then nothing more can be changed.
         $this->post(route('customers.history.undo', $id));
         $this->assertSame(0, DB::table('customer_past_orders')->count());
+        $this->post(route('customers.history.drop-many', $id), ['all' => 1])->assertStatus(422);
+    }
+
+    public function test_an_imported_order_is_edited_in_the_popup_and_deleted_one_or_ticked(): void
+    {
+        $iqs = Customer::create(['name' => 'Already Here', 'primary_phone' => '01799999999']);
+        DB::table('customer_phones')->insert(['customer_id' => $iqs->id, 'phone' => '01799999999', 'is_primary' => true]);
+        $csv = "Name,CN,Phone,Address,Products,Amount,Date,Status\nRahima,DM200001,01711111111,Road 1,Dates,500,2026-07-01,Delivered\n"
+            ."Karim,DM200002,01722222222,Road 2,Honey,800,2026-07-02,Delivered\nNusrat,DM200003,01733333333,Road 3,Ajwa,900,2026-07-03,Delivered\n";
+        $id = $this->upload('edit.csv', $csv);
+        $rahima = DB::table('customer_past_orders')->where('cn', 'DM200001')->first();
+        $this->get(route('customers.history.show', $id))->assertSee('Delete ticked')->assertSee('Edit order of Rahima');
+        $edit = fn (int $pid, array $f) => $this->postJson(route('customers.history.order', [$id, $pid]), $f + ['status' => 'delivered']);
+
+        // Plain edit: name (on a customer this import made), amount, date, status, address and products.
+        $edit($rahima->id, ['name' => 'Rahima Akter', 'phone' => '01711111111', 'cn' => 'dm200001', 'amount' => 'Tk. 1,250', 'date' => '24/07/2026', 'status' => 'returned', 'address' => 'Address: Mirpur', 'items' => 'Dates 2 kg'])->assertOk();
+        $p = DB::table('customer_past_orders')->find($rahima->id);
+        $this->assertSame(['DM200001', '2026-07-24', 'returned', 'Mirpur', 'Dates 2 kg'], [$p->cn, substr($p->ordered_at, 0, 10), $p->status, $p->address, $p->items]);
+        $this->assertEquals(1250, $p->amount);
+        $this->assertSame('Rahima Akter', Customer::find($rahima->customer_id)->name);
+
+        // Wrong values are refused with the field named.
+        $edit($rahima->id, ['name' => 'R', 'phone' => '017111'])->assertStatus(422)->assertJsonValidationErrors('phone');
+        $edit($rahima->id, ['name' => 'R', 'phone' => '01711111111', 'cn' => 'DM200002'])->assertStatus(422)->assertJsonValidationErrors('cn');
+        $edit($rahima->id, ['name' => 'R', 'phone' => '01711111111', 'cn' => 'PENDING'])->assertStatus(422)->assertJsonValidationErrors('cn');
+        $edit($rahima->id, ['name' => 'R', 'phone' => '01711111111', 'date' => 'someday'])->assertStatus(422)->assertJsonValidationErrors('date');
+        $edit($rahima->id, ['name' => 'Name:', 'phone' => '01711111111'])->assertStatus(422)->assertJsonValidationErrors('name');
+
+        // A phone of a customer IQS already has: the order moves to them, their name is not touched, and the empty customer the import made goes.
+        $karim = DB::table('customer_past_orders')->where('cn', 'DM200002')->first();
+        $edit($karim->id, ['name' => 'Karim Renamed', 'phone' => '+880 1799-999999', 'cn' => 'DM200002'])->assertOk();
+        $this->assertSame($iqs->id, DB::table('customer_past_orders')->find($karim->id)->customer_id);
+        $this->assertSame('Already Here', $iqs->fresh()->name);
+        $this->assertNull(Customer::where('primary_phone', '01722222222')->first());
+        // A new number: a new customer, made by this import.
+        $edit($karim->id, ['name' => 'Karim New', 'phone' => '01744444444', 'cn' => 'DM200002'])->assertOk();
+        $new = Customer::where('primary_phone', '01744444444')->first();
+        $this->assertSame([$id, 'Karim New'], [$new->customer_import_id, $new->name]);
+        $this->assertNotNull($iqs->fresh()); // IQS's own customer stays even with nothing imported left
+
+        // An order of another import cannot be edited from this page.
+        $other = $this->upload('other.csv', "Name,Phone,Date\nOther,01788888888,2026-07-09\n");
+        $otherPid = DB::table('customer_past_orders')->where('customer_import_id', $other)->value('id');
+        $edit($otherPid, ['name' => 'X', 'phone' => '01788888888'])->assertNotFound();
+
+        // Delete: one, then the ticked; counts and empty customers follow; another import's order is left alone.
+        $this->post(route('customers.history.orders-delete', $id), ['orders' => [$rahima->id]])->assertSessionHas('success');
+        $this->assertNull(Customer::where('primary_phone', '01711111111')->first());
+        $this->post(route('customers.history.orders-delete', $id), ['orders' => [$karim->id, DB::table('customer_past_orders')->where('cn', 'DM200003')->value('id'), $otherPid]]);
+        $this->assertSame(0, DB::table('customer_past_orders')->where('customer_import_id', $id)->count());
+        $this->assertSame(1, DB::table('customer_past_orders')->where('customer_import_id', $other)->count());
+        $this->assertSame(0, $this->counts($id)['orders']);
+        $this->post(route('customers.history.orders-delete', $id), ['orders' => []])->assertSessionHasErrors('orders');
+
+        // Without the permission: nothing.
+        $mod = User::factory()->create();
+        $mod->roles()->attach($this->role(['customers.view'], [], 'Mod')->id);
+        $this->actingAs($mod)->postJson(route('customers.history.order', [$other, $otherPid]), ['name' => 'X', 'phone' => '01788888888', 'status' => 'delivered'])->assertForbidden();
+        $this->post(route('customers.history.orders-delete', $other), ['orders' => [$otherPid]])->assertForbidden();
     }
 }

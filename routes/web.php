@@ -260,6 +260,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers/history/{import}/undo', 'undo')->whereNumber('import')->name('customers.history.undo');
         Route::post('/customers/history/{import}/rows/{index}', 'fixRow')->whereNumber(['import', 'index'])->name('customers.history.fix');
         Route::delete('/customers/history/{import}/rows/{index}', 'deleteRow')->whereNumber(['import', 'index'])->name('customers.history.drop');
+        Route::post('/customers/history/{import}/rows/delete', 'deleteRows')->whereNumber('import')->name('customers.history.drop-many');
+        Route::post('/customers/history/{import}/orders/{past}', 'editOrder')->whereNumber(['import', 'past'])->name('customers.history.order');
+        Route::post('/customers/history/{import}/orders/delete', 'deleteOrders')->whereNumber('import')->name('customers.history.orders-delete');
     });
     Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');
     Route::get('/customers/steadfast', [CustomerController::class, 'steadfast'])->middleware('can:customers.view')->name('customers.steadfast');

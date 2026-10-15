@@ -2,19 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Order;
 use App\Services\Customers\HistoryImport;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use RuntimeException;
 
-/** Past orders from a CSV or Excel file: upload, map the columns, preview, import. */
+/** Past orders from a CSV or Excel file (the sample's columns, known by name): upload and it imports; Undo takes it back. */
 class CustomerImportController extends Controller
 {
     public function __construct(private HistoryImport $history) {}
@@ -22,7 +19,7 @@ class CustomerImportController extends Controller
     public function index(): View
     {
         return view('customers.history-import', [
-            'imports' => DB::table('customer_imports as i')->leftJoin('users as u', 'u.id', '=', 'i.created_by')
+            'imports' => DB::table('customer_imports as i')->leftJoin('users as u', 'u.id', '=', 'i.created_by')->whereNotNull('i.done_at')
                 ->orderByDesc('i.id')->limit(15)->get(['i.id', 'i.file_name', 'i.source', 'i.row_count', 'i.result', 'i.done_at', 'i.created_at', 'u.name as by']),
         ]);
     }
@@ -54,102 +51,54 @@ class CustomerImportController extends Controller
         Storage::disk('local')->put($path, $json);
         $saved = $this->saved($header);
         $name = mb_substr($file->getClientOriginalName(), 0, 200);
-        // My own unfinished drafts of this file are replaced; anyone's draft untouched for a day goes too.
-        $stale = DB::table('customer_imports')->whereNull('done_at')
-            ->where(fn ($q) => $q->where(fn ($m) => $m->where('file_name', $name)->where('created_by', $request->user()->id))->orWhere('updated_at', '<', now()->subDay()))
-            ->get(['id', 'path']);
-        foreach ($stale as $old) {
-            Storage::disk('local')->delete($old->path);
+        // No column mapping: the columns are known by their names (the sample's own, or what was picked before
+        // for that name, else a guess). Name and Phone must be found; then it imports straight away.
+        $mapping = $this->autoMapping($header, $saved['mapping']);
+        $used = array_count_values(array_filter($mapping));
+        if (($used['phone'] ?? 0) !== 1 || ! ($used['name'] ?? 0)) {
+            Storage::disk('local')->delete($path);
+
+            return back()->withErrors(['file' => __('Name and Phone columns were not found. Download the sample file, put the data in its columns and upload that.')]);
         }
-        DB::table('customer_imports')->whereIn('id', $stale->pluck('id'))->delete();
-
-        $id = DB::table('customer_imports')->insertGetId([
-            'file_name' => $name, 'path' => $path,
-            'columns' => $columns, 'row_count' => count($rows),
-            'source' => $saved['source'], 'mapping' => $saved['mapping'] ? json_encode($saved['mapping'], JSON_UNESCAPED_UNICODE) : null,
-            'values' => json_encode($saved['values'], JSON_UNESCAPED_UNICODE), 'default_medium' => $saved['default_medium'],
-            'created_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
-        ]);
-
-        return redirect()->route('customers.history.map', $id);
-    }
-
-    public function map(int $import): View|RedirectResponse
-    {
-        $row = DB::table('customer_imports')->find($import) ?? abort(404);
-        if ($row->done_at) {
-            return redirect()->route('customers.history.show', $import);
-        }
-        $columns = json_decode($row->columns, true);
-        $header = array_column($columns, 'header');
-        $values = json_decode((string) $row->values, true) ?: [];
-        // Each word's meaning: the saved template's, else a guess.
-        foreach ($columns as $c) {
-            foreach ($c['values'] ?? [] as $w) {
-                $values['status'][$w] ??= $this->history->guessValue('status', $w);
-                $values['medium'][$w] ??= $this->history->guessValue('medium', $w);
+        $values = ['status' => [], 'medium' => []];
+        foreach ($this->history->columns($header, $rows) as $c) {
+            foreach (['status', 'medium'] as $k) {
+                if (($mapping[$c['header']] ?? '') === $k) {
+                    foreach ($c['values'] ?? [] as $w) {
+                        $values[$k][$w] = $saved['values'][$k][$w] ?? $this->history->guessValue($k, (string) $w);
+                    }
+                }
             }
         }
+        $source = mb_substr($saved['source'] ?: pathinfo($name, PATHINFO_FILENAME), 0, 80);
+        $medium = $saved['default_medium'] ?: 'other';
 
-        // What was picked before for a column of the same name wins; a guess only fills the rest (and never a field already taken).
-        $saved = array_intersect_key(json_decode((string) $row->mapping, true) ?: [], array_flip($header));
+        set_time_limit(300); // a lifetime file writes thousands of rows
+        $id = DB::table('customer_imports')->insertGetId([
+            'file_name' => $name, 'path' => $path, 'columns' => $columns, 'row_count' => count($rows),
+            'source' => $source, 'mapping' => json_encode($mapping, JSON_UNESCAPED_UNICODE), 'values' => json_encode($values, JSON_UNESCAPED_UNICODE),
+            'default_medium' => $medium, 'created_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $plan = $this->history->plan($header, $rows, $mapping, $values, $medium, $source);
+        $written = $this->history->import($plan, $id, $source, $request->user()->id);
+        $plan['counts']['orders'] = $written['inserted'];
+        DB::table('customer_imports')->where('id', $id)->update([
+            'result' => json_encode($plan['counts']), 'changes' => $written['changes'] ? json_encode($written['changes'], JSON_UNESCAPED_UNICODE) : null,
+            'done_at' => now(), 'updated_at' => now(),
+        ]);
+        Storage::disk('local')->delete($path);
+
+        return redirect()->route('customers.history.show', $id)->with('success', __('Imported. Wrong? Undo it below.'));
+    }
+
+    /** The field of each column, by its name: what was picked before for that name wins, a guess fills the rest; a one-column field once. */
+    private function autoMapping(array $header, array $saved): array
+    {
+        $saved = array_intersect_key($saved, array_flip($header));
         $taken = array_filter($saved);
         $guess = array_map(fn ($f) => $f !== '' && in_array($f, $taken, true) && ! in_array($f, ['name', 'address'], true) ? '' : $f, $this->history->guess($header));
 
-        return view('customers.history-map', [
-            'import' => $row,
-            'columns' => $columns,
-            'mapping' => array_merge($guess, $saved),
-            'savedKeys' => array_keys($saved),
-            'values' => $values,
-            'fromTemplate' => $saved !== [],
-            // Our own sample file: every column is known, so the check runs by itself and the columns stay folded.
-            'isSample' => array_diff(array_map('strtolower', $header), array_map('strtolower', HistoryImport::SAMPLE[0])) === []
-                && count(array_intersect(array_map('strtolower', $header), ['name', 'phone'])) === 2,
-            'channels' => array_map(fn ($l) => __($l), Order::CHANNELS),
-            'defaultMedium' => $row->default_medium ?: 'other',
-        ]);
-    }
-
-    public function preview(Request $request, int $import): JsonResponse
-    {
-        [$row, $plan, $data] = $this->plan($request, $import);
-        // Import runs only with exactly what was checked here.
-        DB::table('customer_imports')->where('id', $row->id)->update(['preview_hash' => $this->hash($data), 'updated_at' => now()]);
-
-        return response()->json(['counts' => $plan['counts'], 'sample' => array_slice($plan['orders'], 0, 5)]);
-    }
-
-    public function run(Request $request, int $import): JsonResponse
-    {
-        set_time_limit(300); // a lifetime file updates thousands of rows
-        [$row, $plan, $data] = $this->plan($request, $import);
-        abort_unless($row->preview_hash && hash_equals($row->preview_hash, $this->hash($data)), 422, __('Press Check first; the columns changed since.'));
-        // Claim the checked draft: a second tab or a retry while this runs finds nothing to run.
-        $claimed = DB::table('customer_imports')->where('id', $row->id)->whereNull('done_at')->where('preview_hash', $row->preview_hash)->update(['preview_hash' => null]);
-        abort_unless($claimed === 1, 422, __('This file is being imported already.'));
-        $source = $data['source'];
-        try {
-            $written = $this->history->import($plan, $row->id, $source, $request->user()->id);
-        } catch (\Throwable $e) {
-            DB::table('customer_imports')->where('id', $row->id)->update(['preview_hash' => $row->preview_hash]);
-            throw $e;
-        }
-        $plan['counts']['orders'] = $written['inserted'];
-        $header = array_column(json_decode($row->columns, true), 'header');
-        // Remember this file shape for next time.
-        DB::table('import_templates')->updateOrInsert(['signature' => $this->history->signature($header)], [
-            'name' => $source, 'mapping' => json_encode($data['mapping'], JSON_UNESCAPED_UNICODE), 'values' => json_encode($data['values'] ?? [], JSON_UNESCAPED_UNICODE),
-            'default_medium' => $data['default_medium'] ?? null, 'updated_at' => now(), 'created_at' => now(),
-        ]);
-        DB::table('customer_imports')->where('id', $row->id)->update([
-            'source' => $source, 'mapping' => json_encode($data['mapping'], JSON_UNESCAPED_UNICODE), 'values' => json_encode($data['values'] ?? [], JSON_UNESCAPED_UNICODE),
-            'default_medium' => $data['default_medium'] ?? null, 'result' => json_encode($plan['counts']),
-            'changes' => $written['changes'] ? json_encode($written['changes'], JSON_UNESCAPED_UNICODE) : null, 'done_at' => now(), 'updated_at' => now(),
-        ]);
-        Storage::disk('local')->delete($row->path);
-
-        return response()->json(['url' => route('customers.history.show', $row->id)]);
+        return array_merge($guess, $saved);
     }
 
     /** Takes an import back: its orders, and the customers it created that have nothing else in IQS. */
@@ -218,45 +167,5 @@ class CustomerImportController extends Controller
         return ['mapping' => $mapping, 'values' => $values, 'source' => $source, 'default_medium' => $medium];
     }
 
-    private function hash(array $data): string
-    {
-        return hash('sha256', json_encode([$data['mapping'], $data['values'] ?? [], $data['default_medium'] ?? null, $data['source']]));
-    }
 
-    /** @return array{0: object, 1: array, 2: array} */
-    private function plan(Request $request, int $import): array
-    {
-        $row = DB::table('customer_imports')->find($import) ?? abort(404);
-        abort_if((bool) $row->done_at, 422, __('This file was imported already.'));
-        $fields = array_keys(HistoryImport::FIELDS);
-        $data = $request->validate([
-            'mapping' => ['required', 'array'], 'mapping.*' => ['nullable', Rule::in(['', ...$fields])],
-            'values' => ['nullable', 'array'], 'values.status' => ['nullable', 'array'], 'values.status.*' => [Rule::in(array_keys(HistoryImport::STATUSES))],
-            'values.medium' => ['nullable', 'array'], 'values.medium.*' => [Rule::in(array_keys(Order::CHANNELS))],
-            'default_medium' => ['nullable', Rule::in(array_keys(Order::CHANNELS))],
-            'source' => ['nullable', 'string', 'max:80'],
-        ]);
-        $used = array_count_values(array_filter($data['mapping']));
-        if (($used['phone'] ?? 0) !== 1) {
-            abort(422, __('Pick exactly one Phone column.'));
-        }
-        if (! ($used['name'] ?? 0)) {
-            abort(422, __('Pick the Name column.'));
-        }
-        foreach ($used as $field => $n) {
-            if ($n > 1 && ! in_array($field, ['name', 'address'], true)) {
-                abort(422, __(':f is picked for two columns.', ['f' => __(HistoryImport::FIELDS[$field])]));
-            }
-        }
-        // No name given: the file's own name.
-        $data['source'] = mb_substr(trim((string) ($data['source'] ?? '')) ?: pathinfo($row->file_name, PATHINFO_FILENAME), 0, 80);
-        [$header, $rows] = json_decode(Storage::disk('local')->get($row->path) ?? abort(410, __('This upload is gone. Upload the file again.')), true) ?: abort(410, __('This upload is gone. Upload the file again.'));
-        // Only the words of the columns used for status and medium are kept (not every name and phone of a small file).
-        $words = fn (string $field) => array_flip(collect(json_decode($row->columns, true))->filter(fn ($c) => ($data['mapping'][$c['header']] ?? '') === $field)->flatMap(fn ($c) => $c['values'] ?? [])->map(fn ($w) => (string) $w)->all());
-        foreach (['status', 'medium'] as $k) {
-            $data['values'][$k] = array_intersect_key($data['values'][$k] ?? [], $words($k));
-        }
-
-        return [$row, $this->history->plan($header, $rows, $data['mapping'], $data['values'] ?? [], $data['default_medium'] ?? null, $data['source']), $data];
-    }
 }

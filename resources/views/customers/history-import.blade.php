@@ -15,7 +15,7 @@
         </x-card>
 
         <x-card :title="__('Upload a CSV or Excel file')">
-            <p class="mb-3 text-sm text-gray-600">{{ __('The filled sample, or any order export (WooCommerce, Pathao, Steadfast). For an export you tell IQS which column is which once; it is remembered by column name.') }}</p>
+            <p class="mb-3 text-sm text-gray-600">{{ __('The filled sample file. It imports straight away; if something is wrong, Undo it on the next page and upload again.') }}</p>
             <p class="mb-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{{ __('These orders only go into each customer\'s journey. They do not touch stock, money, the courier or points. New phone numbers become new customers.') }}</p>
             <form method="POST" action="{{ route('customers.history.store') }}" enctype="multipart/form-data" class="space-y-3" x-data="{ busy: false }" @submit="busy = true">
                 @csrf
@@ -29,7 +29,7 @@
         <x-card :title="__('Recent imports')">
             @forelse ($imports as $i)
                 @php $r = json_decode((string) $i->result, true) ?: []; @endphp
-                <a href="{{ $i->done_at ? route('customers.history.show', $i->id) : route('customers.history.map', $i->id) }}" class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm last:border-0 hover:bg-gray-50">
+                <a href="{{ route('customers.history.show', $i->id) }}" class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm last:border-0 hover:bg-gray-50">
                     <span class="min-w-0">
                         <span class="block truncate font-medium text-gray-800">{{ $i->file_name }}</span>
                         <span class="text-xs text-gray-500">{{ $i->source ?? __('Not mapped yet') }} · {{ $i->by }} · {{ \Illuminate\Support\Carbon::parse($i->created_at)->format('d M, g:i A') }}</span>

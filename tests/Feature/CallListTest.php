@@ -50,10 +50,7 @@ class CallListTest extends TestCase
             ."Kamal,DM100005,01744444444,Gazipur,Dates,500,2026-07-04,Returned\n"
             ."Old,DM100006,01755555555,Dhaka,Dates,400,2026-07-05,Delivered\n";
         $this->actingAs($this->owner)->post('/customers/history', ['file' => UploadedFile::fake()->createWithContent('lifetime.csv', $csv)]);
-        $this->importId = (int) DB::table('customer_imports')->max('id');
-        $body = ['source' => '', 'mapping' => ['Name' => 'name', 'CN' => 'cn', 'Phone' => 'phone', 'Address' => 'address', 'Products' => 'items', 'Amount' => 'amount', 'Date' => 'date', 'Status' => 'status']];
-        $this->postJson(route('customers.history.preview', $this->importId), $body)->assertOk();
-        $this->postJson(route('customers.history.run', $this->importId), $body)->assertOk();
+        $this->importId = (int) DB::table('customer_imports')->max('id'); // imports on upload
         Customer::where('primary_phone', '01755555555')->update(['do_not_call_at' => now()]);
     }
 

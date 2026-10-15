@@ -257,9 +257,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers/history', 'store')->name('customers.history.store');
         Route::get('/customers/history/sample', 'sample')->name('customers.history.sample');
         Route::get('/customers/history/{import}', 'show')->whereNumber('import')->name('customers.history.show');
-        Route::get('/customers/history/{import}/map', 'map')->whereNumber('import')->name('customers.history.map');
-        Route::post('/customers/history/{import}/preview', 'preview')->whereNumber('import')->name('customers.history.preview');
-        Route::post('/customers/history/{import}/run', 'run')->whereNumber('import')->name('customers.history.run');
         Route::post('/customers/history/{import}/undo', 'undo')->whereNumber('import')->name('customers.history.undo');
     });
     Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');

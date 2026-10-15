@@ -25,6 +25,6 @@
     <input type="hidden" name="proof_modified" :value="modified">
     <label x-show="old" x-cloak class="mt-2 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
         <input type="checkbox" name="proof_old_ok" value="1" x-model="ok" @change="emit()" class="mt-0.5 rounded border-amber-400 text-primary focus:ring-primary">
-        <span><span x-text="@js(__('This file is from')) + ' ' + old + '.'"></span> {{ __('It is the right file') }}</span>
+        <span><span x-text="@js(__('This file is from')) + ' ' + old + ', not today.'"></span> <span class="font-medium">{{ __('Yes, it is the right file') }}</span></span>
     </label>
 </div>

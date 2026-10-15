@@ -53,7 +53,7 @@ class CallProof
         $when = self::fileDate($base, $modifiedMs);
         $old = $when !== null && $when->lt(self::freshFrom($when));
         if ($old && ! $oldOk) {
-            $fail(__('This file is from :d. Tick "It is the right file" if it is, or pick the file of this call.', ['d' => $when->format('d M')]));
+            $fail(__('This file is from :d. Tick "Yes, it is the right file" if it is, or pick the file of this call.', ['d' => $when->format('d M')]));
         }
 
         return ['ext' => $ext, 'name' => $name, 'size' => (int) $file->getSize(), 'hash' => $hash, 'old' => $old];

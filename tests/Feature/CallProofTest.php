@@ -43,7 +43,7 @@ class CallProofTest extends TestCase
 
         $in(['proof' => UploadedFile::fake()->createWithContent('notes.txt', 'hello')])->assertStatus(422)->assertJsonPath('errors.proof.0', 'This is not a recording or a picture. Add the call recording or a screenshot of the call log.');
         $in(['proof' => $this->rec('Call recording 01722222222_20261015_1140.m4a')])->assertStatus(422)->assertJsonPath('errors.proof.0', 'This file is of 01722222222, not of 01711111111. Pick the file of this call.');
-        $in(['proof' => $this->rec('Call recording 20261012_1140.m4a')])->assertStatus(422)->assertJsonPath('errors.proof.0', 'This file is from 12 Oct. Tick "It is the right file" if it is, or pick the file of this call.');
+        $in(['proof' => $this->rec('Call recording 20261012_1140.m4a')])->assertStatus(422)->assertJsonPath('errors.proof.0', 'This file is from 12 Oct. Tick "Yes, it is the right file" if it is, or pick the file of this call.');
         // No date in the name: the time on the phone counts.
         $in(['proof' => $this->rec('voice.m4a'), 'proof_modified' => (string) now()->subDays(2)->getTimestampMs()])->assertStatus(422);
 

@@ -103,18 +103,48 @@
 
             @if ($problems)
                 @php $why = ['bad_phone' => __('Phone not usable'), 'no_name' => __('No name'), 'bad_date' => __('Date not readable'), 'skipped' => __('Skipped by status')]; @endphp
-                <details class="rounded-2xl border border-red-200 bg-white p-4">
+                <details class="rounded-2xl border border-red-200 bg-white p-4" @if ($errors->any() || session('success')) open @endif>
                     <summary class="cursor-pointer text-sm font-semibold text-red-800">{{ __('Rows that did not come in (:n)', ['n' => count($problems)]) }}</summary>
-                    <p class="mt-2 text-xs text-gray-500">{{ __('Fix these rows in the file and upload it again: rows already in come in once, only the fixed ones are added.') }}</p>
+                    <p class="mt-2 text-xs text-gray-500">{{ __('Edit a row to fix it here: Save brings it in. Delete takes it off this list.') }}</p>
                     <div class="mt-2 divide-y divide-gray-100 text-sm">
-                        @foreach ($problems as $pr)
-                            <div class="flex flex-wrap items-baseline justify-between gap-2 py-2">
-                                <span class="min-w-0"><span class="text-xs text-gray-400">{{ __('Row :n', ['n' => $pr['line']]) }}</span> <span class="font-medium text-gray-900">{{ $pr['name'] ?: '-' }}</span>
-                                    <span class="font-mono text-xs text-gray-600">{{ $pr['phone'] ?: __('no phone') }}</span></span>
-                                <x-badge color="red">{{ $why[$pr['why']] ?? $pr['why'] }}</x-badge>
+                        @foreach ($problems as $k => $pr)
+                            @php $err = $errors->first('fix_'.$k); $mine = old('_row') === (string) $k; @endphp
+                            <div class="py-2.5" x-data="{ edit: @js((bool) $err) }">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <span class="min-w-0"><span class="text-xs text-gray-400">{{ __('Row :n', ['n' => $pr['line']]) }}</span> <span class="font-medium text-gray-900">{{ $pr['name'] ?: '-' }}</span>
+                                        <span class="font-mono text-xs text-gray-600">{{ $pr['phone'] ?: __('no phone') }}</span> <x-badge color="red">{{ $why[$pr['why']] ?? $pr['why'] }}</x-badge></span>
+                                    <span class="flex shrink-0 gap-2">
+                                        <button type="button" @click="edit = ! edit" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary" x-text="edit ? @js(__('Close')) : @js(__('Edit'))"></button>
+                                        <form method="POST" action="{{ route('customers.history.drop', [$import->id, $k]) }}" id="drop-row-{{ $k }}">@csrf @method('DELETE')
+                                            <button type="button" class="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                                                @click="$dispatch('open-confirm', { id: 'drop-row-confirm', form: 'drop-row-{{ $k }}', label: @js(__('Row :n', ['n' => $pr['line']])) })">{{ __('Delete') }}</button>
+                                        </form>
+                                    </span>
+                                </div>
+                                <form x-show="edit" x-cloak method="POST" action="{{ route('customers.history.fix', [$import->id, $k]) }}" class="mt-3 grid gap-2 rounded-xl bg-gray-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
+                                    @csrf
+                                    <input type="hidden" name="_row" value="{{ $k }}">
+                                    @if ($err)<p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2 lg:col-span-4">{{ $err }}</p>@endif
+                                    @foreach (['name' => __('Name'), 'phone' => __('Phone'), 'cn' => __('CN'), 'amount' => __('Amount'), 'address' => __('Address'), 'items' => __('Products'), 'date' => __('Date')] as $f => $label)
+                                        <label class="block @if (in_array($f, ['address', 'items'], true)) sm:col-span-2 @endif">
+                                            <span class="text-xs text-gray-500">{{ $label }}@if (in_array($f, ['name', 'phone'], true)) <span class="text-red-600">*</span>@endif</span>
+                                            <input type="text" name="{{ $f }}" value="{{ $mine ? old($f) : ($pr[$f] ?? '') }}" @if ($f === 'date') placeholder="2026-07-24" @endif
+                                                class="mt-0.5 w-full rounded-lg border px-3 py-2 text-base focus:border-primary focus:outline-none {{ $f === $pr['why'] || ($f === 'phone' && $pr['why'] === 'bad_phone') || ($f === 'name' && $pr['why'] === 'no_name') || ($f === 'date' && $pr['why'] === 'bad_date') ? 'border-red-400 bg-white' : 'border-gray-300' }}">
+                                        </label>
+                                    @endforeach
+                                    <label class="block">
+                                        <span class="text-xs text-gray-500">{{ __('Status') }}</span>
+                                        <x-simple-select name="status" :options="['delivered' => __('Delivered'), 'returned' => __('Returned'), 'cancelled' => __('Cancelled'), 'refunded' => __('Refunded'), 'pending' => __('Not finished')]"
+                                            :value="$mine ? old('status') : (app(\App\Services\Customers\HistoryImport::class)->guessValue('status', (string) ($pr['status'] ?? '')) === 'skip' ? 'delivered' : app(\App\Services\Customers\HistoryImport::class)->guessValue('status', (string) ($pr['status'] ?? 'delivered')))" full-width class="mt-0.5" />
+                                    </label>
+                                    <div class="flex items-end sm:col-span-2 lg:col-span-4">
+                                        <x-button>{{ __('Save and bring it in') }}</x-button>
+                                    </div>
+                                </form>
                             </div>
                         @endforeach
                     </div>
+                    <x-confirm-modal id="drop-row-confirm" :verb="__('Delete')" :message="__('This row is taken off the list and stays out of IQS.')" />
                 </details>
             @endif
         @endif

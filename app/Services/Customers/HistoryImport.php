@@ -242,9 +242,12 @@ class HistoryImport
         $orders = [];
         // Rows that did not come in, with why, so they can be fixed in the file (the first 500).
         $problems = [];
-        $problem = function (array $g, string $why) use (&$problems, $getRaw) {
+        $problem = function (array $g, string $why) use (&$problems, $get, $getRaw) {
             if (count($problems) < 500) {
-                $problems[] = ['line' => $g['line'], 'name' => mb_substr($getRaw($g['row'], 'name'), 0, 80), 'phone' => mb_substr($getRaw($g['row'], 'phone'), 0, 60), 'why' => $why];
+                $r = $g['row'];
+                $problems[] = ['line' => $g['line'], 'why' => $why, 'name' => mb_substr($get($r, 'name'), 0, 150), 'phone' => mb_substr($getRaw($r, 'phone'), 0, 60),
+                    'cn' => mb_substr($get($r, 'cn'), 0, 40), 'address' => mb_substr($get($r, 'address', ', '), 0, 500), 'items' => mb_substr(implode(', ', array_unique($g['items'])), 0, 1000),
+                    'amount' => mb_substr($get($r, 'amount'), 0, 30), 'date' => mb_substr($get($r, 'date'), 0, 40), 'status' => mb_substr($get($r, 'status'), 0, 40)];
             }
         };
         foreach ($groups as $g) {

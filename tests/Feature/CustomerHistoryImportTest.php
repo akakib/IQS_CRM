@@ -258,4 +258,30 @@ class CustomerHistoryImportTest extends TestCase
         $this->assertSame('Customer 30', $this->get(route('customers.history.show', [$id, 'sort' => 'high']))->viewData('orders')->first()->name);
         $this->assertSame('Customer 01', $this->get(route('customers.history.show', [$id, 'sort' => 'low']))->viewData('orders')->first()->name);
     }
+
+    public function test_a_row_left_out_is_fixed_or_deleted_on_the_result_page(): void
+    {
+        $csv = "Name,CN,Phone,Address,Products,Amount,Date,Status\nGood,DM100001,01711111111,Road 1,Dates,500,2026-07-01,Delivered\n"
+            ."Short Phone,DM100002,0172222222,Road 2,Honey,800,2026-07-02,Delivered\nNo Date,DM100003,01733333333,Road 3,Ajwa,900,32/13/2026,Returned\n";
+        $id = $this->upload('fix.csv', $csv);
+        $page = $this->get(route('customers.history.show', $id))->assertSee('Rows that did not come in (2)')->assertSee('Save and bring it in');
+        $this->assertSame(['bad_phone', 'bad_date'], array_column($page->viewData('problems'), 'why'));
+
+        // Still wrong: told why, nothing in.
+        $this->post(route('customers.history.fix', [$id, 0]), ['_row' => 0, 'name' => 'Short Phone', 'phone' => '0172222222', 'status' => 'delivered'])->assertSessionHasErrors('fix_0');
+        // Fixed: comes into this import with what was in the file.
+        $this->post(route('customers.history.fix', [$id, 0]), ['_row' => 0, 'name' => 'Short Phone', 'phone' => '01722222222', 'cn' => 'DM100002', 'address' => 'Road 2', 'items' => 'Honey', 'amount' => '800', 'date' => '2026-07-02', 'status' => 'delivered'])
+            ->assertSessionHas('success');
+        $p = DB::table('customer_past_orders')->where('cn', 'DM100002')->first();
+        $this->assertSame([$id, 'Honey', '2026-07-02'], [$p->customer_import_id, $p->items, substr($p->ordered_at, 0, 10)]);
+        $r = $this->counts($id);
+        $this->assertSame([2, 0, 1], [$r['orders'], $r['bad_phone'], count($r['problems'])]);
+
+        // Delete takes the other off the list.
+        $this->delete(route('customers.history.drop', [$id, 0]))->assertSessionHas('success');
+        $this->assertSame([[], 0], [$this->counts($id)['problems'], $this->counts($id)['bad_date']]);
+        // Undo takes back the fixed row too.
+        $this->post(route('customers.history.undo', $id));
+        $this->assertSame(0, DB::table('customer_past_orders')->count());
+    }
 }

@@ -122,6 +122,65 @@ class CustomerImportController extends Controller
         return redirect()->route('customers.history.show', $row->id)->with('status', __('Import taken back.'));
     }
 
+    /** A row that did not come in, fixed on the result page: imported into this same import (so Undo takes it back too). */
+    public function fixRow(Request $request, int $import, int $index): RedirectResponse
+    {
+        [$row, $result, $problem] = $this->problem($import, $index);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'], 'phone' => ['required', 'string', 'max:60'], 'cn' => ['nullable', 'string', 'max:40'],
+            'address' => ['nullable', 'string', 'max:500'], 'items' => ['nullable', 'string', 'max:1000'], 'amount' => ['nullable', 'string', 'max:30'],
+            'date' => ['nullable', 'string', 'max:40'], 'status' => ['required', \Illuminate\Validation\Rule::in(['delivered', 'returned', 'cancelled', 'refunded', 'pending'])],
+        ]);
+        if (! \App\Support\Phone::extract($data['phone'])) {
+            return back()->withErrors(['fix_'.$index => __('This phone is not a full mobile number (11 digits starting 01).')])->withInput();
+        }
+        $header = ['Name', 'CN', 'Phone', 'Address', 'Products', 'Amount', 'Date', 'Status'];
+        $mapping = ['Name' => 'name', 'CN' => 'cn', 'Phone' => 'phone', 'Address' => 'address', 'Products' => 'items', 'Amount' => 'amount', 'Date' => 'date', 'Status' => 'status'];
+        $line = [$data['name'], $data['cn'] ?? '', $data['phone'], $data['address'] ?? '', $data['items'] ?? '', $data['amount'] ?? '', $data['date'] ?? '', $data['status']];
+        $plan = $this->history->plan($header, [$line], $mapping, ['status' => [$data['status'] => $data['status']]], $row->default_medium ?: 'other', $row->source);
+        if ($plan['problems']) {
+            $why = ['bad_phone' => __('The phone is not usable.'), 'no_name' => __('The name is empty.'), 'bad_date' => __('The date is not readable (write 2026-07-24 or 24/07/2026, or leave it empty).')];
+
+            return back()->withErrors(['fix_'.$index => $why[$plan['problems'][0]['why']] ?? __('This row cannot come in.')])->withInput();
+        }
+        $written = $this->history->import($plan, $row->id, $row->source, $request->user()->id);
+        $message = $written['inserted'] ? __('Row :n came in.', ['n' => $problem['line']])
+            : __('Row :n is already in IQS (an order with the same CN, number or details), so it was not added again.', ['n' => $problem['line']]);
+        $this->dropProblem($row, $result, $index, $written['inserted']);
+
+        return back()->with('success', $message);
+    }
+
+    /** A row that did not come in, taken off the list (it stays out). */
+    public function deleteRow(int $import, int $index): RedirectResponse
+    {
+        [$row, $result] = $this->problem($import, $index);
+        $this->dropProblem($row, $result, $index, 0);
+
+        return back()->with('success', __('Row removed from the list.'));
+    }
+
+    /** @return array{0: object, 1: array, 2: array} */
+    private function problem(int $import, int $index): array
+    {
+        $row = DB::table('customer_imports')->find($import) ?? abort(404);
+        abort_unless($row->done_at && ! $row->undone_at, 422, __('This import was taken back.'));
+        $result = json_decode((string) $row->result, true) ?: [];
+        $problem = $result['problems'][$index] ?? abort(404, __('That row is no longer on the list.'));
+
+        return [$row, $result, $problem];
+    }
+
+    /** Off the list; its count goes down, and a row that came in counts as imported. */
+    private function dropProblem(object $row, array $result, int $index, int $inserted): void
+    {
+        $why = $result['problems'][$index]['why'];
+        array_splice($result['problems'], $index, 1);
+        $result[$why] = max(0, (int) ($result[$why] ?? 0) - 1);
+        $result['orders'] = (int) ($result['orders'] ?? 0) + $inserted;
+        DB::table('customer_imports')->where('id', $row->id)->update(['result' => json_encode($result, JSON_UNESCAPED_UNICODE), 'updated_at' => now()]);
+    }
+
     public const SORTS = ['new' => 'Newest order first', 'old' => 'Oldest order first', 'high' => 'Amount: high to low', 'low' => 'Amount: low to high', 'name' => 'Name A to Z'];
 
     /** One import: its numbers, then every order it brought in (search, status, sort, pages), then the rows that did not come in. */

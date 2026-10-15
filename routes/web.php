@@ -258,6 +258,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers/history/sample', 'sample')->name('customers.history.sample');
         Route::get('/customers/history/{import}', 'show')->whereNumber('import')->name('customers.history.show');
         Route::post('/customers/history/{import}/undo', 'undo')->whereNumber('import')->name('customers.history.undo');
+        Route::post('/customers/history/{import}/rows/{index}', 'fixRow')->whereNumber(['import', 'index'])->name('customers.history.fix');
+        Route::delete('/customers/history/{import}/rows/{index}', 'deleteRow')->whereNumber(['import', 'index'])->name('customers.history.drop');
     });
     Route::get('/customers/lookup', [CustomerController::class, 'lookup'])->middleware('can:customers.view')->name('customers.lookup');
     Route::get('/customers/steadfast', [CustomerController::class, 'steadfast'])->middleware('can:customers.view')->name('customers.steadfast');

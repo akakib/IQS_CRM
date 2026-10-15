@@ -48,6 +48,10 @@ Route::get('/tg/app', [TelegramController::class, 'app'])->name('tg.app');
 Route::post('/tg/app/data', [TelegramController::class, 'appData'])->middleware('throttle:60,1')->name('tg.app.data');
 Route::post('/tg/app/report', [TelegramController::class, 'appReport'])->middleware('throttle:60,1')->name('tg.app.report');
 
+// Public, no sign-in: Google asks for both before the Drive connection can be published.
+Route::view('/privacy', 'legal', ['page' => 'privacy'])->name('legal.privacy');
+Route::view('/terms', 'legal', ['page' => 'terms'])->name('legal.terms');
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store']);

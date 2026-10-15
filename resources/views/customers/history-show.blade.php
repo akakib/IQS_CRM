@@ -29,16 +29,94 @@
                 <x-confirm-modal id="history-undo-confirm" :verb="__('Undo')" :message="__('Removes the orders this import brought in, and the customers it created that have no other orders. Customers who already had orders stay, and what it changed on earlier parcels is put back.')" />
             </div>
         @endif
-        @if ($recent->isNotEmpty() && ! $import->undone_at)
-            <x-card :title="__('Some of them')">
-                @foreach ($recent as $p)
-                    @php $tag = auth()->user()->can('customers.view') ? 'a' : 'div'; @endphp
-                    <{{ $tag }} @if ($tag === 'a') href="{{ route('journey.show', $p->id) }}" @endif class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm last:border-0 hover:bg-gray-50">
-                        <span class="min-w-0"><span class="block truncate font-medium text-gray-800">{{ $p->name }}</span><span class="text-xs text-gray-500">{{ $p->cn ?? $p->external_no ?? '-' }} · {{ \Illuminate\Support\Carbon::parse($p->ordered_at)->format('d M Y') }} · {{ __(\App\Services\Customers\HistoryImport::STATUSES[$p->status] ?? $p->status) }}</span></span>
-                        <span class="shrink-0 font-semibold tabular-nums">৳{{ number_format((float) $p->amount) }}</span>
-                    </{{ $tag }}>
-                @endforeach
-            </x-card>
+        @if ($import->done_at && ! $import->undone_at)
+            @php
+                $statusLabels = \App\Services\Customers\HistoryImport::STATUSES;
+                $canJourney = auth()->user()->can('customers.view');
+                $badge = ['delivered' => 'green', 'returned' => 'red', 'cancelled' => 'red', 'refunded' => 'amber', 'pending' => 'gray'];
+            @endphp
+            <div class="rounded-2xl border border-gray-200 bg-white p-4">
+                <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                    <p class="text-sm font-semibold text-gray-900">{{ __('Orders in this import') }}</p>
+                    <p class="text-xs text-gray-500">{{ trans_choice(':count order|:count orders', $orders->total(), ['count' => number_format($orders->total())]) }}</p>
+                </div>
+                <form method="GET" action="{{ route('customers.history.show', $import->id) }}" class="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
+                    <input type="search" name="q" value="{{ $filters['q'] }}" placeholder="{{ __('Name, phone, CN, address or product') }}" autocomplete="off"
+                        class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
+                    <x-simple-select name="status" :options="['' => __('All statuses')] + array_map(fn ($l) => __($l), array_diff_key($statusLabels, ['skip' => 1]))" :value="$filters['status']" full-width
+                        x-on:select-change="$nextTick(() => $el.closest('form').submit())" />
+                    <x-simple-select name="sort" :options="array_map(fn ($l) => __($l), \App\Http\Controllers\CustomerImportController::SORTS)" :value="$filters['sort']" full-width
+                        x-on:select-change="$nextTick(() => $el.closest('form').submit())" />
+                    <div class="flex gap-2">
+                        <x-button class="flex-1">{{ __('Search') }}</x-button>
+                        @if ($filters['q'] !== '' || $filters['status'] !== '' || $filters['sort'] !== 'new')
+                            <x-button variant="secondary" :href="route('customers.history.show', $import->id)">{{ __('Clear') }}</x-button>
+                        @endif
+                    </div>
+                </form>
+
+                @if ($orders->isEmpty())
+                    <p class="mt-4 rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">{{ __('No order matches.') }}</p>
+                @else
+                    {{-- Phone: cards. --}}
+                    <div class="mt-3 space-y-2 md:hidden">
+                        @foreach ($orders as $p)
+                            <div class="rounded-xl border border-gray-100 p-3">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        @if ($canJourney)<a href="{{ route('journey.show', $p->id) }}" class="block truncate font-medium text-gray-900 hover:text-primary">{{ $p->name }}</a>@else<p class="truncate font-medium text-gray-900">{{ $p->name }}</p>@endif
+                                        <p class="font-mono text-xs text-gray-500">{{ \App\Support\Permissions\Mask::value($p->primary_phone, 'customer_contact') }}@if ($p->cn) · {{ $p->cn }}@elseif ($p->external_no) · #{{ $p->external_no }}@endif</p>
+                                    </div>
+                                    <p class="shrink-0 text-right"><span class="font-semibold tabular-nums">৳{{ number_format((float) $p->amount) }}</span><br><x-badge :color="$badge[$p->status] ?? 'gray'">{{ __($statusLabels[$p->status] ?? $p->status) }}</x-badge></p>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500">{{ \Illuminate\Support\Carbon::parse($p->ordered_at)->format('d M Y') }}@if ($p->items) · {{ $p->items }}@endif</p>
+                                @if ($p->address)<p class="truncate text-xs text-gray-400">{{ $p->address }}</p>@endif
+                            </div>
+                        @endforeach
+                    </div>
+                    {{-- Wider screens: a table. --}}
+                    <div class="mt-3 hidden overflow-x-auto md:block">
+                        <table class="w-full text-sm">
+                            <thead><tr class="border-b border-gray-200 text-left text-xs text-gray-500">
+                                <th class="py-2 pr-3 font-medium">{{ __('Customer') }}</th><th class="py-2 pr-3 font-medium">{{ __('Phone') }}</th><th class="py-2 pr-3 font-medium">{{ __('CN') }}</th>
+                                <th class="py-2 pr-3 font-medium">{{ __('Date') }}</th><th class="py-2 pr-3 font-medium">{{ __('Products') }}</th><th class="py-2 pr-3 font-medium">{{ __('Status') }}</th><th class="py-2 text-right font-medium">{{ __('Amount') }}</th>
+                            </tr></thead>
+                            <tbody>
+                                @foreach ($orders as $p)
+                                    <tr class="border-b border-gray-100 align-top last:border-0">
+                                        <td class="py-2 pr-3">@if ($canJourney)<a href="{{ route('journey.show', $p->id) }}" class="font-medium text-gray-900 hover:text-primary">{{ $p->name }}</a>@else<span class="font-medium text-gray-900">{{ $p->name }}</span>@endif
+                                            @if ($p->address)<span class="block max-w-xs truncate text-xs text-gray-400">{{ $p->address }}</span>@endif</td>
+                                        <td class="whitespace-nowrap py-2 pr-3 font-mono text-gray-700">{{ \App\Support\Permissions\Mask::value($p->primary_phone, 'customer_contact') }}</td>
+                                        <td class="whitespace-nowrap py-2 pr-3 font-mono text-gray-700">{{ $p->cn ?? ($p->external_no ? '#'.$p->external_no : '-') }}</td>
+                                        <td class="whitespace-nowrap py-2 pr-3 text-gray-700">{{ \Illuminate\Support\Carbon::parse($p->ordered_at)->format('d M Y') }}</td>
+                                        <td class="max-w-xs py-2 pr-3 text-gray-600">{{ $p->items ?? '-' }}</td>
+                                        <td class="py-2 pr-3"><x-badge :color="$badge[$p->status] ?? 'gray'">{{ __($statusLabels[$p->status] ?? $p->status) }}</x-badge></td>
+                                        <td class="whitespace-nowrap py-2 text-right font-semibold tabular-nums">৳{{ number_format((float) $p->amount) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-4">{{ $orders->links() }}</div>
+                @endif
+            </div>
+
+            @if ($problems)
+                @php $why = ['bad_phone' => __('Phone not usable'), 'no_name' => __('No name'), 'bad_date' => __('Date not readable'), 'skipped' => __('Skipped by status')]; @endphp
+                <details class="rounded-2xl border border-red-200 bg-white p-4">
+                    <summary class="cursor-pointer text-sm font-semibold text-red-800">{{ __('Rows that did not come in (:n)', ['n' => count($problems)]) }}</summary>
+                    <p class="mt-2 text-xs text-gray-500">{{ __('Fix these rows in the file and upload it again: rows already in come in once, only the fixed ones are added.') }}</p>
+                    <div class="mt-2 divide-y divide-gray-100 text-sm">
+                        @foreach ($problems as $pr)
+                            <div class="flex flex-wrap items-baseline justify-between gap-2 py-2">
+                                <span class="min-w-0"><span class="text-xs text-gray-400">{{ __('Row :n', ['n' => $pr['line']]) }}</span> <span class="font-medium text-gray-900">{{ $pr['name'] ?: '-' }}</span>
+                                    <span class="font-mono text-xs text-gray-600">{{ $pr['phone'] ?: __('no phone') }}</span></span>
+                                <x-badge color="red">{{ $why[$pr['why']] ?? $pr['why'] }}</x-badge>
+                            </div>
+                        @endforeach
+                    </div>
+                </details>
+            @endif
         @endif
     </div>
 </x-layouts.app>

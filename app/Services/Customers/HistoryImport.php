@@ -208,7 +208,7 @@ class HistoryImport
                 } elseif ($cn) {
                     $cnOwner[$cn] = $key;
                 }
-                $groups[$key] = ['no' => $no, 'cn' => $cn, 'row' => $row, 'items' => [], 'items_raw' => []];
+                $groups[$key] = ['no' => $no, 'cn' => $cn, 'row' => $row, 'line' => $n + 2, 'items' => [], 'items_raw' => []];
             }
             if (($item = $get($row, 'items')) !== '') {
                 $qty = $get($row, 'qty');
@@ -240,6 +240,13 @@ class HistoryImport
         $dayFirst ??= ! $commaShape;
 
         $orders = [];
+        // Rows that did not come in, with why, so they can be fixed in the file (the first 500).
+        $problems = [];
+        $problem = function (array $g, string $why) use (&$problems, $getRaw) {
+            if (count($problems) < 500) {
+                $problems[] = ['line' => $g['line'], 'name' => mb_substr($getRaw($g['row'], 'name'), 0, 80), 'phone' => mb_substr($getRaw($g['row'], 'phone'), 0, 60), 'why' => $why];
+            }
+        };
         foreach ($groups as $g) {
             $row = $g['row'];
             $phones = Phone::extract($get($row, 'phone', ' / '));
@@ -249,12 +256,14 @@ class HistoryImport
                 (string) (mb_substr(implode(', ', array_unique($g['items_raw'])), 0, 1000) ?: null), mb_strtolower($getRaw($row, 'name'))]));
             if (! $phone) {
                 $counts['bad_phone']++;
+                $problem($g, 'bad_phone');
 
                 continue;
             }
             $name = $get($row, 'name');
             if ($name === '') {
                 $counts['no_name']++;
+                $problem($g, 'no_name');
 
                 continue;
             }
@@ -262,6 +271,7 @@ class HistoryImport
             $date = $rawDate === '' ? now()->format('Y-m-d H:i:s') : $this->date($rawDate, $dayFirst);
             if (! $date) {
                 $counts['bad_date']++;
+                $problem($g, 'bad_date');
 
                 continue;
             }
@@ -269,6 +279,7 @@ class HistoryImport
             $status = $cols('status') && $statusWord !== '' ? ($values['status'][$statusWord] ?? $this->guessValue('status', $statusWord)) : 'delivered';
             if ($status === 'skip') {
                 $counts['skipped']++;
+                $problem($g, 'skipped');
 
                 continue;
             }
@@ -407,7 +418,7 @@ class HistoryImport
         $counts['known'] = count($knownPhones);
         $counts['new'] = count($newPhones);
 
-        return ['orders' => $keep, 'updates' => $updates, 'phones' => $phonesToAdd, 'restore' => array_values(array_intersect_key($restore, $knownPhones)), 'counts' => $counts];
+        return ['orders' => $keep, 'updates' => $updates, 'phones' => $phonesToAdd, 'restore' => array_values(array_intersect_key($restore, $knownPhones)), 'counts' => $counts, 'problems' => $problems];
     }
 
     /**

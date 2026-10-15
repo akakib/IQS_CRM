@@ -238,4 +238,24 @@ class CustomerHistoryImportTest extends TestCase
         $this->assertEquals(700, $p->amount);            // the newer pick for the amount, once
         $this->assertSame('messenger', $p->medium);       // the remembered medium
     }
+
+    public function test_the_result_page_lists_every_order_with_search_sort_and_the_rows_left_out(): void
+    {
+        $csv = "Name,CN,Phone,Address,Products,Amount,Date,Status\n";
+        for ($i = 1; $i <= 30; $i++) {
+            $csv .= sprintf("Customer %02d,DM9%05d,017%08d,Road %d,Dates,%d,2026-07-%02d,%s\n", $i, $i, $i, $i, $i * 100, ($i % 28) + 1, $i % 5 ? 'Delivered' : 'Returned');
+        }
+        $csv .= "Bad Phone,DM999999,0171234,Road,Dates,100,2026-07-01,Delivered\n";
+        $id = $this->upload('big.csv', $csv);
+        $page = $this->get(route('customers.history.show', $id))->assertOk()->assertSee('30 orders')->assertSee('Rows that did not come in (1)')->assertSee('Bad Phone');
+        $this->assertSame(25, $page->viewData('orders')->count()); // pages of 25
+        $this->get(route('customers.history.show', [$id, 'page' => 2]))->assertSee('Customer');
+        // Search by name, by any phone form, by CN; filter by status; sort by amount.
+        $this->get(route('customers.history.show', [$id, 'q' => 'Customer 07']))->assertSee('Customer 07')->assertDontSee('Customer 08');
+        $this->get(route('customers.history.show', [$id, 'q' => '+880 17 00000012']))->assertSee('Customer 12')->assertDontSee('Customer 13');
+        $this->get(route('customers.history.show', [$id, 'q' => 'dm900003']))->assertSee('Customer 03')->assertDontSee('Customer 04');
+        $this->assertSame(6, $this->get(route('customers.history.show', [$id, 'status' => 'returned']))->viewData('orders')->total());
+        $this->assertSame('Customer 30', $this->get(route('customers.history.show', [$id, 'sort' => 'high']))->viewData('orders')->first()->name);
+        $this->assertSame('Customer 01', $this->get(route('customers.history.show', [$id, 'sort' => 'low']))->viewData('orders')->first()->name);
+    }
 }

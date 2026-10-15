@@ -83,7 +83,7 @@ class CustomerImportController extends Controller
         $written = $this->history->import($plan, $id, $source, $request->user()->id);
         $plan['counts']['orders'] = $written['inserted'];
         DB::table('customer_imports')->where('id', $id)->update([
-            'result' => json_encode($plan['counts']), 'changes' => $written['changes'] ? json_encode($written['changes'], JSON_UNESCAPED_UNICODE) : null,
+            'result' => json_encode($plan['counts'] + ['problems' => $plan['problems']], JSON_UNESCAPED_UNICODE), 'changes' => $written['changes'] ? json_encode($written['changes'], JSON_UNESCAPED_UNICODE) : null,
             'done_at' => now(), 'updated_at' => now(),
         ]);
         Storage::disk('local')->delete($path);
@@ -122,16 +122,36 @@ class CustomerImportController extends Controller
         return redirect()->route('customers.history.show', $row->id)->with('status', __('Import taken back.'));
     }
 
-    public function show(int $import): View
+    public const SORTS = ['new' => 'Newest order first', 'old' => 'Oldest order first', 'high' => 'Amount: high to low', 'low' => 'Amount: low to high', 'name' => 'Name A to Z'];
+
+    /** One import: its numbers, then every order it brought in (search, status, sort, pages), then the rows that did not come in. */
+    public function show(Request $request, int $import): View
     {
         $row = DB::table('customer_imports as i')->leftJoin('users as u', 'u.id', '=', 'i.created_by')->where('i.id', $import)
             ->first(['i.*', 'u.name as by']) ?? abort(404);
+        $q = trim(\App\Support\Phone::englishDigits((string) $request->query('q', '')));
+        $status = array_key_exists((string) $request->query('status'), HistoryImport::STATUSES) ? $request->query('status') : '';
+        $sort = array_key_exists((string) $request->query('sort'), self::SORTS) ? $request->query('sort') : 'new';
+        $phone = \App\Support\Phone::normalize($q);
+
+        $orders = DB::table('customer_past_orders as p')->join('customers as c', 'c.id', '=', 'p.customer_id')->where('p.customer_import_id', $import)
+            ->when($q !== '', fn ($w) => $w->where(fn ($s) => $phone
+                ? $s->where('c.primary_phone', $phone)->orWhereIn('c.id', DB::table('customer_phones')->where('phone', $phone)->select('customer_id'))
+                : $s->where('c.name', 'like', '%'.$q.'%')->orWhere('p.cn', strtoupper($q))->orWhere('p.external_no', $q)->orWhere('p.address', 'like', '%'.$q.'%')->orWhere('p.items', 'like', '%'.$q.'%')))
+            ->when($status, fn ($w) => $w->where('p.status', $status))
+            ->when($sort === 'new', fn ($w) => $w->orderByDesc('p.ordered_at'))->when($sort === 'old', fn ($w) => $w->orderBy('p.ordered_at'))
+            ->when($sort === 'high', fn ($w) => $w->orderByDesc('p.amount'))->when($sort === 'low', fn ($w) => $w->orderBy('p.amount'))
+            ->when($sort === 'name', fn ($w) => $w->orderBy('c.name'))->orderBy('p.id')
+            ->select(['c.id', 'c.name', 'c.primary_phone', 'p.external_no', 'p.cn', 'p.ordered_at', 'p.amount', 'p.status', 'p.items', 'p.address'])
+            ->paginate(25)->withQueryString();
+        $result = json_decode((string) $row->result, true) ?: [];
 
         return view('customers.history-show', [
             'import' => $row,
-            'result' => json_decode((string) $row->result, true) ?: [],
-            'recent' => DB::table('customer_past_orders as p')->join('customers as c', 'c.id', '=', 'p.customer_id')->where('p.customer_import_id', $import)
-                ->orderByDesc('p.ordered_at')->limit(10)->get(['c.id', 'c.name', 'p.external_no', 'p.cn', 'p.ordered_at', 'p.amount', 'p.status']),
+            'result' => $result,
+            'orders' => $orders,
+            'problems' => $result['problems'] ?? [],
+            'filters' => ['q' => $q, 'status' => $status, 'sort' => $sort],
         ]);
     }
 

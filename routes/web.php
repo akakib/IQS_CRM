@@ -182,6 +182,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/call-lists/create', 'create')->name('calls.lists.create');
             Route::post('/call-lists', 'store')->name('calls.lists.store');
             Route::get('/call-lists/{list}', 'show')->whereNumber('list')->name('calls.lists.show');
+            Route::get('/call-lists/{list}/items/{item}', 'item')->whereNumber(['list', 'item'])->name('calls.lists.item');
             Route::put('/call-lists/{list}', 'update')->whereNumber('list')->name('calls.lists.update');
         });
         Route::middleware('can:calls.work')->group(function () {

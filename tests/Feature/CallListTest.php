@@ -137,6 +137,42 @@ class CallListTest extends TestCase
         $this->assertNotSame($item->id, $this->item($this->rakin, $list)->id);
     }
 
+    public function test_managers_see_every_number_filter_them_and_open_each_call(): void
+    {
+        $list = $this->makeList([$this->rakin]);
+        $this->actingAs($this->rakin)->get(route('calls.work', $list));
+        $item = $this->item($this->rakin, $list);
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 25, 'topics' => ['delivery' => 'bad', 'product' => 'good'],
+            'note' => 'Box crushed', 'proof' => $this->fakeFile('Call 20260101.m4a', 50, 'audio/mp4'), 'proof_old_ok' => '1', 'seconds' => 95]);
+        $call = DB::table('customer_calls')->where('call_list_item_id', $item->id)->first();
+
+        // Every number of the list is on the page, called or not; filters narrow it down.
+        $page = fn (array $q = []) => $this->actingAs($this->owner)->get(route('calls.lists.show', [$list] + $q))->assertOk();
+        $page()->assertSee('Numbers')->assertSee($item->name)->assertSee('Not called yet')->assertSee('Box crushed');
+        $page(['state' => 'done'])->assertSee($item->name)->assertSee('1 number');
+        $ids = fn (array $q) => $page($q)->viewData('numbers')->getCollection()->pluck('id')->all();
+        $this->assertNotContains($item->id, $ids(['state' => 'not_called']));
+        $this->assertSame([$item->id], $ids(['mood' => 'unhappy', 'caller' => $this->rakin->id]));
+        $this->assertSame([$item->id], $ids(['flag' => 'earlier']));
+        $page(['flag' => 'ordered'])->assertSee('No number matches.');
+        $this->assertSame([$item->id], $ids(['q' => '+88 '.$item->phone])); // any way of writing the number
+        $page(['sort' => 'unhappy', 'state' => 'nonsense'])->assertOk(); // unknown values are ignored
+
+        // A number opens with where it stands and every call with its file.
+        $d = $this->getJson(route('calls.lists.item', [$list, $item->id]))->assertOk()->json();
+        $this->assertSame(['Done', 'Talked', 1, 25], [$d['state'], $d['outcome'], $d['attempts'], $d['satisfaction']['value']]);
+        $this->assertSame([['label' => 'Delivery', 'good' => false], ['label' => 'Product quality', 'good' => true]], $d['topics']);
+        $this->assertSame('1:35', $d['calls'][0]['duration']);
+        $this->assertSame(route('calls.proof', $call->id), $d['calls'][0]['proof']['url']);
+        $this->assertTrue($d['calls'][0]['proof']['old']);
+        $this->assertSame('Call 20260101.m4a', $d['calls'][0]['proof']['picked']);
+        $this->getJson(route('calls.lists.item', [$list + 99, $item->id]))->assertNotFound(); // only through its own list
+
+        // Callers do not get the manager's view.
+        $this->actingAs($this->rakin)->getJson(route('calls.lists.item', [$list, $item->id]))->assertForbidden();
+        $this->get(route('calls.lists.show', $list))->assertForbidden();
+    }
+
     public function test_no_answer_comes_back_later_three_times_and_do_not_call_is_kept(): void
     {
         $list = $this->makeList([$this->rakin]);

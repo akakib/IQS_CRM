@@ -63,18 +63,101 @@ class CallListController extends Controller
         return redirect()->route('calls.lists.show', $id)->with('success', __('Call list made.'));
     }
 
-    public function show(int $list): View
+    /** Ways to sort the numbers of a list. */
+    public const SORTS = ['recent' => 'Latest call first', 'name' => 'Name A to Z', 'unhappy' => 'Least satisfied first', 'tries' => 'Most tries first'];
+
+    /** What a number's state means to a manager. */
+    public const STATES = ['not_called' => 'Not called yet', 'in_hand' => 'With a caller now', 'later' => 'Call again later', 'done' => 'Done'];
+
+    public function show(Request $request, int $list): View
     {
         $row = DB::table('call_lists as l')->leftJoin('customer_imports as i', 'i.id', '=', 'l.customer_import_id')->where('l.id', $list)->first(['l.*', 'i.file_name']) ?? abort(404);
+        $f = [
+            'q' => trim((string) $request->query('q', '')),
+            'state' => array_key_exists($s = (string) $request->query('state', ''), self::STATES) ? $s : '',
+            'outcome' => array_key_exists($o = (string) $request->query('outcome', ''), CallListService::OUTCOMES) ? $o : '',
+            'caller' => ctype_digit($c = (string) $request->query('caller', '')) ? $c : '',
+            'mood' => in_array($m = (string) $request->query('mood', ''), ['unhappy', 'okay', 'happy'], true) ? $m : '',
+            'flag' => in_array($g = (string) $request->query('flag', ''), ['ordered', 'earlier'], true) ? $g : '',
+            'sort' => array_key_exists($t = (string) $request->query('sort', 'recent'), self::SORTS) ? $t : 'recent',
+        ];
+
+        $numbers = DB::table('call_list_items as i')->where('i.call_list_id', $list)
+            ->leftJoin('users as u', 'u.id', '=', 'i.user_id')->leftJoin('orders as o', 'o.id', '=', 'i.order_id')
+            ->when($f['q'] !== '', function ($q) use ($f) {
+                $phone = \App\Support\Phone::normalize($f['q']);
+                $q->where(fn ($w) => $phone ? $w->where('i.phone', $phone) : $w->where('i.name', 'like', '%'.$f['q'].'%')->orWhere('i.phone', 'like', '%'.preg_replace('/\D/', '', $f['q']).'%'));
+            })
+            ->when($f['state'] === 'not_called', fn ($q) => $q->where('i.attempts', 0)->where('i.state', '!=', 'in_hand'))
+            ->when(in_array($f['state'], ['in_hand', 'later', 'done'], true), fn ($q) => $q->where('i.state', $f['state']))
+            ->when($f['outcome'] !== '', fn ($q) => $q->where('i.outcome', $f['outcome']))
+            ->when($f['caller'] !== '', fn ($q) => $q->whereExists(fn ($e) => $e->selectRaw('1')->from('customer_calls as cc')->whereColumn('cc.call_list_item_id', 'i.id')->where('cc.user_id', (int) $f['caller'])))
+            ->when($f['mood'] === 'unhappy', fn ($q) => $q->where('i.satisfaction', '<', 50))
+            ->when($f['mood'] === 'okay', fn ($q) => $q->where('i.satisfaction', 50))
+            ->when($f['mood'] === 'happy', fn ($q) => $q->where('i.satisfaction', '>', 50))
+            ->when($f['flag'] === 'ordered', fn ($q) => $q->whereNotNull('i.order_id'))
+            ->when($f['flag'] === 'earlier', fn ($q) => $q->whereExists(fn ($e) => $e->selectRaw('1')->from('customer_calls as cc')->whereColumn('cc.call_list_item_id', 'i.id')->where('cc.proof_old', true)))
+            ->when($f['sort'] === 'recent', fn ($q) => $q->orderByRaw('i.attempts = 0')->orderByDesc('i.updated_at'))
+            ->when($f['sort'] === 'name', fn ($q) => $q->orderBy('i.name'))
+            ->when($f['sort'] === 'unhappy', fn ($q) => $q->orderByRaw('i.satisfaction IS NULL')->orderBy('i.satisfaction'))
+            ->when($f['sort'] === 'tries', fn ($q) => $q->orderByDesc('i.attempts'))
+            ->orderBy('i.id')
+            ->select(['i.id', 'i.name', 'i.phone', 'i.customer_id', 'i.state', 'i.attempts', 'i.outcome', 'i.satisfaction', 'i.note', 'i.next_at', 'i.updated_at', 'i.order_id', 'u.name as by', 'o.order_no', 'o.grand_total'])
+            ->paginate(25)->withQueryString()->fragment('numbers');
 
         return view('calls.show', [
             'list' => $row,
             'progress' => $this->calls->progress($row),
             'callers' => $this->callers(),
             'assigned' => DB::table('call_list_user')->where('call_list_id', $list)->pluck('user_id')->all(),
-            'recent' => DB::table('customer_calls as cc')->join('call_list_items as i', 'i.id', '=', 'cc.call_list_item_id')->leftJoin('users as u', 'u.id', '=', 'cc.user_id')
-                ->where('i.call_list_id', $list)->orderByDesc('cc.id')->limit(30)
-                ->get(['cc.id', 'cc.started_at', 'cc.note', 'cc.satisfaction', 'cc.proof_path', 'cc.proof_name', 'cc.proof_old', 'cc.duration_seconds', 'i.name', 'i.customer_id', 'u.name as by']),
+            'numbers' => $numbers,
+            'filters' => $f,
+            // Everyone who has called on this list, for the Caller filter.
+            'calledBy' => DB::table('customer_calls as cc')->join('call_list_items as i', 'i.id', '=', 'cc.call_list_item_id')->join('users as u', 'u.id', '=', 'cc.user_id')
+                ->where('i.call_list_id', $list)->distinct()->orderBy('u.name')->pluck('u.name', 'u.id')->all(),
+            'seePhone' => $request->user()->canSeeField('customer_contact'),
+        ]);
+    }
+
+    /** One number of a list, for the details popup: where it stands, every call on it with its file, and the order taken. */
+    public function item(Request $request, int $list, int $item): \Illuminate\Http\JsonResponse
+    {
+        $it = DB::table('call_list_items as i')->leftJoin('orders as o', 'o.id', '=', 'i.order_id')->leftJoin('users as u', 'u.id', '=', 'i.user_id')
+            ->where('i.call_list_id', $list)->where('i.id', $item)->first(['i.*', 'o.order_no', 'o.grand_total', 'u.name as holder']) ?? abort(404);
+        $user = $request->user();
+        $see = $user->canSeeField('customer_contact');
+        $when = fn ($t) => $t ? \Illuminate\Support\Carbon::parse($t)->format('d M Y, g:i A') : null;
+        $calls = DB::table('customer_calls as cc')->leftJoin('users as u', 'u.id', '=', 'cc.user_id')->where('cc.call_list_item_id', $it->id)->orderByDesc('cc.id')
+            ->get(['cc.id', 'cc.started_at', 'cc.ended_at', 'cc.duration_seconds', 'cc.note', 'cc.satisfaction', 'cc.proof_path', 'cc.proof_name', 'cc.proof_old', 'u.name as by']);
+        $n = $calls->count();
+
+        return response()->json([
+            'name' => $it->name,
+            'phone' => $see ? $it->phone : \App\Support\Permissions\Mask::value($it->phone, 'customer_contact'),
+            'state' => __(match (true) { $it->state === 'in_hand' => self::STATES['in_hand'], $it->state === 'later' => self::STATES['later'], $it->state === 'done' => self::STATES['done'], default => self::STATES['not_called'] }),
+            'holder' => $it->state === 'in_hand' ? $it->holder : null,
+            'next_at' => $it->state === 'later' ? $when($it->next_at) : null,
+            'attempts' => (int) $it->attempts,
+            'outcome' => $it->outcome ? __(CallListService::OUTCOMES[$it->outcome] ?? $it->outcome) : null,
+            'satisfaction' => $it->satisfaction === null ? null : ['value' => (int) $it->satisfaction, 'label' => __(CallListService::SATISFACTION[(int) $it->satisfaction] ?? '')],
+            'topics' => collect(json_decode((string) $it->topics, true) ?: [])->map(fn ($v, $k) => ['label' => __(CallListService::TOPICS[$k] ?? $k), 'good' => $v === 'good'])->values(),
+            'note' => $it->note,
+            'order' => $it->order_id ? ['no' => $it->order_no, 'total' => number_format((float) $it->grand_total), 'url' => $user->can('orders.view') ? route('orders.show', $it->order_id) : null] : null,
+            'journey' => $it->customer_id && $user->can('customers.view') ? route('journey.show', $it->customer_id) : null,
+            'calls' => $calls->values()->map(fn ($c, $k) => [
+                'try' => $n - $k,
+                'when' => $when($c->started_at),
+                'by' => $c->by,
+                'duration' => $c->duration_seconds !== null ? intdiv($c->duration_seconds, 60).':'.str_pad((string) ($c->duration_seconds % 60), 2, '0', STR_PAD_LEFT) : null,
+                'note' => $c->note,
+                'satisfaction' => $c->satisfaction,
+                'proof' => $c->proof_path ? [
+                    'url' => route('calls.proof', $c->id),
+                    'kind' => str_starts_with(CallListService::proofMime($c->proof_path), 'image/') ? 'image' : 'audio',
+                    'title' => $it->name, 'sub' => trim(($c->by ?? '').' · '.$when($c->started_at)),
+                    'picked' => $c->proof_name, 'old' => (bool) $c->proof_old,
+                ] : null,
+            ]),
         ]);
     }
 

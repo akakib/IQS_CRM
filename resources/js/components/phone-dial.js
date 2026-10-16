@@ -92,3 +92,12 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
         },
     };
 }
+
+// A phone number as a QR picture (svg) to scan with a phone from a PC screen.
+window.iqsQr = async (phone) => {
+    const { default: qrcode } = await import('qrcode-generator');
+    const code = qrcode(0, 'M');
+    code.addData('tel:' + phone);
+    code.make();
+    return code.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+};

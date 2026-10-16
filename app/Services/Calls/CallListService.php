@@ -178,14 +178,14 @@ class CallListService
             throw ValidationException::withMessages(['satisfaction' => __('Pick how satisfied the customer is.')]);
         }
         if (! $proof) {
-            throw ValidationException::withMessages(['proof' => $spoke ? __('Add the call recording.') : __('Add a screenshot of the call log.')]);
+            throw ValidationException::withMessages(['proof' => __('Add the call recording or a screenshot of the call log.')]);
         }
         if ($outcome === 'later' && empty($data['later_at'])) {
             throw ValidationException::withMessages(['later_at' => __('Pick when to call again.')]);
         }
 
-        // A recording when they spoke, a picture when not; never a file used for another call, nor one of another number.
-        $checked = app(CallProof::class)->check($proof, $spoke, [$item->phone], $data['proof_modified'] ?? null, ! empty($data['proof_old_ok']));
+        // A recording or a screenshot, whatever the result (the caller picks any file); never a file used for another call, nor one of another number.
+        $checked = app(CallProof::class)->check($proof, null, [$item->phone], $data['proof_modified'] ?? null, ! empty($data['proof_old_ok']));
 
         $now = now();
         $attempts = $item->attempts + 1;

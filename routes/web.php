@@ -189,6 +189,7 @@ Route::middleware('auth')->group(function () {
         });
         Route::middleware('can:calls.work')->group(function () {
             Route::get('/my-calls', 'mine')->name('calls.mine');
+            Route::get('/my-calls/history', 'myHistory')->name('calls.history');
             Route::get('/my-calls/numbers/{item}', 'myItem')->whereNumber('item')->name('calls.mine.item');
             Route::get('/my-calls/{list}', 'work')->whereNumber('list')->name('calls.work');
             Route::post('/my-calls/{list}/{item}', 'record')->whereNumber(['list', 'item'])->name('calls.record');

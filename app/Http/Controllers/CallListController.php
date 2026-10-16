@@ -401,9 +401,32 @@ class CallListController extends Controller
     /** How a call went, as kept on each call. */
     public const CALL_RESULTS = ['answered' => 'Talked', 'no_answer' => 'No answer', 'busy' => 'Busy or off', 'wrong' => 'Wrong number'];
 
-    public function mine(Request $request): View|RedirectResponse
+    /** My calls: the lists given to me, today at a glance, my call-backs. The history is its own page. */
+    public function mine(Request $request): View
     {
-        if ($back = $this->remembered($request, 'calls.mine', 'calls.mine', [])) {
+        $user = $request->user();
+        $today = $this->myCalls($user)->where('cc.started_at', '>=', today());
+
+        return view('calls.mine', [
+            'lists' => $this->calls->mine($user),
+            'today' => [
+                'calls' => (clone $today)->count(),
+                'talked' => (clone $today)->where('cc.outcome', 'answered')->count(),
+                'orders' => (clone $today)->whereNotNull('i.order_id')->distinct()->count('i.order_id'),
+                'satisfaction' => ($s = (clone $today)->whereNotNull('cc.satisfaction')->avg('cc.satisfaction')) === null ? null : (int) round($s),
+            ],
+            // Numbers this person put off for later: when each comes back.
+            'callBacks' => DB::table('call_list_items as i')->join('call_lists as l', 'l.id', '=', 'i.call_list_id')->where('i.state', 'later')
+                ->whereExists(fn ($e) => $e->selectRaw('1')->from('customer_calls as cc')->whereColumn('cc.call_list_item_id', 'i.id')->where('cc.user_id', $user->id))
+                ->orderBy('i.next_at')->limit(10)->get(['i.id', 'i.name', 'i.phone', 'i.next_at', 'l.name as list']),
+            'seePhone' => $user->canSeeField('customer_contact'),
+        ]);
+    }
+
+    /** My call history: every call I made from the lists; search, filters, pages. */
+    public function myHistory(Request $request): View|RedirectResponse
+    {
+        if ($back = $this->remembered($request, 'calls.history', 'calls.history', [])) {
             return $back;
         }
         $user = $request->user();
@@ -414,8 +437,7 @@ class CallListController extends Controller
             'list' => ctype_digit($l = (string) $request->query('list', '')) ? $l : '',
             'result' => array_key_exists($r = (string) $request->query('result', ''), self::CALL_RESULTS) ? $r : '',
         ];
-        // Only this person's own calls from the lists.
-        $base = fn () => DB::table('customer_calls as cc')->join('call_list_items as i', 'i.id', '=', 'cc.call_list_item_id')->where('cc.user_id', $user->id);
+        $base = fn () => $this->myCalls($user);
         $calls = $base()->join('call_lists as l', 'l.id', '=', 'i.call_list_id')->leftJoin('orders as o', 'o.id', '=', 'i.order_id')
             ->when($f['q'] !== '', function ($q) use ($f) {
                 $phone = \App\Support\Phone::normalize($f['q']);
@@ -429,26 +451,20 @@ class CallListController extends Controller
             ->orderByDesc('cc.id')
             ->select(['cc.id', 'cc.started_at', 'cc.duration_seconds', 'cc.note', 'cc.satisfaction', 'cc.outcome', 'cc.proof_path', 'cc.proof_name', 'cc.proof_old',
                 'i.id as item_id', 'i.name', 'i.phone', 'l.name as list', 'o.order_no'])
-            ->paginate($f['per'])->withQueryString()->fragment('history');
-        $today = $base()->where('cc.started_at', '>=', today());
+            ->paginate($f['per'])->withQueryString();
 
-        return view('calls.mine', [
-            'lists' => $this->calls->mine($user),
+        return view('calls.history', [
             'calls' => $calls,
             'filters' => $f,
-            'today' => [
-                'calls' => (clone $today)->count(),
-                'talked' => (clone $today)->where('cc.outcome', 'answered')->count(),
-                'orders' => (clone $today)->whereNotNull('i.order_id')->distinct()->count('i.order_id'),
-                'satisfaction' => ($s = (clone $today)->whereNotNull('cc.satisfaction')->avg('cc.satisfaction')) === null ? null : (int) round($s),
-            ],
-            // Numbers this person put off for later: when each comes back.
-            'callBacks' => DB::table('call_list_items as i')->join('call_lists as l', 'l.id', '=', 'i.call_list_id')->where('i.state', 'later')
-                ->whereExists(fn ($e) => $e->selectRaw('1')->from('customer_calls as cc')->whereColumn('cc.call_list_item_id', 'i.id')->where('cc.user_id', $user->id))
-                ->orderBy('i.next_at')->limit(10)->get(['i.id', 'i.name', 'i.phone', 'i.next_at', 'l.name as list']),
             'myLists' => $base()->join('call_lists as l', 'l.id', '=', 'i.call_list_id')->distinct()->orderBy('l.name')->pluck('l.name', 'l.id')->all(),
             'seePhone' => $user->canSeeField('customer_contact'),
         ]);
+    }
+
+    /** Only this person's own calls from the lists. */
+    private function myCalls(User $user): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('customer_calls as cc')->join('call_list_items as i', 'i.id', '=', 'cc.call_list_item_id')->where('cc.user_id', $user->id);
     }
 
     public function work(Request $request, int $list): View|RedirectResponse

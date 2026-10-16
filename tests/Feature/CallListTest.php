@@ -182,7 +182,7 @@ class CallListTest extends TestCase
 
         // A problem: the reason for that field, nothing saved, the number still with the caller.
         $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 75, 'proof' => UploadedFile::fake()->createWithContent('x.txt', 'hi')], $json)
-            ->assertStatus(422)->assertJsonPath('errors.proof.0', 'This is not a recording. Add the call recording (m4a, mp3, amr...).');
+            ->assertStatus(422)->assertJsonPath('errors.proof.0', 'This is not a recording or a picture. Add the call recording or a screenshot of the call log.');
         $this->assertSame('in_hand', DB::table('call_list_items')->find($item->id)->state);
 
         // Saved: where to go next, and the message for the next page.
@@ -215,12 +215,13 @@ class CallListTest extends TestCase
         $theirs = $this->item($this->pranta, $list);
         $this->post(route('calls.record', [$list, $theirs->id]), ['outcome' => 'no_answer', 'proof' => UploadedFile::fake()->image('log.png', 33, 10)]);
 
-        $this->actingAs($this->rakin)->get(route('calls.mine'))->assertOk()
-            ->assertSee('My call history')->assertSee($mine->name)->assertSee('Talked: Liked the dates')->assertDontSee($theirs->name)
-            ->assertSee('Calls today')->assertSee('Play call');
-        $this->get(route('calls.mine', ['result' => 'no_answer']))->assertSee('No call matches.');
-        $this->get(route('calls.mine', ['day' => 'yesterday']))->assertSee('No call matches.');
-        $this->get(route('calls.mine', ['q' => '+88 '.$mine->phone, 'day' => 'today']))->assertSee($mine->name);
+        // My calls keeps the calling in focus: today and a link; the history is its own page.
+        $this->actingAs($this->rakin)->get(route('calls.mine'))->assertOk()->assertSee('Calls today')->assertSee(route('calls.history'))->assertDontSee('Talked: Liked the dates');
+        $this->get(route('calls.history'))->assertOk()
+            ->assertSee('My call history')->assertSee($mine->name)->assertSee('Talked: Liked the dates')->assertDontSee($theirs->name)->assertSee('Play call');
+        $this->get(route('calls.history', ['result' => 'no_answer']))->assertSee('No call matches.');
+        $this->get(route('calls.history', ['day' => 'yesterday']))->assertSee('No call matches.');
+        $this->get(route('calls.history', ['q' => '+88 '.$mine->phone, 'day' => 'today']))->assertSee($mine->name);
 
         // The details: only their own calls, and only numbers they called.
         $d = $this->getJson(route('calls.mine.item', $mine->id))->assertOk()->json();
@@ -232,13 +233,13 @@ class CallListTest extends TestCase
         $later = $this->item($this->rakin, $list);
         $this->post(route('calls.record', [$list, $later->id]), ['outcome' => 'later', 'satisfaction' => 50, 'later_at' => now()->addDay()->format('Y-m-d\TH:i'), 'proof' => $this->fakeFile('d.m4a', 20, 'audio/mp4')]);
         // The last search is remembered: the plain page comes back to it; Clear empties it for good.
-        $this->get(route('calls.mine'))->assertRedirect(route('calls.mine', ['q' => '+88 '.$mine->phone, 'day' => 'today']));
-        $this->get(route('calls.mine', ['clear' => 1]))->assertRedirect(route('calls.mine'));
+        $this->get(route('calls.history'))->assertRedirect(route('calls.history', ['q' => '+88 '.$mine->phone, 'day' => 'today']));
+        $this->get(route('calls.history', ['clear' => 1]))->assertRedirect(route('calls.history'));
         $this->get(route('calls.mine'))->assertOk()->assertSee('Call-backs')->assertSee('Comes back');
 
         // Rows a page: 10, 25, 50 or 100 (anything else is 25).
-        $this->assertSame(10, $this->get(route('calls.mine', ['per' => 10]))->viewData('calls')->perPage());
-        $this->assertSame(25, $this->get(route('calls.mine', ['per' => 7]))->viewData('calls')->perPage());
+        $this->assertSame(10, $this->get(route('calls.history', ['per' => 10]))->viewData('calls')->perPage());
+        $this->assertSame(25, $this->get(route('calls.history', ['per' => 7]))->viewData('calls')->perPage());
     }
 
     public function test_managers_see_every_number_filter_them_and_open_each_call(): void
@@ -425,7 +426,7 @@ class CallListTest extends TestCase
         file_put_contents($path, '<html><body><script>alert(1)</script></body></html>');
         $html = new UploadedFile($path, 'log.jpg', 'image/jpeg', null, true);
         $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'no_answer', 'proof' => $html])->assertSessionHasErrors('proof');
-        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 100, 'proof' => UploadedFile::fake()->image('log.png', 10 + ++$this->files, 10)])->assertSessionHasErrors('proof');
+        // Any result takes a recording or a screenshot (the caller picks any file); only a fake picture is refused above.
         $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 100, 'proof' => $this->fakeFile('call.m4a', 10, 'audio/mp4'), 'seconds' => 300]);
 
         $call = DB::table('customer_calls')->first();

@@ -166,8 +166,8 @@ class CallListTest extends TestCase
         $this->assertStringContainsString($old->name, $sheet);
         $this->assertStringNotContainsString($new->name, $sheet);
         $this->assertStringContainsString('Delivery', $sheet);
-        $this->get(route('calls.lists.print', [$list, 'mood' => 'unhappy'] + $week))->assertOk()->assertSee('No number matches these filters.')->assertDontSee('Save as PDF');
-        $this->get(route('calls.lists.print', [$list, 'as' => 'pdf']))->assertSee('Save as PDF')->assertSee('set Destination to');
+        $this->get(route('calls.lists.print', [$list, 'mood' => 'unhappy'] + $week))->assertOk()->assertSee('No number matches these filters.');
+        $this->get(route('calls.lists.print', $list))->assertSee('Print / PDF')->assertSee('Save as PDF')->assertDontSee('as=pdf', false);
         $this->get(route('calls.lists.print', [$list, 'mood' => 'unhappy']))->assertOk()->assertSee($old->name)->assertDontSee($new->name)->assertSee('Unhappy');
         $this->assertSame(4, DB::table('activity_log')->where('action', 'call_list.exported')->count()); // every download is logged
         $this->actingAs($this->rakin)->get(route('calls.lists.excel', $list))->assertForbidden(); // managers only

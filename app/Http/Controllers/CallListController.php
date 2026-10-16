@@ -111,7 +111,7 @@ class CallListController extends Controller
         return response()->download($file, $this->exportName($row, $f).'.xlsx', ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])->deleteFileAfterSend();
     }
 
-    /** The numbers as filtered on the page, as a page made for paper (Print, or Save as PDF). */
+    /** The numbers as filtered on the page, as a page made for paper (Print / PDF). */
     public function exportPrint(Request $request, int $list): View
     {
         if (app()->bound('debugbar')) {

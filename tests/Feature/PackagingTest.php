@@ -200,8 +200,8 @@ class PackagingTest extends TestCase
 
         $this->post("/handover/{$session}/close")->assertRedirect("/handover/{$session}/manifest");
         $this->get("/handover/{$session}/manifest")->assertOk()->assertSee($a->order_no)->assertSee('NOT handed over')->assertSee($b->order_no)->assertSee('Pickup sheet')->assertSee(route('handover.excel', $session), false)->assertSee('Received by rider')->assertDontSee('window.print(), 300');
-        $this->get("/handover/{$session}/manifest?as=pdf")->assertSee('Save as PDF')->assertSee('window.print(), 300', false)
-            ->assertDontSee('window.close()', false)->assertDontSee('as=pdf"', false); // Back, not Close; no PDF link on the PDF page
+        $this->get("/handover/{$session}/manifest?print=1")->assertSee('Print / PDF')->assertSee('window.print(), 300', false)
+            ->assertDontSee('window.close()', false)->assertDontSee('as=pdf', false); // Back, not Close; one Print / PDF button
         $this->assertSame(3, DB::table('scan_logs')->where('handover_session_id', $session)->count());
 
         // Any time later, from the list: the handed parcels only, same columns as the orders export; contact masked for packers.

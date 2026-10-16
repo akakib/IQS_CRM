@@ -2,14 +2,12 @@
      The page sets no top or bottom paper margin, so the browser has no room for its own date, title, page
      link and page number; the frame below gives every printed page its white space back instead.
      <x-print-page :title="$name"> ...content... <x-slot:styles>css</x-slot:styles> <x-slot:scripts>js</x-slot:scripts> </x-print-page>
-     A list's buttons are Print, PDF (?as=pdf) and Excel, the first two opening this page in a new tab.
-     back: a page opened in place gets Back instead of Close (never both). The main button is Print, or Save as PDF
-     on the PDF page; extra actions must not repeat it. --}}
+     A list's buttons are "Print / PDF" (this page, in a new tab) and Excel: the browser's window prints the page
+     or saves it as a PDF file (Destination: Save as PDF), so there is one button for both.
+     back: a page opened in place gets Back instead of Close (never both). The main button is Print / PDF; extra
+     actions must not repeat it. autoprint=false: opened to read first (the print window opens on ?print=1). --}}
 @props(['title', 'landscape' => true, 'autoprint' => true, 'back' => null])
-@php
-    // ?as=pdf: the same page, saved as a PDF file (the browser's dialog, with Save as PDF to pick); otherwise it is for the printer.
-    $pdf = request()->query('as') === 'pdf';
-@endphp
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -63,11 +61,9 @@
         @unless ($back)
             <button type="button" onclick="window.close()">{{ __('Close') }}</button>
         @endunless
-        <button type="button" class="go" onclick="window.print()">{{ $pdf ? __('Save as PDF') : __('Print') }}</button>
+        <button type="button" class="go" onclick="window.print()">{{ __('Print / PDF') }}</button>
     </div>
-    @if ($pdf)
-        <p class="hint">{{ __('In the window that opens, set Destination to "Save as PDF", then press Save.') }}</p>
-    @endif
+    <p class="hint">{{ __('Print / PDF opens the print window: pick a printer, or set Destination to "Save as PDF" for a file.') }}</p>
     <table class="frame">
         <thead><tr><td></td></tr></thead>
         <tfoot><tr><td></td></tr></tfoot>
@@ -75,7 +71,7 @@
     </table>
     {{ $scripts ?? '' }}
     {{-- Opens Print / Save as PDF at once; Close or Escape leaves the page to read or sort first. --}}
-    @if ($autoprint || request()->has('as'))
+    @if ($autoprint || request()->boolean('print'))
         <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>
     @endif
 </body>

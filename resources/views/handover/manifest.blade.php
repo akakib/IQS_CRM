@@ -6,8 +6,6 @@
         .note { margin-top: 12px; font-size: 12px; }
     </x-slot:styles>
     <x-slot:actions>
-        {{-- Print is the main button; on the PDF page Save as PDF is, so no PDF link there. --}}
-        @unless (request('as') === 'pdf')<a href="{{ route('handover.manifest', ['session' => $session->id, 'as' => 'pdf']) }}">{{ __('PDF') }}</a>@endunless
         <a href="{{ route('handover.excel', $session->id) }}">{{ __('Excel') }}</a>
     </x-slot:actions>
 

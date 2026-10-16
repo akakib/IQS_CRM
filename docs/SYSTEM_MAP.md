@@ -24,7 +24,7 @@ money in BDT. Laravel 12, Blade + Alpine.js + Tailwind. Database design: [DB_DES
 
 ### Product and UI
 - UI text is English only; no Bangla and no em-dash in labels, placeholders, notices or activity text.
-- The business is called **IQS** everywhere (screens, prints, messages, docs); never "Iqbal Store". Print, PDF and
+- The business is called **IQS** everywhere (screens, prints, messages, docs); never "Iqbal Store". Print / PDF and
   Excel downloads carry no business name at all. Only the parcel label prints the sender name, from the
   setting "Sender name on parcel labels" (Iqbal Store).
 - Confirmations use `<x-confirm-modal>`, never the browser's `confirm()`.
@@ -35,7 +35,8 @@ money in BDT. Laravel 12, Blade + Alpine.js + Tailwind. Database design: [DB_DES
 - Page width by kind: lists, tables, reports, dashboards and detail pages use the full width; forms and
   one-task screens (upload, new call list, the calling screen, scan screens) keep a reading width.
 - Search runs on Enter (not while typing); filters, sort, dates and page size stay after a reload.
-- Downloads are always the same three buttons: Print, PDF and Excel (`<x-export-buttons>`).
+- Downloads are always the same two buttons: "Print / PDF" (one print page: the browser prints it or saves a PDF)
+  and Excel (`<x-export-buttons>`).
 - Check every changed screen at phone, tablet and desktop width before handing it over.
 - A new Tailwind class needs `npm run build`, and the built assets are committed.
 
@@ -139,7 +140,7 @@ Blade components in `resources/views/components` (behaviour in Alpine). Use them
 | `x-modal`, `x-confirm-modal`, `x-slide-over` | Popups and confirmations |
 | `x-tabs` (with `tabs('key')`) | Underlined tabs; in-page tabs keep `#key` in the address |
 | `x-card`, `x-stat-tile`, `x-badge`, `x-status-badge`, `x-order-status`, `x-empty-state`, `x-skeleton`, `x-record-card` | Building blocks |
-| `x-export-buttons` + `x-print-page` | Print, PDF and Excel for any list (one clean print page, no browser header or footer) |
+| `x-export-buttons` + `x-print-page` | "Print / PDF" and Excel for any list (one clean print page, no browser header or footer) |
 | `x-call-proof` | The one upload box for a call's recording or screenshot (all four call screens) |
 | `x-play-call` + `x-call-player` | "Play call": recording or screenshot in a popup on the same page |
 | `x-phone-dial` | Call a customer from an order (tap, copy, QR) and log the call |
@@ -188,7 +189,7 @@ Past orders come in from files (Customers > Import order history) with fix, dele
 callers with a daily target. Callers share the pool: Start calling gives the next number (held 30 minutes),
 they record what happened, satisfaction and topics, and upload the recording or screenshot (`x-call-proof`,
 checked by `CallProof`). The file goes to Google Drive right after saving. Managers follow the list in tabs
-(Overview by dates, Numbers with filters, Settings) and download Print, PDF or Excel. Callers see their own
+(Overview by dates, Numbers with filters, Settings) and download Print / PDF or Excel. Callers see their own
 history under My calls.
 
 ---

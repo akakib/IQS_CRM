@@ -58,12 +58,31 @@
             </div>
         @elseif ($tooShort)
             <x-empty-state :message="__('Type at least 3 characters.')" />
-        @elseif ($results->isEmpty() && $past->isEmpty())
+        @elseif ($results->isEmpty() && $past->isEmpty() && $customers->isEmpty())
             <div class="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-10 text-center">
                 <p class="text-sm font-medium text-gray-700">{{ __('No order found for :q', ['q' => $q]) }}</p>
                 @if ($by !== 'all')<p class="mt-1 text-sm text-gray-500">{{ __('Searched in :m only.', ['m' => $modes[$by][0]]) }} <a href="{{ route('orders.search', ['q' => $q]) }}" class="text-primary hover:underline">{{ __('Search in All') }}</a></p>@endif
             </div>
         @else
+            {{-- The customer(s) the search is about. --}}
+            @foreach ($customers as $c)
+                @php $done = $c->delivered_count + $c->returned_count; @endphp
+                <a href="{{ route('customers.show', $c) }}" class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary-soft p-4 hover:border-primary">
+                    <span class="min-w-0">
+                        <span class="block text-xs font-medium uppercase tracking-wide text-primary">{{ __('Customer') }}</span>
+                        <span class="block truncate text-base font-semibold text-gray-900">{{ $c->name }}</span>
+                        <span class="block font-mono text-sm text-gray-600">{{ \App\Support\Permissions\Mask::value($c->primary_phone, 'customer_contact') }}</span>
+                    </span>
+                    <span class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span><span class="font-semibold tabular-nums text-gray-900">{{ $c->orders_count }}</span> <span class="text-gray-600">{{ __('orders') }}</span></span>
+                        <span><span class="font-semibold tabular-nums text-green-700">{{ $c->delivered_count }}</span> <span class="text-gray-600">{{ __('delivered') }}</span></span>
+                        <span><span class="font-semibold tabular-nums {{ $c->returned_count ? 'text-red-700' : 'text-gray-900' }}">{{ $c->returned_count }}</span> <span class="text-gray-600">{{ __('returned') }}</span></span>
+                        @if ($done)<span class="text-gray-600">{{ __(':p% delivered', ['p' => round($c->delivered_count * 100 / $done)]) }}</span>@endif
+                        @if ($c->risk_level && $c->risk_level !== 'normal')<x-badge color="red">{{ \App\Support\Labels::risk($c->risk_level) }}</x-badge>@endif
+                        <span class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white">{{ __('Open customer') }}</span>
+                    </span>
+                </a>
+            @endforeach
             @foreach ($past as $p)
                 <div class="mb-3 rounded-2xl border border-gray-200 bg-white p-4">
                     <div class="flex flex-wrap items-start justify-between gap-2">
@@ -75,7 +94,7 @@
                     </div>
                     <p class="mt-2 text-xs text-gray-500">{{ __('Imported: :s', ['s' => $p->source]) }} · {{ __(\App\Services\Customers\HistoryImport::STATUSES[$p->status] ?? $p->status) }} · {{ \Illuminate\Support\Carbon::parse($p->ordered_at)->format('d M Y') }}@if ($p->items) · {{ $p->items }}@endif</p>
                     @can('customers.view')
-                        <a href="{{ route('journey.show', $p->customer_id) }}" class="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">{{ __('Customer journey') }}</a>
+                        <a href="{{ route('customers.show', $p->customer_id) }}" class="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">{{ __('Open customer') }}</a>
                     @endcan
                 </div>
             @endforeach

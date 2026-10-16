@@ -13,7 +13,7 @@ return [
         ['My points', 'points.mine', 'points.mine', null, 'star'],
     ]],
     'orders' => ['Orders', [
-        ['Order search', 'orders.search', 'orders.search', null, 'search'],
+        ['Search', 'orders.search', 'orders.search', null, 'search'],
         ['Order activity', 'orders.activity', 'orders.activity', 'orders.reassign', 'board'],
         ['Order management', 'desk.index', 'desk.index', 'orders.edit', 'clipboard'],
         ['All orders', 'orders.index', 'orders.index', 'orders.view', 'list'],
@@ -32,7 +32,6 @@ return [
     'catalog' => ['Catalog', [
         ['Products', 'products.index', ['products.index', 'products.create', 'products.edit', 'products.import*', 'categories.*'], 'products.view', 'tag'],
         ['Customers', 'customers.index', 'customers.*', 'customers.view', 'users'],
-        ['Customer journey', 'journey.index', 'journey.*', 'customers.view', 'search'],
     ]],
     'analysis' => ['Analysis', [
         ['KPI', 'kpi.index', 'kpi.*', null, 'chart'],

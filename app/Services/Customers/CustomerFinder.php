@@ -57,6 +57,6 @@ class CustomerFinder
             $c = Customer::withTrashed()->find($c->merged_into_id);
         }
 
-        return $c && ! $c->trashed() ? collect([$c->only(self::COLUMNS) + ['model' => $c]])->map(fn ($a) => $a['model']) : collect();
+        return $c && ! $c->trashed() ? collect([$c]) : collect();
     }
 }

@@ -19,41 +19,10 @@ use Illuminate\View\View;
  */
 class CustomerJourneyController extends Controller
 {
-    public function index(Request $request): View|RedirectResponse
+    /** The journey's search is now the one search (Order search); old links land there. */
+    public function index(Request $request): RedirectResponse
     {
-        $q = trim(Phone::englishDigits((string) $request->query('q', '')));
-        $customers = collect();
-        $tooShort = $q !== '' && mb_strlen($q) < 3;
-
-        if ($q !== '' && ! $tooShort) {
-            if ($phone = Phone::normalize($q)) {
-                // The customer's own numbers first, then a number only an order carries (alt phone).
-                $id = DB::table('customer_phones')->where('phone', $phone)->value('customer_id')
-                    ?? Customer::where('primary_phone', $phone)->value('id')
-                    ?? Order::where('ship_phone', $phone)->orWhere('ship_alt_phone', $phone)->latest('id')->value('customer_id');
-                if ($id && ($c = Customer::withTrashed()->find($id)) && (! $c->trashed() || $c->merged_into_id)) {
-                    return redirect()->route('journey.show', $c->merged_into_id ?: $c->id);
-                }
-            } elseif ($cn = \App\Services\Customers\HistoryImport::cn($q)) {
-                // A courier CN: an imported parcel, or one booked in IQS.
-                $id = DB::table('customer_past_orders')->where('cn', $cn)->value('customer_id')
-                    ?? DB::table('shipments as s')->join('orders as o', 'o.id', '=', 's.order_id')
-                        ->where(fn ($w) => $w->where('s.consignment_id', $cn)->orWhere('s.tracking_code', $cn))->value('o.customer_id');
-                if ($id && ($c = Customer::withTrashed()->find($id)) && (! $c->trashed() || $c->merged_into_id)) {
-                    return redirect()->route('journey.show', $c->merged_into_id ?: $c->id);
-                }
-            }
-            if (! isset($phone) || ! $phone) {
-                $customers = Customer::whereNull('merged_into_id')
-                    ->where(fn ($w) => $w->where('name', 'like', $q.'%')->orWhere('name', 'like', '% '.$q.'%'))
-                    ->select(['id', 'name', 'primary_phone', 'orders_count', 'delivered_count', 'returned_count'])
-                    ->selectSub(DB::table('customer_past_orders as p')->whereColumn('p.customer_id', 'customers.id')->selectRaw('COUNT(*)'), 'past_count')
-                    ->selectSub(DB::table('customer_past_orders as p')->whereColumn('p.customer_id', 'customers.id')->where('p.status', 'delivered')->selectRaw('COUNT(*)'), 'past_delivered')
-                    ->orderByRaw('orders_count + past_count DESC')->limit(25)->get();
-            }
-        }
-
-        return view('journey.index', ['q' => $q, 'customers' => $customers, 'tooShort' => $tooShort]);
+        return redirect()->route('orders.search', array_filter(['q' => $request->query('q')]));
     }
 
     public function show(Customer $customer, Request $request): View|RedirectResponse

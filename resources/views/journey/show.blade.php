@@ -14,7 +14,7 @@
 
 <x-layouts.app :heading="__('Customer journey')">
     <div class="mx-auto max-w-3xl">
-        <a href="{{ route('journey.index') }}" class="mb-3 inline-block text-sm text-primary hover:underline">{{ __('Search another customer') }}</a>
+        <a href="{{ route('orders.search') }}" class="mb-3 inline-block text-sm text-primary hover:underline">{{ __('Search') }}</a>
 
         <div class="mb-3 rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
             <div class="flex flex-wrap items-start justify-between gap-2">

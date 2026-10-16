@@ -48,12 +48,14 @@ class CustomerJourneyTest extends TestCase
         DB::table('orders')->where('id', $second->id)->update(['status_id' => OrderStatus::idFor('cancelled')]);
         $customer = $first->customer_id;
 
-        $this->actingAs($owner)->get('/journey')->assertOk()->assertSee('See a customer');
+        // The old journey search lands on the one search; any form of the phone, the name, or nothing.
+        $this->actingAs($owner)->get('/journey?q=Karim')->assertRedirect(route('orders.search', ['q' => 'Karim']));
         foreach (['+880 1712-345678', '০১৭১২৩৪৫৬৭৮', '008801712345678', '1712345678'] as $q) {
-            $this->get('/journey?q='.urlencode($q))->assertRedirect(route('journey.show', $customer));
+            $res = $this->get('/order-search?q='.urlencode($q))->assertOk()->assertSee('Open customer')->assertSee(route('customers.show', $customer), false);
+            $this->assertSame([$customer], $res->viewData('customers')->pluck('id')->all(), $q);
         }
-        $this->get('/journey?q=Karim')->assertSee(route('journey.show', $customer), false);
-        $this->get('/journey?q=Nobody')->assertSee('No customer found for');
+        $this->get('/order-search?q=Karim')->assertSee(route('customers.show', $customer), false);
+        $this->get('/order-search?q=Nobody')->assertSee('No order found for');
 
         $total = number_format((float) $first->fresh()->grand_total);
         $this->get(route('journey.show', $customer))->assertOk()
@@ -67,6 +69,6 @@ class CustomerJourneyTest extends TestCase
         $packer = User::factory()->create();
         $packer->roles()->attach($this->role(['packaging.view'], [], 'Packer')->id);
         $this->actingAs($packer)->get(route('journey.show', $customer))->assertForbidden();
-        $this->get('/order-search?q='.$first->order_no)->assertDontSee(route('journey.show', $customer), false);
+        $this->get('/order-search?q='.$first->order_no)->assertDontSee(route('journey.show', $customer), false)->assertDontSee('Open customer');
     }
 }

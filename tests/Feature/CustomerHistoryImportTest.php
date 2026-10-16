@@ -133,7 +133,7 @@ class CustomerHistoryImportTest extends TestCase
         $this->assertSame(['2026-07-08', null, null, '1st 300'], [substr($shahin->ordered_at, 0, 10), $shahin->external_no, $shahin->items, $shahin->source]);
         $this->assertSame(['returned', 'cancelled'], [DB::table('customer_past_orders')->where('cn', 'DM1BBBBB')->value('status'), DB::table('customer_past_orders')->where('cn', 'DM1CCCCC')->value('status')]);
 
-        $this->get('/journey?q='.urlencode('dm240726f65t8n'))->assertRedirect(route('journey.show', $shahin->customer_id));
+        $this->assertSame([$shahin->customer_id], $this->get('/order-search?q='.urlencode('dm240726f65t8n'))->viewData('customers')->pluck('id')->all());
         $this->get(route('journey.show', $shahin->customer_id))->assertSee('CN DM240726F65T8N');
         $this->get('/order-search?by=cn&q=DM240726F65T8N')->assertSee('Imported: 1st 300')->assertSee('Md Shahin Raza');
 
@@ -224,7 +224,7 @@ class CustomerHistoryImportTest extends TestCase
         $p = DB::table('customer_past_orders')->where('customer_id', $c->id)->orderBy('ordered_at')->get();
         $this->assertSame(['House 12, Mirpur', 'Dates 1 kg', '2026-07-01'], [$p[0]->address, $p[0]->items, substr($p[0]->ordered_at, 0, 10)]);
         $this->assertEquals([1250, 1250], $p->pluck('amount')->map(fn ($a) => (float) $a)->all());
-        $this->get('/journey?q=01912345678')->assertRedirect(route('journey.show', $c->id));
+        $this->assertSame([$c->id], $this->get('/order-search?q=01912345678')->viewData('customers')->pluck('id')->all());
     }
 
     public function test_remembered_picks_and_medium_are_used_without_asking(): void

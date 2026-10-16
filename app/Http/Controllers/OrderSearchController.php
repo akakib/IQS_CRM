@@ -10,8 +10,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
- * Order search, open to every staff member: find an order by its number, the
- * customer's phone, the courier CN or tracking code, or the customer's name.
+ * The one search, open to every staff member (also from the top bar): find an order by its number,
+ * the customer's phone, the courier CN or tracking code, or the customer's name. The customers it is
+ * about come first (CustomerFinder), for those who may see customers.
  * Nothing is listed before a search. Phones follow each person's masking;
  * the order page opens only for those allowed to see it.
  */
@@ -59,6 +60,8 @@ class OrderSearchController extends Controller
         $user = $request->user();
 
         return view('orders.search', [
+            // The customers the search is about, on top (only for those who may see customers).
+            'customers' => $q !== '' && ! $tooShort && $user->can('customers.view') ? app(\App\Services\Customers\CustomerFinder::class)->find($q, $by) : collect(),
             'q' => $q,
             'by' => $by,
             'past' => $past,

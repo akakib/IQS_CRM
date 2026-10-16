@@ -43,6 +43,17 @@
             </div>
 
             <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+            {{-- The one search, from every page: order no, phone, CN or name. --}}
+            <form method="GET" action="{{ route('orders.search') }}" class="hidden md:block" role="search">
+                <label class="relative block">
+                    <svg class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+                    <input type="search" name="q" value="{{ request()->routeIs('orders.search') ? request('q') : '' }}" placeholder="{{ __('Search order, phone, CN, name') }}" autocomplete="off"
+                        class="w-56 rounded-lg border border-gray-200 bg-gray-50 py-2 pl-8 pr-3 text-sm focus:w-72 focus:border-primary focus:bg-white focus:outline-none lg:w-64">
+                </label>
+            </form>
+            <a href="{{ route('orders.search') }}" class="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 md:hidden" aria-label="{{ __('Search') }}" title="{{ __('Search') }}">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+            </a>
             <x-chat-control />
             <x-new-order-popup />
             <x-break-control part="button" />

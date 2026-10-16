@@ -133,7 +133,7 @@
                     @forelse ($orders as $o)
                         @php $s = $statuses[$o->status_id] ?? null; @endphp
                         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 py-2 text-sm last:border-0">
-                            <span>@if (isset($openable[$o->id]))<a href="{{ route('orders.show', $o->id) }}" class="font-mono font-medium text-primary hover:underline">{{ $o->order_no }}</a>@else<span class="font-mono font-medium text-gray-800">{{ $o->order_no }}</span>@endif
+                            <span>@if (isset($openable[$o->id]))<a href="{{ route('orders.show', $o->id) }}" @click.prevent="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: @js(route('orders.show', ['order' => $o->id, 'embed' => 1])), title: @js($o->order_no), page: @js(route('orders.show', $o->id)) } }))" class="font-mono font-medium text-primary hover:underline">{{ $o->order_no }}</a>@else<span class="font-mono font-medium text-gray-800">{{ $o->order_no }}</span>@endif
                                 <span class="text-xs text-gray-500">· {{ $o->created_at->format('d M Y') }} · {{ Order::channelLabel($o->channel) }}</span></span>
                             <span class="flex items-center gap-2">@if ($s)<x-badge :color="$s['color']">{{ __($s['name']) }}</x-badge>@endif<span class="tabular-nums text-gray-700">{{ $tk($o->grand_total) }}</span></span>
                         </div>

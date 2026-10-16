@@ -49,6 +49,9 @@ class ShortcutsTest extends TestCase
         ], $owner);
 
         $this->actingAs($owner)->get('/customers/'.$order->customer_id)->assertOk()
-            ->assertSee($order->order_no)->assertSee('New order')->assertSee('Overview')->assertSee('Journey')->assertSee('01712345678', false);
+            ->assertSee($order->order_no)->assertSee('New order')->assertSee('Overview')->assertSee('Journey')->assertSee('Open in new tab')->assertSee('?embed=1', false)->assertSee('01712345678', false);
+        // The order opens in the popup: the same page without the sidebar and the header.
+        $this->get(route('orders.show', ['order' => $order->id, 'embed' => 1]))->assertOk()->assertSee($order->order_no)->assertDontSee('Show or hide the menu');
+        $this->get(route('orders.show', $order->id))->assertSee('Show or hide the menu');
     }
 }

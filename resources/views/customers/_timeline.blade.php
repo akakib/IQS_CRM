@@ -21,7 +21,7 @@
                 <div class="flex items-baseline justify-between gap-2">
                     <p class="text-sm text-gray-900">
                         <span class="font-semibold">{{ $r->created_at->format('d M Y') }}</span> ·
-                        @if (isset($openable[$r->id]))<a href="{{ route('orders.show', $r->id) }}" class="font-mono text-primary hover:underline">{{ $r->order_no }}</a>@else<span class="font-mono">{{ $r->order_no }}</span>@endif
+                        @if (isset($openable[$r->id]))<a href="{{ route('orders.show', $r->id) }}" @click.prevent="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: @js(route('orders.show', ['order' => $r->id, 'embed' => 1])), title: @js($r->order_no), page: @js(route('orders.show', $r->id)) } }))" class="font-mono text-primary hover:underline">{{ $r->order_no }}</a>@else<span class="font-mono">{{ $r->order_no }}</span>@endif
                     </p>
                     <p class="shrink-0 text-base font-semibold tabular-nums {{ in_array($r->kind, ['returned', 'cancelled'], true) ? 'text-gray-400 line-through' : 'text-gray-900' }}">{{ $tk($r->grand_total) }}</p>
                 </div>

@@ -5,9 +5,11 @@
     $canAct = $order->moderator_id === $user->id || $user->permissionScope('orders.view') === 'all';
     $noteIcon = ['status' => '●', 'call' => '☎', 'chat' => '✉', 'payment' => '৳', 'assignment' => '👤', 'amendment' => '✎', 'courier' => '🚚', 'verification' => '✓', 'rider' => '🛵'];
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
+    // embed=1: inside the order popup (customer page...), the same page without sidebar or header.
+    $embed = request()->boolean('embed');
 @endphp
 
-<x-layouts.app :heading="$order->order_no">
+<x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="$order->order_no">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-2">
             <a href="{{ route('orders.index') }}" class="text-sm text-primary hover:underline">{{ __('Orders') }}</a>
@@ -259,4 +261,4 @@
         </div>
     </div>
     <x-confirm-modal id="reject-confirm" :verb="__('Reject')" :message="__('This cannot be undone from here.')" />
-</x-layouts.app>
+</x-dynamic-component>

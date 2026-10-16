@@ -25,7 +25,7 @@
         }">
 
         {{-- The lists given to me. --}}
-        <div class="grid gap-3 md:grid-cols-2">
+        <div class="grid gap-3 {{ $lists->count() > 1 ? 'md:grid-cols-2' : '' }}">
             @forelse ($lists as $l)
                 @php $w = $l->daily_target ? min(100, round($l->today / $l->daily_target * 100)) : 0; @endphp
                 <div class="rounded-2xl border border-gray-200 bg-white p-4">

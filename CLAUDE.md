@@ -1,4 +1,9 @@
 # Iqbal OMS — Project Guide
+## Read first
+Before building anything, read `docs/SYSTEM_MAP.md` (modules, the one source of truth for each job,
+shared components, flows, team rules). If something already does the job, use or extend it; never build
+the same thing twice in a different way. Keep the map up to date when a module changes.
+
 ## What this is
 An order, courier, marketing-cost, inventory, accounting and team management
 system for ONE business: Iqbal Store (dry fruits / grocery, Bangladesh).
@@ -21,7 +26,7 @@ from Step 5 onward and gains ad cost in Step 6.
 - Dropdowns of configurable data (roles, locations, reasons, vendors,
   currencies) load from the database, never hardcoded.
 - Timezone: Asia/Dhaka. Money: DECIMAL(12,2) BDT unless stated (USD for ad lots).
-- UI language: Bangla labels via lang files (`lang/bn`), English fallback.
+- UI language: English only (no Bangla, no em-dash in UI text).
 - Hosting starts on shared hosting: no long-running workers. Queues run via
   `schedule:run` cron + `queue:work --stop-when-empty`. Keep code VPS-ready.
 - `npm run build` is done locally and committed (no npm on server).
@@ -45,7 +50,7 @@ from Step 5 onward and gains ad cost in Step 6.
   - Mobile: the same data as cards (never a table); filters open in a
     bottom sheet; search stays on top.
   - Filters, search, sort and page live in the URL query string (shareable,
-    back button works). Search is debounced (~300 ms).
+    back button works). Search runs on Enter, not while typing; filters stay after a reload.
   - Proper pagination: page size options (25/50/100), total count where it
     is cheap; for very large or fast-growing lists (orders, events, logs)
     use simple/cursor pagination instead of COUNT(*) on every load.

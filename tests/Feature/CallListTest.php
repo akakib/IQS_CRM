@@ -212,7 +212,14 @@ class CallListTest extends TestCase
         $this->get(route('calls.work', $list));
         $later = $this->item($this->rakin, $list);
         $this->post(route('calls.record', [$list, $later->id]), ['outcome' => 'later', 'satisfaction' => 50, 'later_at' => now()->addDay()->format('Y-m-d\TH:i'), 'proof' => $this->fakeFile('d.m4a', 20, 'audio/mp4')]);
-        $this->get(route('calls.mine'))->assertSee('Call-backs')->assertSee('Comes back');
+        // The last search is remembered: the plain page comes back to it; Clear empties it for good.
+        $this->get(route('calls.mine'))->assertRedirect(route('calls.mine', ['q' => '+88 '.$mine->phone, 'day' => 'today']));
+        $this->get(route('calls.mine', ['clear' => 1]))->assertRedirect(route('calls.mine'));
+        $this->get(route('calls.mine'))->assertOk()->assertSee('Call-backs')->assertSee('Comes back');
+
+        // Rows a page: 10, 25, 50 or 100 (anything else is 25).
+        $this->assertSame(10, $this->get(route('calls.mine', ['per' => 10]))->viewData('calls')->perPage());
+        $this->assertSame(25, $this->get(route('calls.mine', ['per' => 7]))->viewData('calls')->perPage());
     }
 
     public function test_managers_see_every_number_filter_them_and_open_each_call(): void
@@ -235,6 +242,12 @@ class CallListTest extends TestCase
         $page(['flag' => 'ordered'])->assertSee('No number matches.');
         $this->assertSame([$item->id], $ids(['q' => '+88 '.$item->phone])); // any way of writing the number
         $page(['sort' => 'unhappy', 'state' => 'nonsense'])->assertOk(); // unknown values are ignored
+        $this->assertSame(100, $page(['per' => 100])->viewData('numbers')->perPage());
+        // Coming back to the list opens it as it was left; a link that sets filters says clear=1.
+        $this->get(route('calls.lists.show', $list))->assertRedirect(route('calls.lists.show', [$list, 'per' => 100]));
+        $this->get(route('calls.lists.show', [$list, 'mood' => 'unhappy', 'clear' => 1]))->assertRedirect(route('calls.lists.show', [$list, 'mood' => 'unhappy']));
+        $this->get(route('calls.lists.show', [$list, 'clear' => 1]));
+        $this->get(route('calls.lists.show', $list))->assertOk();
 
         // A number opens with where it stands and every call with its file.
         $d = $this->getJson(route('calls.lists.item', [$list, $item->id]))->assertOk()->json();

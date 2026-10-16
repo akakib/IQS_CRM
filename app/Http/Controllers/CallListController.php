@@ -69,8 +69,11 @@ class CallListController extends Controller
     /** What a number's state means to a manager. */
     public const STATES = ['not_called' => 'Not called yet', 'in_hand' => 'With a caller now', 'later' => 'Call again later', 'done' => 'Done'];
 
-    public function show(Request $request, int $list): View
+    public function show(Request $request, int $list): View|RedirectResponse
     {
+        if ($back = $this->remembered($request, 'calls.list.'.$list, 'calls.lists.show', ['list' => $list])) {
+            return $back;
+        }
         $row = $this->listRow($list);
         $f = $this->numberFilters($request);
 
@@ -79,7 +82,7 @@ class CallListController extends Controller
             'progress' => $this->calls->progress($row),
             'callers' => $this->callers(),
             'assigned' => DB::table('call_list_user')->where('call_list_id', $list)->pluck('user_id')->all(),
-            'numbers' => $this->numbersQuery($list, $f)->paginate(25)->withQueryString()->fragment('numbers'),
+            'numbers' => $this->numbersQuery($list, $f)->paginate($f['per'])->withQueryString()->fragment('numbers'),
             'filters' => $f,
             'overview' => $this->overview($list, $f),
             // Everyone who has called on this list, for the Caller filter.
@@ -154,7 +157,41 @@ class CallListController extends Controller
             'mood' => in_array($m = (string) $request->query('mood', ''), ['unhappy', 'okay', 'happy'], true) ? $m : '',
             'flag' => in_array($g = (string) $request->query('flag', ''), ['ordered', 'earlier'], true) ? $g : '',
             'sort' => array_key_exists($t = (string) $request->query('sort', 'recent'), self::SORTS) ? $t : 'recent',
+            'per' => self::perPage($request),
         ];
+    }
+
+    /** How many rows a page shows: picked at the top of each list. */
+    public const PER_PAGE = [10, 25, 50, 100];
+
+    private static function perPage(Request $request): int
+    {
+        return in_array($p = (int) $request->query('per', 25), self::PER_PAGE, true) ? $p : 25;
+    }
+
+    /**
+     * The filters a person last used on a list are kept (in their session): a reload, or coming back
+     * from another page, opens the list as they left it. A form or a "Clear" sends clear=1, which sets
+     * exactly what it sends (also nothing), so an emptied filter stays empty.
+     */
+    private function remembered(Request $request, string $key, string $route, array $params): ?RedirectResponse
+    {
+        $query = $request->query();
+        if (array_key_exists('clear', $query)) {
+            unset($query['clear']);
+            $query = array_filter($query, fn ($v) => $v !== '' && $v !== null);
+            $request->session()->put('filters.'.$key, \Illuminate\Support\Arr::except($query, ['page']));
+
+            return redirect()->route($route, $params + $query);
+        }
+        if (! $query && ($saved = $request->session()->get('filters.'.$key))) {
+            return redirect()->route($route, $params + $saved);
+        }
+        if ($query) {
+            $request->session()->put('filters.'.$key, \Illuminate\Support\Arr::except($query, ['page']));
+        }
+
+        return null;
     }
 
     /** Calls of this list inside the date range (all of them without one). */
@@ -364,10 +401,14 @@ class CallListController extends Controller
     /** How a call went, as kept on each call. */
     public const CALL_RESULTS = ['answered' => 'Talked', 'no_answer' => 'No answer', 'busy' => 'Busy or off', 'wrong' => 'Wrong number'];
 
-    public function mine(Request $request): View
+    public function mine(Request $request): View|RedirectResponse
     {
+        if ($back = $this->remembered($request, 'calls.mine', 'calls.mine', [])) {
+            return $back;
+        }
         $user = $request->user();
         $f = [
+            'per' => self::perPage($request),
             'q' => trim((string) $request->query('q', '')),
             'day' => array_key_exists($d = (string) $request->query('day', 'all'), self::DAYS) ? $d : 'all',
             'list' => ctype_digit($l = (string) $request->query('list', '')) ? $l : '',
@@ -388,7 +429,7 @@ class CallListController extends Controller
             ->orderByDesc('cc.id')
             ->select(['cc.id', 'cc.started_at', 'cc.duration_seconds', 'cc.note', 'cc.satisfaction', 'cc.outcome', 'cc.proof_path', 'cc.proof_name', 'cc.proof_old',
                 'i.id as item_id', 'i.name', 'i.phone', 'l.name as list', 'o.order_no'])
-            ->paginate(25)->withQueryString()->fragment('history');
+            ->paginate($f['per'])->withQueryString()->fragment('history');
         $today = $base()->where('cc.started_at', '>=', today());
 
         return view('calls.mine', [

@@ -9,7 +9,11 @@
     $filtered = $f['q'] !== '' || $f['state'] !== '' || $f['outcome'] !== '' || $f['caller'] !== '' || $f['mood'] !== '' || $f['flag'] !== '' || $f['sort'] !== 'recent';
     // What is on the screen goes into the download: the same filters and dates.
     $now = array_filter($f, fn ($v, $k) => $v !== '' && ! ($k === 'sort' && $v === 'recent'), ARRAY_FILTER_USE_BOTH);
-    $chip = fn (array $q) => route('calls.lists.show', [$list->id] + $range + $q).'#numbers';
+    // Links that set the filters say clear=1, so what they set is remembered exactly (see remembered()).
+    $keep = $range + ($f['per'] !== 25 ? ['per' => $f['per']] : []);
+    $chip = fn (array $q) => route('calls.lists.show', [$list->id] + $keep + $q + ['clear' => 1]).'#numbers';
+    $submit = '$nextTick(() => $el.closest(\'form\').submit())';
+    $perOptions = collect(\App\Http\Controllers\CallListController::PER_PAGE)->mapWithKeys(fn ($n) => [$n => __(':n a page', ['n' => $n])])->all();
     $chips = [
         [__('All'), [], ! $filtered],
         [__('Not called'), ['state' => 'not_called'], $f['state'] === 'not_called'],
@@ -42,21 +46,22 @@
     </div>
 
     <form method="GET" action="{{ $here }}#numbers" class="space-y-2">
+        <input type="hidden" name="clear" value="1">
         @foreach ($range as $k => $v)<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endforeach
         <div class="flex gap-2">
             <input type="search" name="q" value="{{ $f['q'] }}" placeholder="{{ __('Name or phone') }}" autocomplete="off"
                 class="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
             <x-button>{{ __('Search') }}</x-button>
-            @if ($filtered)<x-button variant="secondary" :href="$here.'#numbers'">{{ __('Clear') }}</x-button>@endif
+            @if ($filtered)<x-button variant="secondary" :href="$chip([])">{{ __('Clear') }}</x-button>@endif
         </div>
-        <div class="grid grid-cols-2 gap-2 lg:grid-cols-6">
-            @php $submit = '$nextTick(() => $el.closest(\'form\').submit())'; @endphp
+        <div class="grid grid-cols-2 gap-2 lg:grid-cols-7">
             <x-simple-select name="state" :options="['' => __('Any state')] + array_map('__', CallListController::STATES)" :value="$f['state']" full-width size="sm" x-on:select-change="{{ $submit }}" />
             <x-simple-select name="outcome" :options="['' => __('Any result')] + array_map('__', CallListService::OUTCOMES) + ['not_reached' => __('No answer or off')]" :value="$f['outcome']" full-width size="sm" x-on:select-change="{{ $submit }}" />
             <x-simple-select name="caller" :options="['' => __('Any caller')] + $calledBy" :value="$f['caller']" full-width size="sm" x-on:select-change="{{ $submit }}" />
             <x-simple-select name="mood" :options="['' => __('Any satisfaction'), 'unhappy' => __('Unhappy'), 'okay' => __('Okay'), 'happy' => __('Happy')]" :value="$f['mood']" full-width size="sm" x-on:select-change="{{ $submit }}" />
             <x-simple-select name="flag" :options="['' => __('Everything'), 'ordered' => __('Ordered on the call'), 'earlier' => __('Earlier file used')]" :value="$f['flag']" full-width size="sm" x-on:select-change="{{ $submit }}" />
             <x-simple-select name="sort" :options="array_map('__', CallListController::SORTS)" :value="$f['sort']" full-width size="sm" x-on:select-change="{{ $submit }}" />
+            <x-simple-select name="per" :options="$perOptions" :value="$f['per']" full-width size="sm" class="col-span-2 lg:col-span-1" x-on:select-change="{{ $submit }}" />
         </div>
     </form>
 

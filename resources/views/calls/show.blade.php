@@ -6,7 +6,7 @@
     $pct = $p['total'] ? round($p['done'] / $p['total'] * 100) : 0;
     // The date range goes with every link, so a number opened from the Overview is the same period.
     $range = array_filter(['from' => $f['from'], 'to' => $f['to']]);
-    $num = fn (array $q = []) => route('calls.lists.show', [$list->id] + $range + $q).'#numbers';
+    $num = fn (array $q = []) => route('calls.lists.show', [$list->id] + $range + $q + ['clear' => 1]).'#numbers';
     $tile = 'block rounded-xl border border-gray-200 bg-white p-3 hover:border-primary hover:bg-primary-soft';
 @endphp
 
@@ -41,12 +41,13 @@
             {{-- One date range for Overview and Numbers; the open tab stays open. --}}
             <form method="GET" action="{{ route('calls.lists.show', $list->id) }}" x-show="tab !== 'settings'" class="mb-4 flex flex-wrap items-center gap-2"
                 @submit="$el.action = $el.action.split('#')[0] + '#' + tab" x-on:select-change="$nextTick(() => $el.requestSubmit())">
+                <input type="hidden" name="clear" value="1">
                 @foreach (\Illuminate\Support\Arr::except($f, ['from', 'to']) as $k => $v)
-                    @if ($v !== '' && ! ($k === 'sort' && $v === 'recent'))<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endif
+                    @if ($v !== '' && ! ($k === 'sort' && $v === 'recent') && ! ($k === 'per' && $v === 25))<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endif
                 @endforeach
                 <span class="w-full text-sm text-gray-600 sm:w-auto">{{ __('Calls made') }}</span>
                 <x-date-range :from="$f['from'] ?: null" :to="$f['to'] ?: null" />
-                @if ($range)<a href="{{ route('calls.lists.show', [$list->id] + \Illuminate\Support\Arr::except(array_filter($f, fn ($v, $k) => $v !== '' && ! ($k === 'sort' && $v === 'recent'), ARRAY_FILTER_USE_BOTH), ['from', 'to'])) }}" class="text-sm text-primary hover:underline" @click="$el.href = $el.href.split('#')[0] + '#' + tab">{{ __('All days') }}</a>@endif
+                @if ($range)<a href="{{ route('calls.lists.show', [$list->id] + \Illuminate\Support\Arr::except(array_filter($f, fn ($v, $k) => $v !== '' && ! ($k === 'sort' && $v === 'recent') && ! ($k === 'per' && $v === 25), ARRAY_FILTER_USE_BOTH), ['from', 'to']) + ['clear' => 1]) }}" class="text-sm text-primary hover:underline" @click="$el.href = $el.href.split('#')[0] + '#' + tab">{{ __('All days') }}</a>@endif
             </form>
 
             {{-- Overview: how the calls in the period went. Every figure opens the matching numbers. --}}

@@ -80,16 +80,18 @@
                 <p class="text-xs text-gray-500">{{ trans_choice(':count call|:count calls', $calls->total(), ['count' => number_format($calls->total())]) }}</p>
             </div>
             <form method="GET" action="{{ $here }}#history" class="space-y-2">
+                <input type="hidden" name="clear" value="1">
                 <div class="flex gap-2">
                     <input type="search" name="q" value="{{ $f['q'] }}" placeholder="{{ __('Name or phone') }}" autocomplete="off"
                         class="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
                     <x-button>{{ __('Search') }}</x-button>
-                    @if ($filtered)<x-button variant="secondary" :href="$here.'#history'">{{ __('Clear') }}</x-button>@endif
+                    @if ($filtered)<x-button variant="secondary" :href="route('calls.mine', ($f['per'] !== 25 ? ['per' => $f['per']] : []) + ['clear' => 1]).'#history'">{{ __('Clear') }}</x-button>@endif
                 </div>
-                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <x-simple-select name="day" :options="array_map('__', CallListController::DAYS)" :value="$f['day']" full-width size="sm" x-on:select-change="{{ $submit }}" />
                     <x-simple-select name="result" :options="['' => __('Any result')] + array_map('__', CallListController::CALL_RESULTS)" :value="$f['result']" full-width size="sm" x-on:select-change="{{ $submit }}" />
-                    <x-simple-select name="list" :options="['' => __('Every list')] + $myLists" :value="$f['list']" full-width size="sm" class="col-span-2 sm:col-span-1" x-on:select-change="{{ $submit }}" />
+                    <x-simple-select name="list" :options="['' => __('Every list')] + $myLists" :value="$f['list']" full-width size="sm" x-on:select-change="{{ $submit }}" />
+                    <x-simple-select name="per" :options="collect(CallListController::PER_PAGE)->mapWithKeys(fn ($n) => [$n => __(':n a page', ['n' => $n])])->all()" :value="$f['per']" full-width size="sm" x-on:select-change="{{ $submit }}" />
                 </div>
             </form>
 

@@ -2,8 +2,12 @@
      The page sets no top or bottom paper margin, so the browser has no room for its own date, title, page
      link and page number; the frame below gives every printed page its white space back instead.
      <x-print-page :title="$name"> ...content... <x-slot:styles>css</x-slot:styles> <x-slot:scripts>js</x-slot:scripts> </x-print-page>
-     A list's buttons are "Excel" and "PDF", the PDF opening in a new tab. --}}
+     A list's buttons are Print, PDF (?as=pdf) and Excel, the first two opening this page in a new tab. --}}
 @props(['title', 'landscape' => true])
+@php
+    // ?as=pdf: the same page, saved as a PDF file (the browser's dialog, with Save as PDF to pick); otherwise it is for the printer.
+    $pdf = request()->query('as') === 'pdf';
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,7 +38,9 @@
         .list tr { page-break-inside: avoid; }
         .list thead { display: table-header-group; }
         .warn { color: #b45309; margin: 6px 0; }
+        .hint { margin: 0; padding: 8px 16px; background: #fffbeb; color: #92400e; font-size: 13px; border-bottom: 1px solid #fde68a; }
         @media print {
+            .hint { display: none; }
             .bar { display: none; }
             .page { padding: 0; }
             .frame > thead { display: table-header-group; }
@@ -47,8 +53,11 @@
 <body>
     <div class="bar">
         <button type="button" onclick="window.close()">{{ __('Close') }}</button>
-        <button type="button" class="go" onclick="window.print()">{{ __('Print or save as PDF') }}</button>
+        <button type="button" class="go" onclick="window.print()">{{ $pdf ? __('Save as PDF') : __('Print') }}</button>
     </div>
+    @if ($pdf)
+        <p class="hint">{{ __('In the window that opens, set Destination to "Save as PDF", then press Save.') }}</p>
+    @endif
     <table class="frame">
         <thead><tr><td></td></tr></thead>
         <tfoot><tr><td></td></tr></tfoot>

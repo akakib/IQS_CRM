@@ -40,8 +40,7 @@
         </div>
         <div class="flex items-center gap-2">
             <span class="text-xs text-gray-500">{{ trans_choice(':count number|:count numbers', $numbers->total(), ['count' => number_format($numbers->total())]) }}</span>
-            <x-button size="sm" variant="secondary" :href="route('calls.lists.excel', [$list->id] + $now)"><x-icon name="download" class="h-3.5 w-3.5" /> {{ __('Excel') }}</x-button>
-            <x-button size="sm" variant="secondary" :href="route('calls.lists.print', [$list->id] + $now)" target="_blank" rel="noopener"><x-icon name="printer" class="h-3.5 w-3.5" /> {{ __('PDF') }}</x-button>
+            <x-export-buttons :print="route('calls.lists.print', [$list->id] + $now)" :excel="route('calls.lists.excel', [$list->id] + $now)" />
         </div>
     </div>
 

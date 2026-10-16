@@ -3,7 +3,7 @@
      link and page number; the frame below gives every printed page its white space back instead.
      <x-print-page :title="$name"> ...content... <x-slot:styles>css</x-slot:styles> <x-slot:scripts>js</x-slot:scripts> </x-print-page>
      A list's buttons are Print, PDF (?as=pdf) and Excel, the first two opening this page in a new tab. --}}
-@props(['title', 'landscape' => true])
+@props(['title', 'landscape' => true, 'autoprint' => true])
 @php
     // ?as=pdf: the same page, saved as a PDF file (the browser's dialog, with Save as PDF to pick); otherwise it is for the printer.
     $pdf = request()->query('as') === 'pdf';
@@ -19,7 +19,8 @@
         * { box-sizing: border-box; }
         body { margin: 0; font-family: system-ui, 'Segoe UI', 'Noto Sans Bengali', Arial, sans-serif; font-size: 10.5px; color: #111; background: #fff; }
         .bar { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 16px; border-bottom: 1px solid #e5e7eb; }
-        .bar button { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+        .bar button, .bar a { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; color: #374151; cursor: pointer; text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
+        .bar .left { margin-right: auto; }
         .bar .go { background: #0d542b; border-color: #0d542b; color: #fff; }
         .page { padding: 12px 16px; }
         /* White space at the top and bottom of every printed page (repeats on each page). */
@@ -52,6 +53,7 @@
 </head>
 <body>
     <div class="bar">
+        {{ $actions ?? '' }}
         <button type="button" onclick="window.close()">{{ __('Close') }}</button>
         <button type="button" class="go" onclick="window.print()">{{ $pdf ? __('Save as PDF') : __('Print') }}</button>
     </div>
@@ -65,6 +67,8 @@
     </table>
     {{ $scripts ?? '' }}
     {{-- Opens Print / Save as PDF at once; Close or Escape leaves the page to read or sort first. --}}
-    <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>
+    @if ($autoprint || request()->has('as'))
+        <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>
+    @endif
 </body>
 </html>

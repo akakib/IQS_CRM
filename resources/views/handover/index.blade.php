@@ -50,11 +50,12 @@
                         <span class="block font-medium text-gray-900">{{ \Illuminate\Support\Carbon::parse($s->started_at)->format('d M Y, g:i A') }} · {{ $s->rider_name ?? __('Rider') }}</span>
                         <span class="block text-xs text-gray-500">{{ trans_choice(':count parcel|:count parcels', $s->parcels) }}{{ $s->rider_phone ? ' · '.$s->rider_phone : '' }}{{ $s->by ? ' · '.__('by :n', ['n' => $s->by]) : '' }}</span>
                     </a>
-                    <span class="flex shrink-0 items-center gap-1.5">
+                    {{-- Scanning: the rider is still being given parcels; Handed over: closed, the pickup sheet is ready. --}}
+                    <span class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                        <x-badge :color="$s->closed_at ? 'green' : 'blue'">{{ $s->closed_at ? __('Handed over') : __('Scanning') }}</x-badge>
                         @if ($s->parcels)
                             <x-export-buttons :print="route('handover.print', $s->id)" :excel="route('handover.excel', $s->id)" />
                         @endif
-                        <x-badge :color="$s->closed_at ? 'green' : 'blue'">{{ $s->closed_at ? __('Manifest') : __('Open') }}</x-badge>
                     </span>
                 </div>
             @empty

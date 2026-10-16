@@ -49,10 +49,11 @@ class CustomerCallTest extends TestCase
 
         // After the call.
         $this->patchJson('/customer-calls/'.$id, ['outcome' => 'maybe'])->assertStatus(422);
-        $this->patchJson('/customer-calls/'.$id, ['outcome' => 'answered', 'minutes' => 2, 'seconds' => 5, 'recording_url' => 'https://drive.google.com/file/d/abc/view', 'note' => 'Wants it Friday'])
+        $this->patchJson('/customer-calls/'.$id, ['outcome' => 'answered', 'satisfaction' => 33])->assertStatus(422);
+        $this->patchJson('/customer-calls/'.$id, ['outcome' => 'answered', 'satisfaction' => 75, 'minutes' => 2, 'seconds' => 5, 'recording_url' => 'https://drive.google.com/file/d/abc/view', 'note' => 'Wants it Friday'])
             ->assertOk()->assertJson(['message' => 'Call saved.']);
-        $this->assertDatabaseHas('customer_calls', ['id' => $id, 'user_id' => $mod->id, 'phone' => '01712345678', 'outcome' => 'answered', 'duration_seconds' => 125]);
-        $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'call', 'body' => 'Called (2:05): Answered · Wants it Friday']);
+        $this->assertDatabaseHas('customer_calls', ['id' => $id, 'user_id' => $mod->id, 'phone' => '01712345678', 'outcome' => 'answered', 'duration_seconds' => 125, 'satisfaction' => 75]);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'call', 'body' => 'Called (2:05): Talked · Wants it Friday']);
 
         // Only the caller can finish their call; the next tap is a new call.
         $this->actingAs($other)->patchJson('/customer-calls/'.$id, ['outcome' => 'answered'])->assertNotFound();

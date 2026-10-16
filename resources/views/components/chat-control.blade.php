@@ -11,13 +11,25 @@
     $hasChannels = $myTypes->contains(fn ($t) => $t !== $rider);
     // Rider calls: the Rider line channel or the hotline permission. Owners watch, they do not take rider calls.
     $hotline = ! $chatUser->current_break_id && ! $chatUser->isOwner() && ($myTypes->contains($rider) || $chatUser->can('hotline.view'));
-    $chatSession = $hasChannels || $hotline ? app(\App\Services\Work\ChatService::class)->openSession($chatUser->id) : null;
+    // Ended here if nothing was done for 15 minutes (no cron needed).
+    $chatSession = $hasChannels || $hotline ? app(\App\Services\Work\ChatService::class)->openSessionChecked($chatUser->id) : null;
 @endphp
 
 @if (($hasChannels || $hotline) && ! $chatUser->current_break_id)
 <div x-data="{
         on: @js((bool) $chatSession), since: @js($chatSession ? \Illuminate\Support\Carbon::parse($chatSession->started_at)->format('g:i A') : null),
         open: false, data: null, ask: null, busy: false, error: null,
+        // No chat tap, call or order action for 15 minutes: it stops (the server ends it at the last action + 5 minutes).
+        lastAt: @js($chatSession ? $chatSession->last_action_at->getTimestampMs() : null), stopped: null,
+        init() { setInterval(() => this.idle(), 30000) },
+        idle() {
+            if (! this.on || ! this.lastAt) return;
+            try { if (localStorage.getItem('iqs-call-live')) { this.lastAt = Date.now(); return } } catch (e) {} // a call in progress is work
+            if (Date.now() - this.lastAt < {{ \App\Services\Work\ChatService::IDLE_MINUTES }} * 60000) return;
+            this.on = false;
+            this.stopped = new Date(this.lastAt + {{ \App\Services\Work\ChatService::GRACE_MINUTES }} * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        },
+        acted() { this.lastAt = Date.now(); this.stopped = null },
         tab: @js($hasChannels ? 'chats' : 'calls'),
         q: '', found: null, finding: false, rider: '', riderPhone: '', claim: null, verdict: null, action: null, note: '', rstart: null, saved: null,
         headers() { return { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } },
@@ -30,17 +42,17 @@
                 this.data = j; this.on = j.on; this.since = j.since;
             } catch (e) { this.error = @js(__('No connection. Try again.')) } finally { this.busy = false }
         },
-        async show() { this.open = true; this.ask = null; await this.call(@js(route('chat.start')), {}) },
+        async show() { this.open = true; this.ask = null; if (! this.on) this.acted(); await this.call(@js(route('chat.start')), {}) },
         // + counts at once however fast it is tapped: the number goes up now and each tap is sent on its own.
         async tap(c) {
-            c.messages++; this.error = null;
+            c.messages++; this.error = null; this.acted();
             if (!this.on) { this.on = true; this.since = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }
             try {
                 const r = await fetch(@js(route('chat.record')), { method: 'POST', headers: this.headers(), body: JSON.stringify({ channel_id: c.id, kind: 'message' }) });
                 if (!r.ok) { c.messages--; const j = await r.json().catch(() => ({})); this.error = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')) }
             } catch (e) { c.messages--; this.error = @js(__('No connection. Try again.')) }
         },
-        count(channel, kind, reason = null) { this.ask = null; this.call(@js(route('chat.record')), { channel_id: channel, kind: kind, reason_id: reason }) },
+        count(channel, kind, reason = null) { this.ask = null; this.acted(); this.call(@js(route('chat.record')), { channel_id: channel, kind: kind, reason_id: reason }) },
         async stop() { await this.call(@js(route('chat.stop')), {}); this.open = false },
         async find() {
             if (!this.q.trim()) return;
@@ -59,7 +71,7 @@
                 const r = await fetch(@js(route('rider-calls.store')), { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: fd });
                 const j = await r.json();
                 if (!r.ok) { this.error = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')); return }
-                this.saved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.on = true;
+                this.saved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.on = true; this.acted();
                 this.q = ''; this.found = null; this.claim = null; this.verdict = null; this.action = null; this.note = ''; this.rstart = null; window.dispatchEvent(new CustomEvent('proof-clear', { detail: 'proof-rider' }));
             } catch (e) { this.error = @js(__('No connection. Try again.')) } finally { this.busy = false }
         },
@@ -69,6 +81,14 @@
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         <span class="hidden sm:inline">{{ __('Communication') }}</span>
     </button>
+
+    <template x-teleport="body">
+        <div x-show="stopped" x-cloak role="status" class="fixed inset-x-3 bottom-3 z-[70] mx-auto flex max-w-md items-start gap-3 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 shadow-lg">
+            <span class="min-w-0 flex-1"><span class="block font-semibold" x-text="@js(__('Communication stopped at')) + ' ' + stopped"></span>
+                {{ __('No chat and no call for :n minutes, so your work clock stopped.', ['n' => \App\Services\Work\ChatService::IDLE_MINUTES]) }}</span>
+            <button type="button" @click="stopped = null; show()" class="inline-flex min-h-8 shrink-0 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-dark">{{ __('Start again') }}</button>
+        </div>
+    </template>
 
     <template x-teleport="body">
         <div x-show="open" x-cloak class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
@@ -172,7 +192,7 @@
                                     const r = await fetch(@js(route('customer-calls.incoming')), { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: fd });
                                     const j = await r.json();
                                     if (!r.ok) { this.cerror = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')); return }
-                                    this.csaved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.cnew = j.new_order_url; on = true;
+                                    this.csaved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.cnew = j.new_order_url; on = true; acted();
                                     this.cq = ''; this.cfound = null; this.corder = null; this.creason = null; this.cnote = ''; this.cstart = null;
                                 } catch (e) { this.cerror = @js(__('No connection. Try again.')) } finally { this.csaving = false }
                             },

@@ -24,7 +24,7 @@ use Illuminate\View\View;
  */
 class CustomerCallController extends Controller
 {
-    public const OUTCOMES = ['answered' => 'Answered', 'no_answer' => 'No answer', 'busy' => 'Busy or switched off', 'wrong' => 'Wrong number'];
+    public const OUTCOMES = ['answered' => 'Talked', 'no_answer' => 'No answer', 'busy' => 'Busy or off', 'wrong' => 'Wrong number'];
 
     public const REASONS_IN = ['new_order' => 'Wants to order', 'question' => 'About an order', 'complaint' => 'Complaint', 'other' => 'Other'];
 
@@ -49,6 +49,7 @@ class CustomerCallController extends Controller
         $row = DB::table('customer_calls')->where('id', $call)->where('user_id', $request->user()->id)->first() ?? abort(404);
         $data = $request->validate([
             'outcome' => ['required', Rule::in(array_keys(self::OUTCOMES))],
+            'satisfaction' => ['nullable', 'integer', Rule::in(array_keys(\App\Services\Calls\CallListService::SATISFACTION))],
             'minutes' => ['nullable', 'integer', 'min:0', 'max:300'], 'seconds' => ['nullable', 'integer', 'min:0', 'max:59'],
             'recording_url' => ['nullable', 'url:http,https', 'max:500'], 'note' => ['nullable', 'string', 'max:500'],
         ]);
@@ -56,6 +57,7 @@ class CustomerCallController extends Controller
         $proof = app(CallProof::class)->take($request, [$row->phone], 'call-proofs/order', (string) $call);
         DB::table('customer_calls')->where('id', $call)->update([
             'outcome' => $data['outcome'], 'duration_seconds' => $duration, 'recording_url' => $data['recording_url'] ?? null, 'note' => $data['note'] ?? null,
+            'satisfaction' => $data['outcome'] === 'answered' ? ($data['satisfaction'] ?? null) : null,
         ] + $proof);
         if ($row->order_id && ($order = Order::find($row->order_id))) {
             $line = __('Called').($duration !== null ? ' ('.intdiv($duration, 60).':'.str_pad((string) ($duration % 60), 2, '0', STR_PAD_LEFT).')' : '')

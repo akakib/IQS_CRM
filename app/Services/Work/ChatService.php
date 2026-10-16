@@ -4,7 +4,9 @@ namespace App\Services\Work;
 
 use App\Models\ChatChannel;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -50,7 +52,7 @@ class ChatService
         if ($this->channelsFor($user)->isEmpty() && ! $user->handlesRiders()) {
             throw ValidationException::withMessages(['chat' => __('No chat channel is given to you. A manager can add one on the Staff page.')]);
         }
-        if (! $this->openSession($user->id)) {
+        if (! $this->openSessionChecked($user->id)) {
             DB::table('chat_sessions')->insert(['user_id' => $user->id, 'started_at' => now()]);
         }
     }
@@ -78,10 +80,10 @@ class ChatService
     }
 
     /** No real work for this long ends Communication, even with the app open. */
-    public const IDLE_MINUTES = 30;
+    public const IDLE_MINUTES = 15;
 
     /** Time allowed after the last action (reading, typing a reply) before the session counts as stopped. */
-    private const GRACE_MINUTES = 10;
+    public const GRACE_MINUTES = 5;
 
     /**
      * Communication left on with the app open but nothing done: no chat tap, no call, no order action
@@ -90,23 +92,54 @@ class ChatService
      */
     private function closeIdle(): int
     {
-        $open = DB::table('chat_sessions')->whereNull('ended_at')->where('started_at', '<', now()->subMinutes(self::IDLE_MINUTES))->get(['id', 'user_id', 'started_at']);
-        $closed = 0;
-        foreach ($open as $c) {
-            $last = collect([
-                $c->started_at,
-                DB::table('chat_events')->where('user_id', $c->user_id)->where('created_at', '>=', $c->started_at)->max('created_at'),
-                DB::table('customer_calls')->where('user_id', $c->user_id)->where('started_at', '>=', $c->started_at)->max('started_at'),
-                DB::table('rider_calls')->where('handled_by', $c->user_id)->where('created_at', '>=', $c->started_at)->max('created_at'),
-                DB::table('order_events')->where('user_id', $c->user_id)->where('created_at', '>=', $c->started_at)->max('created_at'),
-            ])->filter()->map(fn ($t) => \Illuminate\Support\Carbon::parse($t))->max();
-            if ($last->lt(now()->subMinutes(self::IDLE_MINUTES))) {
-                DB::table('chat_sessions')->where('id', $c->id)->whereNull('ended_at')->update(['ended_at' => $last->copy()->addMinutes(self::GRACE_MINUTES)]);
-                $closed++;
-            }
-        }
+        return DB::table('chat_sessions')->whereNull('ended_at')->where('started_at', '<', now()->subMinutes(self::IDLE_MINUTES))
+            ->get(['id', 'user_id', 'started_at'])->filter(fn ($c) => $this->closeIfIdle($c))->count();
+    }
 
-        return $closed;
+    /** The last real work in this session: a chat tap, a call, a rider call, an order action (else when it started). */
+    public function lastAction(object $session): Carbon
+    {
+        return collect([
+            $session->started_at,
+            DB::table('chat_events')->where('user_id', $session->user_id)->where('created_at', '>=', $session->started_at)->max('created_at'),
+            DB::table('customer_calls')->where('user_id', $session->user_id)->where('started_at', '>=', $session->started_at)->max('started_at'),
+            DB::table('rider_calls')->where('handled_by', $session->user_id)->where('created_at', '>=', $session->started_at)->max('created_at'),
+            DB::table('order_events')->where('user_id', $session->user_id)->where('created_at', '>=', $session->started_at)->max('created_at'),
+        ])->filter()->map(fn ($t) => Carbon::parse($t))->max();
+    }
+
+    private function closeIfIdle(object $session): bool
+    {
+        $last = $this->lastAction($session);
+        if ($last->gte(now()->subMinutes(self::IDLE_MINUTES))) {
+            return false;
+        }
+        DB::table('chat_sessions')->where('id', $session->id)->whereNull('ended_at')->update(['ended_at' => $last->copy()->addMinutes(self::GRACE_MINUTES)]);
+        Cache::forget('chat-last:'.$session->id);
+
+        return true;
+    }
+
+    /**
+     * This person's Communication, checked as their page opens (no cron needed): ended if nothing was done for
+     * IDLE_MINUTES. The last action is looked up at most once a minute per person; last_action_at goes to the page.
+     */
+    public function openSessionChecked(int $userId): ?object
+    {
+        $session = $this->openSession($userId);
+        if (! $session) {
+            return null;
+        }
+        $last = Carbon::parse(Cache::remember('chat-last:'.$session->id, 60, fn () => $this->lastAction($session)->toIso8601String()));
+        if ($last->lt(now()->subMinutes(self::IDLE_MINUTES))) {
+            if ($this->closeIfIdle($session)) {
+                return null;
+            }
+            $last = $this->lastAction($session); // something was done within the last minute
+        }
+        $session->last_action_at = $last;
+
+        return $session;
     }
 
     /** + (message), − (undo, with a reason) or No order (with a reason). */

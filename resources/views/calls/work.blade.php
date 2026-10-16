@@ -15,7 +15,13 @@
         x-data="{
             key: 'iqs-call-start-{{ $item->id }}', started: null, now: Date.now(), away: 0, leftAt: null, leaving: false, warn: false, qr: '',
             init() {
-                try { this.started = +localStorage.getItem(this.key) || null } catch (e) {}
+                try {
+                    this.started = +localStorage.getItem(this.key) || null;
+                    // A call of this page that is no longer here (saved, or went back to the list): its bar goes.
+                    const live = JSON.parse(localStorage.getItem('iqs-call-live') || 'null');
+                    if (live && live.url === location.pathname + location.search && live.item !== {{ $item->id }}) localStorage.removeItem('iqs-call-live');
+                    if (this.started) this.live();
+                } catch (e) {}
                 setInterval(() => this.now = Date.now(), 1000);
                 // Back from the phone's dialer: the time away is the talk.
                 document.addEventListener('visibilitychange', () => {
@@ -23,16 +29,18 @@
                     if (document.hidden) this.leftAt = Date.now();
                     else if (this.leftAt) { this.away += Math.round((Date.now() - this.leftAt) / 1000); this.leftAt = null }
                 });
-                window.addEventListener('beforeunload', e => { if (this.started && ! this.leaving) e.preventDefault() });
                 @if ($seePhone) if (window.matchMedia('(min-width: 768px)').matches) window.iqsQr(@js($item->phone)).then(s => this.qr = s); @endif
             },
             start() {
                 if (this.started) return;
                 this.started = Date.now();
                 try { localStorage.setItem(this.key, this.started) } catch (e) {}
+                this.live();
                 fetch(@js(route('calls.touch', [$list->id, $item->id])), { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
             },
-            done() { this.leaving = true; try { localStorage.removeItem(this.key) } catch (e) {} },
+            // The call follows the caller to other pages until it is saved.
+            live() { try { localStorage.setItem('iqs-call-live', JSON.stringify({ item: {{ $item->id }}, name: @js($item->name), url: location.pathname + location.search, started: this.started })) } catch (e) {} },
+            done() { this.leaving = true; try { localStorage.removeItem(this.key); localStorage.removeItem('iqs-call-live') } catch (e) {} },
             mmss(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') },
             elapsed() { return this.started ? Math.max(0, Math.round((this.now - this.started) / 1000)) : 0 },
             // How long they talked when the recording does not tell: the time away at the dialer, else since Call.

@@ -36,7 +36,7 @@ class WorkHoursTest extends TestCase
         $other = User::factory()->create(['last_seen_at' => now()]);
         DB::table('users')->where('id', $this->mahim->id)->update(['last_seen_at' => '2026-10-07 16:00:00']);
         $left = DB::table('chat_sessions')->insertGetId(['user_id' => $this->mahim->id, 'started_at' => '2026-10-07 15:00:00']);
-        $still = DB::table('chat_sessions')->insertGetId(['user_id' => $other->id, 'started_at' => '2026-10-07 18:00:00']);
+        $still = DB::table('chat_sessions')->insertGetId(['user_id' => $other->id, 'started_at' => '2026-10-07 18:20:00']);
 
         $this->assertSame(1, app(ChatService::class)->closeStale());
         $this->assertSame('2026-10-07 16:00:00', (string) DB::table('chat_sessions')->where('id', $left)->value('ended_at')); // not 18:30
@@ -173,13 +173,18 @@ class WorkHoursTest extends TestCase
         DB::table('chat_events')->insert(['user_id' => $this->mahim->id, 'chat_channel_id' => $channel, 'kind' => 'message', 'created_at' => '2026-10-07 15:20:00']);
 
         app(ChatService::class)->closeStale();
-        // Last real work 15:20, plus 10 minutes: not the hour after.
-        $this->assertSame('2026-10-07 15:30:00', (string) DB::table('chat_sessions')->where('id', $idle)->value('ended_at'));
+        // Last real work 15:20, plus 5 minutes: not the hour after.
+        $this->assertSame('2026-10-07 15:25:00', (string) DB::table('chat_sessions')->where('id', $idle)->value('ended_at'));
 
         // Someone still tapping keeps it on.
         $busy = DB::table('chat_sessions')->insertGetId(['user_id' => $this->mahim->id, 'started_at' => '2026-10-07 15:00:00']);
         DB::table('chat_events')->insert(['user_id' => $this->mahim->id, 'chat_channel_id' => $channel, 'kind' => 'message', 'created_at' => '2026-10-07 15:50:00']);
         app(ChatService::class)->closeStale();
         $this->assertNull(DB::table('chat_sessions')->where('id', $busy)->value('ended_at'));
+
+        // No cron: the person's own page ends it after 15 minutes with nothing done (16:06, last tap 15:50).
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-07 16:06:00'));
+        $this->assertNull(app(ChatService::class)->openSessionChecked($this->mahim->id));
+        $this->assertSame('2026-10-07 15:55:00', (string) DB::table('chat_sessions')->where('id', $busy)->value('ended_at'));
     }
 }

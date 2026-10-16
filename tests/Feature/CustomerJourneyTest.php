@@ -57,18 +57,25 @@ class CustomerJourneyTest extends TestCase
         $this->get('/order-search?q=Karim')->assertSee(route('customers.show', $customer), false);
         $this->get('/order-search?q=Nobody')->assertSee('No order found for');
 
+        // Opened from the search: Back to results returns to it, also after a reload; from the list: Back to customers.
+        $search = url('/order-search?q=Karim');
+        $this->from($search)->get(route('customers.show', $customer))->assertSee('Back to results')->assertSee($search, false);
+        $this->get(route('customers.show', $customer))->assertSee('Back to results');
+        $this->flushSession();
+        $this->actingAs($owner)->from(route('customers.index'))->get(route('customers.show', $customer))->assertSee('Back to customers')->assertDontSee('Back to results');
+
         $total = number_format((float) $first->fresh()->grand_total);
-        $this->get(route('journey.show', $customer))->assertOk()
+        $this->get(route('customers.show', $customer))->assertOk()
             ->assertSee($first->order_no)->assertSee($second->order_no)->assertSee('Ajwa Dates')
             ->assertSee('Delivered sales')->assertSee('৳'.$total)
             ->assertSee('1 cancelled', false)->assertSee('20 days later');
 
         // Order search links to the journey; a role without customers.view cannot open it.
-        $this->get('/order-search?q='.$first->order_no)->assertSee(route('journey.show', $customer), false);
+        $this->get('/order-search?q='.$first->order_no)->assertSee(route('customers.show', $customer), false);
         $this->get('/order-search?q='.urlencode('১০'.substr($first->order_no, 4)))->assertOk();
         $packer = User::factory()->create();
         $packer->roles()->attach($this->role(['packaging.view'], [], 'Packer')->id);
-        $this->actingAs($packer)->get(route('journey.show', $customer))->assertForbidden();
-        $this->get('/order-search?q='.$first->order_no)->assertDontSee(route('journey.show', $customer), false)->assertDontSee('Open customer');
+        $this->actingAs($packer)->get(route('customers.show', $customer))->assertForbidden();
+        $this->get('/order-search?q='.$first->order_no)->assertDontSee(route('customers.show', $customer), false)->assertDontSee('Open customer');
     }
 }

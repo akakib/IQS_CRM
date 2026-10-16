@@ -52,21 +52,27 @@ class CustomerController extends Controller
         return redirect()->route('customers.show', $customer)->with('success', __('Customer added.'));
     }
 
+    /**
+     * The one page of a customer, in tabs: Overview (totals, contact, addresses, fraud check), Journey
+     * (orders, imported orders and calls in time order), Orders and Calls. Opened from the search, a call
+     * list, an order or the customer list; came from a search, "Back to results" returns to it.
+     */
     public function show(Customer $customer, Request $request): View
     {
         $customer->load(['phones', 'addresses.zone:id,name']);
         $checks = $customer->fraudChecks()->with('provider:id,name,system_key')->latest('checked_at')->limit(20)->get();
+        // Came from the search: remembered for this customer, so it stays after a reload or an action here.
+        $from = (string) url()->previous();
+        if (str_contains((string) parse_url($from, PHP_URL_PATH), '/order-search')) {
+            $request->session()->put('customer_back.'.$customer->id, $from);
+        }
 
-        $orders = \App\Models\Order::visibleTo($request->user())->where('customer_id', $customer->id)->latest('id')->limit(10)
-            ->get(['id', 'order_no', 'status_id', 'grand_total', 'created_at', 'channel']);
-
-        return view('customers.show', [
+        return view('customers.show', app(\App\Services\Customers\CustomerJourney::class)->build($customer, $request->user()) + [
             'customer' => $customer,
-            'orders' => $orders,
-            'statuses' => \App\Models\OrderStatus::map(),
             'checks' => $checks,
             'latest' => $checks->unique('provider_id'),
             'canSeeContact' => $request->user()->canSeeField('customer_contact'),
+            'backToResults' => $request->session()->get('customer_back.'.$customer->id),
         ]);
     }
 

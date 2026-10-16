@@ -49,7 +49,7 @@ class CustomerStatsTest extends TestCase
         // The customer page shows these numbers, and so does the journey.
         $page = $this->get(route('customers.show', $customer))->assertOk();
         $this->assertSame(2, $page->viewData('customer')->delivered_count);
-        $journey = $this->get(route('journey.show', $customer))->assertOk()->viewData('stats');
+        $journey = $this->get(route('customers.show', $customer))->assertOk()->viewData('stats');
         $this->assertSame([3, 2, 1], [$journey['orders'], $journey['delivered'], $journey['returned'][0]]);
 
         // Undo the import: back to the IQS order only.

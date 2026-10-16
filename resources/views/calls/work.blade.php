@@ -34,7 +34,7 @@
                         <p class="font-mono text-sm text-gray-500">{{ $seePhone ? $item->phone : Mask::value($item->phone, 'customer_contact') }}@if ($item->attempts) · {{ __('Try :n', ['n' => $item->attempts + 1]) }}@endif</p>
                     </div>
                     @if ($item->customer_id)
-                        @can('customers.view')<a href="{{ route('journey.show', $item->customer_id) }}" target="_blank" rel="noopener" class="shrink-0 text-xs text-primary hover:underline">{{ __('Journey') }}</a>@endcan
+                        @can('customers.view')<a href="{{ route('customers.show', $item->customer_id) }}#journey" target="_blank" rel="noopener" class="shrink-0 text-xs text-primary hover:underline">{{ __('Customer') }}</a>@endcan
                     @endif
                 </div>
                 <a href="tel:{{ $item->phone }}" @click="window.iqsCallStart = Date.now(); fetch(@js(route('calls.touch', [$list->id, $item->id])), { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {})" class="mt-3 flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-4 text-lg font-semibold text-white hover:bg-green-700">

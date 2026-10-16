@@ -63,7 +63,7 @@ class CustomerHistoryImportTest extends TestCase
         $kamal = Customer::where('primary_phone', '01812345678')->first();
         $this->assertSame('Kamal Hossain', $kamal->name);
         $this->assertSame('cancelled', DB::table('customer_past_orders')->where('customer_id', $kamal->id)->value('status'));
-        $this->get(route('journey.show', $known))->assertOk()->assertSee('#5521')->assertSee('Imported: woo')->assertSee('৳890');
+        $this->get(route('customers.show', $known))->assertOk()->assertSee('#5521')->assertSee('Imported: woo')->assertSee('৳890');
 
         // The same file again: nothing doubles.
         $again = $this->upload('woo.csv', $woo);
@@ -134,7 +134,7 @@ class CustomerHistoryImportTest extends TestCase
         $this->assertSame(['returned', 'cancelled'], [DB::table('customer_past_orders')->where('cn', 'DM1BBBBB')->value('status'), DB::table('customer_past_orders')->where('cn', 'DM1CCCCC')->value('status')]);
 
         $this->assertSame([$shahin->customer_id], $this->get('/order-search?q='.urlencode('dm240726f65t8n'))->viewData('customers')->pluck('id')->all());
-        $this->get(route('journey.show', $shahin->customer_id))->assertSee('CN DM240726F65T8N');
+        $this->get(route('customers.show', $shahin->customer_id))->assertSee('CN DM240726F65T8N');
         $this->get('/order-search?by=cn&q=DM240726F65T8N')->assertSee('Imported: 1st 300')->assertSee('Md Shahin Raza');
 
         // The same parcel from another file, with a newer amount: updated, not added; Undo puts the old amount back.
@@ -177,7 +177,7 @@ class CustomerHistoryImportTest extends TestCase
         $cafe = Customer::where('primary_phone', '01812345678')->first();
         app(\App\Services\Customers\CustomerService::class)->merge($karim, $cafe, $this->boss->id);
         $this->assertSame(3, DB::table('customer_past_orders')->where('customer_id', $karim->id)->count());
-        $this->get(route('journey.show', $cafe->id))->assertRedirect(route('journey.show', $karim->id));
+        $this->get(route('journey.show', $cafe->id))->assertRedirect(route('customers.show', $karim->id).'#journey');
 
         // Two columns with one name keep apart.
         [$header] = app(HistoryImport::class)->read(tap(tempnam(sys_get_temp_dir(), 'c'), fn ($p) => file_put_contents($p, "Phone,Phone,Name\n017,018,X\n")), 'csv');

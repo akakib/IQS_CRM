@@ -23,6 +23,10 @@ class Order extends Model
         'b2b' => 'B2B', 'other' => 'Other',
     ];
 
+    /** One colour per channel, wherever orders are shown by where they came from (customer page). */
+    public const CHANNEL_COLORS = ['web' => '#16a34a', 'messenger' => '#2563eb', 'whatsapp' => '#22c55e', 'comments' => '#6366f1', 'instagram' => '#db2777',
+        'tiktok' => '#111827', 'telegram' => '#0ea5e9', 'phone' => '#f59e0b', 'b2b' => '#7c3aed', 'other' => '#9ca3af'];
+
     /** The ones staff pick when they make an order by hand (Website orders come from the site). */
     public static function manualChannels(): array
     {

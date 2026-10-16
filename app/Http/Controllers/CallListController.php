@@ -357,7 +357,7 @@ class CallListController extends Controller
             'topics' => collect(json_decode((string) $it->topics, true) ?: [])->map(fn ($v, $k) => ['label' => __(CallListService::TOPICS[$k] ?? $k), 'good' => $v === 'good'])->values(),
             'note' => $it->note,
             'order' => $it->order_id ? ['no' => $it->order_no, 'total' => number_format((float) $it->grand_total), 'url' => $user->can('orders.view') ? route('orders.show', $it->order_id) : null] : null,
-            'journey' => $it->customer_id && $user->can('customers.view') ? route('journey.show', $it->customer_id) : null,
+            'journey' => $it->customer_id && $user->can('customers.view') ? route('customers.show', $it->customer_id) : null,
             'calls' => $calls->values()->map(fn ($c, $k) => [
                 'try' => $n - $k,
                 'when' => $when($c->started_at),

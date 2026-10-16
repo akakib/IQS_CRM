@@ -84,7 +84,7 @@
                                 <div class="flex items-start gap-2">
                                     <input type="checkbox" value="{{ $p->past_id }}" x-model.number="picked" class="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-primary">
                                     <div class="min-w-0 flex-1">
-                                        @if ($canJourney)<a href="{{ route('journey.show', $p->id) }}" class="block truncate font-medium text-gray-900 hover:text-primary">{{ $p->name }}</a>@else<p class="truncate font-medium text-gray-900">{{ $p->name }}</p>@endif
+                                        @if ($canJourney)<a href="{{ route('customers.show', $p->id) }}" class="block truncate font-medium text-gray-900 hover:text-primary">{{ $p->name }}</a>@else<p class="truncate font-medium text-gray-900">{{ $p->name }}</p>@endif
                                         <p class="font-mono text-xs text-gray-500">{{ $mask($p->primary_phone) }}@if ($p->cn) · {{ $p->cn }}@elseif ($p->external_no) · #{{ $p->external_no }}@endif</p>
                                     </div>
                                     <p class="shrink-0 text-right"><span class="font-semibold tabular-nums">৳{{ number_format((float) $p->amount) }}</span><br><x-badge :color="$badge[$p->status] ?? 'gray'">{{ __($statusLabels[$p->status] ?? $p->status) }}</x-badge></p>
@@ -112,7 +112,7 @@
                                 @foreach ($orders as $p)
                                     <tr class="border-b border-gray-100 align-top last:border-0" :class="picked.includes({{ $p->past_id }}) ? 'bg-green-50/40' : ''">
                                         <td class="py-2.5"><input type="checkbox" value="{{ $p->past_id }}" x-model.number="picked" class="h-4 w-4 rounded border-gray-300 text-primary"></td>
-                                        <td class="py-2 pr-3">@if ($canJourney)<a href="{{ route('journey.show', $p->id) }}" class="font-medium text-gray-900 hover:text-primary">{{ $p->name }}</a>@else<span class="font-medium text-gray-900">{{ $p->name }}</span>@endif
+                                        <td class="py-2 pr-3">@if ($canJourney)<a href="{{ route('customers.show', $p->id) }}" class="font-medium text-gray-900 hover:text-primary">{{ $p->name }}</a>@else<span class="font-medium text-gray-900">{{ $p->name }}</span>@endif
                                             @if ($p->address)<span class="block max-w-xs truncate text-xs text-gray-400">{{ $p->address }}</span>@endif</td>
                                         <td class="whitespace-nowrap py-2 pr-3 font-mono text-gray-700">{{ $mask($p->primary_phone) }}</td>
                                         <td class="whitespace-nowrap py-2 pr-3 font-mono text-gray-700">{{ $p->cn ?? ($p->external_no ? '#'.$p->external_no : '-') }}</td>

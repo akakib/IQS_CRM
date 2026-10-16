@@ -49,6 +49,6 @@ class ShortcutsTest extends TestCase
         ], $owner);
 
         $this->actingAs($owner)->get('/customers/'.$order->customer_id)->assertOk()
-            ->assertSee($order->order_no)->assertSee('New order for this customer')->assertSee('01712345678', false);
+            ->assertSee($order->order_no)->assertSee('New order')->assertSee('Overview')->assertSee('Journey')->assertSee('01712345678', false);
     }
 }

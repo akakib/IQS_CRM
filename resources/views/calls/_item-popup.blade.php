@@ -67,7 +67,7 @@
                     </template>
                 </div>
 
-                <a x-show="item.d.journey" :href="item.d.journey" class="inline-block text-sm text-primary hover:underline">{{ __('Customer journey') }}</a>
+                <a x-show="item.d.journey" :href="item.d.journey" class="inline-block text-sm text-primary hover:underline">{{ __('Open customer') }}</a>
             </div>
         </template>
     </div>

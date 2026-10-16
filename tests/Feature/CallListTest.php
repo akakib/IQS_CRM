@@ -126,7 +126,7 @@ class CallListTest extends TestCase
 
         // It counts for today, shows on the journey and as unhappy for the manager; the proof opens for the caller and managers only.
         $this->get(route('calls.mine'))->assertSeeText('1 / 2');
-        $this->get(route('journey.show', $item->customer_id))->assertSee('25% satisfied');
+        $this->get(route('customers.show', $item->customer_id))->assertSee('25% satisfied');
         $this->get(route('calls.proof', $call->id))->assertOk();
         $this->actingAs($this->pranta)->get(route('calls.proof', $call->id))->assertNotFound();
         $this->actingAs($this->owner)->get(route('calls.lists.show', $list))->assertOk()->assertSee('Overview')->assertSee('Box crushed')->assertSee('Rakin');

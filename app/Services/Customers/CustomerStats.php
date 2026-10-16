@@ -6,10 +6,12 @@ use App\Models\OrderStatus;
 use Illuminate\Support\Facades\DB;
 
 /**
- * A customer's counts, one rule for every screen: orders, delivered and returned, counting both
- * orders made in IQS and orders brought in from a file (customer_past_orders). Kept on the customer
- * (orders_count, delivered_count, returned_count) and counted again here whenever orders change,
- * so the customer page, the journey, the order page, the desk, verification and fraud check agree.
+ * A customer's counts, one rule for every screen, counted again here whenever orders change:
+ *  - orders_count, delivered_count, returned_count: the whole picture (IQS orders and orders imported
+ *    from a file), what people read on the customer page, journey, search, order page and desk;
+ *  - iqs_orders_count, iqs_delivered_count, iqs_returned_count: only what IQS saw itself. Verification
+ *    rules, the fraud check and "new customer" use these, so a typed-in file can never make a customer
+ *    look trusted (imported counts are a separate rule condition an admin may choose to use).
  */
 class CustomerStats
 {
@@ -37,6 +39,9 @@ class CustomerStats
                     'orders_count' => (int) ($o->n ?? 0) + (int) ($p->n ?? 0),
                     'delivered_count' => (int) ($o->d ?? 0) + (int) ($p->d ?? 0),
                     'returned_count' => (int) ($o->r ?? 0) + (int) ($p->r ?? 0),
+                    'iqs_orders_count' => (int) ($o->n ?? 0),
+                    'iqs_delivered_count' => (int) ($o->d ?? 0),
+                    'iqs_returned_count' => (int) ($o->r ?? 0),
                 ]);
             }
         }

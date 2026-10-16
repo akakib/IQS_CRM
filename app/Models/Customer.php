@@ -14,7 +14,7 @@ class Customer extends Model
 
     protected $fillable = [
         'name', 'primary_phone', 'messenger_psid', 'whatsapp_number', 'risk_level', 'blocked_reason', 'note',
-        'orders_count', 'delivered_count', 'returned_count', 'first_order_at', 'marketing_consent', 'consent_at',
+        'orders_count', 'delivered_count', 'returned_count', 'iqs_orders_count', 'iqs_delivered_count', 'iqs_returned_count', 'first_order_at', 'marketing_consent', 'consent_at',
         'merged_into_id', 'created_by', 'do_not_call_at',
     ];
 
@@ -43,9 +43,19 @@ class Customer extends Model
         return $this->hasMany(CustomerFraudCheck::class);
     }
 
-    /** No delivered or returned parcel anywhere in our own history. */
+    /** No delivered or returned parcel in what IQS itself saw (imported files do not count). */
     public function isNew(): bool
     {
-        return $this->delivered_count === 0 && $this->returned_count === 0;
+        return (int) $this->iqs_delivered_count === 0 && (int) $this->iqs_returned_count === 0;
+    }
+
+    /** Orders brought in from files (history only): the whole count less what IQS saw. */
+    public function importedCounts(): array
+    {
+        return [
+            'orders' => max(0, (int) $this->orders_count - (int) $this->iqs_orders_count),
+            'delivered' => max(0, (int) $this->delivered_count - (int) $this->iqs_delivered_count),
+            'returned' => max(0, (int) $this->returned_count - (int) $this->iqs_returned_count),
+        ];
     }
 }

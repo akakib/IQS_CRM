@@ -141,8 +141,10 @@ class VerificationTest extends TestCase
     {
         $customer = Customer::create(['name' => 'Loyal', 'primary_phone' => '01912345670']);
         DB::table('customer_phones')->insert(['customer_id' => $customer->id, 'phone' => '01912345670', 'is_primary' => true]);
-        foreach ([1, 2, 3] as $n) { // three delivered parcels from an imported file
-            DB::table('customer_past_orders')->insert(['customer_id' => $customer->id, 'source' => 'old', 'external_no' => 'P'.$n.'-'.$customer->id, 'ordered_at' => now()->subMonths($n), 'status' => 'delivered', 'created_at' => now(), 'updated_at' => now()]);
+        // Three orders IQS itself delivered (the courier said so).
+        foreach ([1, 2, 3] as $n) {
+            $earlier = $this->order('01912345670');
+            DB::table('orders')->where('id', $earlier->id)->update(['status_id' => OrderStatus::idFor('delivered')]);
         }
         \App\Services\Customers\CustomerStats::refresh([$customer->id]);
 
@@ -154,6 +156,23 @@ class VerificationTest extends TestCase
 
         app(\App\Services\Orders\OrderStateMachine::class)->transition($order, 'confirmed', null, 'rule');
         $this->assertSame('350.00', $order->fresh()->items->first()->cost_price_snapshot);
+    }
+
+    public function test_deliveries_from_an_imported_file_never_make_a_customer_trusted(): void
+    {
+        $customer = Customer::create(['name' => 'From a file', 'primary_phone' => '01912345671']);
+        DB::table('customer_phones')->insert(['customer_id' => $customer->id, 'phone' => '01912345671', 'is_primary' => true]);
+        foreach ([1, 2, 3] as $n) { // typed into a file: not proof
+            DB::table('customer_past_orders')->insert(['customer_id' => $customer->id, 'source' => 'old', 'external_no' => 'F'.$n, 'ordered_at' => now()->subMonths($n), 'status' => 'delivered', 'created_at' => now(), 'updated_at' => now()]);
+        }
+        \App\Services\Customers\CustomerStats::refresh([$customer->id]);
+
+        $order = $this->order('01912345671');
+        $inputs = json_decode(DB::table('verification_runs')->where('order_id', $order->id)->value('inputs_snapshot'), true);
+        $this->assertSame([0, 3], [$inputs['own_delivered_count'], $inputs['imported_delivered_count']]);
+        $this->assertNotSame('Trusted repeat customer', DB::table('verification_rules')->where('id', DB::table('verification_runs')->where('order_id', $order->id)->value('matched_rule_id'))->value('name'));
+        // People still see the whole picture: 4 orders, 3 delivered (all from the file).
+        $this->assertSame([4, 3, 0, 1], [$customer->fresh()->orders_count, $customer->fresh()->delivered_count, $customer->fresh()->iqs_delivered_count, $customer->fresh()->iqs_orders_count]);
     }
 
     public function test_blocked_customer_always_goes_to_manual_review(): void

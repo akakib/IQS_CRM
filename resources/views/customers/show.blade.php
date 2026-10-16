@@ -23,8 +23,9 @@
         </div>
     @endcan
     <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <x-stat-tile :label="__('Orders')" :value="$customer->orders_count" />
-        <x-stat-tile :label="__('Delivered')" :value="$customer->delivered_count" />
+        @php $imported = $customer->importedCounts(); @endphp
+        <x-stat-tile :label="__('Orders')" :value="$customer->orders_count" :hint="$imported['orders'] ? __(':i in IQS · :f from files', ['i' => $customer->iqs_orders_count, 'f' => $imported['orders']]) : null" />
+        <x-stat-tile :label="__('Delivered')" :value="$customer->delivered_count" :hint="$imported['delivered'] ? __(':i in IQS · :f from files', ['i' => $customer->iqs_delivered_count, 'f' => $imported['delivered']]) : null" />
         <x-stat-tile :label="__('Returned')" :value="$customer->returned_count" :trend="$customer->returned_count ? 'down' : null" :hint="$total ? round($customer->delivered_count * 100 / $total).'% '.__('success') : __('New customer')" />
         <div class="rounded-xl border border-gray-200 bg-white p-4">
             <p class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ __('Risk') }}</p>

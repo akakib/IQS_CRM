@@ -212,7 +212,7 @@ works without cron; the cron (`desk:tick`) checks everyone too.
 Places that may do the same job twice; to be checked and merged where they are real duplicates:
 Order activity / Order management / Control room / All orders; Parcel status (was Hotline) / Delivery issues / rider calls;
 Returns / Return report; KPI / Scorecard / Team Activity / Packers / My points; Stock count / Stock status;
-the call screens now share one way of logging a call (see section 7); rider calls still have their own fields.
+the call screens now share one way of logging a call (see section 7). Rider calls: Parcel status and Communication > Rider calls save through the same RiderCallService (one parcel lookup, one rider_calls table).
 
 ---
 

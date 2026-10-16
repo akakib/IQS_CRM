@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Orders\DeliveryIssueService;
 use App\Services\Orders\OrderService;
 use App\Support\Phone;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -36,17 +37,28 @@ class RiderCallService
 
     public function __construct(private OrderService $orders, private DeliveryIssueService $issues, private ChatService $chat) {}
 
-    /** The parcel for a CN, an order number or the customer's phone, with what the courier last said. */
-    public function find(string $q): ?array
+    /**
+     * The one parcel lookup of Parcel status and Communication > Rider calls: an order number, the customer's
+     * phone (or second phone), a CN, or (a short query) the start of the customer's name. Newest first.
+     */
+    public function search(string $q): Builder
     {
         $q = trim($q);
         $digits = preg_replace('/\D/', '', strtr($q, ['০' => '0', '১' => '1', '২' => '2', '৩' => '3', '৪' => '4', '৫' => '5', '৬' => '6', '৭' => '7', '৮' => '8', '৯' => '9']));
         $phone = Phone::normalize($q);
-        $order = Order::query()
+
+        return Order::query()
             ->where(fn ($w) => $w->where('order_no', strtoupper($q))
-                ->when(strlen($digits) >= 5, fn ($w) => $w->orWhereIn('id', DB::table('shipments')->select('order_id')->where('consignment_id', $digits)))
-                ->when($phone, fn ($w) => $w->orWhere('ship_phone', $phone)))
-            ->orderByDesc('id')->first();
+                ->when($phone, fn ($w) => $w->orWhere('ship_phone', $phone)->orWhere('ship_alt_phone', $phone))
+                ->when(strlen($digits) >= 5, fn ($w) => $w->orWhereIn('orders.id', DB::table('shipments')->select('order_id')->where('consignment_id', $digits)))
+                ->when(strlen($digits) < 5, fn ($w) => $w->orWhere('ship_name', 'like', $q.'%')))
+            ->orderByDesc('orders.id');
+    }
+
+    /** The parcel for a CN, an order number or the customer's phone, with what the courier last said. */
+    public function find(string $q): ?array
+    {
+        $order = trim($q) === '' ? null : $this->search($q)->first();
         if (! $order) {
             return null;
         }
@@ -64,8 +76,14 @@ class RiderCallService
         ];
     }
 
-    /** @param array{order_id: int, rider_name?: ?string, rider_phone?: ?string, claim: string, verdict?: ?string, action?: ?string, note?: ?string} $d */
-    public function record(User $by, array $d, array $proof = []): int
+    /**
+     * Every rider call is saved here (Communication > Rider calls and Parcel status), so the Riders report,
+     * work time and the order's timeline all see it. $askedCustomer false (Parcel status): no verdict needed.
+     * issue_type: the delivery issue to open when the action is "moderator" (else from the claim).
+     *
+     * @param  array{order_id: int, rider_name?: ?string, rider_phone?: ?string, claim: string, verdict?: ?string, action?: ?string, note?: ?string, issue_type?: ?string}  $d
+     */
+    public function record(User $by, array $d, array $proof = [], bool $askedCustomer = true): int
     {
         $order = Order::find($d['order_id']) ?? throw ValidationException::withMessages(['order_id' => __('Find the parcel first.')]);
         foreach (['claim' => self::CLAIMS, 'verdict' => self::VERDICTS, 'action' => self::ACTIONS] as $field => $allowed) {
@@ -73,7 +91,7 @@ class RiderCallService
                 throw ValidationException::withMessages([$field => __('Choose from the list.')]);
             }
         }
-        if (empty($d['verdict']) || empty($d['action'])) {
+        if (($askedCustomer && empty($d['verdict'])) || empty($d['action'])) {
             throw ValidationException::withMessages([empty($d['verdict']) ? 'verdict' : 'action' => __('Say what the customer said and what was done.')]);
         }
 
@@ -89,20 +107,26 @@ class RiderCallService
         }
 
         $issueId = $d['action'] === 'moderator'
-            ? $this->issues->open($order, self::ISSUE_TYPE[$d['claim']], $phone, trim(__(self::CLAIMS[$d['claim']]).'. '.($d['note'] ?? '')), $by)
+            ? $this->issues->open($order, $d['issue_type'] ?? self::ISSUE_TYPE[$d['claim']], $phone, trim(__(self::CLAIMS[$d['claim']]).'. '.($d['note'] ?? '')), $by)
             : null;
         $id = DB::table('rider_calls')->insertGetId([
             'order_id' => $order->id, 'consignment_id' => DB::table('shipments')->where('id', $order->active_shipment_id)->value('consignment_id'),
-            'rider_id' => $riderId, 'rider_phone' => $phone, 'claim' => $d['claim'], 'verdict' => $d['verdict'], 'action' => $d['action'],
+            'rider_id' => $riderId, 'rider_phone' => $phone, 'claim' => $d['claim'], 'verdict' => $d['verdict'] ?? null, 'action' => $d['action'],
             'note' => $d['note'] ?? null, 'delivery_issue_id' => $issueId, 'handled_by' => $by->id, 'created_at' => now(),
             'duration_seconds' => ($d['minutes'] ?? null) !== null || ($d['seconds'] ?? null) !== null ? (int) ($d['minutes'] ?? 0) * 60 + (int) ($d['seconds'] ?? 0) : null,
             'recording_url' => $d['recording_url'] ?? null,
         ] + $proof);
-        $this->orders->note($order, 'rider', __('Rider call:rider: :c · checked with the customer: :v · :a', [
-            'rider' => $name !== '' ? ' '.$name : '', 'c' => __(self::CLAIMS[$d['claim']]), 'v' => __(self::VERDICTS[$d['verdict']]), 'a' => __(self::ACTIONS[$d['action']]),
-        ]).(! empty($d['note']) ? ' · '.$d['note'] : ''), $by, ['rider_call_id' => $id, 'recording_url' => $d['recording_url'] ?? null, 'proof_rider_call' => $proof ? $id : null]);
-        // Hotline work counts as work, like chats.
-        $this->chat->start($by);
+        $line = empty($d['verdict'])
+            ? __('Rider call:rider: :c · :a', ['rider' => $name !== '' ? ' '.$name : '', 'c' => __(self::CLAIMS[$d['claim']]), 'a' => __(self::ACTIONS[$d['action']])])
+            : __('Rider call:rider: :c · checked with the customer: :v · :a', [
+                'rider' => $name !== '' ? ' '.$name : '', 'c' => __(self::CLAIMS[$d['claim']]), 'v' => __(self::VERDICTS[$d['verdict']]), 'a' => __(self::ACTIONS[$d['action']]),
+            ]);
+        $this->orders->note($order, 'rider', $line.(! empty($d['note']) ? ' · '.$d['note'] : ''), $by, ['rider_call_id' => $id, 'recording_url' => $d['recording_url'] ?? null, 'proof_rider_call' => $proof ? $id : null]);
+        // Hotline work counts as work, like chats (someone with no channel, e.g. an owner, has no Communication to start).
+        try {
+            $this->chat->start($by);
+        } catch (ValidationException) {
+        }
 
         return $id;
     }

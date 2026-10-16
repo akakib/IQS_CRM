@@ -139,9 +139,28 @@ class HotlineTest extends TestCase
 
     public function test_small_issue_is_saved_on_the_timeline(): void
     {
-        $this->actingAs($this->owner())->post("/hotline/{$this->order->id}/solved", ['note' => 'Customer coming down in 5 minutes'])->assertSessionHas('success');
+        $owner = $this->owner();
+        $this->actingAs($owner)->post("/hotline/{$this->order->id}/solved", ['note' => 'Customer coming down in 5 minutes', 'rider_phone' => '01811111111'])->assertSessionHas('success');
 
         $this->assertDatabaseHas('order_notes', ['order_id' => $this->order->id, 'note_type' => 'rider']);
+        // The same rider call as from Communication: counted in the Riders report and as work.
+        $this->assertDatabaseHas('rider_calls', ['order_id' => $this->order->id, 'consignment_id' => $this->cn, 'claim' => 'other', 'verdict' => null,
+            'action' => 'solved', 'note' => 'Customer coming down in 5 minutes', 'rider_phone' => '01811111111', 'handled_by' => $owner->id]);
+
+        // Bigger issue: a rider call sent on, with its delivery issue.
+        $this->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'address', 'note' => 'Lane closed'])->assertSessionHas('success');
+        $call = DB::table('rider_calls')->where('action', 'moderator')->first();
+        $this->assertSame(['address', 'address'], [$call->claim, DB::table('delivery_issues')->where('id', $call->delivery_issue_id)->value('issue_type')]);
+        $this->get(route('riders-report.index'))->assertOk()->assertSee('Address wrong or not found');
+    }
+
+    public function test_parcel_status_and_rider_calls_find_the_parcel_the_same_way(): void
+    {
+        $this->actingAs($this->owner());
+        foreach ([$this->cn, $this->order->order_no, '+8801712345678'] as $q) {
+            $this->get('/hotline?q='.urlencode($q))->assertSee($this->order->order_no);
+            $this->getJson('/rider-calls/find?q='.urlencode($q))->assertJson(['found' => true, 'order_no' => $this->order->order_no]);
+        }
     }
 
     public function test_an_issue_waits_for_no_one_who_is_off_work_and_costs_them_nothing(): void

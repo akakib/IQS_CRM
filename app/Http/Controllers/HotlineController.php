@@ -5,8 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use App\Models\OrderStatus;
 use App\Services\Orders\DeliveryIssueService;
-use App\Services\Orders\OrderService;
-use App\Support\Phone;
+use App\Services\Work\RiderCallService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,17 +21,9 @@ class HotlineController extends Controller
         $results = collect();
 
         if ($q !== '') {
-            $digits = preg_replace('/\D/', '', $q);
-            $phone = Phone::normalize($q);
-            $results = Order::query()
+            $results = app(RiderCallService::class)->search($q)
                 ->select(['orders.id', 'order_no', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'cod_amount', 'created_at', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address'])
-                ->with('moderator:id,name')
-                ->where(fn ($w) => $w
-                    ->where('order_no', strtoupper($q))
-                    ->when($phone, fn ($w) => $w->orWhere('ship_phone', $phone)->orWhere('ship_alt_phone', $phone))
-                    ->when(strlen($digits) >= 5, fn ($w) => $w->orWhereIn('orders.id', DB::table('shipments')->select('order_id')->where('consignment_id', $digits)))
-                    ->when(strlen($digits) < 5, fn ($w) => $w->orWhere('ship_name', 'like', $q.'%')))
-                ->orderByDesc('orders.id')->limit(10)->get();
+                ->with('moderator:id,name')->limit(10)->get();
         }
 
         // The whole order (the list above loads only a few columns): its parcel, address and items.
@@ -53,25 +44,32 @@ class HotlineController extends Controller
         return view('hotline.index', ['q' => $q, 'results' => $results, 'detail' => $detail, 'statuses' => OrderStatus::map()]);
     }
 
-    public function solved(Order $order, Request $request, OrderService $orders): RedirectResponse
+    /** Small issue solved on the call: a rider call like the one from Communication (Riders report, work time, timeline). */
+    public function solved(Order $order, Request $request, RiderCallService $calls): RedirectResponse
     {
         $data = $request->validate(['note' => ['required', 'string', 'max:500'], 'rider_phone' => ['nullable', 'string', 'max:20']]);
-        $orders->note($order, 'rider', __('Hotline solved: :n', ['n' => $data['note']]).(! empty($data['rider_phone']) ? ' · '.__('rider :p', ['p' => $data['rider_phone']]) : ''), $request->user());
+        $calls->record($request->user(), ['order_id' => $order->id, 'rider_phone' => $data['rider_phone'] ?? null, 'claim' => 'other', 'action' => 'solved', 'note' => $data['note']], [], false);
 
-        return back()->with('success', __('Saved on the order timeline.'));
+        return back()->with('success', __('Rider call saved.'));
     }
 
-    public function openIssue(Order $order, Request $request, DeliveryIssueService $issues): RedirectResponse
+    /** Bigger issue: a rider call sent to the person on the order (it opens the delivery issue with its timer). */
+    public function openIssue(Order $order, Request $request, RiderCallService $calls): RedirectResponse
     {
         $data = $request->validate([
             'issue_type' => ['required', Rule::in(DeliveryIssueService::TYPES)],
             'rider_phone' => ['nullable', 'string', 'max:20'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
-        $issues->open($order, $data['issue_type'], $data['rider_phone'] ?? null, $data['note'] ?? null, $request->user());
+        $claim = self::CLAIM_OF_ISSUE[$data['issue_type']] ?? 'other';
+        $calls->record($request->user(), ['order_id' => $order->id, 'rider_phone' => $data['rider_phone'] ?? null, 'claim' => $claim, 'action' => 'moderator',
+            'note' => $data['note'] ?? null, 'issue_type' => $data['issue_type']], [], false);
 
         return back()->with('success', __('Sent to :n with a timer.', ['n' => $order->moderator?->name ?? __('the managers')]));
     }
+
+    /** What the rider said, for each delivery issue picked on Parcel status (the Riders report groups by it). */
+    private const CLAIM_OF_ISSUE = ['no_answer' => 'no_answer', 'address' => 'address', 'cancel' => 'refused', 'hold' => 'later'];
 
     public function issues(Request $request): View
     {

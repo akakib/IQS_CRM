@@ -25,7 +25,8 @@ money in BDT. Laravel 12, Blade + Alpine.js + Tailwind. Database design: [DB_DES
 ### Product and UI
 - UI text is English only; no Bangla and no em-dash in labels, placeholders, notices or activity text.
 - The business is called **IQS** everywhere (screens, prints, messages, docs); never "Iqbal Store". Print, PDF and
-  Excel downloads carry no business name at all.
+  Excel downloads carry no business name at all. Only the parcel label prints the sender name, from the
+  setting "Sender name on parcel labels" (Iqbal Store).
 - Confirmations use `<x-confirm-modal>`, never the browser's `confirm()`.
 - Never a native `<select>`: use `<x-simple-select>` (or `<x-search-select>` for long lists).
 - Lists are cards on phones and a table on desktop; real pagination with 10 / 25 / 50 / 100 a page.

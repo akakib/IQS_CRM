@@ -34,7 +34,7 @@
         <div class="label">
             <div class="row">
                 <div>
-                    <div class="store">{{ settings('store.name') }}</div>
+                    <div class="store">{{ settings('store.label_name') }}</div>
                     @if (settings('store.hotline'))<div class="small">{{ __('Rider hotline') }}: <b>{{ settings('store.hotline') }}</b></div>@endif
                     <div class="small">{{ $l ? ucfirst($l->courier).' CN '.$l->consignment_id : __('Not booked') }}</div>
                 </div>

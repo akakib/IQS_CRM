@@ -8,6 +8,8 @@
 
 return [
     'store.name' => ['string', 'IQS', 'Store name', 'Store', ['required', 'string', 'max:100']],
+    // Printed on the parcel label as the sender (the only place the shop's own name is shown).
+    'store.label_name' => ['string', 'Iqbal Store', 'Sender name on parcel labels', 'Store', ['required', 'string', 'max:100']],
     'store.hotline' => ['string', '', 'Rider hotline number', 'Store', ['nullable', 'regex:/^01[3-9]\d{8}$/']],
     'appearance.primary_color' => ['string', '#0d542b', 'Main colour (buttons, links, the current page in the menu)', 'Appearance', ['required', 'regex:/^#[0-9a-fA-F]{6}$/']],
     'appearance.font' => ['string', 'Figtree', 'Font', 'Appearance', ['required', 'string', 'max:40']],

@@ -39,7 +39,7 @@
                 const r = await fetch(url, { method: body ? 'POST' : 'GET', headers: this.headers(), body: body ? JSON.stringify(body) : undefined });
                 const j = await r.json();
                 if (!r.ok) { this.error = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')); return }
-                this.data = j; this.on = j.on; this.since = j.since;
+                this.data = j; this.on = j.on; this.since = j.since; if (j.last) { this.lastAt = Math.max(this.lastAt || 0, j.last); this.stopped = null }
             } catch (e) { this.error = @js(__('No connection. Try again.')) } finally { this.busy = false }
         },
         async show() { this.open = true; this.ask = null; if (! this.on) this.acted(); await this.call(@js(route('chat.start')), {}) },
@@ -219,7 +219,7 @@
                                     <button type="button" @click="paste()" class="inline-flex h-12 shrink-0 items-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Paste') }}</button>
                                 </div>
                                 <p x-show="pasteHint" x-cloak class="mt-1.5 text-xs text-gray-500">{{ __('Long-press the box and choose Paste.') }}</p>
-                                <x-dial-pad model="cq" submit="cfind()" :label="__('Open')" busy="cfinding" class="mt-2" />
+                                <x-dial-pad model="cq" submit="cfind()" :label="__('Open')" busy="cfinding" class="mt-3" />
                             </form>
                             <div x-show="recent && recent.length" x-cloak>
                                 <p class="mb-1.5 text-sm font-semibold text-gray-900">{{ __('Or tap a recent customer') }}</p>

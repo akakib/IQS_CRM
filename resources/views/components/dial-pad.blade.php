@@ -4,7 +4,7 @@
      model: the Alpine field the digits go into. submit: what the green key runs. busy: an Alpine expression. --}}
 @props(['model', 'submit', 'label', 'busy' => 'false'])
 
-<div class="grid grid-cols-3 gap-2 md:mx-auto md:max-w-xs" {{ $attributes }}>
+<div {{ $attributes->merge(['class' => 'grid grid-cols-3 gap-2']) }}>
     @foreach (['1', '2', '3', '4', '5', '6', '7', '8', '9'] as $d)
         <button type="button" @click="{{ $model }} = String({{ $model }} || '') + '{{ $d }}'; navigator.vibrate?.(8)"
             class="h-12 rounded-xl border border-gray-300 bg-white text-xl font-semibold tabular-nums text-gray-900 hover:bg-gray-50 active:bg-gray-100">{{ $d }}</button>

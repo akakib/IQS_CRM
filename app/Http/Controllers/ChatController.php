@@ -22,7 +22,7 @@ class ChatController extends Controller
         $user = $request->user();
         $channels = $this->chat->channelsFor($user);
         $today = $this->chat->today($user, $channels->pluck('id')->all());
-        $session = $this->chat->openSession($user->id);
+        $session = $this->chat->openSessionChecked($user->id);
         $reasons = DB::table('status_reasons')->whereIn('reason_type', ['chat_lost', 'chat_undo'])->where('is_active', true)
             ->orderBy('sort_order')->get(['id', 'reason_type', 'label_en'])->groupBy('reason_type')
             ->map(fn ($r) => $r->map(fn ($x) => ['id' => $x->id, 'label' => __($x->label_en)])->values());
@@ -30,6 +30,7 @@ class ChatController extends Controller
         return response()->json([
             'date' => now()->format('l, d M'),
             'on' => (bool) $session,
+            'last' => $session ? $session->last_action_at->getTimestampMs() : null, // the last real work: the 15-minute stop counts from it
             'since' => $session ? \Illuminate\Support\Carbon::parse($session->started_at)->format('g:i A') : null,
             'channels' => $channels->map(fn ($c) => [
                 'id' => $c->id, 'name' => $c->name, 'type' => ChatChannel::TYPES[$c->type] ?? $c->type, 'kind' => $c->type,

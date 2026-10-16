@@ -194,7 +194,7 @@ checked by `CallProof`). The file goes to Google Drive right after saving. Manag
 their call-backs under My calls; their history is its own page (My call history).
 
 **One way to log a call, everywhere.** The call list, the order page (`x-phone-dial`, a panel over the page) and
-Communication > Customer calls (tap a recent customer or paste the number) ask the same things: what happened
+Communication > Customer calls (a customer called or I will call; the number from the dial pad, Paste or a recent customer; a new caller can be saved as a customer) ask the same things: what happened
 (or why they called), how happy, the recording or screenshot (any file, any result), a note. Nobody types a
 duration: it is the recording's own length, else the clock since the call started. A started, unsaved call
 follows the caller to every page (`x-call-live-bar`, kept in the browser) until it is saved.

@@ -27,7 +27,7 @@
                         @csrf
                         <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-40 rounded-lg border border-gray-300 px-2 py-1 text-sm">
                         <x-button size="sm" name="decision" value="dismissed" variant="secondary">{{ __('Dismiss') }}</x-button>
-                        <x-button type="button" size="sm" variant="danger" @click="$el.form.querySelector('input[type=hidden][name=decision]').value = 'confirmed'; $dispatch('open-confirm', { id: 'points-confirm', form: 'flag-{{ $f->id }}', verb: @js(__('Confirm fake')) })">{{ __('Confirm fake') }}</x-button>
+                        <x-button type="button" size="sm" variant="danger" @click="$el.form.querySelector('input[type=hidden][name=decision]').value = 'confirmed'; $dispatch('open-confirm', { id: 'points-confirm', form: 'flag-{{ $f->id }}', verb: {{ \Illuminate\Support\Js::from(__('Confirm fake')) }} })">{{ __('Confirm fake') }}</x-button>
                     </form>
                 </div>
             </div>
@@ -51,7 +51,7 @@
                         <input type="hidden" name="decision" value="">
                         @csrf
                         <x-button size="sm" name="decision" value="rejected" variant="secondary">{{ __('Keep the point') }}</x-button>
-                        <x-button type="button" size="sm" @click="$el.form.querySelector('input[type=hidden][name=decision]').value = 'upheld'; $dispatch('open-confirm', { id: 'points-confirm', form: 'dispute-{{ $d->id }}', verb: @js(__('Remove the point')) })">{{ __('Remove the point') }}</x-button>
+                        <x-button type="button" size="sm" @click="$el.form.querySelector('input[type=hidden][name=decision]').value = 'upheld'; $dispatch('open-confirm', { id: 'points-confirm', form: 'dispute-{{ $d->id }}', verb: {{ \Illuminate\Support\Js::from(__('Remove the point')) }} })">{{ __('Remove the point') }}</x-button>
                     </form>
                 </div>
             </div>
@@ -77,7 +77,7 @@
                             @csrf
                             <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-36 rounded-lg border border-gray-300 px-2 py-1 text-sm">
                             <x-button size="sm" name="result" value="call_verified">{{ __('Was called') }}</x-button>
-                            <x-button type="button" size="sm" variant="danger" @click="$el.form.querySelector('input[type=hidden][name=result]').value = 'not_called'; $dispatch('open-confirm', { id: 'points-confirm', form: 'qa-{{ $o->id }}', verb: @js(__('Not called')) })">{{ __('Not called') }}</x-button>
+                            <x-button type="button" size="sm" variant="danger" @click="$el.form.querySelector('input[type=hidden][name=result]').value = 'not_called'; $dispatch('open-confirm', { id: 'points-confirm', form: 'qa-{{ $o->id }}', verb: {{ \Illuminate\Support\Js::from(__('Not called')) }} })">{{ __('Not called') }}</x-button>
                             <x-button size="sm" name="result" value="wrong_info" variant="secondary">{{ __('Wrong info') }}</x-button>
                         </form>
                     </div>

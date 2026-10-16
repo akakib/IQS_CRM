@@ -19,7 +19,7 @@
                         @endforeach
                         <div x-show="d && d !== 'dismiss'"><x-date-input name="expected_restock_date" :min="now()->toDateString()" :placeholder="__('Expected date')" size="sm" /></div>
                         <x-button type="button" size="sm" x-bind:disabled="!d"
-                            @click="d === 'dismiss' ? $el.closest('form').submit() : $dispatch('open-confirm', { id: 'stock-issue-confirm', form: 'stock-issue-{{ $r->id }}', label: @js($r->product), verb: d === 'backorder' ? @js(__('Pre-order')) : @js(__('Out of stock')) })">{{ __('Save') }}</x-button>
+                            @click="d === 'dismiss' ? $el.closest('form').submit() : $dispatch('open-confirm', { id: 'stock-issue-confirm', form: 'stock-issue-{{ $r->id }}', label: {{ \Illuminate\Support\Js::from($r->product) }}, verb: d === 'backorder' ? {{ \Illuminate\Support\Js::from(__('Pre-order')) }} : {{ \Illuminate\Support\Js::from(__('Out of stock')) }} })">{{ __('Save') }}</x-button>
                     </form>
                 @endcan
             </div>

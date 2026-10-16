@@ -39,7 +39,7 @@
                     <div class="rounded-xl border p-4" :class="total - count > 0 ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'"><p class="text-xs uppercase text-gray-500">{{ __('Left') }}</p><p class="text-2xl font-semibold tabular-nums" x-text="Math.max(0, total - count)"></p></div>
                 </div>
                 <form method="POST" action="{{ route('handover.close', $session->id) }}" id="handover-finish-scan" class="mt-4">@csrf
-                    <x-button type="button" class="w-full" @click="$dispatch('open-confirm', { id: 'handover-finish', form: 'handover-finish-scan', message: missing.length ? missing.length + ' ' + @js(__('parcels not scanned move to the next pickup.')) : @js(__('Every parcel was handed over.')) })">{{ __('Finish handover') }}</x-button>
+                    <x-button type="button" class="w-full" @click="$dispatch('open-confirm', { id: 'handover-finish', form: 'handover-finish-scan', message: missing.length ? missing.length + ' ' + {{ \Illuminate\Support\Js::from(__('parcels not scanned move to the next pickup.')) }} : {{ \Illuminate\Support\Js::from(__('Every parcel was handed over.')) }} })">{{ __('Finish handover') }}</x-button>
                 </form>
                 <p class="mt-1 text-center text-xs text-gray-500">{{ __('Parcels not scanned move to the next pickup.') }}</p>
             </div>
@@ -122,7 +122,7 @@
             @endif
 
             <form method="POST" action="{{ route('handover.close', $session->id) }}" id="handover-finish-manual" class="mt-4">@csrf
-                <x-button type="button" variant="secondary" class="w-full" @click="$dispatch('open-confirm', { id: 'handover-finish', form: 'handover-finish-manual', message: @js(trans_choice('{0} Every parcel was handed over.|{1} 1 parcel not handed over moves to the next pickup.|[2,*] :count parcels not handed over move to the next pickup.', $missing->count())) })">{{ __('Finish handover') }}</x-button>
+                <x-button type="button" variant="secondary" class="w-full" @click="$dispatch('open-confirm', { id: 'handover-finish', form: 'handover-finish-manual', message: {{ \Illuminate\Support\Js::from(trans_choice('{0} Every parcel was handed over.|{1} 1 parcel not handed over moves to the next pickup.|[2,*] :count parcels not handed over move to the next pickup.', $missing->count())) }} })">{{ __('Finish handover') }}</x-button>
             </form>
             <p class="mt-1 text-center text-xs text-gray-500">{{ __('Parcels not handed over move to the next pickup.') }}</p>
         </div>

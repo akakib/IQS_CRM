@@ -25,7 +25,7 @@
             <span>{{ __('Closed on :d by :n. These are the numbers as they stood then; later returns or revoked points do not change them.', ['d' => $closedAt?->format('d M Y'), 'n' => $closedBy ?? '-']) }}</span>
             @if (auth()->user()->isOwner())
                 <form method="POST" action="{{ route('scorecard.close') }}" id="scorecard-reopen">@csrf<input type="hidden" name="month" value="{{ $month->format('Y-m') }}"><input type="hidden" name="reopen" value="1">
-                    <x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'scorecard-reopen-confirm', form: 'scorecard-reopen', label: @js($month->format('F Y')) })">{{ __('Reopen') }}</x-button></form>
+                    <x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'scorecard-reopen-confirm', form: 'scorecard-reopen', label: {{ \Illuminate\Support\Js::from($month->format('F Y')) }} })">{{ __('Reopen') }}</x-button></form>
                 <x-confirm-modal id="scorecard-reopen-confirm" :verb="__('Reopen')" :message="__('Numbers become live again and may change.')" />
             @endif
         </div>
@@ -33,7 +33,7 @@
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             <span>{{ __('This month is over but still live: a late return or a revoked point can still change it. Close it once bonuses are decided.') }}</span>
             <form method="POST" action="{{ route('scorecard.close') }}" id="scorecard-close">@csrf<input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
-                <x-button type="button" size="sm" @click="$dispatch('open-confirm', { id: 'scorecard-close-confirm', form: 'scorecard-close', label: @js($month->format('F Y')) })">{{ __('Close month') }}</x-button></form>
+                <x-button type="button" size="sm" @click="$dispatch('open-confirm', { id: 'scorecard-close-confirm', form: 'scorecard-close', label: {{ \Illuminate\Support\Js::from($month->format('F Y')) }} })">{{ __('Close month') }}</x-button></form>
             <x-confirm-modal id="scorecard-close-confirm" :verb="__('Close')" :message="__('The numbers are saved as they stand now and stop changing.')" :danger="false" />
         </div>
     @endif

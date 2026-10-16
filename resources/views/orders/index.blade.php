@@ -11,7 +11,7 @@
             :staff="$list->filter('moderator')" :people="collect($moderatorOptions)->map(fn ($name, $id) => (object) ['id' => $id, 'name' => $name])->values()" />
         <x-website-sync size="sm" />
         @can('orders.create')
-            <x-button size="sm" :href="route('orders.create')" class="shrink-0">+ {{ __('New order') }}</x-button>
+            <x-button size="sm" type="button" class="shrink-0" @click="window.dispatchEvent(new CustomEvent('order-new', { detail: {{ \Illuminate\Support\Js::from(route('orders.create', ['embed' => 1])) }} }))">+ {{ __('New order') }}</x-button>
         @endcan
     </div>
     <x-tabs class="mb-3" :tabs="[

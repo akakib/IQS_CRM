@@ -36,7 +36,7 @@
                         <x-button type="button" size="sm" @click="$dispatch('open-modal', 'refund-{{ $o->id }}')">{{ __('Give back') }}</x-button>
                         @if ($o->customer_id)
                             <form method="POST" action="{{ route('refunds.credit', $o->id) }}" id="credit-{{ $o->id }}">@csrf<input type="hidden" name="amount" value="{{ $o->refund_due }}">
-                                <x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'credit-confirm', form: 'credit-{{ $o->id }}', label: @js($o->order_no.' · ৳'.number_format((float) $o->refund_due)) })">{{ __('Keep as credit') }}</x-button>
+                                <x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'credit-confirm', form: 'credit-{{ $o->id }}', label: {{ \Illuminate\Support\Js::from($o->order_no.' · ৳'.number_format((float) $o->refund_due)) }} })">{{ __('Keep as credit') }}</x-button>
                             </form>
                         @endif
                     </div>

@@ -49,7 +49,7 @@
                     @can('orders.approve')
                         <div class="mt-3 flex gap-2">
                             <form method="POST" action="{{ route('orders.amendments.decide', [$order, $a->id]) }}">@csrf<input type="hidden" name="decision" value="approve"><x-button size="sm">{{ __('Approve') }}</x-button></form>
-                            <form method="POST" action="{{ route('orders.amendments.decide', [$order, $a->id]) }}" id="amend-reject-{{ $a->id }}">@csrf<input type="hidden" name="decision" value="reject"><x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'reject-confirm', form: 'amend-reject-{{ $a->id }}', label: @js(__('this change')) })">{{ __('Reject') }}</x-button></form>
+                            <form method="POST" action="{{ route('orders.amendments.decide', [$order, $a->id]) }}" id="amend-reject-{{ $a->id }}">@csrf<input type="hidden" name="decision" value="reject"><x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'reject-confirm', form: 'amend-reject-{{ $a->id }}', label: {{ \Illuminate\Support\Js::from(__('this change')) }} })">{{ __('Reject') }}</x-button></form>
                         </div>
                     @endcan
                 </div>
@@ -117,7 +117,7 @@
                                     <span class="flex flex-wrap items-center gap-2">
                                         @if ($p->counts_now)<x-badge color="amber">{{ __('COD already lowered') }}</x-badge>@endif
                                         <form method="POST" action="{{ route('orders.payments.verify', [$order, $p->id]) }}">@csrf<input type="hidden" name="decision" value="approve"><x-button size="sm">{{ __('Verify') }}</x-button></form>
-                                        <form method="POST" action="{{ route('orders.payments.verify', [$order, $p->id]) }}" id="pay-reject-{{ $p->id }}">@csrf<input type="hidden" name="decision" value="reject"><x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'reject-confirm', form: 'pay-reject-{{ $p->id }}', label: @js('৳'.number_format((float) $p->amount)) })">{{ __('Reject') }}</x-button></form>
+                                        <form method="POST" action="{{ route('orders.payments.verify', [$order, $p->id]) }}" id="pay-reject-{{ $p->id }}">@csrf<input type="hidden" name="decision" value="reject"><x-button type="button" size="sm" variant="secondary" @click="$dispatch('open-confirm', { id: 'reject-confirm', form: 'pay-reject-{{ $p->id }}', label: {{ \Illuminate\Support\Js::from('৳'.number_format((float) $p->amount)) }} })">{{ __('Reject') }}</x-button></form>
                                     </span>
                                 @else
                                     <x-badge color="amber">{{ $p->counts_now ? __('To check · COD already lowered') : __('Waiting for the check') }}</x-badge>

@@ -52,7 +52,8 @@
             <ul x-show="isOpen(@js($key))" data-mini-open @if ($key !== $activeGroup && ! in_array($key, $openByDefault, true)) x-cloak @endif class="mb-2 space-y-0.5">
                 @foreach ($group['items'] as $item)
                     <li>
-                        <a href="{{ $item['url'] }}" title="{{ $item['label'] }}" @if ($item['active']) aria-current="page" @endif @class([
+                        {{-- New order opens in the popup over the page you are on (a new tab still opens the full page). --}}
+                        <a href="{{ $item['url'] }}" title="{{ $item['label'] }}" @if ($item['url'] === route('orders.create')) @click.prevent="window.dispatchEvent(new CustomEvent('order-new', { detail: @js(route('orders.create', ['embed' => 1])) }))" @endif @if ($item['active']) aria-current="page" @endif @class([
                             'mini-center relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm',
                             'bg-primary-soft font-semibold text-primary' => $item['active'],
                             'font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! $item['active'],

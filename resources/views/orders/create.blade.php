@@ -174,7 +174,7 @@
                             <p class="mb-1 text-sm font-medium text-gray-700">{{ __('From which chat') }}</p>
                             <x-simple-select data-draft="chat" :options="['' => __('Not from a chat')] + $chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->name])->all()"
                                 :value="(string) old('chat_channel_id', $chatChannel?->id ?? '')" full-width class="w-full sm:w-72"
-                                @select-change="chatChannel = $event.detail; const t = @js($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all())[$event.detail]; if (t) { channel = t; byChat = true } else if (byChat) { channel = ''; byChat = false }" />
+                                @select-change="chatChannel = $event.detail; const t = {{ \Illuminate\Support\Js::from($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all()) }}[$event.detail]; if (t) { channel = t; byChat = true } else if (byChat) { channel = ''; byChat = false }" />
                             @error('chat_channel_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
                         </div>
                     @endif

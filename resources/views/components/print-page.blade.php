@@ -2,8 +2,10 @@
      The page sets no top or bottom paper margin, so the browser has no room for its own date, title, page
      link and page number; the frame below gives every printed page its white space back instead.
      <x-print-page :title="$name"> ...content... <x-slot:styles>css</x-slot:styles> <x-slot:scripts>js</x-slot:scripts> </x-print-page>
-     A list's buttons are Print, PDF (?as=pdf) and Excel, the first two opening this page in a new tab. --}}
-@props(['title', 'landscape' => true, 'autoprint' => true])
+     A list's buttons are Print, PDF (?as=pdf) and Excel, the first two opening this page in a new tab.
+     back: a page opened in place gets Back instead of Close (never both). The main button is Print, or Save as PDF
+     on the PDF page; extra actions must not repeat it. --}}
+@props(['title', 'landscape' => true, 'autoprint' => true, 'back' => null])
 @php
     // ?as=pdf: the same page, saved as a PDF file (the browser's dialog, with Save as PDF to pick); otherwise it is for the printer.
     $pdf = request()->query('as') === 'pdf';
@@ -53,8 +55,14 @@
 </head>
 <body>
     <div class="bar">
+        {{-- One way out: Back when the page was opened in place, Close when it opened in its own tab. --}}
+        @if ($back)
+            <a href="{{ $back }}" class="left">{{ __('Back') }}</a>
+        @endif
         {{ $actions ?? '' }}
-        <button type="button" onclick="window.close()">{{ __('Close') }}</button>
+        @unless ($back)
+            <button type="button" onclick="window.close()">{{ __('Close') }}</button>
+        @endunless
         <button type="button" class="go" onclick="window.print()">{{ $pdf ? __('Save as PDF') : __('Print') }}</button>
     </div>
     @if ($pdf)

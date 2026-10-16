@@ -1,13 +1,13 @@
 {{-- The pickup sheet of one handover: the parcels the rider took, to print and sign. The same page as every list download. --}}
-<x-print-page :title="__('Pickup sheet').' · '.\Illuminate\Support\Carbon::parse($session->started_at)->format('d M Y')" :landscape="false" :autoprint="false">
+<x-print-page :title="__('Pickup sheet').' · '.\Illuminate\Support\Carbon::parse($session->started_at)->format('d M Y')" :landscape="false" :autoprint="false" :back="route('handover.index')">
     <x-slot:styles>
         .sign { display: flex; gap: 40px; margin-top: 48px; font-size: 12px; }
         .sign div { flex: 1; border-top: 1px solid #333; padding-top: 4px; }
         .note { margin-top: 12px; font-size: 12px; }
     </x-slot:styles>
     <x-slot:actions>
-        <a href="{{ route('handover.index') }}" class="left">{{ __('Back') }}</a>
-        <a href="{{ route('handover.manifest', ['session' => $session->id, 'as' => 'pdf']) }}">{{ __('PDF') }}</a>
+        {{-- Print is the main button; on the PDF page Save as PDF is, so no PDF link there. --}}
+        @unless (request('as') === 'pdf')<a href="{{ route('handover.manifest', ['session' => $session->id, 'as' => 'pdf']) }}">{{ __('PDF') }}</a>@endunless
         <a href="{{ route('handover.excel', $session->id) }}">{{ __('Excel') }}</a>
     </x-slot:actions>
 

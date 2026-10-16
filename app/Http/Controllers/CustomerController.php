@@ -89,7 +89,8 @@ class CustomerController extends Controller
         $data = $this->validated($request);
         $this->customers->save($customer, $data, $data['extra_phones'] ?? [], $data['addresses'] ?? [], $request->user()->id);
 
-        return redirect()->route('customers.show', $customer)->with('success', __('Customer saved.'));
+        // From the popup: back into it (embed), not the full page.
+        return redirect()->route('customers.show', array_filter(['customer' => $customer, 'embed' => $request->boolean('embed') ?: null]))->with('success', __('Customer saved.'));
     }
 
     public function destroy(Customer $customer): RedirectResponse

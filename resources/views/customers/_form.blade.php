@@ -80,5 +80,5 @@
 
 <div class="mt-6 flex items-center gap-2">
     <x-button>{{ __('Save customer') }}</x-button>
-    <x-button variant="secondary" :href="$customer->exists ? route('customers.show', $customer) : route('customers.index')">{{ __('Cancel') }}</x-button>
+    <x-button variant="secondary" :href="$customer->exists ? route('customers.show', array_filter(['customer' => $customer, 'embed' => request()->boolean('embed') ?: null])) : route('customers.index')">{{ __('Cancel') }}</x-button>
 </div>

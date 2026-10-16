@@ -57,7 +57,11 @@ class CustomerJourneyTest extends TestCase
         $this->get('/order-search?q=Karim')->assertSee(route('customers.show', $customer), false)
             ->assertSee('customers\/'.$customer.'?embed=1', false); // opens in a popup
         // In the popup: the page alone (no sidebar), no Back link (the popup has Close and Open in new tab).
-        $this->get(route('customers.show', ['customer' => $customer, 'embed' => 1]))->assertOk()->assertSee('Karim')->assertDontSee('Back to customers')->assertDontSee('sidebar-nav', false);
+        $this->get(route('customers.show', ['customer' => $customer, 'embed' => 1]))->assertOk()->assertSee('Karim')->assertDontSee('Back to customers')->assertDontSee(route('dashboard'), false)
+            ->assertSee(route('customers.edit', ['customer' => $customer, 'embed' => 1]), false);
+        $this->get(route('customers.show', $customer))->assertSee(route('dashboard'), false); // the full page has the menu
+        // Edit from the popup stays in it, and Save goes back into it.
+        $this->get(route('customers.edit', ['customer' => $customer, 'embed' => 1]))->assertOk()->assertDontSee(route('dashboard'), false)->assertSee('name="embed" value="1"', false);
         $this->get('/order-search?q=Nobody')->assertSee('No order found for');
 
         // Opened from the search: Back to results returns to it, also after a reload; from the list: Back to customers.

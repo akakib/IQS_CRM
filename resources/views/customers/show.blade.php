@@ -29,7 +29,7 @@
                     <x-button type="button" size="sm" @click="window.dispatchEvent(new CustomEvent('order-new', { detail: {{ \Illuminate\Support\Js::from(route('orders.create', array_filter(['phone' => $firstPhone, 'embed' => 1]))) }} }))">+ {{ __('New order') }}</x-button>
                 @endcan
                 @can('customers.edit')
-                    @if ($canSeeContact)<x-button size="sm" variant="secondary" :href="route('customers.edit', $customer)">{{ __('Edit') }}</x-button>@endif
+                    @if ($canSeeContact)<x-button size="sm" variant="secondary" :href="route('customers.edit', array_filter(['customer' => $customer, 'embed' => $embed ?: null]))">{{ __('Edit') }}</x-button>@endif
                     <x-button size="sm" type="button" variant="secondary" @click="$dispatch('open-modal', 'merge')">{{ __('Merge duplicate') }}</x-button>
                 @endcan
             </div>

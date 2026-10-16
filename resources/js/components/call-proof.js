@@ -33,7 +33,20 @@ export default function callProof(id) {
                 const stale = d.dayOnly ? d.when < today : d.when < new Date(Date.now() - FRESH_HOURS * 3600000);
                 if (stale) this.old = d.when.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
             }
+            this.length(f);
             this.emit();
+        },
+
+        // How long the recording is (mp3, m4a, wav...): the call's length. Not every file tells (amr, pictures).
+        length(f) {
+            delete this.$root.dataset.seconds;
+            if (!f || !(f.type.startsWith('audio') || /\.(m4a|mp3|aac|ogg|opus|wav|3gp)$/i.test(f.name))) return;
+            const url = URL.createObjectURL(f);
+            const a = new Audio();
+            a.preload = 'metadata';
+            a.onloadedmetadata = () => { if (isFinite(a.duration) && a.duration > 0) this.$root.dataset.seconds = String(Math.round(a.duration)); URL.revokeObjectURL(url); };
+            a.onerror = () => URL.revokeObjectURL(url);
+            a.src = url;
         },
 
         ready() { return this.file && (!this.old || this.ok); },
@@ -44,6 +57,7 @@ export default function callProof(id) {
             this.file = ''; this.old = ''; this.ok = false; this.modified = '';
             const input = this.$root.querySelector('input[type=file]');
             if (input) input.value = '';
+            delete this.$root.dataset.seconds;
             this.emit();
         },
     };
@@ -58,6 +72,16 @@ window.iqsAddProof = (fd, id) => {
     if (f.lastModified) fd.append('proof_modified', String(f.lastModified));
     if (root.querySelector('input[name=proof_old_ok]')?.checked) fd.append('proof_old_ok', '1');
 };
+
+// A call's length in seconds: the recording's own length, else the time since the call was opened (startedMs).
+window.iqsCallSeconds = (id, startedMs) => {
+    const s = +document.getElementById(id)?.dataset.seconds;
+    if (s > 0) return s;
+    return startedMs ? Math.max(0, Math.round((Date.now() - startedMs) / 1000)) : null;
+};
+
+// The same as minutes and seconds, for the forms that take them.
+window.iqsMinSec = (secs) => (secs === null || secs === undefined ? {} : { minutes: Math.min(300, Math.floor(secs / 60)), seconds: secs % 60 });
 
 // A plain object as FormData (empty values left out), for the boxes saved by fetch.
 window.iqsFormData = (obj) => {

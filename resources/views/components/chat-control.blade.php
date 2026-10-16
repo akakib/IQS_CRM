@@ -19,7 +19,7 @@
         on: @js((bool) $chatSession), since: @js($chatSession ? \Illuminate\Support\Carbon::parse($chatSession->started_at)->format('g:i A') : null),
         open: false, data: null, ask: null, busy: false, error: null,
         tab: @js($hasChannels ? 'chats' : 'calls'),
-        q: '', found: null, finding: false, rider: '', riderPhone: '', claim: null, verdict: null, action: null, note: '', rmin: '', rsec: '', saved: null,
+        q: '', found: null, finding: false, rider: '', riderPhone: '', claim: null, verdict: null, action: null, note: '', rstart: null, saved: null,
         headers() { return { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } },
         async call(url, body) {
             this.busy = true; this.error = null;
@@ -45,6 +45,7 @@
         async find() {
             if (!this.q.trim()) return;
             this.finding = true; this.found = null; this.error = null; this.saved = null;
+            this.rstart = Date.now();
             try { this.found = await (await fetch(@js(route('rider-calls.find')) + '?q=' + encodeURIComponent(this.q.trim()), { headers: { Accept: 'application/json' } })).json() }
             catch (e) { this.error = @js(__('No connection. Try again.')) }
             this.finding = false;
@@ -53,13 +54,13 @@
             if (!this.found?.found) return;
             this.busy = true; this.error = null;
             try {
-                const fd = window.iqsFormData({ order_id: this.found.id, rider_name: this.rider, rider_phone: this.riderPhone, claim: this.claim, verdict: this.verdict, action: this.action, note: this.note, minutes: this.rmin, seconds: this.rsec });
+                const fd = window.iqsFormData({ order_id: this.found.id, rider_name: this.rider, rider_phone: this.riderPhone, claim: this.claim, verdict: this.verdict, action: this.action, note: this.note, ...window.iqsMinSec(window.iqsCallSeconds('proof-rider', this.rstart)) });
                 window.iqsAddProof(fd, 'proof-rider');
                 const r = await fetch(@js(route('rider-calls.store')), { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: fd });
                 const j = await r.json();
                 if (!r.ok) { this.error = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')); return }
                 this.saved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.on = true;
-                this.q = ''; this.found = null; this.claim = null; this.verdict = null; this.action = null; this.note = ''; this.rmin = ''; this.rsec = ''; window.dispatchEvent(new CustomEvent('proof-clear', { detail: 'proof-rider' }));
+                this.q = ''; this.found = null; this.claim = null; this.verdict = null; this.action = null; this.note = ''; this.rstart = null; window.dispatchEvent(new CustomEvent('proof-clear', { detail: 'proof-rider' }));
             } catch (e) { this.error = @js(__('No connection. Try again.')) } finally { this.busy = false }
         },
     }" @chat-open.window="show()">
@@ -131,16 +132,33 @@
                     </div>
                     @endif
 
-                    {{-- A customer phoned in: find them by number, pick the order it is about (or none), why they called. --}}
+                    {{-- A customer phoned in: tap them in the list (or paste the number), why they called, the recording, Save.
+                         How long it took comes from the recording, else from the clock since they were opened. --}}
                     <div x-show="tab === 'calls'" x-cloak class="space-y-3" x-data="{
-                            cq: '', cfound: null, cfinding: false, corder: null, creason: null, cmin: '', csec: '', cnote: '', csaved: null, cnew: null, cerror: null, csaving: false,
+                            cq: '', cfound: null, cfinding: false, corder: null, creason: null, cnote: '', csaved: null, cnew: null, cerror: null, csaving: false, cstart: null,
+                            recent: null, loadedAt: 0, pasteHint: false,
+                            init() {
+                                this.$watch('tab', v => { if (v === 'calls') this.load() });
+                                this.$watch('open', v => { if (v && tab === 'calls') this.load() });
+                            },
+                            async load() {
+                                if (Date.now() - this.loadedAt < 60000) return;
+                                this.loadedAt = Date.now();
+                                try { this.recent = (await (await fetch(@js(route('customer-calls.recent')), { headers: { Accept: 'application/json' } })).json()).people } catch (e) {}
+                            },
+                            async paste() {
+                                this.pasteHint = false;
+                                try { const t = await navigator.clipboard.readText(); if (t.trim()) { this.cq = t.trim(); return this.cfind() } } catch (e) {}
+                                this.pasteHint = true; this.$refs.cq.focus();
+                            },
                             async cfind() {
                                 if (!this.cq.trim()) return;
                                 this.cfinding = true; this.cfound = null; this.corder = null; this.csaved = null; this.cnew = null; this.cerror = null;
                                 try {
                                     const r = await fetch(@js(route('customer-calls.find')) + '?q=' + encodeURIComponent(this.cq.trim()), { headers: { Accept: 'application/json' } });
                                     if (!r.ok) throw new Error();
-                                    this.cfound = await r.json();
+                                    this.cfound = await r.json(); this.cstart = Date.now();
+                                    if (this.cfound.orders.length === 1) this.corder = this.cfound.orders[0].id;
                                 } catch (e) { this.cerror = @js(__('No connection. Try again.')) }
                                 this.cfinding = false;
                             },
@@ -149,57 +167,76 @@
                                 if (!this.creason) { this.cerror = @js(__('Pick why they called.')); return }
                                 this.csaving = true;
                                 try {
-                                    const fd = window.iqsFormData({ phone: this.cfound?.phone || this.cq, order_id: this.corder, reason: this.creason, minutes: this.cmin, seconds: this.csec, note: this.cnote });
+                                    const fd = window.iqsFormData({ phone: this.cfound?.phone || this.cq, order_id: this.corder, reason: this.creason, note: this.cnote, ...window.iqsMinSec(window.iqsCallSeconds('proof-in', this.cstart)) });
                                     window.iqsAddProof(fd, 'proof-in');
                                     const r = await fetch(@js(route('customer-calls.incoming')), { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }, body: fd });
                                     const j = await r.json();
                                     if (!r.ok) { this.cerror = Object.values(j.errors || {})[0]?.[0] || @js(__('Something went wrong. Try again.')); return }
                                     this.csaved = j.message + ' ' + @js(__('Today:')) + ' ' + j.today; this.cnew = j.new_order_url; on = true;
-                                    this.cq = ''; this.cfound = null; this.corder = null; this.creason = null; this.cmin = ''; this.csec = ''; this.cnote = ''; window.dispatchEvent(new CustomEvent('proof-clear', { detail: 'proof-in' }));
+                                    this.cq = ''; this.cfound = null; this.corder = null; this.creason = null; this.cnote = ''; this.cstart = null;
                                 } catch (e) { this.cerror = @js(__('No connection. Try again.')) } finally { this.csaving = false }
                             },
                         }">
                         <div x-show="csaved" x-cloak class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
                             <span x-text="csaved"></span>
-                            <button type="button" x-show="cnew" @click="open = false; window.dispatchEvent(new CustomEvent('order-new', { detail: cnew }))" class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark">{{ __('Make the order') }}</button>
+                            <button type="button" x-show="cnew" @click="open = false; window.dispatchEvent(new CustomEvent('order-new', { detail: cnew }))" class="inline-flex min-h-8 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-dark">{{ __('Make the order') }}</button>
                         </div>
                         <p x-show="cerror" x-cloak class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" x-text="cerror"></p>
-                        <form @submit.prevent="cfind()" class="flex gap-2">
-                            <input x-model="cq" inputmode="tel" placeholder="{{ __('Caller number or order no') }}" class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
-                            <button class="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-dark" x-text="cfinding ? @js(__('Finding…')) : @js(__('Find'))"></button>
-                        </form>
+
+                        {{-- Who called. --}}
+                        <div x-show="! cfound" class="space-y-3">
+                            <div x-show="recent && recent.length" x-cloak>
+                                <p class="mb-1.5 text-sm font-semibold text-gray-900">{{ __('Who called? Tap one') }}</p>
+                                <div class="divide-y divide-gray-100 rounded-xl border border-gray-200">
+                                    <template x-for="p in recent || []" :key="p.phone">
+                                        <button type="button" @click="cq = p.phone; cfind()" class="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-gray-50">
+                                            <span class="min-w-0"><span class="block truncate text-sm font-medium text-gray-900" x-text="p.name || p.phone"></span><span class="block truncate text-xs text-gray-500" x-text="p.phone + ' · ' + p.from"></span></span>
+                                            <span class="text-lg text-gray-400" aria-hidden="true">&rsaquo;</span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                            <form @submit.prevent="cfind()">
+                                <p class="mb-1.5 text-sm font-semibold text-gray-900" x-text="recent && recent.length ? @js(__('Not in the list? Paste or type the number')) : @js(__('Who called? Paste or type the number'))"></p>
+                                <div class="flex gap-2">
+                                    <input x-model="cq" x-ref="cq" inputmode="tel" autocomplete="off" placeholder="{{ __('Number or order no') }}" class="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-base sm:text-sm focus:border-primary focus:outline-none">
+                                    <button type="button" @click="paste()" class="inline-flex h-10 shrink-0 items-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Paste') }}</button>
+                                    <button class="inline-flex h-10 shrink-0 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-dark" x-text="cfinding ? @js(__('Finding…')) : @js(__('Open'))"></button>
+                                </div>
+                                <p x-show="pasteHint" x-cloak class="mt-1.5 text-xs text-gray-500">{{ __('Long-press the box and choose Paste.') }}</p>
+                            </form>
+                        </div>
+
+                        {{-- The caller, and the call. --}}
                         <template x-if="cfound">
-                            <div class="space-y-3">
-                                <div>
-                                    <p class="mb-1 text-xs font-medium text-gray-500"><span x-text="cfound.name || @js(__('New number'))"></span><span x-show="cfound.phone"> · <span x-text="cfound.phone"></span></span> · {{ __('About which order?') }}</p>
+                            <div class="space-y-4">
+                                <div class="flex items-start justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2.5">
+                                    <span class="min-w-0"><span class="block truncate text-base font-semibold text-gray-900" x-text="cfound.name || @js(__('New customer'))"></span><span class="block font-mono text-sm text-gray-500" x-text="cfound.phone"></span></span>
+                                    <button type="button" @click="cfound = null; cq = ''; cstart = null" class="inline-flex min-h-8 shrink-0 items-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-50">{{ __('Change') }}</button>
+                                </div>
+                                <div x-show="cfound.orders.length">
+                                    <p class="mb-1.5 text-sm font-semibold text-gray-900">{{ __('About which order?') }} <span class="text-xs font-normal text-gray-500">({{ __('optional') }})</span></p>
                                     <div class="space-y-1.5">
                                         <template x-for="o in cfound.orders" :key="o.id">
                                             <button type="button" @click="corder = corder === o.id ? null : o.id" class="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm"
                                                 :class="corder === o.id ? 'border-primary bg-primary-soft' : 'border-gray-200 hover:border-gray-300'">
-                                                <span><span class="font-medium text-gray-900" x-text="o.order_no"></span> <span class="text-xs text-gray-500" x-text="'· ' + o.when + ' · ' + o.status"></span></span>
+                                                <span><span class="font-mono font-medium text-gray-900" x-text="o.order_no"></span> <span class="text-xs text-gray-500" x-text="'· ' + o.when + ' · ' + o.status"></span></span>
                                                 <span class="tabular-nums text-gray-700" x-text="'৳' + Math.round(o.total).toLocaleString('en-IN')"></span>
                                             </button>
                                         </template>
-                                        <p x-show="!cfound.orders.length" class="text-sm text-gray-500">{{ __('No orders on this number. It is saved as a call on the number.') }}</p>
                                     </div>
                                 </div>
                                 <div>
-                                    <p class="mb-1 text-xs font-medium text-gray-500">{{ __('Why they called') }}</p>
-                                    <div class="flex flex-wrap gap-1.5">
+                                    <p class="mb-1.5 text-sm font-semibold text-gray-900">{{ __('Why did they call?') }}</p>
+                                    <div class="flex flex-wrap gap-2">
                                         @foreach (\App\Http\Controllers\CustomerCallController::REASONS_IN as $k => $label)
-                                            <button type="button" @click="creason = @js($k)" class="rounded-lg border px-2.5 py-1 text-xs" :class="creason === @js($k) ? 'border-primary bg-primary-soft font-medium text-primary' : 'border-gray-300 text-gray-700'">{{ __($label) }}</button>
+                                            <button type="button" @click="creason = @js($k); cerror = null" class="min-h-10 rounded-full border px-4 text-sm" :class="creason === @js($k) ? 'border-primary bg-primary font-medium text-white' : 'border-gray-300 text-gray-800 hover:border-primary'">{{ __($label) }}</button>
                                         @endforeach
                                     </div>
                                 </div>
-                                <div class="flex flex-wrap items-center gap-2 text-sm">
-                                    <span class="text-xs text-gray-500">{{ __('Duration') }}</span>
-                                    <input type="number" min="0" max="300" x-model="cmin" placeholder="{{ __('min') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
-                                    <span class="text-gray-400">:</span>
-                                    <input type="number" min="0" max="59" x-model="csec" placeholder="{{ __('sec') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
-                                </div>
-                                <x-call-proof id="proof-in" size="sm" />
-                                <input type="text" x-model="cnote" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">
-                                <button type="button" @click="csave()" :disabled="csaving" class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-60">{{ __('Save call') }}</button>
+                                <x-call-proof id="proof-in" :title="\Illuminate\Support\Js::from(__('Call recording or screenshot (optional)'))" />
+                                <textarea x-model="cnote" rows="2" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base sm:text-sm focus:border-primary focus:outline-none"></textarea>
+                                <button type="button" @click="csave()" :disabled="csaving" class="w-full rounded-xl bg-primary px-4 py-3 text-base font-semibold text-white hover:bg-primary-dark disabled:opacity-60" x-text="csaving ? @js(__('Saving...')) : @js(__('Save'))"></button>
                             </div>
                         </template>
                     </div>
@@ -250,13 +287,6 @@
                                             <button type="button" @click="action = @js($k)" class="rounded-lg border px-2.5 py-1 text-xs" :class="action === @js($k) ? 'border-primary bg-primary-soft font-medium text-primary' : 'border-gray-300 text-gray-700'">{{ __($label) }}</button>
                                         @endforeach
                                     </div>
-                                </div>
-                                {{-- Same as a customer call: how long, and the recording's Drive link. --}}
-                                <div class="flex flex-wrap items-center gap-2 text-sm">
-                                    <span class="text-xs text-gray-500">{{ __('Duration') }}</span>
-                                    <input type="number" min="0" max="300" x-model="rmin" placeholder="{{ __('min') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
-                                    <span class="text-gray-400">:</span>
-                                    <input type="number" min="0" max="59" x-model="rsec" placeholder="{{ __('sec') }}" class="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
                                 </div>
                                 <x-call-proof id="proof-rider" size="sm" />
                                 <input x-model="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none">

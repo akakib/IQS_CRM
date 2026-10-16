@@ -89,6 +89,19 @@ class CustomerCallController extends Controller
         ]);
     }
 
+    /** Who may be calling: the latest orders this person may see (last 24 hours), one row a number. */
+    public function recent(Request $request): JsonResponse
+    {
+        $this->allowIncoming($request);
+        $orders = Order::visibleTo($request->user())->where('created_at', '>=', now()->subDay())->orderByDesc('id')->limit(40)
+            ->get(['id', 'order_no', 'ship_name', 'ship_phone', 'created_at'])->unique('ship_phone')->take(8);
+
+        return response()->json(['people' => $orders->map(fn ($o) => [
+            'phone' => $o->ship_phone, 'name' => $o->ship_name,
+            'from' => __('Order :no · :t', ['no' => $o->order_no, 't' => $o->created_at->isToday() ? $o->created_at->format('g:i A') : __('yesterday')]),
+        ])->values()]);
+    }
+
     /** Save a call that came in. */
     public function incoming(Request $request): JsonResponse
     {

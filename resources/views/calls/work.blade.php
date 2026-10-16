@@ -13,7 +13,7 @@
     <div class="mx-auto max-w-6xl space-y-3"
         @if ($item)
         x-data="{
-            key: 'iqs-call-start-{{ $item->id }}', started: null, now: Date.now(), away: 0, leftAt: null, talked: null, editing: false, leaving: false, warn: false, qr: '',
+            key: 'iqs-call-start-{{ $item->id }}', started: null, now: Date.now(), away: 0, leftAt: null, leaving: false, warn: false, qr: '',
             init() {
                 try { this.started = +localStorage.getItem(this.key) || null } catch (e) {}
                 setInterval(() => this.now = Date.now(), 1000);
@@ -35,8 +35,8 @@
             done() { this.leaving = true; try { localStorage.removeItem(this.key) } catch (e) {} },
             mmss(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') },
             elapsed() { return this.started ? Math.max(0, Math.round((this.now - this.started) / 1000)) : 0 },
-            talk() { return this.talked ?? (this.away || this.elapsed()) },
-            setTalk(v) { const m = String(v).trim().match(/^(\d+):([0-5]\d)$/); if (m) this.talked = +m[1] * 60 + +m[2]; this.editing = false },
+            // How long they talked when the recording does not tell: the time away at the dialer, else since Call.
+            talk() { return this.away || this.elapsed() },
             skip(e) { if (this.started) { e.preventDefault(); this.warn = true; setTimeout(() => this.warn = false, 3000) } else this.leaving = true },
         }"
         @endif
@@ -177,7 +177,7 @@
                             e.preventDefault();
                             if (this.busy) return;
                             if (! this.ready()) { this.hint(); return }
-                            this.$refs.seconds.value = talk() || '';
+                            this.$refs.seconds.value = (+document.getElementById('proof-list')?.dataset.seconds || talk()) || '';
                             this.busy = true; this.errors = {}; this.failed = '';
                             try {
                                 const r = await fetch(this.$el.action, { method: 'POST', headers: { Accept: 'application/json' }, body: new FormData(this.$el) });
@@ -276,15 +276,6 @@
                             @endforeach
                         </div>
                         <textarea name="note" rows="2" maxlength="500" x-model="note" placeholder="{{ __('What did the customer say?') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base sm:text-sm focus:border-primary focus:outline-none"></textarea>
-                        {{-- How long they talked, measured by itself; can be put right. --}}
-                        <div x-show="started" class="mt-2 flex items-center justify-between gap-2 text-sm text-gray-500">
-                            <span class="tabular-nums">{{ __('Talked for') }} <span class="font-semibold text-gray-800" x-text="mmss(talk())"></span></span>
-                            <button type="button" x-show="! editing" @click="editing = true; $nextTick(() => $refs.talkInput.select())" class="text-primary underline">{{ __('Change') }}</button>
-                            <span x-show="editing" x-cloak class="flex items-center gap-2">
-                                <input type="text" x-ref="talkInput" :value="mmss(talk())" inputmode="numeric" placeholder="m:ss" @keydown.enter.prevent="setTalk($event.target.value)" class="h-8 w-20 rounded-lg border border-gray-300 px-2 text-sm focus:border-primary focus:outline-none">
-                                <button type="button" @click="setTalk($refs.talkInput.value)" class="text-primary underline">{{ __('Done') }}</button>
-                            </span>
-                        </div>
                     </div>
 
                     <p x-show="failed" x-cloak class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" x-text="failed"></p>

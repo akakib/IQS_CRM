@@ -156,9 +156,6 @@
                                     · {{ $o->created_at->format('d M Y, g:i A') }}
                                     · {{ __('With') }} {{ $o->moderator?->name ?? __('nobody') }}
                                 </p>
-                                @can('customers.view')
-                                    <a href="{{ route('customers.show', $o->customer_id) }}" @click.prevent="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: {{ \Illuminate\Support\Js::from(route('customers.show', ['customer' => $o->customer_id, 'embed' => 1])) }}, title: {{ \Illuminate\Support\Js::from($o->ship_name) }}, page: {{ \Illuminate\Support\Js::from(route('customers.show', $o->customer_id)) }} } }))" class="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">{{ __('Open customer') }}</a>
-                                @endcan
                             </div>
                         </div>
                     </div>

@@ -32,6 +32,10 @@ class CustomerFinder
 
             return $this->one($id);
         }
+        // An order number: the customer of that order (the order card no longer has its own Open customer).
+        if ($by === 'all' && preg_match('/^IQ\d+$/i', $q) && ($id = Order::where('order_no', strtoupper($q))->value('customer_id'))) {
+            return $this->one($id);
+        }
         if (in_array($by, ['all', 'cn'], true) && preg_match('/\d{5,}/', $q) && ($cn = HistoryImport::cn($q))) {
             $id = DB::table('customer_past_orders')->where('cn', $cn)->value('customer_id')
                 ?? DB::table('shipments as s')->join('orders as o', 'o.id', '=', 's.order_id')

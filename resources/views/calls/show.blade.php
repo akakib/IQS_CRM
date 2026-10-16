@@ -11,7 +11,7 @@
 @endphp
 
 <x-layouts.app :heading="$list->name">
-    <div class="mx-auto max-w-6xl space-y-4" x-data="{
+    <div class="space-y-4" x-data="{
             item: { open: false, loading: false, error: null, d: {} },
             async openItem(id) {
                 this.item = { open: true, loading: true, error: null, d: {} };

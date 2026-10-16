@@ -30,7 +30,7 @@
     @click.outside="open = false" @keydown.escape="open = false">
     <input type="hidden" name="{{ $name }}" :value="value ?? ''">
 
-    <button type="button" @click="openPanel()" class="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm">
+    <button type="button" @click="openPanel()" class="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm">
         <span class="truncate" :class="label ? 'text-gray-800' : 'text-gray-400'" x-text="label || @js($placeholder)"></span>
         <span class="flex items-center gap-1">
             <span x-show="value" @click.stop="clear()" class="px-1 text-gray-400 hover:text-red-600" aria-label="{{ __('Clear') }}">&times;</span>

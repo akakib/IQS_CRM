@@ -1,7 +1,7 @@
 @php use App\Services\Calls\CallListService; @endphp
 
 <x-layouts.app :heading="__('Call lists')">
-    <div class="mx-auto max-w-4xl space-y-4">
+    <div class="space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-sm text-gray-500">{{ __('Make a list from an imported file, give it to callers with a daily target, and follow it here.') }}</p>
             <x-button :href="route('calls.lists.create')">+ {{ __('New call list') }}</x-button>

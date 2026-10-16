@@ -172,7 +172,8 @@
                     @if ($chatChannels->isNotEmpty())
                         <div class="mb-4">
                             <p class="mb-1 text-sm font-medium text-gray-700">{{ __('From which chat') }}</p>
-                            <x-simple-select data-draft="chat" :options="['' => __('Not from a chat')] + $chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->name])->all()"
+                            <x-simple-select data-draft="chat" :options="['' => __('Not from a chat')] + $chatChannels->sortBy(fn ($c) => [$c->type, mb_strtolower($c->name)])->mapWithKeys(fn ($c) => [(string) $c->id => $c->name.' · '.__(\App\Models\ChatChannel::TYPES[$c->type] ?? $c->type)])->all()"
+                                :icons="$chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->type])->all()" only="o.value === '' || ! channel || chatPlatforms[o.value] === channel"
                                 :value="(string) old('chat_channel_id', $chatChannel?->id ?? '')" full-width class="w-full sm:w-72"
                                 @select-change="chatChannel = $event.detail; const t = {{ \Illuminate\Support\Js::from($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all()) }}[$event.detail]; if (t) { channel = t; byChat = true } else if (byChat) { channel = ''; byChat = false }" />
                             @error('chat_channel_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror

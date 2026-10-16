@@ -13,7 +13,7 @@
 
 {{-- The one page of a customer: Overview, Journey, Orders, Calls. --}}
 <x-layouts.app :heading="$customer->name">
-    <div class="mx-auto max-w-5xl">
+    <div>
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
             @if ($backToResults)
                 <a href="{{ $backToResults }}" class="text-sm text-primary hover:underline">{{ __('Back to results') }}</a>

@@ -166,7 +166,7 @@
 
                 <div x-show="outcome" x-cloak>
                     <p class="mb-2 text-sm font-semibold text-gray-900">{{ __('Note') }} <span class="text-xs font-normal text-gray-500">({{ __('optional') }})</span></p>
-                    <textarea name="note" rows="2" maxlength="500" x-model="note" placeholder="{{ __('What did the customer say?') }}" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none"></textarea>
+                    <textarea name="note" rows="2" maxlength="500" x-model="note" placeholder="{{ __('What did the customer say?') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base sm:text-sm focus:border-primary focus:outline-none"></textarea>
                 </div>
 
                 <button type="submit" :disabled="busy || ! ready()" class="w-full rounded-xl bg-primary px-4 py-3.5 text-base font-semibold text-white hover:bg-primary-dark disabled:opacity-50"

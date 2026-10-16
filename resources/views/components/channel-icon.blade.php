@@ -1,6 +1,6 @@
 {{-- A channel's mark in its brand colour, so each row is known at a glance.
      Blade: <x-channel-icon type="whatsapp" />   Alpine (type from data): <x-channel-icon expr="c.kind" /> --}}
-@props(['type' => null, 'expr' => null])
+@props(['type' => null, 'expr' => null, 'size' => 'md'])
 
 @php
     // [background, svg inner] per type. Simple shapes, white on the brand colour.
@@ -15,15 +15,17 @@
         'rider' => ['bg-amber-500', '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7h11v8H3zM14 10h4l3 3v2h-7M7 18a1.5 1.5 0 1 0 0-.01M17 18a1.5 1.5 0 1 0 0-.01"/>'],
         'other' => ['bg-gray-500', '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.4-4 8-9 8-1.5 0-3-.3-4.3-.9L3 20l1.4-3.7A7.4 7.4 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8Z"/>'],
     ];
-    $box = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white';
+    // md: lists (36px); xs: inside a dropdown, next to the text (20px).
+    $box = 'flex shrink-0 items-center justify-center rounded-full text-white '.($size === 'xs' ? 'h-5 w-5' : 'h-9 w-9');
+    $svgSize = $size === 'xs' ? 'h-3 w-3' : 'h-5 w-5';
     [$bg, $svg] = $marks[$type] ?? $marks['other'];
     $keys = array_keys($marks);
 @endphp
 
 @if ($expr)
     @foreach ($marks as $key => [$markBg, $markSvg])
-        <span x-show="(@js($keys).includes({{ $expr }}) ? {{ $expr }} : 'other') === @js($key)" {{ $attributes->merge(['class' => "$box $markBg"]) }} aria-hidden="true"><svg class="h-5 w-5" viewBox="0 0 24 24">{!! $markSvg !!}</svg></span>
+        <span x-show="(@js($keys).includes({{ $expr }}) ? {{ $expr }} : 'other') === @js($key)" {{ $attributes->merge(['class' => "$box $markBg"]) }} aria-hidden="true"><svg class="{{ $svgSize }}" viewBox="0 0 24 24">{!! $markSvg !!}</svg></span>
     @endforeach
 @else
-    <span {{ $attributes->merge(['class' => "$box $bg"]) }} aria-hidden="true"><svg class="h-5 w-5" viewBox="0 0 24 24">{!! $svg !!}</svg></span>
+    <span {{ $attributes->merge(['class' => "$box $bg"]) }} aria-hidden="true"><svg class="{{ $svgSize }}" viewBox="0 0 24 24">{!! $svg !!}</svg></span>
 @endif

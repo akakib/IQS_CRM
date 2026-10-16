@@ -19,7 +19,7 @@
     {{-- Enter searches, also a short text; the box's own clear (x) shows everything again. After the search the cursor stays at the end. --}}
     <input type="search" name="q" value="{{ $list->search }}" @keydown.enter.prevent="$refs.filters.requestSubmit()" @search="$el.value === '' && $refs.filters.requestSubmit()" enterkeyhint="search" placeholder="{{ $placeholder }}"
         x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length) }"
-        class="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none md:max-w-xs">
+        class="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none md:max-w-xs">
 
     <button type="button" @click="sheet = true" class="relative shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 md:hidden">
         {{ __('Filters') }}

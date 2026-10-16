@@ -10,7 +10,7 @@
 @endphp
 
 <x-layouts.app :heading="__('Search')">
-    <div class="mx-auto max-w-4xl">
+    <div>
         {{-- Search: pick where to look, type, Enter. Recent searches come back with one tap. --}}
         <form method="GET" action="{{ route('orders.search') }}" x-ref="f"
             x-data="{

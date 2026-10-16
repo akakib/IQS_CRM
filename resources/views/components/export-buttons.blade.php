@@ -4,7 +4,7 @@
 @props(['print' => null, 'excel' => null, 'printJs' => null, 'excelJs' => null, 'disabledJs' => null, 'size' => 'sm'])
 
 @php
-    $btn = 'inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 '.($size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-4 py-2 text-sm');
+    $btn = 'inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 '.($size === 'sm' ? 'min-h-8 px-2.5 py-1.5 text-xs' : 'min-h-10 px-4 py-2 text-sm');
     $icon = $size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4';
     $pdf = fn (string $url) => $url.(str_contains($url, '?') ? '&' : '?').'as=pdf';
 @endphp

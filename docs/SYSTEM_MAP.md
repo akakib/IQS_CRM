@@ -27,6 +27,10 @@ money in BDT. Laravel 12, Blade + Alpine.js + Tailwind. Database design: [DB_DES
 - Confirmations use `<x-confirm-modal>`, never the browser's `confirm()`.
 - Never a native `<select>`: use `<x-simple-select>` (or `<x-search-select>` for long lists).
 - Lists are cards on phones and a table on desktop; real pagination with 10 / 25 / 50 / 100 a page.
+- Controls side by side have one height: full size 40px, small 32px (buttons, inputs, dropdowns; set in the
+  shared components, so hand-made buttons use the same `min-h-10` / `min-h-8`).
+- Page width by kind: lists, tables, reports, dashboards and detail pages use the full width; forms and
+  one-task screens (upload, new call list, the calling screen, scan screens) keep a reading width.
 - Search runs on Enter (not while typing); filters, sort, dates and page size stay after a reload.
 - Downloads are always the same three buttons: Print, PDF and Excel (`<x-export-buttons>`).
 - Check every changed screen at phone, tablet and desktop width before handing it over.
@@ -127,7 +131,7 @@ Blade components in `resources/views/components` (behaviour in Alpine). Use them
 |---|---|
 | `x-layouts.app` | Page frame: sidebar, top bar with the one search box, toaster, call player |
 | `x-list.filter-bar`, `x-list.table`, `x-list.cards`, `x-list.sort`, `x-list.pager` | Index pages (search on Enter, filters, sort, cards on phones) |
-| `x-simple-select`, `x-search-select`, `x-dropdown` | Every dropdown |
+| `x-simple-select`, `x-search-select`, `x-dropdown` | Every dropdown (`x-simple-select` can show a channel icon per option and filter options with `only`) |
 | `x-date-input`, `x-date-range` | Dates and date ranges with presets |
 | `x-modal`, `x-confirm-modal`, `x-slide-over` | Popups and confirmations |
 | `x-tabs` (with `tabs('key')`) | Underlined tabs; in-page tabs keep `#key` in the address |
@@ -137,6 +141,8 @@ Blade components in `resources/views/components` (behaviour in Alpine). Use them
 | `x-play-call` + `x-call-player` | "Play call": recording or screenshot in a popup on the same page |
 | `x-phone-dial` | Call a customer from an order (tap, copy, QR) and log the call |
 | `x-chat-control` | Communication popup: chats, customer calls in, rider calls |
+| `x-channel-icon` | A chat channel's icon (WhatsApp, Messenger, Instagram...), `size="xs"` inside dropdowns |
+| `x-new-order-popup` | The popup for New order and for looking at an order (`orders.show?embed=1`, Open in new tab) |
 | `x-timeline` | An order's history notes |
 | `x-scan-input` | Barcode scanning on packaging and handover screens |
 

@@ -4,7 +4,7 @@
 <div>
     <label class="block text-xs font-medium text-gray-700">{{ __('Name') }}</label>
     <input type="text" name="name" value="{{ old('name', $list->name ?? '') }}" required maxlength="120" placeholder="{{ __('Feedback, July buyers') }}"
-        class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
+        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base sm:text-sm focus:border-primary focus:outline-none">
     @error('name')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
 </div>
 
@@ -16,7 +16,7 @@
     <div>
         <label class="block text-xs font-medium text-gray-700">{{ __('Calls a day, each person') }}</label>
         <input type="number" name="daily_target" min="1" max="500" value="{{ old('daily_target', $list->daily_target ?? 50) }}" required
-            class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
+            class="mt-1 w-full h-10 rounded-lg border border-gray-300 px-3 text-base sm:text-sm focus:border-primary focus:outline-none">
         @error('daily_target')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
 </div>
@@ -40,5 +40,5 @@
 <div>
     <label class="block text-xs font-medium text-gray-700">{{ __('What to say (shown to the caller)') }}</label>
     <textarea name="instructions" rows="3" maxlength="2000" placeholder="{{ __('Ask how the dates were, offer 5% on the next order...') }}"
-        class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">{{ old('instructions', $list->instructions ?? '') }}</textarea>
+        class="mt-1 w-full h-10 rounded-lg border border-gray-300 px-3 text-base sm:text-sm focus:border-primary focus:outline-none">{{ old('instructions', $list->instructions ?? '') }}</textarea>
 </div>

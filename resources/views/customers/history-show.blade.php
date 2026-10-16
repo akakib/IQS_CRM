@@ -4,7 +4,7 @@
 @endphp
 
 <x-layouts.app :heading="__('Import order history')">
-    <div class="mx-auto max-w-6xl space-y-4">
+    <div class="space-y-4">
         <a href="{{ route('customers.history') }}" class="inline-block text-sm text-primary hover:underline">{{ __('Back to imports') }}</a>
         @if ($import->undone_at)
             <p class="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{{ __('This import was taken back on :d. Its orders and the customers it created are gone.', ['d' => \Illuminate\Support\Carbon::parse($import->undone_at)->format('d M, g:i A')]) }}</p>
@@ -51,7 +51,7 @@
                 </div>
                 <form method="GET" action="{{ route('customers.history.show', $import->id) }}" class="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
                     <input type="search" name="q" value="{{ $filters['q'] }}" placeholder="{{ __('Name, phone, CN, address or product') }}" autocomplete="off"
-                        class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
+                        class="w-full h-10 rounded-lg border border-gray-300 px-3 text-base sm:text-sm focus:border-primary focus:outline-none">
                     <x-simple-select name="status" :options="['' => __('All statuses')] + array_map(fn ($l) => __($l), array_diff_key($statusLabels, ['skip' => 1]))" :value="$filters['status']" full-width
                         x-on:select-change="$nextTick(() => $el.closest('form').submit())" />
                     <x-simple-select name="sort" :options="array_map(fn ($l) => __($l), \App\Http\Controllers\CustomerImportController::SORTS)" :value="$filters['sort']" full-width

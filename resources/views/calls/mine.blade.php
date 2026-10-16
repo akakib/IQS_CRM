@@ -11,7 +11,7 @@
 @endphp
 
 <x-layouts.app :heading="__('My calls')">
-    <div class="mx-auto max-w-5xl space-y-4" x-data="{
+    <div class="space-y-4" x-data="{
             item: { open: false, loading: false, error: null, d: {} },
             async openItem(id) {
                 this.item = { open: true, loading: true, error: null, d: {} };
@@ -83,7 +83,7 @@
                 <input type="hidden" name="clear" value="1">
                 <div class="flex gap-2">
                     <input type="search" name="q" value="{{ $f['q'] }}" placeholder="{{ __('Name or phone') }}" autocomplete="off"
-                        class="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
+                        class="min-w-0 flex-1 h-10 rounded-lg border border-gray-300 px-3 text-base sm:text-sm focus:border-primary focus:outline-none">
                     <x-button>{{ __('Search') }}</x-button>
                     @if ($filtered)<x-button variant="secondary" :href="route('calls.mine', ($f['per'] !== 25 ? ['per' => $f['per']] : []) + ['clear' => 1]).'#history'">{{ __('Clear') }}</x-button>@endif
                 </div>

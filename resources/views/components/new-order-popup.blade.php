@@ -15,8 +15,8 @@
                 <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-6">
                     <h3 class="text-base font-semibold text-gray-900" x-text="title || @js(__('New order'))"></h3>
                     <div class="flex shrink-0 items-center gap-2">
-                        <a x-show="page" :href="page" target="_blank" rel="noopener" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Open in new tab') }}</a>
-                        <button type="button" @click="src = ''" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Close') }}</button>
+                        <a x-show="page" :href="page" target="_blank" rel="noopener" class="inline-flex min-h-8 items-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Open in new tab') }}</a>
+                        <button type="button" @click="src = ''" class="inline-flex min-h-8 items-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Close') }}</button>
                     </div>
                 </div>
                 <template x-if="src"><iframe :src="src" :title="title || @js(__('New order'))" class="min-h-0 w-full flex-1 border-0 bg-gray-50"></iframe></template>

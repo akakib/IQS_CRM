@@ -46,7 +46,7 @@
     <x-tabs :tabs="$tabs" :active="$tab" />
 
     @if ($tab !== 'statements')
-        <x-list.filter-bar :list="$list" :action="route('cod.index')" :placeholder="__('Order no, CN or tracking code')">
+        <x-list.filter-bar :list="$list" :action="route('cod.index')" :placeholder="__('Order no, CN or tracking code')" :results="$rows" :noun="[__('parcel'), __('parcels')]">
             <input type="hidden" name="tab" value="{{ $tab }}">
         </x-list.filter-bar>
     @endif

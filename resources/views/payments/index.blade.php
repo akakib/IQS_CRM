@@ -12,7 +12,7 @@
 
     <p class="mb-4 text-sm text-gray-500">{{ __('Compare each TrxID and amount with the bKash / Nagad statement, tick the ones that match and verify them together. A small advance (up to ৳:l) already lowered the COD; a bigger one holds its order until it is checked.', ['l' => number_format((int) settings('payments.trust_up_to'))]) }}</p>
 
-    <x-list.filter-bar :list="$list" :action="route('payments.index')" :placeholder="__('TrxID, order no or phone')">
+    <x-list.filter-bar :list="$list" :action="route('payments.index')" :placeholder="__('TrxID, order no or phone')" :results="$payments" :noun="[__('payment'), __('payments')]">
         <x-simple-select name="status" :options="$statusOptions" :value="$status" />
         <x-simple-select name="method" :options="['' => __('Any method')] + $methods" :value="$list->filter('method') ?? ''" />
         <x-date-range :from="$list->filter('from')" :to="$list->filter('to')" />

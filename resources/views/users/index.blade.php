@@ -1,12 +1,11 @@
 <x-layouts.app :heading="__('Staff')">
-    <div class="mb-4 flex items-center justify-between gap-3">
-        <p class="text-sm text-gray-500">{{ trans_choice(':count staff member|:count staff members', $users->total(), ['count' => $users->total()]) }}</p>
+    <div class="mb-4 flex items-center justify-end gap-3">
         @can('staff.create')
             <x-button :href="route('users.create')">+ {{ __('Add staff') }}</x-button>
         @endcan
     </div>
 
-    <x-list.filter-bar :list="$list" :action="route('users.index')" :placeholder="__('Search name, email or phone')">
+    <x-list.filter-bar :list="$list" :action="route('users.index')" :placeholder="__('Search name, email or phone')" :results="$users" :noun="[__('staff member'), __('staff members')]">
         <x-simple-select name="employment_type" :options="['' => __('All types')] + $employmentOptions" :value="$list->filter('employment_type') ?? ''" />
         <x-simple-select name="location" :options="['' => __('All locations')] + $locationOptions" :value="$list->filter('location') ?? ''" />
         <x-simple-select name="status" :options="['' => __('All statuses'), 'active' => __('Active'), 'inactive' => __('Inactive')]" :value="$list->filter('status') ?? ''" />

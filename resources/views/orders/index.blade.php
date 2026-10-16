@@ -27,7 +27,7 @@
         </div>
     @endif
 
-    <x-list.filter-bar :list="$list" :action="route('orders.index')" :placeholder="__('Order no, phone, name or CN')">
+    <x-list.filter-bar :list="$list" :action="route('orders.index')" :placeholder="__('Order no, phone, name or CN')" :results="$orders" :total="$total" :cap="\App\Http\Controllers\OrderController::COUNT_CAP" :noun="[__('order'), __('orders')]">
         <input type="hidden" name="tab" value="{{ $tab }}">
         <x-simple-select name="status" :options="$statusOptions" :value="$list->filter('status') ?? ''" />
         <x-simple-select name="channel" :options="['' => __('Any channel')] + array_map('__', \App\Models\Order::CHANNELS)" :value="$list->filter('channel') ?? ''" />

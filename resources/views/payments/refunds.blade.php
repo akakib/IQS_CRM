@@ -13,7 +13,7 @@
 
     <x-tabs :tabs="$tabs" :active="$tab" />
 
-    <x-list.filter-bar :list="$list" :action="route('refunds.index')" :placeholder="__('Order no, phone or TrxID')">
+    <x-list.filter-bar :list="$list" :action="route('refunds.index')" :placeholder="__('Order no, phone or TrxID')" :results="$rows" :noun="[__('refund'), __('refunds')]">
         <input type="hidden" name="tab" value="{{ $tab }}">
     </x-list.filter-bar>
 

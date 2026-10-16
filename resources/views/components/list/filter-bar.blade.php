@@ -2,10 +2,12 @@
      inside submits on change. Desktop: one row. Phone: search stays on top,
      the filters open as a bottom sheet (the SAME controls, rendered once, so
      no field is sent twice). State lives in the query string.
-     <x-list.filter-bar :list="$list" :action="route('users.index')" placeholder="Search">
+     <x-list.filter-bar :list="$list" :action="route('users.index')" placeholder="Search" :results="$users" :noun="[__('staff member'), __('staff members')]">
          <x-simple-select name="status" ... />
-     </x-list.filter-bar> --}}
-@props(['list', 'action', 'placeholder' => __('Search')])
+     </x-list.filter-bar>
+     results (a page of the list): under the bar, how many match and which ones this page shows ("117 orders · showing 26–50").
+     A simple page (no count of its own) passes total, counted up to cap (more shows as "10,000+"). --}}
+@props(['list', 'action', 'placeholder' => __('Search'), 'results' => null, 'total' => null, 'cap' => null, 'noun' => [__('result'), __('results')]])
 
 @php($activeFilters = count(array_filter($list->filters, fn ($v) => $v !== null)))
 
@@ -43,3 +45,11 @@
         </div>
     </div>
 </form>
+
+@php($count = $results ? ($total ?? (method_exists($results, 'total') ? $results->total() : null)) : null)
+@if ($count)
+    <p class="mb-3 text-sm text-gray-500" role="status">
+        <span class="font-semibold tabular-nums text-gray-900">{{ $cap && $count > $cap ? number_format($cap).'+' : number_format($count) }}</span> {{ $count === 1 ? $noun[0] : $noun[1] }}
+        @if ($count > $results->perPage() || $results->currentPage() > 1)<span> · {{ __('showing :a–:b', ['a' => number_format($results->firstItem()), 'b' => number_format($results->lastItem())]) }}</span>@endif
+    </p>
+@endif

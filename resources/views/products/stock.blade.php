@@ -16,7 +16,7 @@
 
     <x-tabs :tabs="$tabs" :active="$show" />
 
-    <x-list.filter-bar :list="$list" :action="route('products.stock')" :placeholder="__('Search name or SKU')">
+    <x-list.filter-bar :list="$list" :action="route('products.stock')" :placeholder="__('Search name or SKU')" :results="$variants" :noun="[__('item'), __('items')]">
         <input type="hidden" name="show" value="{{ $show }}">
     </x-list.filter-bar>
 

@@ -19,14 +19,13 @@
 <x-layouts.app :heading="__('Products')">
     <x-products.subnav active="products" />
 
-    <div class="mb-4 flex items-center justify-between gap-3">
-        <p class="text-sm text-gray-500">{{ trans_choice(':count product|:count products', $products->total(), ['count' => $products->total()]) }}</p>
+    <div class="mb-4 flex items-center justify-end gap-3">
         @can('products.create')
             <x-button :href="route('products.create')">+ {{ __('New product') }}</x-button>
         @endcan
     </div>
 
-    <x-list.filter-bar :list="$list" :action="route('products.index')" :placeholder="__('Search name, SKU or barcode')">
+    <x-list.filter-bar :list="$list" :action="route('products.index')" :placeholder="__('Search name, SKU or barcode')" :results="$products" :noun="[__('product'), __('products')]">
         <x-simple-select name="category" :options="['' => __('All categories')] + $categoryOptions" :value="$list->filter('category') ?? ''" />
         <x-simple-select name="status" :options="['' => __('Any status'), 'active' => __('Active'), 'draft' => __('Draft'), 'archived' => __('Archived')]" :value="$list->filter('status') ?? ''" />
         <x-simple-select name="availability" :options="['' => __('Any stock status'), 'in_stock' => __('In stock'), 'backorder' => __('Pre-order'), 'out_of_stock' => __('Out of stock')]" :value="$list->filter('availability') ?? ''" />

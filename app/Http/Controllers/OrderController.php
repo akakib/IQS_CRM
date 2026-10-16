@@ -25,6 +25,9 @@ use Illuminate\View\View;
 
 class OrderController extends Controller
 {
+    /** The order list counts its matches up to this many (more shows as "10,000+"). */
+    public const COUNT_CAP = 10000;
+
     public function __construct(private OrderService $orders, private OrderStateMachine $machine) {}
 
     public function index(Request $request): View
@@ -44,8 +47,8 @@ class OrderController extends Controller
         $q = trim($list->search);
         $digits = preg_replace('/\D/', '', $q);
 
-        // Large, fast-growing list: simple pagination (no COUNT), indexed filters.
-        $orders = Order::query()->visibleTo($user)
+        // Large, fast-growing list: simple pagination, indexed filters; the count above the list stops at COUNT_CAP.
+        $query = Order::query()->visibleTo($user)
             ->select(['id', 'order_no', 'channel', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'grand_total', 'cod_amount',
                 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packed_version', 'current_version', 'edited_after_pack', 'created_at'])
             ->with('moderator:id,name')
@@ -66,9 +69,10 @@ class OrderController extends Controller
                     ->orWhere('ship_name', 'like', $q.'%')
                     ->when($byCn, fn ($s) => $s->orWhereIn('id', $byCn)));
             })
-            ->tap(fn ($w) => $list->applySort($w))
-            ->simplePaginate($list->perPage)
-            ->withQueryString();
+            ->tap(fn ($w) => $list->applySort($w));
+        $orders = (clone $query)->simplePaginate($list->perPage)->withQueryString();
+        // How many match, counted only up to the cap (shown as "10,000+"): cheap even on a big table.
+        $total = DB::query()->fromSub((clone $query)->reorder()->setEagerLoads([])->select('orders.id')->limit(self::COUNT_CAP + 1), 'x')->count();
 
         $counts = [
             'take' => app(\App\Services\Orders\DeskService::class)->whereWaiting(Order::visibleTo($user))->count(),
@@ -77,6 +81,7 @@ class OrderController extends Controller
 
         return view('orders.index', [
             'orders' => $orders,
+            'total' => $total,
             'list' => $list,
             'tab' => $tab,
             'counts' => $counts,

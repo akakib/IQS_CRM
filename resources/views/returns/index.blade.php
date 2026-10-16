@@ -79,7 +79,7 @@
     @endif
 
     <x-tabs :tabs="$tabs" :active="$tab" />
-    <x-list.filter-bar :list="$list" :action="route('returns.index')" :placeholder="__('Order no or phone')">
+    <x-list.filter-bar :list="$list" :action="route('returns.index')" :placeholder="__('Order no or phone')" :results="$rows" :noun="[__('return'), __('returns')]">
         <input type="hidden" name="tab" value="{{ $tab }}">
     </x-list.filter-bar>
 

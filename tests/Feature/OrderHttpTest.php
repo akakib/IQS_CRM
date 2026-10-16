@@ -167,6 +167,10 @@ class OrderHttpTest extends TestCase
         $this->actingAs($this->owner());
 
         $this->get('/orders?q='.$a->order_no)->assertSee($a->order_no)->assertDontSee($b->order_no);
-        $this->get('/orders?q=01812')->assertSee($b->order_no)->assertDontSee($a->order_no);
+        $this->get('/orders?q=01812')->assertSee($b->order_no)->assertDontSee($a->order_no)->assertSeeInOrder(['1</span>', 'order'], false);
+
+        // How many match, under the filters; the page range only when there is more than one page.
+        $this->get('/orders?tab=all')->assertSeeInOrder(['2</span>', 'orders'], false)->assertDontSee('showing 1');
+        $this->assertSame(2, $this->get('/orders?tab=all')->viewData('total'));
     }
 }

@@ -5,8 +5,7 @@
 @endphp
 
 <x-layouts.app :heading="__('Customers')">
-    <div class="mb-4 flex items-center justify-between gap-3">
-        <p class="text-sm text-gray-500">{{ trans_choice(':count customer|:count customers', $customers->total(), ['count' => $customers->total()]) }}</p>
+    <div class="mb-4 flex items-center justify-end gap-3">
         <div class="flex gap-2">
             @can('customers.import')
                 <x-button variant="secondary" :href="route('customers.history')">{{ __('Import order history') }}</x-button>
@@ -17,7 +16,7 @@
         </div>
     </div>
 
-    <x-list.filter-bar :list="$list" :action="route('customers.index')" :placeholder="__('Phone number or name')">
+    <x-list.filter-bar :list="$list" :action="route('customers.index')" :placeholder="__('Phone number or name')" :results="$customers" :noun="[__('customer'), __('customers')]">
         <x-simple-select name="risk" :options="['' => __('Any risk'), 'normal' => __('Normal'), 'watch' => __('Watch'), 'blocked' => __('Blocked')]" :value="$list->filter('risk') ?? ''" />
     </x-list.filter-bar>
 

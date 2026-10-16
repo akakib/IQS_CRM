@@ -33,8 +33,8 @@
     </aside>
 
     <div class="app-main flex min-w-0 flex-1 flex-col transition-[margin] duration-200 lg:ml-[260px]">
-        <header class="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
-            <div class="flex min-w-0 items-center gap-3">
+        <header class="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 sm:px-4">
+            <div class="flex min-w-0 items-center gap-2 sm:gap-3">
                 <button type="button" @click="menu()"
                     class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100" aria-label="{{ __('Menu') }}" title="{{ __('Show or hide the menu') }}">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -42,7 +42,7 @@
                 <h1 class="truncate text-base font-semibold text-gray-800">{{ $heading ?? '' }}</h1>
             </div>
 
-            <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div class="flex shrink-0 items-center gap-1.5 sm:gap-3">
             {{-- The one search, from every page: order no, phone, CN or name. --}}
             <form method="GET" action="{{ route('orders.search') }}" class="hidden md:block" role="search">
                 <label class="relative block">
@@ -58,10 +58,10 @@
             <x-new-order-popup />
             <x-break-control part="button" />
             <x-voice-alerts />
-            <x-theme-toggle />
+            <div class="hidden sm:block"><x-theme-toggle /></div>
             <x-notification-bell />
             <div class="relative" x-data="{ open: false }" @click.outside="open = false">
-                <button type="button" @click="open = !open" class="flex items-center gap-2 text-gray-700">
+                <button type="button" @click="open = !open" class="flex shrink-0 items-center gap-2 text-gray-700" aria-label="{{ __('My profile') }}">
                     <x-avatar :name="auth()->user()->name" :photo="auth()->user()->photo_path" size="md" />
                     <span class="hidden text-sm font-medium sm:block">{{ auth()->user()->name }}</span>
                 </button>
@@ -71,6 +71,12 @@
                         <p class="truncate text-xs text-gray-500">{{ auth()->user()->email }}</p>
                     </div>
                     <a href="{{ route('profile.edit') }}" class="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">{{ __('My profile') }}</a>
+                    {{-- Phone: dark mode lives here (the top bar keeps only what is used all day). --}}
+                    <button type="button" x-data="{ dark: document.documentElement.classList.contains('dark') }"
+                        @click="dark = !dark; document.documentElement.classList.toggle('dark', dark); try { localStorage.setItem('iqs_theme', dark ? 'dark' : 'light') } catch (e) {}"
+                        class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 sm:hidden">
+                        <span>{{ __('Dark mode') }}</span><span class="text-xs text-gray-500" x-text="dark ? @js(__('On')) : @js(__('Off'))"></span>
+                    </button>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">{{ __('Log out') }}</button>

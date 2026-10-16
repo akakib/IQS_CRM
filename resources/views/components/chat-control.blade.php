@@ -76,7 +76,7 @@
             } catch (e) { this.error = @js(__('No connection. Try again.')) } finally { this.busy = false }
         },
     }" @chat-open.window="show()">
-    <button type="button" @click="show()" class="flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium"
+    <button type="button" @click="show()" class="flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border text-sm font-medium sm:w-auto sm:px-3"
         :class="on ? 'border-green-600 bg-green-600 text-white hover:bg-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-100'">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         <span class="hidden sm:inline">{{ __('Communication') }}</span>

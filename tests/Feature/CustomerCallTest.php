@@ -80,6 +80,24 @@ class CustomerCallTest extends TestCase
         $this->postJson('/customer-calls/incoming', ['phone' => '019999', 'reason' => 'new_order'])->assertStatus(422)->assertJsonValidationErrors('phone');
         $this->postJson('/customer-calls/incoming', ['phone' => '01999999999', 'reason' => 'new_order'])->assertOk()->assertJson(['today' => 2, 'new_order_url' => null]); // no orders.create
         $this->assertDatabaseHas('customer_calls', ['phone' => '01999999999', 'direction' => 'in', 'order_id' => null, 'outcome' => 'new_order']);
+        $this->assertDatabaseMissing('customers', ['primary_phone' => '01999999999']); // nothing given: no empty customer
+        $this->getJson('/customer-calls/find?q=01999999999')->assertJson(['known' => false, 'name' => null]);
+
+        // A new caller who gives a name and address becomes a customer, once; the next call knows them.
+        $this->postJson('/customer-calls/incoming', ['phone' => '01888888888', 'reason' => 'new_order', 'name' => 'Karim', 'address' => 'House 5, Agrabad'])->assertOk();
+        $karim = \App\Models\Customer::firstWhere('primary_phone', '01888888888');
+        $this->assertSame(['Karim', $mod->id, 'House 5, Agrabad'], [$karim->name, $karim->created_by, $karim->addresses()->value('address_line')]);
+        $this->postJson('/customer-calls/incoming', ['phone' => '01888888888', 'reason' => 'other', 'name' => 'Someone else'])->assertOk();
+        $this->assertSame(1, \App\Models\Customer::where('primary_phone', '01888888888')->count());
+        $this->assertSame('Karim', $karim->fresh()->name);
+        $this->getJson('/customer-calls/find?q=01888888888')->assertJson(['known' => true, 'name' => 'Karim']);
+
+        // I call a customer from Communication: what happened (and how happy) instead of why.
+        $this->postJson('/customer-calls/incoming', ['direction' => 'out', 'phone' => '01712345678', 'reason' => 'complaint'])->assertStatus(422)->assertJsonValidationErrors('outcome');
+        $this->postJson('/customer-calls/incoming', ['direction' => 'out', 'phone' => '01712345678', 'order_id' => $order->id, 'outcome' => 'answered', 'satisfaction' => 100, 'minutes' => 0, 'seconds' => 40])
+            ->assertOk();
+        $this->assertDatabaseHas('customer_calls', ['phone' => '01712345678', 'direction' => 'out', 'outcome' => 'answered', 'satisfaction' => 100, 'duration_seconds' => 40]);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'call', 'body' => 'Called (0:40): Talked']);
 
         // The Communication report: Chats, Customer calls and Rider calls as tabs; calls by person and one by one.
         $boss = User::factory()->create(['name' => 'Boss']);

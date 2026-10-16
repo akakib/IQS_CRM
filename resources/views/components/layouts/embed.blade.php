@@ -14,5 +14,6 @@
     <main class="p-4 sm:p-6">{{ $slot }}</main>
     <x-toaster />
     <x-call-player />
+    <x-new-order-popup />
 </body>
 </html>

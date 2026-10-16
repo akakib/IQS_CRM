@@ -67,7 +67,7 @@
             {{-- The customer(s) the search is about. --}}
             @foreach ($customers as $c)
                 @php $done = $c->delivered_count + $c->returned_count; @endphp
-                <a href="{{ route('customers.show', $c) }}" class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary-soft p-4 hover:border-primary">
+                <a href="{{ route('customers.show', $c) }}" @click.prevent="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: {{ \Illuminate\Support\Js::from(route('customers.show', ['customer' => $c->id, 'embed' => 1])) }}, title: {{ \Illuminate\Support\Js::from($c->name) }}, page: {{ \Illuminate\Support\Js::from(route('customers.show', $c->id)) }} } }))" class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary-soft p-4 hover:border-primary">
                     <span class="min-w-0">
                         <span class="block text-xs font-medium uppercase tracking-wide text-primary">{{ __('Customer') }}</span>
                         <span class="block truncate text-base font-semibold text-gray-900">{{ $c->name }}</span>
@@ -94,7 +94,7 @@
                     </div>
                     <p class="mt-2 text-xs text-gray-500">{{ __('Imported: :s', ['s' => $p->source]) }} · {{ __(\App\Services\Customers\HistoryImport::STATUSES[$p->status] ?? $p->status) }} · {{ \Illuminate\Support\Carbon::parse($p->ordered_at)->format('d M Y') }}@if ($p->items) · {{ $p->items }}@endif</p>
                     @can('customers.view')
-                        <a href="{{ route('customers.show', $p->customer_id) }}" class="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">{{ __('Open customer') }}</a>
+                        <a href="{{ route('customers.show', $p->customer_id) }}" @click.prevent="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: {{ \Illuminate\Support\Js::from(route('customers.show', ['customer' => $p->customer_id, 'embed' => 1])) }}, title: {{ \Illuminate\Support\Js::from($p->name) }}, page: {{ \Illuminate\Support\Js::from(route('customers.show', $p->customer_id)) }} } }))" class="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">{{ __('Open customer') }}</a>
                     @endcan
                 </div>
             @endforeach
@@ -157,7 +157,7 @@
                                     · {{ __('With') }} {{ $o->moderator?->name ?? __('nobody') }}
                                 </p>
                                 @can('customers.view')
-                                    <a href="{{ route('customers.show', $o->customer_id) }}" class="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">{{ __('Open customer') }}</a>
+                                    <a href="{{ route('customers.show', $o->customer_id) }}" @click.prevent="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: {{ \Illuminate\Support\Js::from(route('customers.show', ['customer' => $o->customer_id, 'embed' => 1])) }}, title: {{ \Illuminate\Support\Js::from($o->ship_name) }}, page: {{ \Illuminate\Support\Js::from(route('customers.show', $o->customer_id)) }} } }))" class="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">{{ __('Open customer') }}</a>
                                 @endcan
                             </div>
                         </div>

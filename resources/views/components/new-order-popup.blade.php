@@ -7,7 +7,7 @@
 <div x-data="{ src: '', title: '', page: '' }" @order-new.window="src = $event.detail.url || $event.detail; title = $event.detail.title || ''; page = $event.detail.page || ''"
     @message.window="if ($event.origin === location.origin && $event.data?.iqsOrderCreated) {
         if ($event.data.stay) { src = ''; window.dispatchEvent(new CustomEvent('iqs-order-made', { detail: $event.data })) }
-        else location.href = $event.data.url || @js(route('desk.index'))
+        else (window.top || window).location.href = $event.data.url || @js(route('desk.index'))
     }">
     <template x-teleport="body">
         <div x-show="src" x-cloak class="fixed inset-0 z-[130] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">

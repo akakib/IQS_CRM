@@ -54,7 +54,10 @@ class CustomerJourneyTest extends TestCase
             $res = $this->get('/order-search?q='.urlencode($q))->assertOk()->assertSee('Open customer')->assertSee(route('customers.show', $customer), false);
             $this->assertSame([$customer], $res->viewData('customers')->pluck('id')->all(), $q);
         }
-        $this->get('/order-search?q=Karim')->assertSee(route('customers.show', $customer), false);
+        $this->get('/order-search?q=Karim')->assertSee(route('customers.show', $customer), false)
+            ->assertSee('customers\/'.$customer.'?embed=1', false); // opens in a popup
+        // In the popup: the page alone (no sidebar), no Back link (the popup has Close and Open in new tab).
+        $this->get(route('customers.show', ['customer' => $customer, 'embed' => 1]))->assertOk()->assertSee('Karim')->assertDontSee('Back to customers')->assertDontSee('sidebar-nav', false);
         $this->get('/order-search?q=Nobody')->assertSee('No order found for');
 
         // Opened from the search: Back to results returns to it, also after a reload; from the list: Back to customers.

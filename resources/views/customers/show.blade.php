@@ -9,13 +9,16 @@
     $lostAmt = $stats['returned'][1] + $stats['cancelled'][1];
     $imported = $customer->importedCounts();
     $mayHear = fn ($c) => $c->proof_path && (auth()->id() === $c->user_id || auth()->user()->can('calls.manage'));
+    $embed = request()->boolean('embed');
 @endphp
 
-{{-- The one page of a customer: Overview, Journey, Orders, Calls. --}}
-<x-layouts.app :heading="$customer->name">
+{{-- The one page of a customer: Overview, Journey, Orders, Calls. embed=1: inside a popup (Search), without sidebar or header. --}}
+<x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="$customer->name">
     <div>
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-            @if ($backToResults)
+            @if ($embed)
+                <span></span>
+            @elseif ($backToResults)
                 <a href="{{ $backToResults }}" class="text-sm text-primary hover:underline">{{ __('Back to results') }}</a>
             @else
                 <a href="{{ route('customers.index') }}" class="text-sm text-primary hover:underline">{{ __('Back to customers') }}</a>
@@ -194,4 +197,4 @@
         </x-modal>
         <x-confirm-modal id="merge-confirm" :verb="__('Merge')" :message="__('The other customer is removed for good; everything moves here.')" />
     @endcan
-</x-layouts.app>
+</x-dynamic-component>

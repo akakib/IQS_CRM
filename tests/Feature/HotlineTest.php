@@ -113,6 +113,8 @@ class HotlineTest extends TestCase
         // Search and filters: by order number, and Overdue (not yet).
         $no = DB::table('orders')->where('id', $issue->order_id)->value('order_no');
         $this->get('/issues?q='.$no)->assertOk()->assertSee('Wants only one item');
+        $this->get('/issues?q='.$this->cn)->assertOk()->assertSee('Wants only one item'); // by the CN too
+        $this->get('/issues?q=999999999')->assertOk()->assertDontSee('Wants only one item');
         $this->get('/issues?q=IQ99999')->assertOk()->assertDontSee('Wants only one item')->assertSee('No issue matches these filters.');
         $this->get('/issues?show=overdue')->assertOk()->assertDontSee('Wants only one item');
 

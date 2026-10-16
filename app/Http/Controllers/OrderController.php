@@ -51,6 +51,8 @@ class OrderController extends Controller
         $query = Order::query()->visibleTo($user)
             ->select(['id', 'order_no', 'channel', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'grand_total', 'cod_amount',
                 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packed_version', 'current_version', 'edited_after_pack', 'created_at'])
+            ->addSelect(['courier' => DB::table('shipments')->select('courier')->whereColumn('shipments.id', 'orders.active_shipment_id')->limit(1),
+                'courier_status' => DB::table('shipments')->select('courier_status')->whereColumn('shipments.id', 'orders.active_shipment_id')->limit(1)])
             ->with('moderator:id,name')
             ->when($tab === 'take', fn ($w) => app(\App\Services\Orders\DeskService::class)->whereWaiting($w))
             ->when($tab === 'mine', fn ($w) => $w->where('moderator_id', $user->id)->whereNotIn('status_id', $finals))

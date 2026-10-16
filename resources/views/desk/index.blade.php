@@ -289,6 +289,7 @@
                                     <span>{{ \App\Models\Order::channelLabel($order->channel) }}</span>
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
+                                    <x-courier-word :status="$detail['parcel']->courier_status ?? null" :courier="$detail['parcel']->courier ?? null" />
                                     {{-- Who has it (and who packs it): shown to managers and whenever it is not the viewer's own order. --}}
                                     @if (! $embed && ($order->moderator_id !== auth()->id() || auth()->user()->can('orders.reassign')))
                                         <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-0.5 pr-2 text-xs text-gray-700" title="{{ __('Assigned to') }}">

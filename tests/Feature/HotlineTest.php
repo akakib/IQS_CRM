@@ -76,6 +76,10 @@ class HotlineTest extends TestCase
         $this->get('/hotline?q='.$this->cn)->assertOk()->assertSee('Parcel status')->assertSee('Copy tracking link')->assertSee($link, false)
             ->assertSeeInOrder(['Booked', 'With courier', 'Delivered'])->assertSee('On hold at the courier')->assertSee('Re-sync courier status');
         $this->get(route('orders.show', $this->order))->assertOk()->assertSee('Copy tracking link')->assertSee($link, false);
+        // What the courier says, beside IQS's own status: All orders, Order activity, Order management.
+        $this->get(route('orders.index', ['tab' => 'all']))->assertSee('Fake: Hold');
+        $this->get(route('orders.activity'))->assertSee('Fake: Hold');
+        $this->get(route('desk.index', ['order' => $this->order->id]))->assertSee('Fake: Hold');
 
         // Returned: the last step says so; a link that is not https is never shown.
         DB::table('shipments')->where('order_id', $this->order->id)->update(['tracking_link' => 'javascript:alert(1)', 'courier_status' => 'cancelled']);

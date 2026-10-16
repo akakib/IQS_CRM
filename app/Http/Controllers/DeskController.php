@@ -430,7 +430,8 @@ class DeskController extends Controller
             'heldBy' => $heldBy,
             'heldFrom' => $heldFrom ?? null,
             'openDuplicates' => $duplicates->filter(fn ($d) => ! (OrderStatus::map()[$d->status_id]['final'] ?? false) && OrderStatus::map()[$d->status_id]['key'] !== 'cancelled')->values(),
-            'consignment' => $order->active_shipment_id ? DB::table('shipments')->where('id', $order->active_shipment_id)->value('consignment_id') : null,
+            'parcel' => $parcel = $order->active_shipment_id ? DB::table('shipments')->where('id', $order->active_shipment_id)->first(['consignment_id', 'courier', 'courier_status']) : null,
+            'consignment' => $parcel?->consignment_id,
         ];
     }
 }

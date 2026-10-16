@@ -111,6 +111,7 @@ class OrderActivityController extends Controller
             ->leftJoin('users as m', 'm.id', '=', 'o.moderator_id')
             ->leftJoin('users as p', 'p.id', '=', 'o.packer_id')
             ->leftJoin('status_reasons as hr', 'hr.id', '=', 'o.hold_reason_id')
+            ->leftJoin('shipments as cs', 'cs.id', '=', 'o.active_shipment_id')
             // Oldest first: what has waited longest is what needs a look.
             ->orderByRaw('COALESCE(o.queue_since, o.assigned_at, o.created_at)')->orderBy('o.id')
             ->forPage($page, self::PER_COLUMN)
@@ -118,7 +119,7 @@ class OrderActivityController extends Controller
                 'o.assigned_at', 'o.action_due_at', 'o.next_call_at', 'o.no_response_count', 'o.booking_state', 'o.booking_error',
                 'o.hold_expected_date', 'o.packed_at', 'o.packaging_started_at', 'o.edited_after_pack', 'o.packed_version', 'o.current_version',
                 'o.moderator_id', 'm.name as moderator', 'm.photo_path as moderator_photo', 'm.current_break_id as moderator_on_break',
-                'p.name as packer', 'p.photo_path as packer_photo', 'hr.label_en as hold_reason',
+                'p.name as packer', 'p.photo_path as packer_photo', 'hr.label_en as hold_reason', 'cs.courier', 'cs.courier_status',
                 DB::raw("EXISTS (SELECT 1 FROM order_amendments ca WHERE ca.order_id = o.id AND ca.courier_action = 'update_cod' AND ca.courier_action_done_at IS NULL) as cod_pending")]);
     }
 }

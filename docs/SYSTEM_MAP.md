@@ -146,6 +146,7 @@ Blade components in `resources/views/components` (behaviour in Alpine). Use them
 | `x-phone-dial` | Call a customer from an order (tap, copy, QR) and log the call |
 | `x-call-live-bar` | The yellow bar of a started, unsaved call, on every page (in the layout) |
 | `x-parcel-track` | A booked parcel: steps (Booked, With courier, Delivered / Returned), stuck states, Copy tracking link, Open (Parcel status, order page) |
+| `x-courier-word` | What the courier last said ("Steadfast: Unknown") beside the IQS status: All orders, Order activity, Order management |
 | `x-courier-resync` | Ask the courier now about every parcel on its way, with when it was last asked (once a minute) |
 | `x-chat-control` | Communication popup: chats, customer calls in, rider calls |
 | `x-channel-icon` | A chat channel's icon (WhatsApp, Messenger, Instagram...), `size="xs"` inside dropdowns |

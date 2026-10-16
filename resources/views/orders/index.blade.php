@@ -54,7 +54,7 @@
                 <tr class="cursor-pointer" onclick="location.href='{{ $open }}'">
                     <td><a href="{{ $open }}" onclick="event.stopPropagation()" class="font-mono font-medium text-gray-800 hover:text-primary hover:underline">{{ $o->order_no }}</a> <span class="text-xs text-gray-400">{{ \App\Models\Order::channelLabel($o->channel) }}</span></td>
                     <td><p class="text-gray-800">{{ $o->ship_name }}</p><p class="font-mono text-xs text-gray-500">{{ Mask::value($o->ship_phone, 'customer_contact') }}</p></td>
-                    <td><x-order-status :order="$o" :statuses="$statuses" /></td>
+                    <td><x-order-status :order="$o" :statuses="$statuses" /> <x-courier-word :status="$o->courier_status" :courier="$o->courier" /></td>
                     <td class="text-gray-600">{{ $o->moderator?->name ?? '-' }}</td>
                     <td class="text-right tabular-nums text-gray-800">৳{{ number_format((float) $o->grand_total) }}</td>
                     <td class="text-gray-500">{{ $o->created_at->format('d M, g:i A') }}</td>
@@ -66,7 +66,7 @@
             @foreach ($orders as $o)
                 <a href="{{ $o->moderator_id === auth()->id() ? route('desk.notice', $o) : route('orders.show', $o) }}" class="block">
                     <x-record-card :title="$o->order_no.' · '.$o->ship_name" :subtitle="Mask::value($o->ship_phone, 'customer_contact')">
-                        <x-slot:badge><x-order-status :order="$o" :statuses="$statuses" /></x-slot:badge>
+                        <x-slot:badge><x-order-status :order="$o" :statuses="$statuses" /> <x-courier-word :status="$o->courier_status" :courier="$o->courier" /></x-slot:badge>
                         <x-slot:footer>{{ $o->created_at->format('d M, g:i A') }} · {{ $o->moderator?->name ?? __('Not taken') }}</x-slot:footer>
                         <x-slot:actions><span class="font-semibold tabular-nums">৳{{ number_format((float) $o->grand_total) }}</span></x-slot:actions>
                     </x-record-card>

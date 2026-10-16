@@ -81,6 +81,7 @@ class CustomerImportController extends Controller
         ]);
         $plan = $this->history->plan($header, $rows, $mapping, $values, $medium, $source);
         $written = $this->history->import($plan, $id, $source, $request->user()->id);
+        \App\Services\Customers\CustomerStats::refresh(\App\Services\Customers\CustomerStats::ofImport($id));
         $plan['counts']['orders'] = $written['inserted'];
         DB::table('customer_imports')->where('id', $id)->update([
             'result' => json_encode($plan['counts'] + ['problems' => $plan['problems']], JSON_UNESCAPED_UNICODE), 'changes' => $written['changes'] ? json_encode($written['changes'], JSON_UNESCAPED_UNICODE) : null,
@@ -106,6 +107,7 @@ class CustomerImportController extends Controller
     {
         $row = DB::table('customer_imports')->find($import) ?? abort(404);
         abort_unless($row->done_at && ! $row->undone_at, 422, __('Nothing to undo.'));
+        $touched = \App\Services\Customers\CustomerStats::ofImport($row->id); // before its orders go
         DB::transaction(function () use ($row) {
             foreach (json_decode((string) $row->changes, true) ?: [] as $id => $old) {
                 DB::table('customer_past_orders')->where('id', $id)->update($old + ['updated_at' => now()]);
@@ -118,6 +120,7 @@ class CustomerImportController extends Controller
                 ->delete();
             DB::table('customer_imports')->where('id', $row->id)->update(['undone_at' => now(), 'updated_at' => now()]);
         });
+        \App\Services\Customers\CustomerStats::refresh($touched);
 
         return redirect()->route('customers.history.show', $row->id)->with('status', __('Import taken back.'));
     }
@@ -141,6 +144,7 @@ class CustomerImportController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages([$field => $why]);
         }
         $written = $this->history->import($plan, $row->id, $row->source, $request->user()->id);
+        \App\Services\Customers\CustomerStats::refresh(\App\Services\Customers\CustomerStats::ofImport($row->id));
         $this->dropProblems($row, $result, [$index], $written['inserted']);
 
         return response()->json(['message' => $written['inserted'] ? __('Row :n came in.', ['n' => $problem['line']])

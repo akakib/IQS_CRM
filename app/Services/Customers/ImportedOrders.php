@@ -79,6 +79,7 @@ class ImportedOrders
             if ((int) $past->customer_id !== $customerId) {
                 $this->dropEmptyCustomers($import, [(int) $past->customer_id]);
             }
+            CustomerStats::refresh([(int) $past->customer_id, $customerId]);
 
             return $note;
         });
@@ -91,6 +92,7 @@ class ImportedOrders
             $rows = DB::table('customer_past_orders')->where('customer_import_id', $import->id)->whereIn('id', $ids)->get(['id', 'customer_id']);
             DB::table('customer_past_orders')->whereIn('id', $rows->pluck('id'))->delete();
             $this->dropEmptyCustomers($import, $rows->pluck('customer_id')->unique()->all());
+            CustomerStats::refresh($rows->pluck('customer_id'));
 
             return $rows->count();
         });

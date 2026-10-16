@@ -119,10 +119,8 @@ class OrderService
                 $this->openAssignment($order, $by->id, 'created', null);
             }
 
-            DB::table('customers')->where('id', $customer->id)->update([
-                'orders_count' => DB::raw('orders_count + 1'),
-                'first_order_at' => $customer->first_order_at ?? now(),
-            ]);
+            DB::table('customers')->where('id', $customer->id)->update(['first_order_at' => $customer->first_order_at ?? now()]);
+            \App\Services\Customers\CustomerStats::refresh([$customer->id]);
 
             if (! empty($data['advance']['amount'])) {
                 $this->addPayment($order, $data['advance'] + ['payment_type' => 'advance'], $by);

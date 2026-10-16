@@ -131,6 +131,9 @@ class OrderStateMachine
                 $listener($fresh, $from, $to, $user);
             }
 
+            // Delivered or returned changes what the customer's counts say, everywhere.
+            \App\Services\Customers\CustomerStats::refresh([$fresh->customer_id]);
+
             $order->setRawAttributes($fresh->getAttributes(), true);
 
             return $order;

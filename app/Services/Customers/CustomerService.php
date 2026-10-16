@@ -138,6 +138,7 @@ class CustomerService
             $duplicate->delete();
 
             $this->logger->log('customer.merged', $keep, $before, ['kept' => $keep->id]);
+            CustomerStats::refresh([$keep->id]);
 
             return $keep;
         });

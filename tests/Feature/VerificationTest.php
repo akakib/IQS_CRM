@@ -141,7 +141,10 @@ class VerificationTest extends TestCase
     {
         $customer = Customer::create(['name' => 'Loyal', 'primary_phone' => '01912345670']);
         DB::table('customer_phones')->insert(['customer_id' => $customer->id, 'phone' => '01912345670', 'is_primary' => true]);
-        $customer->update(['delivered_count' => 3]);
+        foreach ([1, 2, 3] as $n) { // three delivered parcels from an imported file
+            DB::table('customer_past_orders')->insert(['customer_id' => $customer->id, 'source' => 'old', 'external_no' => 'P'.$n.'-'.$customer->id, 'ordered_at' => now()->subMonths($n), 'status' => 'delivered', 'created_at' => now(), 'updated_at' => now()]);
+        }
+        \App\Services\Customers\CustomerStats::refresh([$customer->id]);
 
         $order = $this->order('01912345670');
 

@@ -91,7 +91,11 @@ class CustomerTest extends TestCase
     {
         $keep = $this->create('Karim', '01712345678');
         $dup = $this->create('Karim Bhai', '01812345678');
-        $dup->update(['delivered_count' => 3, 'orders_count' => 4, 'risk_level' => 'watch']);
+        $dup->update(['risk_level' => 'watch']);
+        foreach ([1, 2, 3] as $n) { // three delivered parcels from an imported file
+            DB::table('customer_past_orders')->insert(['customer_id' => $dup->id, 'source' => 'old', 'external_no' => 'P'.$n.'-'.$dup->id, 'ordered_at' => now()->subMonths($n), 'status' => 'delivered', 'created_at' => now(), 'updated_at' => now()]);
+        }
+        \App\Services\Customers\CustomerStats::refresh([$dup->id]);
         $dup->addresses()->create(['address_line' => 'Old address']);
 
         $this->post("/customers/{$keep->id}/merge", ['duplicate_phone' => '01812345678'])->assertSessionHas('success');

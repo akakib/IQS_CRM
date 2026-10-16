@@ -163,9 +163,7 @@ class CourierUpdateProcessor
                 default => (float) $shipment->cod_amount,
             };
             DB::table('shipments')->where('id', $shipment->id)->update(['final_at' => now(), 'collected_amount' => $collected]);
-            DB::table('customers')->where('id', $order->customer_id)->update(
-                $target === 'returned' ? ['returned_count' => DB::raw('returned_count + 1')] : ['delivered_count' => DB::raw('delivered_count + 1')]
-            );
+            // The customer's delivered / returned counts are counted again by the status change itself.
             if ($target === 'returned') {
                 // The courier's charge for a return, as set today (Settings, Returns); kept on the order for the loss.
                 DB::table('orders')->where('id', $order->id)->update(['return_charge' => (float) settings('returns.courier_charge')]);

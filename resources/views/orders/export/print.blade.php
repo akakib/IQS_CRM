@@ -1,43 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $title ?? __('Orders').' '.$filters['from'].' '.__('to').' '.$filters['to'] }}</title>
-    {{-- A page made for paper: A4 landscape, no app chrome. Sort by a heading, then Print. --}}
-    <style>
-        @page { size: A4 landscape; margin: 10mm; }
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: system-ui, 'Segoe UI', 'Noto Sans Bengali', Arial, sans-serif; font-size: 10.5px; color: #111; background: #fff; }
-        .bar { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 16px; border-bottom: 1px solid #e5e7eb; }
-        .bar button { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
-        .bar .go { background: #0d542b; border-color: #0d542b; color: #fff; }
-        .page { padding: 12px 16px; }
-        h1 { font-size: 16px; margin: 0 0 4px; }
-        .meta { color: #4b5563; margin-bottom: 8px; }
-        .sum { display: flex; gap: 18px; margin: 6px 0 10px; font-size: 12px; }
-        .sum b { font-size: 13px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #d1d5db; padding: 3px 5px; text-align: left; vertical-align: top; }
-        th { background: #eaf3de; font-weight: 600; }
-        td.n, th.n { text-align: right; white-space: nowrap; }
-        tr { page-break-inside: avoid; }
-        thead { display: table-header-group; }
+{{-- Orders (or a handover) for paper or PDF, the same way as every list. Click a heading to sort the page first. --}}
+<x-print-page :title="$title ?? __('Orders').' '.$filters['from'].' '.__('to').' '.$filters['to']">
+    <x-slot:styles>
         th[data-sort] { cursor: pointer; user-select: none; }
         th[data-sort]:hover { background: #d9ebc6; }
         th[data-dir="up"]::after { content: ' \25B2'; font-size: 9px; }
         th[data-dir="down"]::after { content: ' \25BC'; font-size: 9px; }
         @media print { th[data-dir]::after { content: ''; } }
-        .warn { color: #b45309; margin: 6px 0; }
-        @media print { .bar { display: none; } .page { padding: 0; } }
-    </style>
-</head>
-<body>
-    <div class="bar">
-        <button type="button" onclick="window.close()">{{ __('Close') }}</button>
-        <button type="button" class="go" onclick="window.print()">{{ __('Print') }}</button>
-    </div>
-    <div class="page">
+    </x-slot:styles>
         <h1>{{ $title ?? __('Orders').' · '.\Illuminate\Support\Carbon::parse($filters['from'])->format('d M Y').' '.__('to').' '.\Illuminate\Support\Carbon::parse($filters['to'])->format('d M Y') }}</h1>
         <div class="meta">@if (isset($subtitle)){{ $subtitle }} · @else{{ __('Stage') }}: {{ $stageNames }} · {{ __('Person') }}: {{ $staffName }} · @endif{{ __('Sorted by') }}: <span id="sorted">{{ $sortName }}</span> · {{ __('Printed :t by :n', ['t' => now()->format('d M Y, g:i A'), 'n' => auth()->user()->name]) }}</div>
         <div class="sum">
@@ -52,7 +21,7 @@
             <p>{{ __('No orders for these filters.') }}</p>
         @else
             {{-- Click a heading to sort the page before printing; again to reverse. --}}
-            <table id="list">
+            <table id="list" class="list">
                 <thead>
                     <tr>
                         <th>#</th>
@@ -72,7 +41,7 @@
                 </tbody>
             </table>
         @endif
-    </div>
+    <x-slot:scripts>
     <script>
         (() => {
             const table = document.getElementById('list');
@@ -97,5 +66,5 @@
             });
         })();
     </script>
-</body>
-</html>
+    </x-slot:scripts>
+</x-print-page>

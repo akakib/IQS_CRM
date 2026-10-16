@@ -52,7 +52,7 @@
                     </a>
                     <span class="flex shrink-0 items-center gap-1.5">
                         @if ($s->parcels)
-                            <a href="{{ route('handover.print', $s->id) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" title="{{ __('Print the full list') }}"><x-icon name="printer" class="h-3.5 w-3.5" /><span class="hidden sm:inline">{{ __('Print') }}</span></a>
+                            <a href="{{ route('handover.print', $s->id) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" title="{{ __('The full list as PDF') }}"><x-icon name="printer" class="h-3.5 w-3.5" /><span class="hidden sm:inline">{{ __('PDF') }}</span></a>
                             <a href="{{ route('handover.excel', $s->id) }}" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" title="{{ __('Download the full list (Excel)') }}"><x-icon name="download" class="h-3.5 w-3.5" /><span class="hidden sm:inline">{{ __('Excel') }}</span></a>
                         @endif
                         <x-badge :color="$s->closed_at ? 'green' : 'blue'">{{ $s->closed_at ? __('Manifest') : __('Open') }}</x-badge>

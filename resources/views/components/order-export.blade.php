@@ -94,7 +94,7 @@
                 <a :href="@js(route('orders.export.print')) + '?' + query()" target="_blank" rel="noopener"
                     :class="(!totals || !totals.orders) && 'pointer-events-none opacity-50'"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <x-icon name="printer" class="h-4 w-4" /> {{ __('Print') }}
+                    <x-icon name="printer" class="h-4 w-4" /> {{ __('PDF') }}
                 </a>
                 <a :href="@js(route('orders.export.excel')) + '?' + query()"
                     :class="(!totals || !totals.orders) && 'pointer-events-none opacity-50'"

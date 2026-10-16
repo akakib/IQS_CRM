@@ -99,7 +99,25 @@
                     tomorrow() { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(11, 0, 0, 0); this.laterAt = this.local(d) },
                     local(d) { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) },
                     ready() { return this.outcome && this.file && (! this.spoke() || this.sat !== null) && (this.outcome !== 'later' || this.laterAt) },
-                    submit(e) { if (! this.ready()) { e.preventDefault(); return } this.$refs.seconds.value = window.iqsCallSeconds || ''; this.busy = true },
+                    errors: {}, failed: '',
+                    async submit(e) {
+                        e.preventDefault();
+                        if (! this.ready() || this.busy) return;
+                        this.$refs.seconds.value = window.iqsCallSeconds || '';
+                        this.busy = true; this.errors = {}; this.failed = '';
+                        try {
+                            const r = await fetch(this.$el.action, { method: 'POST', headers: { Accept: 'application/json' }, body: new FormData(this.$el) });
+                            if (r.ok) { const d = await r.json(); window.location.href = d.next; return }
+                            const d = await r.json().catch(() => ({}));
+                            if (r.status === 422 && d.errors) {
+                                this.errors = d.errors;
+                                // The first field with a problem comes into view.
+                                this.$nextTick(() => this.$el.querySelector('[data-error]:not([style*=none])')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+                            } else { this.failed = d.message || @js(__('Could not save. Check the connection and press Save again.')) }
+                        } catch (err) { this.failed = @js(__('Could not save. Check the connection and press Save again.')) }
+                        this.busy = false;
+                    },
+                    err(k) { return (this.errors[k] || [])[0] || '' },
                 }" @submit="submit($event)">
                 @csrf
                 <input type="hidden" name="seconds" x-ref="seconds">
@@ -117,6 +135,7 @@
                             </label>
                         @endforeach
                     </div>
+                    <p data-error x-show="err('outcome')" x-cloak class="mt-2 text-sm font-medium text-red-600" x-text="err('outcome')"></p>
                     <p x-show="order && orderLinked" x-cloak class="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">{{ __('Order made:') }} <span class="font-mono font-semibold" x-text="order"></span></p>
                     <p x-show="order && ! orderLinked" x-cloak class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('The order was made, but this number waited too long and went back to the list, so the order is not linked to it. Press Next call.') }} <span class="font-mono font-semibold" x-text="order"></span></p>
                     @if ($canOrder)
@@ -133,7 +152,8 @@
                         <button type="button" @click="laterIn(3)" class="rounded-full border border-gray-300 px-3 py-1.5">{{ __('In 3 hours') }}</button>
                         <button type="button" @click="tomorrow()" class="rounded-full border border-gray-300 px-3 py-1.5">{{ __('Tomorrow 11 AM') }}</button>
                     </div>
-                    <input type="datetime-local" name="later_at" x-model="laterAt" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2 text-base focus:border-primary focus:outline-none">
+                    <input type="datetime-local" name="later_at" x-model="laterAt" class="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-base focus:border-primary focus:outline-none">
+                    <p data-error x-show="err('later_at')" x-cloak class="mt-1 text-sm font-medium text-red-600" x-text="err('later_at')"></p>
                 </div>
 
                 <div x-show="spoke()" x-cloak>
@@ -149,6 +169,7 @@
                             </label>
                         @endforeach
                     </div>
+                    <p data-error x-show="err('satisfaction')" x-cloak class="mt-1 text-sm font-medium text-red-600" x-text="err('satisfaction')"></p>
                     <p class="mt-2 text-xs text-gray-500">{{ __('About what (tap once good, twice bad)') }}</p>
                     <div class="mt-1 flex flex-wrap gap-1.5">
                         @foreach (CallListService::TOPICS as $t => $label)
@@ -164,11 +185,14 @@
                     <x-call-proof id="proof-list" kind="spoke() ? 'audio' : 'image'" :title="'spoke() ? '.\Illuminate\Support\Js::from(__('Call recording')).' : '.\Illuminate\Support\Js::from(__('Screenshot of the call log'))" />
                 </div>
 
+                <p data-error x-show="err('proof')" x-cloak class="-mt-2 text-sm font-medium text-red-600" x-text="err('proof')"></p>
+
                 <div x-show="outcome" x-cloak>
                     <p class="mb-2 text-sm font-semibold text-gray-900">{{ __('Note') }} <span class="text-xs font-normal text-gray-500">({{ __('optional') }})</span></p>
                     <textarea name="note" rows="2" maxlength="500" x-model="note" placeholder="{{ __('What did the customer say?') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base sm:text-sm focus:border-primary focus:outline-none"></textarea>
                 </div>
 
+                <p x-show="failed" x-cloak class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" x-text="failed"></p>
                 <button type="submit" :disabled="busy || ! ready()" class="w-full rounded-xl bg-primary px-4 py-3.5 text-base font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
                     x-text="busy ? @js(__('Saving...')) : (ready() ? @js(__('Save and next')) : (! outcome ? @js(__('Pick what happened')) : (! file ? (spoke() ? @js(__('Add the recording')) : @js(__('Add the screenshot'))) : (spoke() && sat === null ? @js(__('Pick how satisfied')) : @js(__('Pick when to call again'))))))"></button>
             </form>

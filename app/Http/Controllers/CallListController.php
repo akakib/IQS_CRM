@@ -468,7 +468,7 @@ class CallListController extends Controller
         ]);
     }
 
-    public function record(Request $request, int $list, int $item): RedirectResponse
+    public function record(Request $request, int $list, int $item): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $row = $this->myList($request->user(), $list);
         $it = DB::table('call_list_items')->where('call_list_id', $row->id)->find($item) ?? abort(404);
@@ -485,6 +485,13 @@ class CallListController extends Controller
         $this->calls->record($it, $request->user(), $data, $request->file('proof'));
         // No cron on staging: the file goes to Drive right after the caller gets the next page (cron, where it runs, catches the rest).
         dispatch(fn () => \Illuminate\Support\Facades\Artisan::call('calls:proofs-to-drive', ['--limit' => 5]))->afterResponse();
+        if ($request->expectsJson()) {
+            // Saved from the page without leaving it: it goes on to the next number itself.
+            session()->flash('success', __('Saved. Next number below.'));
+            session()->flash('saved_item', $it->id);
+
+            return response()->json(['next' => route('calls.work', $row->id)]);
+        }
 
         return redirect()->route('calls.work', $row->id)->with('success', __('Saved. Next number below.'))->with('saved_item', $it->id);
     }

@@ -173,6 +173,24 @@ class CallListTest extends TestCase
         $this->actingAs($this->rakin)->get(route('calls.lists.excel', $list))->assertForbidden(); // managers only
     }
 
+    public function test_saved_from_the_page_problems_come_back_per_field(): void
+    {
+        $list = $this->makeList([$this->rakin]);
+        $this->actingAs($this->rakin)->get(route('calls.work', $list))->assertSee('data-error', false);
+        $item = $this->item($this->rakin, $list);
+        $json = ['Accept' => 'application/json'];
+
+        // A problem: the reason for that field, nothing saved, the number still with the caller.
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 75, 'proof' => UploadedFile::fake()->createWithContent('x.txt', 'hi')], $json)
+            ->assertStatus(422)->assertJsonPath('errors.proof.0', 'This is not a recording. Add the call recording (m4a, mp3, amr...).');
+        $this->assertSame('in_hand', DB::table('call_list_items')->find($item->id)->state);
+
+        // Saved: where to go next, and the message for the next page.
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'answered', 'satisfaction' => 75, 'proof' => $this->fakeFile('ok.m4a', 10, 'audio/mp4')], $json)
+            ->assertOk()->assertJsonPath('next', route('calls.work', $list))->assertSessionHas('success');
+        $this->assertSame('done', DB::table('call_list_items')->find($item->id)->state);
+    }
+
     public function test_no_not_reached_result_once_an_order_was_taken_on_the_call(): void
     {
         $list = $this->makeList([$this->rakin]);

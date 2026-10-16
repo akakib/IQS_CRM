@@ -28,7 +28,7 @@ class SettingsTest extends TestCase
 
     public function test_defaults_apply_until_saved(): void
     {
-        $this->assertSame('Iqbal Store', settings('store.name'));
+        $this->assertSame('IQS', settings('store.name'));
         $this->assertSame(['15:00'], settings('orders.pickup_cutoffs'));
         $this->assertTrue(settings('verification.rerun_on_edit'));
     }

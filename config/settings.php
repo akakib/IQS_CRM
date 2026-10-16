@@ -7,7 +7,7 @@
 */
 
 return [
-    'store.name' => ['string', 'Iqbal Store', 'Store name', 'Store', ['required', 'string', 'max:100']],
+    'store.name' => ['string', 'IQS', 'Store name', 'Store', ['required', 'string', 'max:100']],
     'store.hotline' => ['string', '', 'Rider hotline number', 'Store', ['nullable', 'regex:/^01[3-9]\d{8}$/']],
     'appearance.primary_color' => ['string', '#0d542b', 'Main colour (buttons, links, the current page in the menu)', 'Appearance', ['required', 'regex:/^#[0-9a-fA-F]{6}$/']],
     'appearance.font' => ['string', 'Figtree', 'Font', 'Appearance', ['required', 'string', 'max:40']],

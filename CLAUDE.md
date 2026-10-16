@@ -1,4 +1,4 @@
-# Iqbal OMS — Project Guide
+# IQS — Project Guide
 ## Read first
 Before building anything, read `docs/SYSTEM_MAP.md` (modules, the one source of truth for each job,
 shared components, flows, team rules). If something already does the job, use or extend it; never build
@@ -6,7 +6,7 @@ the same thing twice in a different way. Keep the map up to date when a module c
 
 ## What this is
 An order, courier, marketing-cost, inventory, accounting and team management
-system for ONE business: Iqbal Store (dry fruits / grocery, Bangladesh).
+system for ONE business: IQS (dry fruits / grocery, Bangladesh).
 It replaces a WhatsApp-group workflow. Single business only — do NOT build
 multi-tenancy (no business_id, no business switcher).
 Scale: ~7,000 products, ~200 website orders/day (growing), 1,000+

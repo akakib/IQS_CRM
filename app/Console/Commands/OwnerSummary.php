@@ -23,7 +23,7 @@ class OwnerSummary extends Command
         $t = $profit->totals($day, $day);
         $tk = fn ($v) => '৳'.number_format((float) $v);
 
-        $text = '📊 <b>'.__('Iqbal Store, :d', ['d' => date('d M', strtotime($day))])."</b>\n"
+        $text = '📊 <b>'.__('IQS, :d', ['d' => date('d M', strtotime($day))])."</b>\n"
             .__('New orders: :n', ['n' => DB::table('orders')->whereBetween('created_at', $range)->count()])."\n"
             .__('Confirmed: :c · Cancelled: :x', ['c' => $count('confirmed'), 'x' => $count('cancelled')])."\n"
             .__('Delivered: :d · Returned: :r', ['d' => $t['delivered'], 'r' => $t['orders'] - $t['delivered']])."\n"

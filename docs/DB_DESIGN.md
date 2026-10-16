@@ -1,9 +1,9 @@
-# Iqbal OMS: Database Design
+# IQS: Database Design
 
 > Extracted from the PDF the owner shared (IQS_DB_Design-2.pdf). A few Bangla labels did not survive PDF text extraction; the meaning is in the English around them.
 
 ```text
-Iqbal OMS — Database Design (Order, Verification,
+IQS — Database Design (Order, Verification,
 Payments, Tracking Events)
 Save as docs/DB_DESIGN.md in the project. CLAUDE.md should say:
 "Follow docs/DB_DESIGN.md for all order-related tables."

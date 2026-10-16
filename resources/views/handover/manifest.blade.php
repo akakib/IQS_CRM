@@ -1,5 +1,5 @@
 {{-- The pickup sheet of one handover: the parcels the rider took, to print and sign. The same page as every list download. --}}
-<x-print-page :title="settings('store.name').' · '.__('Pickup sheet').' · '.\Illuminate\Support\Carbon::parse($session->started_at)->format('d M Y')" :landscape="false" :autoprint="false">
+<x-print-page :title="__('Pickup sheet').' · '.\Illuminate\Support\Carbon::parse($session->started_at)->format('d M Y')" :landscape="false" :autoprint="false">
     <x-slot:styles>
         .sign { display: flex; gap: 40px; margin-top: 48px; font-size: 12px; }
         .sign div { flex: 1; border-top: 1px solid #333; padding-top: 4px; }
@@ -11,7 +11,7 @@
         <a href="{{ route('handover.excel', $session->id) }}">{{ __('Excel') }}</a>
     </x-slot:actions>
 
-    <h1>{{ settings('store.name') }} · {{ __('Pickup sheet') }}</h1>
+    <h1>{{ __('Pickup sheet') }}</h1>
     <div class="meta">
         {{ \Illuminate\Support\Carbon::parse($session->started_at)->format('d M Y, g:i A') }} · {{ ucfirst($session->courier) }} ·
         {{ __('Rider') }}: {{ $session->rider_name ?? '-' }} {{ $session->rider_phone ?? '' }}

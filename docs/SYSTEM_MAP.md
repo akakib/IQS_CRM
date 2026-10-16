@@ -144,6 +144,7 @@ Blade components in `resources/views/components` (behaviour in Alpine). Use them
 | `x-call-proof` | The one upload box for a call's recording or screenshot (all four call screens) |
 | `x-play-call` + `x-call-player` | "Play call": recording or screenshot in a popup on the same page |
 | `x-phone-dial` | Call a customer from an order (tap, copy, QR) and log the call |
+| `x-call-live-bar` | The yellow bar of a started, unsaved call, on every page (in the layout) |
 | `x-chat-control` | Communication popup: chats, customer calls in, rider calls |
 | `x-channel-icon` | A chat channel's icon (WhatsApp, Messenger, Instagram...), `size="xs"` inside dropdowns |
 | `x-new-order-popup` | The popup for New order and for looking at an order (`orders.show?embed=1`, Open in new tab) |
@@ -189,8 +190,18 @@ Past orders come in from files (Customers > Import order history) with fix, dele
 callers with a daily target. Callers share the pool: Start calling gives the next number (held 30 minutes),
 they record what happened, satisfaction and topics, and upload the recording or screenshot (`x-call-proof`,
 checked by `CallProof`). The file goes to Google Drive right after saving. Managers follow the list in tabs
-(Overview by dates, Numbers with filters, Settings) and download Print / PDF or Excel. Callers see their own
-history under My calls.
+(Overview by dates, Numbers with filters, Settings) and download Print / PDF or Excel. Callers see today and
+their call-backs under My calls; their history is its own page (My call history).
+
+**One way to log a call, everywhere.** The call list, the order page (`x-phone-dial`, a panel over the page) and
+Communication > Customer calls (tap a recent customer or paste the number) ask the same things: what happened
+(or why they called), how happy, the recording or screenshot (any file, any result), a note. Nobody types a
+duration: it is the recording's own length, else the clock since the call started. A started, unsaved call
+follows the caller to every page (`x-call-live-bar`, kept in the browser) until it is saved.
+
+**Communication stops by itself** after 15 minutes with no chat tap, call or order action (`ChatService::IDLE_MINUTES`),
+counted to the last action + 5 minutes. It is checked when the person's page opens and before a tap, so it
+works without cron; the cron (`desk:tick`) checks everyone too.
 
 ---
 
@@ -199,7 +210,7 @@ history under My calls.
 Places that may do the same job twice; to be checked and merged where they are real duplicates:
 Order activity / Order management / Control room / All orders; Hotline / Delivery issues / rider calls;
 Returns / Return report; KPI / Scorecard / Team Activity / Packers / My points; Stock count / Stock status;
-the call screens (Communication calls in, order page call box, My calls, Call lists).
+the call screens now share one way of logging a call (see section 7); rider calls still have their own fields.
 
 ---
 

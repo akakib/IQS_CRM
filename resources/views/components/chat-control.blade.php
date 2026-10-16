@@ -93,8 +93,8 @@
     <template x-teleport="body">
         <div x-show="open" x-cloak class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
             <div class="absolute inset-0 bg-black/40"></div>
-            <div class="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-xl">
-                <div class="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-3">
+            <div class="relative flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-xl">
+                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-5 py-3">
                     <div>
                         <h3 class="text-sm font-semibold text-gray-800">{{ __('Communication') }} <span class="font-normal text-gray-500" x-text="data ? '· ' + data.date : ''"></span></h3>
                         <p class="text-xs" :class="on ? 'text-green-700' : 'text-gray-500'" x-text="on ? @js(__('Communication on since')) + ' ' + since : @js(__('Communication off'))"></p>
@@ -102,7 +102,7 @@
                     <button type="button" @click="open = false" class="text-gray-400 hover:text-gray-600" aria-label="{{ __('Close') }}">&times;</button>
                 </div>
                 {{-- Chats (their channels), Customer calls (a customer phoned in: everyone here), Rider calls (rider line or hotline). --}}
-                <div class="flex gap-5 overflow-x-auto border-b border-gray-200 px-5">
+                <div class="flex shrink-0 gap-5 overflow-x-auto border-b border-gray-200 px-5">
                     @if ($hasChannels)
                         <button type="button" @click="tab = 'chats'" class="-mb-px shrink-0 border-b-2 pb-2 pt-2 text-sm" :class="tab === 'chats' ? 'border-primary font-medium text-primary' : 'border-transparent text-gray-500'">{{ __('Chats') }}</button>
                     @endif
@@ -112,7 +112,7 @@
                     @endif
                 </div>
 
-                <div class="overflow-y-auto px-5 py-3">
+                <div class="min-h-0 flex-1 overflow-y-auto px-5 py-3">
                     <p x-show="error" x-cloak class="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" x-text="error"></p>
 
                     @if ($hasChannels)
@@ -156,16 +156,7 @@
                          How long it took comes from the recording, else from the clock since they were opened. --}}
                     <div x-show="tab === 'calls'" x-cloak class="space-y-3" x-data="{
                             cmode: 'in', cout: null, csat: null, cq: '', cfound: null, cfinding: false, corder: null, creason: null, cnote: '', cname: '', caddr: '', csaved: null, cnew: null, cerror: null, csaving: false, cstart: null,
-                            recent: null, loadedAt: 0, pasteHint: false,
-                            init() {
-                                this.$watch('tab', v => { if (v === 'calls') this.load() });
-                                this.$watch('open', v => { if (v && tab === 'calls') this.load() });
-                            },
-                            async load() {
-                                if (Date.now() - this.loadedAt < 60000) return;
-                                this.loadedAt = Date.now();
-                                try { this.recent = (await (await fetch(@js(route('customer-calls.recent')), { headers: { Accept: 'application/json' } })).json()).people } catch (e) {}
-                            },
+                            pasteHint: false,
                             async paste() {
                                 this.pasteHint = false;
                                 try { const t = await navigator.clipboard.readText(); if (t.trim()) { this.cq = t.trim(); return this.cfind() } } catch (e) {}
@@ -221,17 +212,9 @@
                                 <p x-show="pasteHint" x-cloak class="mt-1.5 text-xs text-gray-500">{{ __('Long-press the box and choose Paste.') }}</p>
                                 <x-dial-pad model="cq" submit="cfind()" :label="__('Open')" busy="cfinding" class="mt-3" />
                             </form>
-                            <div x-show="recent && recent.length" x-cloak>
-                                <p class="mb-1.5 text-sm font-semibold text-gray-900">{{ __('Or tap a recent customer') }}</p>
-                                <div class="divide-y divide-gray-100 rounded-xl border border-gray-200">
-                                    <template x-for="p in recent || []" :key="p.phone">
-                                        <button type="button" @click="cq = p.phone; cfind()" class="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-gray-50">
-                                            <span class="min-w-0"><span class="block truncate text-sm font-medium text-gray-900" x-text="p.name || p.phone"></span><span class="block truncate text-xs text-gray-500" x-text="p.phone + ' · ' + p.from"></span></span>
-                                            <span class="text-lg text-gray-400" aria-hidden="true">&rsaquo;</span>
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
+                            @can('calls.work')
+                                <a href="{{ route('calls.mine') }}" class="flex min-h-10 w-full items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Open my call list') }}</a>
+                            @endcan
                         </div>
 
                         {{-- The caller, and the call. --}}

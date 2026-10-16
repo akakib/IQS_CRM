@@ -61,13 +61,10 @@ class CustomerCallTest extends TestCase
         $this->assertSame(2, DB::table('customer_calls')->count());
 
         // A customer phones in. Only people with Communication (a channel or the hotline) log it.
-        $this->getJson('/customer-calls/recent')->assertForbidden();
         $this->getJson('/customer-calls/find?q=01712345678')->assertForbidden();
         $wa = \App\Models\ChatChannel::create(['name' => 'WhatsApp 1', 'type' => 'whatsapp', 'is_active' => true]);
         $wa->users()->attach($mod->id);
         $this->getJson('/dashboard')->assertOk();
-        // Who may be calling: the latest orders they may see, one row a number, tap to open.
-        $this->getJson('/customer-calls/recent')->assertOk()->assertJsonPath('people.0.phone', '01712345678')->assertJsonPath('people.0.name', 'Rahim')->assertJsonCount(1, 'people');
         $this->getJson('/customer-calls/find?q='.urlencode('+880 1712-345678'))->assertOk()
             ->assertJson(['phone' => '01712345678', 'name' => 'Rahim'])->assertJsonPath('orders.0.order_no', $order->order_no);
         $this->postJson('/customer-calls/incoming', ['phone' => '01712345678', 'order_id' => $order->id, 'reason' => 'complaint', 'minutes' => 1, 'seconds' => 0, 'note' => 'Box was wet'])

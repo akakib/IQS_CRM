@@ -124,7 +124,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/rider-calls/find', [\App\Http\Controllers\RiderCallController::class, 'find'])->middleware('can:rider-calls')->name('rider-calls.find');
     Route::post('/rider-calls', [\App\Http\Controllers\RiderCallController::class, 'store'])->middleware('can:rider-calls')->name('rider-calls.store');
     Route::get('/customer-calls/find', [\App\Http\Controllers\CustomerCallController::class, 'find'])->name('customer-calls.find');
-    Route::get('/customer-calls/recent', [\App\Http\Controllers\CustomerCallController::class, 'recent'])->name('customer-calls.recent');
     Route::post('/customer-calls/incoming', [\App\Http\Controllers\CustomerCallController::class, 'incoming'])->name('customer-calls.incoming');
     Route::get('/calls-report', [\App\Http\Controllers\CustomerCallController::class, 'report'])->middleware('can:orders.reassign')->name('calls-report.index');
     Route::post('/customer-calls',[\App\Http\Controllers\CustomerCallController::class, 'start'])->middleware('can:orders.edit')->name('customer-calls.start');

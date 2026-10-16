@@ -35,6 +35,9 @@ class CallListService
 
     public const SATISFACTION = [0 => 'Very unhappy', 25 => 'Unhappy', 50 => 'Okay', 75 => 'Happy', 100 => 'Very happy'];
 
+    /** Results where the customer was not reached: no order can come from such a call. */
+    public const NOT_REACHED = ['no_answer', 'busy', 'wrong', 'do_not_call'];
+
     public const TOPICS = ['product' => 'Product quality', 'delivery' => 'Delivery', 'packaging' => 'Packaging', 'price' => 'Price', 'staff' => 'Staff'];
 
     /** No answer or busy: tried again after this long, at most this many times. */
@@ -167,6 +170,9 @@ class CallListService
             throw $gone;
         }
         $outcome = $data['outcome'];
+        if ($item->order_id && in_array($outcome, self::NOT_REACHED, true)) {
+            throw ValidationException::withMessages(['outcome' => __('An order was taken on this call, so the customer was reached. Pick Ordered or Talked.')]);
+        }
         $spoke = in_array($outcome, self::SPOKE, true);
         if ($spoke && ! array_key_exists((int) ($data['satisfaction'] ?? -1), self::SATISFACTION)) {
             throw ValidationException::withMessages(['satisfaction' => __('Pick how satisfied the customer is.')]);
@@ -287,8 +293,6 @@ class CallListService
             'satisfaction' => ($s = DB::table('call_list_items')->where('call_list_id', $list->id)->whereNotNull('satisfaction')->avg('satisfaction')) === null ? null : (int) round($s),
             'orders' => (clone $orders)->count(),
             'sold' => (float) (clone $orders)->sum('o.grand_total'),
-            'unhappy' => DB::table('call_list_items as i')->leftJoin('users as u', 'u.id', '=', 'i.user_id')->where('i.call_list_id', $list->id)
-                ->where('i.satisfaction', '<', 50)->orderByDesc('i.updated_at')->limit(20)->get(['i.id', 'i.name', 'i.customer_id', 'i.satisfaction', 'i.note', 'i.topics', 'u.name as by']),
         ];
     }
 

@@ -183,6 +183,8 @@ Route::middleware('auth')->group(function () {
             Route::post('/call-lists', 'store')->name('calls.lists.store');
             Route::get('/call-lists/{list}', 'show')->whereNumber('list')->name('calls.lists.show');
             Route::get('/call-lists/{list}/items/{item}', 'item')->whereNumber(['list', 'item'])->name('calls.lists.item');
+            Route::get('/call-lists/{list}/excel', 'exportExcel')->whereNumber('list')->name('calls.lists.excel');
+            Route::get('/call-lists/{list}/print', 'exportPrint')->whereNumber('list')->name('calls.lists.print');
             Route::put('/call-lists/{list}', 'update')->whereNumber('list')->name('calls.lists.update');
         });
         Route::middleware('can:calls.work')->group(function () {

@@ -129,12 +129,60 @@ class CallListTest extends TestCase
         $this->get(route('journey.show', $item->customer_id))->assertSee('25% satisfied');
         $this->get(route('calls.proof', $call->id))->assertOk();
         $this->actingAs($this->pranta)->get(route('calls.proof', $call->id))->assertNotFound();
-        $this->actingAs($this->owner)->get(route('calls.lists.show', $list))->assertOk()->assertSee('Unhappy customers')->assertSee('Box crushed')->assertSee('Rakin');
+        $this->actingAs($this->owner)->get(route('calls.lists.show', $list))->assertOk()->assertSee('Overview')->assertSee('Box crushed')->assertSee('Rakin');
         $this->get(route('calls.proof', $call->id))->assertOk();
 
         // Back on the page, the next number is already there.
         $this->actingAs($this->rakin)->get(route('calls.work', $list))->assertOk();
         $this->assertNotSame($item->id, $this->item($this->rakin, $list)->id);
+    }
+
+    public function test_overview_by_dates_and_downloads_of_what_is_filtered(): void
+    {
+        $list = $this->makeList([$this->rakin]);
+        $this->actingAs($this->rakin)->get(route('calls.work', $list));
+        $old = $this->item($this->rakin, $list);
+        $this->post(route('calls.record', [$list, $old->id]), ['outcome' => 'answered', 'satisfaction' => 25, 'topics' => ['delivery' => 'bad'], 'note' => 'Late', 'proof' => $this->fakeFile('a.m4a', 20, 'audio/mp4')]);
+        DB::table('customer_calls')->where('call_list_item_id', $old->id)->update(['started_at' => now()->subDays(10)]);
+        $this->get(route('calls.work', $list));
+        $new = $this->item($this->rakin, $list);
+        $this->post(route('calls.record', [$list, $new->id]), ['outcome' => 'answered', 'satisfaction' => 100, 'topics' => ['product' => 'good'], 'proof' => $this->fakeFile('b.m4a', 20, 'audio/mp4')]);
+
+        // All days: both calls; the last 7 days: only the new one, in the Overview and in Numbers.
+        $all = $this->actingAs($this->owner)->get(route('calls.lists.show', $list))->assertOk()->viewData('overview');
+        $this->assertSame([2, 1, 1, 1], [$all['calls'], $all['happy'], $all['unhappy'], $all['topics']['delivery']['bad']]);
+        $week = ['from' => now()->subDays(6)->toDateString(), 'to' => now()->toDateString()];
+        $res = $this->get(route('calls.lists.show', [$list] + $week))->assertOk();
+        $this->assertSame([1, 1, 0], [$res->viewData('overview')['calls'], $res->viewData('overview')['happy'], $res->viewData('overview')['unhappy']]);
+        $this->assertSame([$new->id], $res->viewData('numbers')->getCollection()->pluck('id')->all());
+        $res->assertSee('Settings')->assertSee(route('calls.lists.excel', [$list] + $week));
+
+        // Excel and PDF carry the same filters: unhappy, all days -> only the old call's customer.
+        $xlsx = $this->get(route('calls.lists.excel', [$list, 'mood' => 'unhappy']))->assertOk();
+        $this->assertStringContainsString('.xlsx', $xlsx->headers->get('content-disposition'));
+        $zip = new \ZipArchive;
+        $zip->open($xlsx->baseResponse->getFile()->getPathname());
+        $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $this->assertStringContainsString($old->name, $sheet);
+        $this->assertStringNotContainsString($new->name, $sheet);
+        $this->assertStringContainsString('Delivery', $sheet);
+        $this->get(route('calls.lists.print', [$list, 'mood' => 'unhappy'] + $week))->assertOk()->assertSee('No number matches these filters.');
+        $this->get(route('calls.lists.print', [$list, 'mood' => 'unhappy']))->assertOk()->assertSee($old->name)->assertDontSee($new->name)->assertSee('Unhappy');
+        $this->assertSame(3, DB::table('activity_log')->where('action', 'call_list.exported')->count()); // every download is logged
+        $this->actingAs($this->rakin)->get(route('calls.lists.excel', $list))->assertForbidden(); // managers only
+    }
+
+    public function test_no_not_reached_result_once_an_order_was_taken_on_the_call(): void
+    {
+        $list = $this->makeList([$this->rakin]);
+        $this->actingAs($this->rakin)->get(route('calls.work', $list));
+        $item = $this->item($this->rakin, $list);
+        (new OrderConfigSeeder)->run();
+
+        $orderId = DB::table('orders')->insertGetId(['order_no' => 'IQ1', 'channel' => 'phone', 'status_id' => \App\Models\OrderStatus::query()->value('id') ?? 1, 'customer_id' => $item->customer_id, 'ship_name' => 'X', 'ship_phone' => $item->phone, 'ship_address' => 'Y', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('call_list_items')->where('id', $item->id)->update(['order_id' => $orderId]);
+        $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'busy', 'proof' => UploadedFile::fake()->image('log.png', 44, 10)])
+            ->assertSessionHasErrors(['outcome' => 'An order was taken on this call, so the customer was reached. Pick Ordered or Talked.']);
     }
 
     public function test_callers_see_their_own_call_history_only(): void
@@ -267,7 +315,7 @@ class CallListTest extends TestCase
 
         $this->post(route('calls.record', [$list, $item->id]), ['outcome' => 'ordered', 'satisfaction' => 100, 'proof' => $this->fakeFile('c.m4a', 10)]);
         $this->assertSame($orderId, DB::table('customer_calls')->value('order_id'));
-        $this->actingAs($this->owner)->get(route('calls.lists.show', $list))->assertSee('Orders from calls');
+        $this->actingAs($this->owner)->get(route('calls.lists.show', $list))->assertSee('Orders from these calls');
         $this->assertSame(1, app(\App\Services\Calls\CallListService::class)->progress(DB::table('call_lists')->find($list))['orders']);
     }
 
@@ -358,6 +406,7 @@ class CallListTest extends TestCase
 
     public function test_work_time_reports_and_the_order_popup_see_list_calls(): void
     {
+        \Illuminate\Support\Carbon::setTestNow('2026-10-18 13:00:00'); // a working day at midday (Friday is the day off)
         $list = $this->makeList([$this->rakin]);
         $this->actingAs($this->rakin)->get(route('calls.work', $list));
         $item = $this->item($this->rakin, $list);

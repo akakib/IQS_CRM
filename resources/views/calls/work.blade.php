@@ -76,7 +76,7 @@
                 class="space-y-4 rounded-2xl border-2 border-primary/30 bg-white p-4"
                 x-data="{
                     outcome: @js(old('outcome', '')), sat: @js(old('satisfaction') === null ? null : (int) old('satisfaction')), topics: {}, laterAt: @js(old('later_at', '')),
-                    file: '', order: null, busy: false, note: '', key: 'iqs-call-note-{{ $item->id }}',
+                    file: '', order: @js($item->order_id ? \Illuminate\Support\Facades\DB::table('orders')->where('id', $item->order_id)->value('order_no') : null), busy: false, note: '', key: 'iqs-call-note-{{ $item->id }}',
                     spoke() { return this.spokeOf(this.outcome) },
                     spokeOf(o) { return @js(CallListService::SPOKE).includes(o) }, orderLinked: true,
                     init() {
@@ -110,15 +110,18 @@
                     <div class="grid grid-cols-2 gap-2">
                         @foreach (CallListService::OUTCOMES as $key => $label)
                             <label class="cursor-pointer">
-                                <input type="radio" name="outcome" value="{{ $key }}" x-model="outcome" class="peer sr-only">
-                                <span class="block rounded-xl border border-gray-300 px-3 py-3 text-center text-sm font-medium text-gray-800 peer-checked:border-primary peer-checked:bg-primary peer-checked:text-white">{{ __($label) }}</span>
+                                {{-- An order taken on this call: the customer was reached, so "not reached" results are closed. --}}
+                                <input type="radio" name="outcome" value="{{ $key }}" x-model="outcome" class="peer sr-only"
+                                    @if (in_array($key, CallListService::NOT_REACHED, true)) :disabled="order && orderLinked" @endif>
+                                <span class="block rounded-xl border border-gray-300 px-3 py-3 text-center text-sm font-medium text-gray-800 peer-checked:border-primary peer-checked:bg-primary peer-checked:text-white peer-disabled:cursor-not-allowed peer-disabled:opacity-40">{{ __($label) }}</span>
                             </label>
                         @endforeach
                     </div>
                     <p x-show="order && orderLinked" x-cloak class="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">{{ __('Order made:') }} <span class="font-mono font-semibold" x-text="order"></span></p>
                     <p x-show="order && ! orderLinked" x-cloak class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('The order was made, but this number waited too long and went back to the list, so the order is not linked to it. Press Next call.') }} <span class="font-mono font-semibold" x-text="order"></span></p>
                     @if ($canOrder)
-                        <button type="button" class="mt-2 w-full rounded-xl border border-primary px-3 py-2.5 text-sm font-semibold text-primary hover:bg-green-50"
+                        {{-- No order when the customer was not reached. --}}
+                        <button type="button" x-show="! @js(CallListService::NOT_REACHED).includes(outcome)" class="mt-2 w-full rounded-xl border border-primary px-3 py-2.5 text-sm font-semibold text-primary hover:bg-green-50"
                             @click="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: @js(route('orders.create', ['phone' => $item->phone, 'channel' => 'phone', 'embed' => 1, 'call_item' => $item->id])), title: @js(__('Order for :n', ['n' => $item->name])) } }))">+ {{ __('Take an order') }}</button>
                     @endif
                 </div>

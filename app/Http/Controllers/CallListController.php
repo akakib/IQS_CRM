@@ -71,26 +71,116 @@ class CallListController extends Controller
 
     public function show(Request $request, int $list): View
     {
-        $row = DB::table('call_lists as l')->leftJoin('customer_imports as i', 'i.id', '=', 'l.customer_import_id')->where('l.id', $list)->first(['l.*', 'i.file_name']) ?? abort(404);
-        $f = [
+        $row = $this->listRow($list);
+        $f = $this->numberFilters($request);
+
+        return view('calls.show', [
+            'list' => $row,
+            'progress' => $this->calls->progress($row),
+            'callers' => $this->callers(),
+            'assigned' => DB::table('call_list_user')->where('call_list_id', $list)->pluck('user_id')->all(),
+            'numbers' => $this->numbersQuery($list, $f)->paginate(25)->withQueryString()->fragment('numbers'),
+            'filters' => $f,
+            'overview' => $this->overview($list, $f),
+            // Everyone who has called on this list, for the Caller filter.
+            'calledBy' => DB::table('customer_calls as cc')->join('call_list_items as i', 'i.id', '=', 'cc.call_list_item_id')->join('users as u', 'u.id', '=', 'cc.user_id')
+                ->where('i.call_list_id', $list)->distinct()->orderBy('u.name')->pluck('u.name', 'u.id')->all(),
+            'seePhone' => $request->user()->canSeeField('customer_contact'),
+        ]);
+    }
+
+    /** The numbers as filtered on the page, as an Excel file. */
+    public function exportExcel(Request $request, int $list): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $row = $this->listRow($list);
+        $f = $this->numberFilters($request);
+        $see = $request->user()->canSeeField('customer_contact');
+        $rows = $this->exportRows($list, $f);
+        $file = \App\Support\Xlsx::write(__('Numbers'), [
+            __('Customer'), __('Phone'), __('State'), __('Result'), __('Satisfied'), __('Good about'), __('Bad about'), __('Note'), __('Tries'), __('Last caller'), __('Last call'), __('Order'), __('Order total'),
+        ], $rows->map(fn ($n) => [
+            $n->name, $see ? $n->phone : \App\Support\Permissions\Mask::value($n->phone, 'customer_contact'), $this->stateLabel($n), $n->outcome ? __(CallListService::OUTCOMES[$n->outcome] ?? $n->outcome) : '',
+            $n->satisfaction === null ? '' : $n->satisfaction.'%', $this->topicText($n->topics, 'good'), $this->topicText($n->topics, 'bad'), (string) $n->note, (int) $n->attempts,
+            (string) $n->by, $n->attempts ? \Illuminate\Support\Carbon::parse($n->updated_at)->format('Y-m-d H:i') : '', (string) $n->order_no, $n->order_no ? (float) $n->grand_total : '',
+        ]), [22, 14, 16, 14, 9, 22, 22, 40, 6, 14, 16, 12, 11]);
+        app(\App\Services\ActivityLogger::class)->log('call_list.exported', ['call_list', $list], null, ['as' => 'excel', 'rows' => $rows->count()] + $f);
+
+        return response()->download($file, $this->exportName($row, $f).'.xlsx', ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])->deleteFileAfterSend();
+    }
+
+    /** The numbers as filtered on the page, as a page made for paper (Print, or Save as PDF). */
+    public function exportPrint(Request $request, int $list): View
+    {
+        if (app()->bound('debugbar')) {
+            app('debugbar')->disable();
+        }
+        $row = $this->listRow($list);
+        $f = $this->numberFilters($request);
+        $rows = $this->exportRows($list, $f);
+        app(\App\Services\ActivityLogger::class)->log('call_list.exported', ['call_list', $list], null, ['as' => 'print', 'rows' => $rows->count()] + $f);
+
+        return view('calls.export-print', [
+            'list' => $row, 'rows' => $rows, 'filters' => $f, 'overview' => $this->overview($list, $f), 'title' => $this->exportName($row, $f),
+            'describe' => $this->describeFilters($f), 'seePhone' => $request->user()->canSeeField('customer_contact'),
+            'stateLabel' => fn ($n) => $this->stateLabel($n), 'topicText' => fn ($t, $k) => $this->topicText($t, $k), 'max' => self::EXPORT_MAX,
+        ]);
+    }
+
+    /** At most this many numbers in one download. */
+    public const EXPORT_MAX = 20000;
+
+    private function exportRows(int $list, array $f): \Illuminate\Support\Collection
+    {
+        return $this->numbersQuery($list, $f)->addSelect('i.topics')->limit(self::EXPORT_MAX)->get();
+    }
+
+    private function listRow(int $list): object
+    {
+        return DB::table('call_lists as l')->leftJoin('customer_imports as i', 'i.id', '=', 'l.customer_import_id')->where('l.id', $list)->first(['l.*', 'i.file_name']) ?? abort(404);
+    }
+
+    /** The filters of the Numbers tab (and the date range all tabs share); anything unknown is dropped. */
+    private function numberFilters(Request $request): array
+    {
+        $date = fn (string $k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d = (string) $request->query($k, '')) && strtotime($d) ? $d : '';
+
+        return [
+            'from' => $date('from'),
+            'to' => $date('to'),
             'q' => trim((string) $request->query('q', '')),
             'state' => array_key_exists($s = (string) $request->query('state', ''), self::STATES) ? $s : '',
-            'outcome' => array_key_exists($o = (string) $request->query('outcome', ''), CallListService::OUTCOMES) ? $o : '',
+            'outcome' => array_key_exists($o = (string) $request->query('outcome', ''), CallListService::OUTCOMES) || $o === 'not_reached' ? $o : '',
             'caller' => ctype_digit($c = (string) $request->query('caller', '')) ? $c : '',
             'mood' => in_array($m = (string) $request->query('mood', ''), ['unhappy', 'okay', 'happy'], true) ? $m : '',
             'flag' => in_array($g = (string) $request->query('flag', ''), ['ordered', 'earlier'], true) ? $g : '',
             'sort' => array_key_exists($t = (string) $request->query('sort', 'recent'), self::SORTS) ? $t : 'recent',
         ];
+    }
 
-        $numbers = DB::table('call_list_items as i')->where('i.call_list_id', $list)
+    /** Calls of this list inside the date range (all of them without one). */
+    private function callsInRange(int $list, array $f): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('customer_calls as cc')->join('call_list_items as i', 'i.id', '=', 'cc.call_list_item_id')->where('i.call_list_id', $list)
+            ->when($f['from'] !== '', fn ($q) => $q->where('cc.started_at', '>=', $f['from'].' 00:00:00'))
+            ->when($f['to'] !== '', fn ($q) => $q->where('cc.started_at', '<=', $f['to'].' 23:59:59'));
+    }
+
+    private function numbersQuery(int $list, array $f): \Illuminate\Database\Query\Builder
+    {
+        $ranged = $f['from'] !== '' || $f['to'] !== '';
+
+        return DB::table('call_list_items as i')->where('i.call_list_id', $list)
             ->leftJoin('users as u', 'u.id', '=', 'i.user_id')->leftJoin('orders as o', 'o.id', '=', 'i.order_id')
+            // A date range keeps the numbers called in it.
+            ->when($ranged, fn ($q) => $q->whereIn('i.id', $this->callsInRange($list, $f)->select('cc.call_list_item_id')))
             ->when($f['q'] !== '', function ($q) use ($f) {
                 $phone = \App\Support\Phone::normalize($f['q']);
                 $q->where(fn ($w) => $phone ? $w->where('i.phone', $phone) : $w->where('i.name', 'like', '%'.$f['q'].'%')->orWhere('i.phone', 'like', '%'.preg_replace('/\D/', '', $f['q']).'%'));
             })
             ->when($f['state'] === 'not_called', fn ($q) => $q->where('i.attempts', 0)->where('i.state', '!=', 'in_hand'))
             ->when(in_array($f['state'], ['in_hand', 'later', 'done'], true), fn ($q) => $q->where('i.state', $f['state']))
-            ->when($f['outcome'] !== '', fn ($q) => $q->where('i.outcome', $f['outcome']))
+            ->when($f['outcome'] === 'not_reached', fn ($q) => $q->whereIn('i.outcome', ['no_answer', 'busy']))
+            ->when($f['outcome'] !== '' && $f['outcome'] !== 'not_reached', fn ($q) => $q->where('i.outcome', $f['outcome']))
             ->when($f['caller'] !== '', fn ($q) => $q->whereExists(fn ($e) => $e->selectRaw('1')->from('customer_calls as cc')->whereColumn('cc.call_list_item_id', 'i.id')->where('cc.user_id', (int) $f['caller'])))
             ->when($f['mood'] === 'unhappy', fn ($q) => $q->where('i.satisfaction', '<', 50))
             ->when($f['mood'] === 'okay', fn ($q) => $q->where('i.satisfaction', 50))
@@ -102,21 +192,89 @@ class CallListController extends Controller
             ->when($f['sort'] === 'unhappy', fn ($q) => $q->orderByRaw('i.satisfaction IS NULL')->orderBy('i.satisfaction'))
             ->when($f['sort'] === 'tries', fn ($q) => $q->orderByDesc('i.attempts'))
             ->orderBy('i.id')
-            ->select(['i.id', 'i.name', 'i.phone', 'i.customer_id', 'i.state', 'i.attempts', 'i.outcome', 'i.satisfaction', 'i.note', 'i.next_at', 'i.updated_at', 'i.order_id', 'u.name as by', 'o.order_no', 'o.grand_total'])
-            ->paginate(25)->withQueryString()->fragment('numbers');
+            ->select(['i.id', 'i.name', 'i.phone', 'i.customer_id', 'i.state', 'i.attempts', 'i.outcome', 'i.satisfaction', 'i.note', 'i.next_at', 'i.updated_at', 'i.order_id', 'u.name as by', 'o.order_no', 'o.grand_total']);
+    }
 
-        return view('calls.show', [
-            'list' => $row,
-            'progress' => $this->calls->progress($row),
-            'callers' => $this->callers(),
-            'assigned' => DB::table('call_list_user')->where('call_list_id', $list)->pluck('user_id')->all(),
-            'numbers' => $numbers,
-            'filters' => $f,
-            // Everyone who has called on this list, for the Caller filter.
-            'calledBy' => DB::table('customer_calls as cc')->join('call_list_items as i', 'i.id', '=', 'cc.call_list_item_id')->join('users as u', 'u.id', '=', 'cc.user_id')
-                ->where('i.call_list_id', $list)->distinct()->orderBy('u.name')->pluck('u.name', 'u.id')->all(),
-            'seePhone' => $request->user()->canSeeField('customer_contact'),
+    /**
+     * The Overview tab, for the date range: calls and how they went, how satisfied the customers were,
+     * orders, what they complained about, and each caller.
+     */
+    private function overview(int $list, array $f): array
+    {
+        $calls = $this->callsInRange($list, $f);
+        $byOutcome = (clone $calls)->groupBy('cc.outcome')->selectRaw('cc.outcome, COUNT(*) as n')->pluck('n', 'cc.outcome');
+        // Each customer counted once, by how they felt on their latest call in the range.
+        $moods = (clone $calls)->whereNotNull('cc.satisfaction')
+            ->whereRaw('cc.id = (SELECT MAX(c2.id) FROM customer_calls c2 WHERE c2.call_list_item_id = cc.call_list_item_id AND c2.satisfaction IS NOT NULL'
+                .($f['from'] !== '' ? " AND c2.started_at >= '".$f['from']." 00:00:00'" : '').($f['to'] !== '' ? " AND c2.started_at <= '".$f['to']." 23:59:59'" : '').')')
+            ->pluck('cc.satisfaction');
+        $items = (clone $calls)->distinct()->pluck('cc.call_list_item_id');
+        $orders = DB::table('call_list_items as i')->join('orders as o', 'o.id', '=', 'i.order_id')->whereIn('i.id', $items);
+        $topics = [];
+        foreach (DB::table('call_list_items')->whereIn('id', $items)->whereNotNull('topics')->pluck('topics') as $t) {
+            foreach (json_decode((string) $t, true) ?: [] as $k => $v) {
+                $topics[$k][$v] = ($topics[$k][$v] ?? 0) + 1;
+            }
+        }
+        $people = (clone $calls)->join('users as u', 'u.id', '=', 'cc.user_id')->groupBy('cc.user_id', 'u.name')
+            ->selectRaw("cc.user_id, u.name, COUNT(*) as calls, SUM(CASE WHEN cc.outcome = 'answered' THEN 1 ELSE 0 END) as talked, AVG(cc.satisfaction) as sat, COUNT(DISTINCT i.order_id) as orders")
+            ->orderByDesc('calls')->get();
+
+        return [
+            'calls' => (int) $byOutcome->sum(),
+            'customers' => $items->count(),
+            'talked' => (int) ($byOutcome['answered'] ?? 0),
+            'not_reached' => (int) ($byOutcome['no_answer'] ?? 0) + (int) ($byOutcome['busy'] ?? 0),
+            'wrong' => (int) ($byOutcome['wrong'] ?? 0),
+            'happy' => $moods->filter(fn ($s) => $s > 50)->count(),
+            'okay' => $moods->filter(fn ($s) => (int) $s === 50)->count(),
+            'unhappy' => $moods->filter(fn ($s) => $s < 50)->count(),
+            'satisfaction' => $moods->isEmpty() ? null : (int) round($moods->avg()),
+            'orders' => (clone $orders)->count(),
+            'sold' => (float) (clone $orders)->sum('o.grand_total'),
+            'topics' => collect(CallListService::TOPICS)->map(fn ($label, $k) => ['label' => __($label), 'bad' => $topics[$k]['bad'] ?? 0, 'good' => $topics[$k]['good'] ?? 0])
+                ->filter(fn ($t) => $t['bad'] || $t['good'])->sortByDesc('bad')->all(),
+            'people' => $people,
+        ];
+    }
+
+    private function stateLabel(object $n): string
+    {
+        return match (true) {
+            $n->state === 'in_hand' => __('With :n now', ['n' => $n->by ?? '-']),
+            $n->state === 'later' => __('Again :d', ['d' => $n->next_at ? \Illuminate\Support\Carbon::parse($n->next_at)->format('d M, g:i A') : '-']),
+            $n->state === 'done' => __('Done'),
+            default => __('Not called yet'),
+        };
+    }
+
+    private function topicText(?string $topics, string $kind): string
+    {
+        return collect(json_decode((string) $topics, true) ?: [])->filter(fn ($v) => $v === $kind)->keys()
+            ->map(fn ($k) => __(CallListService::TOPICS[$k] ?? $k))->join(', ');
+    }
+
+    /** "Unhappy, Done, 01 Oct 2026 to 15 Oct 2026" for the top of a download. */
+    private function describeFilters(array $f): string
+    {
+        $bits = array_filter([
+            $f['from'] !== '' || $f['to'] !== '' ? ($f['from'] !== '' ? \Illuminate\Support\Carbon::parse($f['from'])->format('d M Y') : __('Start')).' '.__('to').' '.($f['to'] !== '' ? \Illuminate\Support\Carbon::parse($f['to'])->format('d M Y') : __('today')) : __('All days'),
+            $f['state'] !== '' ? __(self::STATES[$f['state']]) : null,
+            $f['outcome'] !== '' ? __(CallListService::OUTCOMES[$f['outcome']] ?? 'No answer or off') : null,
+            $f['caller'] !== '' ? DB::table('users')->where('id', (int) $f['caller'])->value('name') : null,
+            ['unhappy' => __('Unhappy'), 'okay' => __('Okay'), 'happy' => __('Happy'), '' => null][$f['mood']],
+            ['ordered' => __('Ordered on the call'), 'earlier' => __('Earlier file used'), '' => null][$f['flag']],
+            $f['q'] !== '' ? '"'.$f['q'].'"' : null,
         ]);
+
+        return implode(' · ', $bits);
+    }
+
+    private function exportName(object $list, array $f): string
+    {
+        $mood = ['unhappy' => ' unhappy', 'okay' => ' okay', 'happy' => ' happy', '' => ''][$f['mood']];
+
+        return trim(preg_replace('/[^\w\- ]+/u', '', $list->name).$mood.' '.($f['from'] ?: 'start').' to '.($f['to'] ?: now()->toDateString()));
     }
 
     /** One number of a list, for the details popup: where it stands, every call on it with its file, and the order taken. */
@@ -195,7 +353,7 @@ class CallListController extends Controller
             CallListService::giveBack(DB::table('call_list_items')->where('call_list_id', $list)->where('state', 'in_hand')->whereNotIn('user_id', $data['callers']));
         });
 
-        return redirect()->route('calls.lists.show', $list)->with('success', __('Saved.'));
+        return redirect()->to(route('calls.lists.show', $list).'#settings')->with('success', __('Saved.'));
     }
 
     // ---- Callers -------------------------------------------------------------------------------

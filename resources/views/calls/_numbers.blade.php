@@ -4,8 +4,20 @@
     use App\Services\Calls\CallListService;
     use App\Support\Permissions\Mask;
     $f = $filters;
-    $here = route('calls.lists.show', $list->id);
+    $range = array_filter(['from' => $f['from'], 'to' => $f['to']]);
+    $here = route('calls.lists.show', [$list->id] + $range);
     $filtered = $f['q'] !== '' || $f['state'] !== '' || $f['outcome'] !== '' || $f['caller'] !== '' || $f['mood'] !== '' || $f['flag'] !== '' || $f['sort'] !== 'recent';
+    // What is on the screen goes into the download: the same filters and dates.
+    $now = array_filter($f, fn ($v, $k) => $v !== '' && ! ($k === 'sort' && $v === 'recent'), ARRAY_FILTER_USE_BOTH);
+    $chip = fn (array $q) => route('calls.lists.show', [$list->id] + $range + $q).'#numbers';
+    $chips = [
+        [__('All'), [], ! $filtered],
+        [__('Not called'), ['state' => 'not_called'], $f['state'] === 'not_called'],
+        [__('Unhappy'), ['mood' => 'unhappy'], $f['mood'] === 'unhappy'],
+        [__('Ordered'), ['flag' => 'ordered'], $f['flag'] === 'ordered'],
+        [__('Call later'), ['state' => 'later'], $f['state'] === 'later'],
+        [__('Wrong number'), ['outcome' => 'wrong'], $f['outcome'] === 'wrong'],
+    ];
     $stateBadge = fn ($n) => match (true) {
         $n->state === 'in_hand' => ['blue', __('With :n now', ['n' => $n->by ?? '-'])],
         $n->state === 'later' => ['amber', __('Again :d', ['d' => $n->next_at ? \Illuminate\Support\Carbon::parse($n->next_at)->format('d M, g:i A') : '-'])],
@@ -16,12 +28,21 @@
 @endphp
 
 <div id="numbers" class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-    <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <p class="text-sm font-semibold text-gray-900">{{ __('Numbers') }}</p>
-        <p class="text-xs text-gray-500">{{ trans_choice(':count number|:count numbers', $numbers->total(), ['count' => number_format($numbers->total())]) }}</p>
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap gap-1.5">
+            @foreach ($chips as [$label, $q, $on])
+                <a href="{{ $chip($q) }}" class="rounded-full border px-3 py-1 text-xs font-medium {{ $on ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-700 hover:border-primary' }}">{{ $label }}</a>
+            @endforeach
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-500">{{ trans_choice(':count number|:count numbers', $numbers->total(), ['count' => number_format($numbers->total())]) }}</span>
+            <x-button size="sm" variant="secondary" :href="route('calls.lists.excel', [$list->id] + $now)">{{ __('Excel') }}</x-button>
+            <x-button size="sm" variant="secondary" :href="route('calls.lists.print', [$list->id] + $now)" target="_blank">{{ __('PDF') }}</x-button>
+        </div>
     </div>
 
     <form method="GET" action="{{ $here }}#numbers" class="space-y-2">
+        @foreach ($range as $k => $v)<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endforeach
         <div class="flex gap-2">
             <input type="search" name="q" value="{{ $f['q'] }}" placeholder="{{ __('Name or phone') }}" autocomplete="off"
                 class="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none">
@@ -31,7 +52,7 @@
         <div class="grid grid-cols-2 gap-2 lg:grid-cols-6">
             @php $submit = '$nextTick(() => $el.closest(\'form\').submit())'; @endphp
             <x-simple-select name="state" :options="['' => __('Any state')] + array_map('__', CallListController::STATES)" :value="$f['state']" full-width size="sm" x-on:select-change="{{ $submit }}" />
-            <x-simple-select name="outcome" :options="['' => __('Any result')] + array_map('__', CallListService::OUTCOMES)" :value="$f['outcome']" full-width size="sm" x-on:select-change="{{ $submit }}" />
+            <x-simple-select name="outcome" :options="['' => __('Any result')] + array_map('__', CallListService::OUTCOMES) + ['not_reached' => __('No answer or off')]" :value="$f['outcome']" full-width size="sm" x-on:select-change="{{ $submit }}" />
             <x-simple-select name="caller" :options="['' => __('Any caller')] + $calledBy" :value="$f['caller']" full-width size="sm" x-on:select-change="{{ $submit }}" />
             <x-simple-select name="mood" :options="['' => __('Any satisfaction'), 'unhappy' => __('Unhappy'), 'okay' => __('Okay'), 'happy' => __('Happy')]" :value="$f['mood']" full-width size="sm" x-on:select-change="{{ $submit }}" />
             <x-simple-select name="flag" :options="['' => __('Everything'), 'ordered' => __('Ordered on the call'), 'earlier' => __('Earlier file used')]" :value="$f['flag']" full-width size="sm" x-on:select-change="{{ $submit }}" />

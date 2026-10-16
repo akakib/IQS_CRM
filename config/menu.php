@@ -22,7 +22,7 @@ return [
         ['Packaging', 'packaging.index', 'packaging.*', 'packaging.view', 'box'],
         ['Handover', 'handover.index', 'handover.*', 'packaging.view', 'swap'],
         ['Returns', 'returns.index', 'returns.*', 'packaging.view', 'refresh'],
-        ['Hotline', 'hotline.index', 'hotline.*', 'hotline.view', 'phone'],
+        ['Parcel status', 'hotline.index', 'hotline.*', 'hotline.view', 'phone'],
         ['Delivery issues', 'issues.index', 'issues.*', 'orders.view', 'alert'],
         ['Payments to check', 'payments.index', 'payments.*', 'payments.verify', 'cash'],
         ['Control room', 'desk.control', 'desk.control', 'orders.reassign', 'monitor'],

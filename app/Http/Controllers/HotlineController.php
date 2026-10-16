@@ -35,7 +35,9 @@ class HotlineController extends Controller
                 ->orderByDesc('orders.id')->limit(10)->get();
         }
 
-        $selected = $results->count() === 1 ? $results->first() : ($request->integer('order') ? Order::find($request->integer('order')) : null);
+        // The whole order (the list above loads only a few columns): its parcel, address and items.
+        $pick = $results->count() === 1 ? $results->first()->id : $request->integer('order');
+        $selected = $pick ? Order::find($pick) : null;
         $detail = null;
         if ($selected) {
             $selected->load(['items:id,order_id,name_snapshot,qty,unit', 'moderator:id,name']);

@@ -65,7 +65,7 @@ Menu groups are in `config/menu.php` (an item shows only with its permission).
 | Packaging | `packaging.*` (batches, scan, pack, issues) | PackagingController | Packaging/BatchService, ScanService, StockIssueService |
 | Handover | `handover.*` (scan to rider, manifest) | HandoverController | Packaging/ScanService |
 | Returns | `returns.*`, `returns-report.*` | ReturnController, ReturnReportController | Packaging/ReturnService |
-| Hotline / delivery issues | `hotline.*`, `issues.*`, rider calls | HotlineController, RiderCallController | Orders/DeliveryIssueService, Work/RiderCallService |
+| Parcel status (was Hotline) / delivery issues | `hotline.*`, `issues.*`, rider calls | HotlineController, RiderCallController | Orders/DeliveryIssueService, Work/RiderCallService |
 | Payments | `payments.*`, `cod.*`, `refunds.*` | PaymentController, CodPayoutController, RefundController | Orders/RefundService, Courier/PayoutImporter |
 | Customers | `customers.*` (list, one customer page with tabs, edit, merge, fraud check) | CustomerController | Customers/CustomerService, CustomerStats, CustomerJourney, FraudCheckService |
 | Order history import | `customers.history*` (upload CSV/Excel, fix rows, undo) | CustomerImportController | Customers/HistoryImport, ImportedOrders |
@@ -145,6 +145,8 @@ Blade components in `resources/views/components` (behaviour in Alpine). Use them
 | `x-play-call` + `x-call-player` | "Play call": recording or screenshot in a popup on the same page |
 | `x-phone-dial` | Call a customer from an order (tap, copy, QR) and log the call |
 | `x-call-live-bar` | The yellow bar of a started, unsaved call, on every page (in the layout) |
+| `x-parcel-track` | A booked parcel: steps (Booked, With courier, Delivered / Returned), stuck states, Copy tracking link, Open (Parcel status, order page) |
+| `x-courier-resync` | Ask the courier now about every parcel on its way, with when it was last asked (once a minute) |
 | `x-chat-control` | Communication popup: chats, customer calls in, rider calls |
 | `x-channel-icon` | A chat channel's icon (WhatsApp, Messenger, Instagram...), `size="xs"` inside dropdowns |
 | `x-new-order-popup` | The popup for New order and for looking at an order (`orders.show?embed=1`, Open in new tab) |
@@ -208,7 +210,7 @@ works without cron; the cron (`desk:tick`) checks everyone too.
 ## 8. Known overlaps to review
 
 Places that may do the same job twice; to be checked and merged where they are real duplicates:
-Order activity / Order management / Control room / All orders; Hotline / Delivery issues / rider calls;
+Order activity / Order management / Control room / All orders; Parcel status (was Hotline) / Delivery issues / rider calls;
 Returns / Return report; KPI / Scorecard / Team Activity / Packers / My points; Stock count / Stock status;
 the call screens now share one way of logging a call (see section 7); rider calls still have their own fields.
 

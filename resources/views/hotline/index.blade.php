@@ -3,7 +3,8 @@
     $types = array_map('__', \App\Support\Labels::ISSUE_TYPES);
 @endphp
 
-<x-layouts.app :heading="__('Rider hotline')">
+<x-layouts.app :heading="__('Parcel status')">
+    <x-courier-resync class="mb-3" />
     <form method="GET" action="{{ route('hotline.index') }}" class="mb-4 flex gap-2">
         <input name="q" value="{{ $q }}" autofocus placeholder="{{ __('CN number, customer phone, order no or name') }}" class="{{ $input }} text-base">
         <x-button>{{ __('Find') }}</x-button>
@@ -33,13 +34,13 @@
                         <div>
                             <a href="{{ route('orders.show', $o) }}" class="font-mono text-lg font-semibold hover:underline">{{ $o->order_no }}</a>
                             <x-order-status :order="$o" :statuses="$statuses" />
-                            <p class="mt-1 text-sm text-gray-600">{{ __('CN') }} {{ $detail['shipment']->consignment_id ?? '-' }} · {{ \App\Support\Labels::courierStatus($detail['shipment']->courier_status ?? null) }}</p>
                         </div>
                         <div class="text-right">
                             <p class="text-xs text-gray-500">{{ __('COD') }}</p>
                             <p class="text-2xl font-bold tabular-nums">৳{{ number_format((float) $o->cod_amount) }}</p>
                         </div>
                     </div>
+                    <x-parcel-track :order="$o" flat class="mt-4 border-t border-gray-100 pt-4" />
                     <p class="mt-3 text-sm"><b>{{ $o->ship_name }}</b> · <a href="tel:{{ $o->ship_phone }}" class="font-mono text-primary">{{ $o->ship_phone }}</a>{{ $o->ship_alt_phone ? ' / '.$o->ship_alt_phone : '' }}</p>
                     <p class="text-sm text-gray-600">{{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}</p>
                     <p class="mt-2 text-sm text-gray-700">{{ $o->items->map(fn ($i) => $i->name_snapshot.' ×'.rtrim(rtrim($i->qty, '0'), '.'))->join(', ') }}</p>

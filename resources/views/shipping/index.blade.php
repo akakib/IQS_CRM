@@ -9,11 +9,7 @@
         <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{{ __('Test mode: bookings use the fake courier. No real Steadfast parcel is created.') }}</div>
     @endif
 
-    <div class="mb-3 flex justify-end">
-        @can('shipping.create')
-            <form method="POST" action="{{ route('shipping.resync') }}">@csrf<x-button size="sm" variant="secondary">{{ __('Re-sync courier status') }}</x-button></form>
-        @endcan
-    </div>
+    <x-courier-resync class="mb-3" />
 
     <x-list.filter-bar :list="$list" :action="route('shipping.index')" :placeholder="__('Order no, phone or area')" />
 

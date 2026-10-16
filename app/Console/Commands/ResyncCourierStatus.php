@@ -22,6 +22,7 @@ class ResyncCourierStatus extends Command
             ->get(['s.id', 's.consignment_id', 'o.order_no']);
 
         $changed = 0;
+        $failed = [];
         foreach ($shipments as $s) {
             try {
                 $update = $courier->driver()->statusByInvoice($s->order_no);
@@ -36,10 +37,14 @@ class ResyncCourierStatus extends Command
                 $changed += in_array($result, ['no_change', 'tracking_note'], true) ? 0 : 1;
             } catch (\Throwable $e) {
                 $this->warn("{$s->order_no}: {$e->getMessage()}");
+                $failed[] = $s->order_no;
             }
         }
 
         $this->info("Checked {$shipments->count()} parcels, {$changed} changed.");
+        if ($failed) {
+            $this->info('Failed: '.implode(', ', $failed));
+        }
 
         return self::SUCCESS;
     }

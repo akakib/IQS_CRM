@@ -3,6 +3,7 @@
 @endphp
 
 <x-layouts.app :heading="$all ? __('Delivery issues') : __('My delivery issues')">
+    <x-courier-resync class="mb-3" />
     <x-list.filter-bar :list="$list" :action="route('issues.index')" :placeholder="__('Order no or phone')">
         <x-simple-select name="show" :options="['all' => __('All open'), 'overdue' => __('Overdue')]" :value="$list->filter('show') ?? 'all'" />
         @if ($all)<x-simple-select name="person" :options="['' => __('Anyone')] + $people" :value="$list->filter('person') ?? ''" />@endif

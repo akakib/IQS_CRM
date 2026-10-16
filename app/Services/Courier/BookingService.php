@@ -78,7 +78,7 @@ class BookingService
                     DB::table('shipments')->where('order_id', $order->id)->where('is_active', true)->update(['is_active' => false, 'updated_at' => now()]);
                     $shipmentId = DB::table('shipments')->insertGetId([
                         'order_id' => $order->id, 'courier' => $driver->name(), 'consignment_id' => $r->consignmentId,
-                        'tracking_code' => $r->trackingCode, 'cod_amount' => $order->cod_amount, 'courier_status' => $r->status,
+                        'tracking_code' => $r->trackingCode, 'tracking_link' => is_string($r->trackingLink) && str_starts_with($r->trackingLink, 'https://') ? mb_substr($r->trackingLink, 0, 255) : null, 'cod_amount' => $order->cod_amount, 'courier_status' => $r->status,
                         'booked_by' => $by?->id, 'booked_at' => now(), 'is_active' => true, 'raw_booking' => json_encode($r->raw),
                         'created_at' => now(), 'updated_at' => now(),
                     ]);

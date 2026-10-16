@@ -14,5 +14,7 @@ final class BookingResult
         public readonly array $raw = [],
         /** On failure: auth (keys refused), rejected (the courier refused this parcel's data), temporary (network, server) */
         public readonly string $kind = 'temporary',
+        /** The courier's public tracking page for the customer (Steadfast: https://steadfast.com.bd/tl/...). */
+        public readonly ?string $trackingLink = null,
     ) {}
 }

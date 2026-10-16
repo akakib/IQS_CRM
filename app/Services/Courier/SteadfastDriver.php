@@ -41,7 +41,7 @@ class SteadfastDriver implements CourierDriver
                 ]);
                 $c = $response->json('consignment') ?? [];
                 $results[$req->invoice] = $response->successful() && ! empty($c['consignment_id'])
-                    ? new BookingResult($req->invoice, true, (string) $c['consignment_id'], $c['tracking_code'] ?? null, $c['status'] ?? null, raw: $response->json())
+                    ? new BookingResult($req->invoice, true, (string) $c['consignment_id'], $c['tracking_code'] ?? null, $c['status'] ?? null, raw: $response->json(), trackingLink: $c['tracking_link'] ?? null)
                     : new BookingResult($req->invoice, false, error: 'Steadfast: HTTP '.$response->status().' '.mb_substr($response->body(), 0, 300), raw: $response->json() ?? [],
                         kind: match (true) {
                             in_array($response->status(), [401, 403], true) => 'auth',

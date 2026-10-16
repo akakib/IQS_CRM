@@ -30,6 +30,7 @@
     <x-courier-cancel :order="$order" />
     <x-take-back :order="$order" class="mb-3" />
     <x-advance-wait :order="$order" />
+    <x-parcel-track :order="$order" class="mb-4" />
 
     <div class="grid gap-6 xl:grid-cols-3">
         <div class="space-y-6 xl:col-span-2">

@@ -85,13 +85,28 @@ class ShippingController extends Controller
     }
 
     /** Webhook fallback, on demand. */
-    public function resync(): RedirectResponse
-    {
-        \Illuminate\Support\Facades\Artisan::call('courier:resync');
-        // The command prints "Checked N parcels, M changed."; the toast says it in plain words.
-        preg_match('/Checked (\d+) parcels, (\d+) changed/', \Illuminate\Support\Facades\Artisan::output(), $m);
+    /** When the courier was last asked (the Re-sync button shows it). */
+    public const RESYNC_AT = 'courier-resync-at';
 
-        return back()->with('success', $m ? __(':n parcels checked, :c updated.', ['n' => $m[1], 'c' => $m[2]]) : __('Courier status checked.'));
+    /** Ask the courier now about every parcel on its way (booking, Parcel status and Delivery issues people); once a minute at most. */
+    public function resync(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->can('shipping.create') || $request->user()->can('hotline.view'), 403);
+        if (! \Illuminate\Support\Facades\Cache::add('courier-resync-lock', 1, 60)) {
+            return back()->with('success', __('Checked less than a minute ago. Try again in a minute.'));
+        }
+        \Illuminate\Support\Facades\Artisan::call('courier:resync');
+        \Illuminate\Support\Facades\Cache::forever(self::RESYNC_AT, now()->toIso8601String());
+        // The command prints "Checked N parcels, M changed." and "Failed: ..."; the toast says it in plain words.
+        $out = \Illuminate\Support\Facades\Artisan::output();
+        preg_match('/Checked (\d+) parcels, (\d+) changed/', $out, $m);
+        preg_match('/Failed: (.+)/', $out, $f);
+        $message = $m ? __(':n parcels checked, :c updated.', ['n' => $m[1], 'c' => $m[2]]) : __('Courier status checked.');
+        if ($f) {
+            return back()->with('error', $message.' '.__('The courier did not answer for :o.', ['o' => trim($f[1])]));
+        }
+
+        return back()->with('success', $message);
     }
 
     /** New label for the current version (after an address/COD change); voids the old one. */

@@ -214,7 +214,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/shipping', [ShippingController::class, 'index'])->middleware('can:shipping.view')->name('shipping.index');
     Route::post('/shipping/book', [ShippingController::class, 'book'])->middleware('can:shipping.create')->name('shipping.book');
     Route::get('/shipping/labels', [ShippingController::class, 'labels'])->middleware('can:shipping.view')->name('shipping.labels');
-    Route::post('/shipping/resync', [ShippingController::class, 'resync'])->middleware('can:shipping.create')->name('shipping.resync');
+    Route::post('/shipping/resync', [ShippingController::class, 'resync'])->name('shipping.resync'); // booking or Parcel status people (checked inside)
     Route::post('/shipping/{order}/reprint', [ShippingController::class, 'reprint'])->middleware('can:shipping.create')->name('shipping.reprint');
 
     // Packaging and handover

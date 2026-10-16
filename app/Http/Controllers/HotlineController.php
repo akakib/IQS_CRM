@@ -44,11 +44,12 @@ class HotlineController extends Controller
         return view('hotline.index', ['q' => $q, 'results' => $results, 'detail' => $detail, 'statuses' => OrderStatus::map()]);
     }
 
-    /** Small issue solved on the call: a rider call like the one from Communication (Riders report, work time, timeline). */
+    /** Small issue solved on the call: a rider call like the one from Communication (checked with the customer, Riders report, work time, timeline). */
     public function solved(Order $order, Request $request, RiderCallService $calls): RedirectResponse
     {
-        $data = $request->validate(['note' => ['required', 'string', 'max:500'], 'rider_phone' => ['nullable', 'string', 'max:20']]);
-        $calls->record($request->user(), ['order_id' => $order->id, 'rider_phone' => $data['rider_phone'] ?? null, 'claim' => 'other', 'action' => 'solved', 'note' => $data['note']], [], false);
+        $data = $request->validate(['note' => ['required', 'string', 'max:500'], 'rider_phone' => ['nullable', 'string', 'max:20'],
+            'verdict' => ['required', Rule::in(array_keys(RiderCallService::VERDICTS))]], ['verdict.required' => __('Say what the customer said.')]);
+        $calls->record($request->user(), ['order_id' => $order->id, 'rider_phone' => $data['rider_phone'] ?? null, 'claim' => 'other', 'verdict' => $data['verdict'], 'action' => 'solved', 'note' => $data['note']]);
 
         return back()->with('success', __('Rider call saved.'));
     }
@@ -60,10 +61,11 @@ class HotlineController extends Controller
             'issue_type' => ['required', Rule::in(DeliveryIssueService::TYPES)],
             'rider_phone' => ['nullable', 'string', 'max:20'],
             'note' => ['nullable', 'string', 'max:500'],
-        ]);
+            'verdict' => ['required', Rule::in(array_keys(RiderCallService::VERDICTS))],
+        ], ['verdict.required' => __('Say what the customer said.')]);
         $claim = self::CLAIM_OF_ISSUE[$data['issue_type']] ?? 'other';
-        $calls->record($request->user(), ['order_id' => $order->id, 'rider_phone' => $data['rider_phone'] ?? null, 'claim' => $claim, 'action' => 'moderator',
-            'note' => $data['note'] ?? null, 'issue_type' => $data['issue_type']], [], false);
+        $calls->record($request->user(), ['order_id' => $order->id, 'rider_phone' => $data['rider_phone'] ?? null, 'claim' => $claim, 'verdict' => $data['verdict'], 'action' => 'moderator',
+            'note' => $data['note'] ?? null, 'issue_type' => $data['issue_type']]);
 
         return back()->with('success', __('Sent to :n with a timer.', ['n' => $order->moderator?->name ?? __('the managers')]));
     }

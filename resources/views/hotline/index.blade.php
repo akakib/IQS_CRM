@@ -60,17 +60,24 @@
             </div>
 
             <div class="space-y-4">
-                <x-card :title="__('Small issue: solved here')">
+                <x-card :title="__('Small issue: solved here')" x-data="{ verdict: null }">
                     <form method="POST" action="{{ route('hotline.solved', $o) }}" class="space-y-2">
                         @csrf
                         <input name="rider_phone" inputmode="tel" placeholder="{{ __('Rider phone (optional)') }}" class="{{ $input }}">
+                        <p class="text-xs font-medium text-gray-600">{{ __('Checked with the customer?') }}</p>
+                        <input type="hidden" name="verdict" :value="verdict">
+                        <div class="flex flex-wrap gap-1.5">
+                            @foreach (\App\Services\Work\RiderCallService::VERDICTS as $k => $label)
+                                <button type="button" @click="verdict = @js($k)" class="rounded-full border px-2.5 py-1 text-xs" :class="verdict === @js($k) ? (@js($k) === 'false' ? 'border-red-600 bg-red-50 font-medium text-red-700' : 'border-primary bg-primary-soft font-medium text-primary') : 'border-gray-300 text-gray-600'">{{ __($label) }}</button>
+                            @endforeach
+                        </div>
                         <textarea name="note" rows="2" required maxlength="500" placeholder="{{ __('What was done, e.g. called the customer, she will receive in 10 minutes') }}" class="{{ $input }}"></textarea>
-                        <x-button variant="secondary" class="w-full">{{ __('Save') }}</x-button>
+                        <x-button variant="secondary" class="w-full" x-bind:disabled="!verdict">{{ __('Save') }}</x-button>
                     </form>
                 </x-card>
 
                 @can('hotline.create')
-                    <x-card :title="__('Bigger issue: send to the assigned moderator')" x-data="{ type: null }">
+                    <x-card :title="__('Bigger issue: send to the assigned moderator')" x-data="{ type: null, verdict: null }">
                         <form method="POST" action="{{ route('hotline.issue', $o) }}" class="space-y-2">
                             @csrf
                             <input type="hidden" name="issue_type" :value="type">
@@ -80,8 +87,15 @@
                                 @endforeach
                             </div>
                             <input name="rider_phone" inputmode="tel" placeholder="{{ __('Rider phone') }}" class="{{ $input }}">
+                            <p class="text-xs font-medium text-gray-600">{{ __('Checked with the customer?') }}</p>
+                            <input type="hidden" name="verdict" :value="verdict">
+                            <div class="flex flex-wrap gap-1.5">
+                                @foreach (\App\Services\Work\RiderCallService::VERDICTS as $k => $label)
+                                    <button type="button" @click="verdict = @js($k)" class="rounded-full border px-2.5 py-1 text-xs" :class="verdict === @js($k) ? (@js($k) === 'false' ? 'border-red-600 bg-red-50 font-medium text-red-700' : 'border-primary bg-primary-soft font-medium text-primary') : 'border-gray-300 text-gray-600'">{{ __($label) }}</button>
+                                @endforeach
+                            </div>
                             <textarea name="note" rows="2" maxlength="500" placeholder="{{ __('Details') }}" class="{{ $input }}"></textarea>
-                            <x-button variant="danger" class="w-full" x-bind:disabled="!type">{{ __('Send with timer') }}</x-button>
+                            <x-button variant="danger" class="w-full" x-bind:disabled="!type || !verdict">{{ __('Send with timer') }}</x-button>
                         </form>
                     </x-card>
                 @endcan

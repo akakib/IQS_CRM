@@ -97,7 +97,7 @@ class HotlineTest extends TestCase
     public function test_bigger_issue_goes_to_the_moderator_with_a_timer_and_escalates_when_late(): void
     {
         $this->actingAs($this->owner());
-        $this->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'partial', 'rider_phone' => '01811111111', 'note' => 'Wants only one item'])
+        $this->post("/hotline/{$this->order->id}/issue", ['verdict' => 'true', 'issue_type' => 'partial', 'rider_phone' => '01811111111', 'note' => 'Wants only one item'])
             ->assertSessionHas('success');
 
         $issue = DB::table('delivery_issues')->first();
@@ -121,7 +121,7 @@ class HotlineTest extends TestCase
 
     public function test_owner_closes_the_issue_and_urgent_highlight_ends(): void
     {
-        $this->actingAs($this->owner())->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'no_answer']);
+        $this->actingAs($this->owner())->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'no_answer', 'verdict' => 'true']);
         $issue = DB::table('delivery_issues')->value('id');
 
         $this->actingAs($this->agent)->post("/issues/{$issue}/resolve", ['resolution' => 'delivered', 'note' => 'Called, received'])->assertSessionHas('success');
@@ -132,7 +132,7 @@ class HotlineTest extends TestCase
         $other = User::factory()->create();
         $other->roles()->attach(DB::table('roles')->where('system_key', 'moderator')->value('id'));
         app(\App\Services\PermissionService::class)->bump();
-        $this->actingAs($this->owner())->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'address']);
+        $this->actingAs($this->owner())->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'address', 'verdict' => 'true']);
         $second = DB::table('delivery_issues')->whereNull('resolved_at')->value('id');
         $this->actingAs($other)->post("/issues/{$second}/resolve", ['resolution' => 'solved'])->assertForbidden();
     }
@@ -140,15 +140,16 @@ class HotlineTest extends TestCase
     public function test_small_issue_is_saved_on_the_timeline(): void
     {
         $owner = $this->owner();
-        $this->actingAs($owner)->post("/hotline/{$this->order->id}/solved", ['note' => 'Customer coming down in 5 minutes', 'rider_phone' => '01811111111'])->assertSessionHas('success');
+        $this->actingAs($owner)->post("/hotline/{$this->order->id}/solved", ['note' => 'Customer coming down in 5 minutes', 'rider_phone' => '01811111111'])->assertSessionHasErrors('verdict'); // what the customer said is asked here too
+        $this->post("/hotline/{$this->order->id}/solved", ['note' => 'Customer coming down in 5 minutes', 'rider_phone' => '01811111111', 'verdict' => 'true'])->assertSessionHas('success');
 
         $this->assertDatabaseHas('order_notes', ['order_id' => $this->order->id, 'note_type' => 'rider']);
         // The same rider call as from Communication: counted in the Riders report and as work.
-        $this->assertDatabaseHas('rider_calls', ['order_id' => $this->order->id, 'consignment_id' => $this->cn, 'claim' => 'other', 'verdict' => null,
+        $this->assertDatabaseHas('rider_calls', ['order_id' => $this->order->id, 'consignment_id' => $this->cn, 'claim' => 'other', 'verdict' => 'true',
             'action' => 'solved', 'note' => 'Customer coming down in 5 minutes', 'rider_phone' => '01811111111', 'handled_by' => $owner->id]);
 
         // Bigger issue: a rider call sent on, with its delivery issue.
-        $this->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'address', 'note' => 'Lane closed'])->assertSessionHas('success');
+        $this->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'address', 'note' => 'Lane closed', 'verdict' => 'false'])->assertSessionHas('success');
         $call = DB::table('rider_calls')->where('action', 'moderator')->first();
         $this->assertSame(['address', 'address'], [$call->claim, DB::table('delivery_issues')->where('id', $call->delivery_issue_id)->value('issue_type')]);
         $this->get(route('riders-report.index'))->assertOk()->assertSee('Address wrong or not found');
@@ -168,7 +169,7 @@ class HotlineTest extends TestCase
         (new \Database\Seeders\PointsSeeder)->run();
         // 3 AM: outside every shift. The issue goes to the managers by name, not to the person at home.
         $this->travelTo(today()->setTime(3, 0));
-        $this->actingAs($this->owner())->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'partial', 'note' => 'Night call']);
+        $this->actingAs($this->owner())->post("/hotline/{$this->order->id}/issue", ['verdict' => 'true', 'issue_type' => 'partial', 'note' => 'Night call']);
         $this->assertNull(DB::table('delivery_issues')->value('assigned_to'));
 
         // An issue given while at work whose shift then ended: handed to managers, no minus point.

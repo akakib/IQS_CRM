@@ -3,7 +3,9 @@
     $conds = collect($ruleConditions ?? [])->map(fn ($c) => ['field' => $c->field, 'operator' => $c->operator, 'value' => (string) $c->value, 'provider_id' => $c->provider_id])->values();
 @endphp
 <form method="POST" action="{{ $rule ? route('settings.verification.update', $rule->id) : route('settings.verification.store') }}" id="{{ $formId }}" class="space-y-3 text-left"
-    x-data="{ conds: {{ \Illuminate\Support\Js::from($conds) }}, provFields: {{ \Illuminate\Support\Js::from($providerFields) }} }">
+    x-data="{ conds: {{ \Illuminate\Support\Js::from($conds) }}, provFields: {{ \Illuminate\Support\Js::from($providerFields) }},
+        outcome: {{ \Illuminate\Support\Js::from($rule->outcome ?? 'record_verified') }}, match: {{ \Illuminate\Support\Js::from($rule->match_mode ?? 'all') }},
+        adv: {{ \Illuminate\Support\Js::from($rule->advance_type ?? 'delivery') }} }">
     @csrf
     @if ($rule) @method('PUT') @endif
     <label class="block text-xs font-medium text-gray-600">{{ __('Rule name') }}
@@ -15,13 +17,33 @@
     </label>
     <div>
         <p class="mb-1 text-xs font-medium text-gray-600">{{ __('What happens when it matches') }}</p>
-        <x-simple-select name="outcome" :options="$outcomes" :value="$rule->outcome ?? 'record_verified'" full-width class="w-full" />
+        <x-simple-select name="outcome" :options="$outcomes" :value="$rule->outcome ?? 'record_verified'" full-width class="w-full" @select-change="outcome = $event.detail" />
+    </div>
+    {{-- Hold for advance: how much. --}}
+    <div x-show="outcome === 'hold_for_advance'" class="rounded-lg bg-amber-50 p-2">
+        <p class="mb-1 text-xs font-medium text-gray-600">{{ __('Advance to ask for') }}</p>
+        <input type="hidden" name="advance_type" :value="adv">
+        <div class="flex flex-wrap items-center gap-1">
+            @foreach (['delivery' => __('Delivery charge'), 'fixed' => __('Fixed ৳'), 'percent' => __('% of total')] as $k => $l)
+                <button type="button" @click="adv = @js($k)" class="rounded-full border px-2.5 py-1 text-xs" :class="adv === @js($k) ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white text-gray-700'">{{ $l }}</button>
+            @endforeach
+            <input x-show="adv !== 'delivery'" :disabled="adv === 'delivery'" name="advance_value" type="number" min="1" :max="adv === 'percent' ? 100 : 1000000" step="any" value="{{ $rule->advance_value ?? '' }}"
+                :placeholder="adv === 'percent' ? '20' : '300'" class="w-24 rounded border border-gray-300 px-2 py-1 text-xs" :required="outcome === 'hold_for_advance' && adv !== 'delivery'">
+        </div>
     </div>
     <div>
         <p class="mb-1 text-xs font-medium text-gray-600">{{ __('Which orders it applies to') }}</p>
         <x-simple-select name="applies_to_channel" :options="['all' => __('All channels'), 'web' => __('Website'), 'messenger' => 'Messenger', 'whatsapp' => 'WhatsApp', 'phone' => __('Phone')]" :value="$rule->applies_to_channel ?? 'all'" full-width class="w-full" />
     </div>
-    <p class="text-xs font-medium text-gray-600">{{ __('Conditions (all must be true). None = matches every order.') }}</p>
+    <div>
+        <p class="mb-1 text-xs font-medium text-gray-600">{{ __('Conditions. None = matches every order.') }}</p>
+        <input type="hidden" name="match_mode" :value="match">
+        <div class="flex flex-wrap gap-1">
+            @foreach (['all' => __('All must be true'), 'any' => __('Any one is enough')] as $k => $l)
+                <button type="button" @click="match = @js($k)" class="rounded-full border px-2.5 py-1 text-xs" :class="match === @js($k) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-700'">{{ $l }}</button>
+            @endforeach
+        </div>
+    </div>
     <template x-for="(c, i) in conds" :key="i">
         <div class="rounded-lg border border-gray-200 p-2">
             <div class="mb-1 flex flex-wrap gap-1">

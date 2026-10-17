@@ -63,6 +63,9 @@ class VerificationRuleController extends Controller
             'priority' => ['required', 'integer', 'min:1', 'max:999'],
             'outcome' => ['required', Rule::in(['record_verified', 'record_verified_and_confirmed', 'manual_review', 'hold_for_advance'])],
             'applies_to_channel' => ['required', Rule::in(['all', 'web', 'messenger', 'whatsapp', 'phone'])],
+            'match_mode' => ['nullable', Rule::in(['all', 'any'])],
+            'advance_type' => ['nullable', Rule::in(['delivery', 'fixed', 'percent'])],
+            'advance_value' => ['nullable', 'required_if:advance_type,fixed,percent', 'numeric', 'min:1', request('advance_type') === 'percent' ? 'max:100' : 'max:1000000'],
             'conditions' => ['array', 'max:8'],
             'conditions.*.field' => ['required', Rule::in(array_keys(VerificationEngine::FIELDS))],
             'conditions.*.provider_id' => ['nullable', 'integer'],
@@ -73,7 +76,9 @@ class VerificationRuleController extends Controller
 
     private function row(array $data): array
     {
-        return ['name' => $data['name'], 'priority' => $data['priority'], 'outcome' => $data['outcome'], 'applies_to_channel' => $data['applies_to_channel'], 'updated_at' => now()];
+        return ['name' => $data['name'], 'priority' => $data['priority'], 'outcome' => $data['outcome'], 'applies_to_channel' => $data['applies_to_channel'],
+            'match_mode' => $data['match_mode'] ?? 'all', 'advance_type' => $data['advance_type'] ?? 'delivery',
+            'advance_value' => in_array($data['advance_type'] ?? 'delivery', ['fixed', 'percent'], true) ? $data['advance_value'] : null, 'updated_at' => now()];
     }
 
     private function saveConditions(int $ruleId, array $data): void

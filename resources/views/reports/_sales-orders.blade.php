@@ -32,7 +32,7 @@
                     <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
                         <span>{{ \Illuminate\Support\Carbon::parse($r->at)->format('d M, g:i A') }}</span>
                         @if ($r->first_item)<span class="truncate">{{ $r->first_item }}{{ $r->line_count > 1 ? ' '.__('+ :n more', ['n' => $r->line_count - 1]) : '' }}</span>@endif
-                        <span @class(['rounded-full px-2 py-0.5 font-medium', 'bg-primary-soft text-primary' => $r->is_returning, 'bg-gray-100 text-gray-600' => ! $r->is_returning])>{{ $r->is_returning ? __('Returning') : __('New') }}</span>
+                        <span @class(['rounded-full px-2 py-0.5 font-medium', 'bg-primary-soft text-primary' => $r->is_returning, 'bg-gray-100 text-gray-600' => ! $r->is_returning])>{{ $r->is_returning ? __('Repeat customer') : __('New customer') }}</span>
                         @isset($since[$r->status_id])<span class="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">{{ $since[$r->status_id] }}</span>@endisset
                         @unless (isset($only['channel']))<span>{{ \App\Models\Order::channelLabel($r->channel) }}</span>@endunless
                         @if ($r->moderator)<span>{{ __('with :name', ['name' => $r->moderator]) }}</span>@endif

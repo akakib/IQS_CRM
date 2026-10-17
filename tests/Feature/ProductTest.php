@@ -191,6 +191,8 @@ class ProductTest extends TestCase
             public function name(): string { return 'broken'; }
 
             public function pushVariant(object $link, array $payload): void { throw new \RuntimeException('HTTP 500'); }
+
+            public function setOrderStatus(string $orderId, string $status): void {}
         });
         $this->app->forgetInstance(ChannelSync::class);
         \Illuminate\Support\Facades\Artisan::call('notifications:sync');

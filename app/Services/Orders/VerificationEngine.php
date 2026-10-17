@@ -23,6 +23,7 @@ class VerificationEngine
         'any_provider_success_rate' => 'Best success rate of any courier (%)',
         'all_providers_success_rate' => 'Worst success rate of all couriers (%)',
         'is_new_customer' => 'New customer (true/false)',
+        'own_success_rate' => 'Our delivery success rate (%)',
         'own_delivered_count' => 'Delivered orders with us',
         'own_return_count' => 'Returned orders with us',
         'imported_delivered_count' => 'Delivered orders in imported files',
@@ -52,16 +53,11 @@ class VerificationEngine
         $conditions = DB::table('verification_rule_conditions')->whereIn('rule_id', $rules->pluck('id'))->get()->groupBy('rule_id');
 
         foreach ($rules as $rule) {
-            $ok = true;
-            foreach ($conditions[$rule->id] ?? [] as $c) {
-                $actual = in_array($c->field, self::PROVIDER_FIELDS, true)
-                    ? ($inputs['providers'][$c->provider_id][$c->field === 'provider_success_rate' ? 'success_rate' : 'total_parcels'] ?? null)
-                    : ($inputs[$c->field] ?? null);
-                if (! $this->compare($actual, $c->operator, $c->value)) {
-                    $ok = false;
-                    break;
-                }
-            }
+            // All conditions must pass, or (match_mode any) one is enough; no conditions match every order.
+            $passed = collect($conditions[$rule->id] ?? [])->map(fn ($c) => $this->compare(in_array($c->field, self::PROVIDER_FIELDS, true)
+                ? ($inputs['providers'][$c->provider_id][$c->field === 'provider_success_rate' ? 'success_rate' : 'total_parcels'] ?? null)
+                : ($inputs[$c->field] ?? null), $c->operator, $c->value));
+            $ok = $passed->isEmpty() || (($rule->match_mode ?? 'all') === 'any' ? $passed->contains(true) : ! $passed->contains(false));
             if ($ok) {
                 return ['inputs' => $inputs, 'rule' => $rule, 'outcome' => $rule->outcome];
             }
@@ -104,17 +100,31 @@ class VerificationEngine
                 $this->machine->transition($order, 'record_verified', null, 'rule', null, $ruleName);
                 $this->machine->transition($order, 'confirmed', null, 'rule', null, __('Auto-confirmed: :r', ['r' => $ruleName]));
             })(),
-            'hold_for_advance' => (function () use ($order, $ruleName) {
-                // The delivery charge in advance; an admin can let it go without (Ask admin).
-                $order->forceFill(['advance_required' => max((float) $order->delivery_charge, 1), 'advance_hold_since' => now(), 'advance_reminded_at' => null])->save();
+            'hold_for_advance' => (function () use ($order, $ruleName, $decision) {
+                // The rule's advance (delivery charge, a fixed amount or a percent of the total); an admin can let it go without (Ask admin).
+                $amount = self::advanceFor($decision['rule'], $order);
+                $order->forceFill(['advance_required' => $amount, 'advance_hold_since' => now(), 'advance_reminded_at' => null])->save();
                 $this->machine->transition($order, 'hold', null, 'rule',
                     DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id'),
-                    __(':r: delivery charge ৳:a in advance', ['r' => $ruleName, 'a' => number_format((float) $order->delivery_charge)]));
+                    __(':r: ৳:a in advance', ['r' => $ruleName, 'a' => number_format($amount)]));
             })(),
             default => null, // manual_review: stays New for a person to look at
         };
 
         return $decision['outcome'];
+    }
+
+    /** How much a Hold for advance rule asks for this order: at least ৳1, never more than the order. */
+    public static function advanceFor(?object $rule, Order $order): float
+    {
+        $value = (float) ($rule->advance_value ?? 0);
+        $amount = match ($rule->advance_type ?? 'delivery') {
+            'fixed' => $value,
+            'percent' => ceil((float) $order->grand_total * $value / 100),
+            default => (float) $order->delivery_charge,
+        };
+
+        return max(1, min($amount, max(1, (float) $order->grand_total)));
     }
 
     private function inputs(Order $order, bool $fresh = false): array
@@ -146,6 +156,8 @@ class VerificationEngine
             'all_providers_success_rate' => $rates->min(),
             // Only what IQS saw itself decides on its own; imported files are separate conditions an admin may add.
             'is_new_customer' => ! $anyHistory && (int) $customer?->iqs_delivered_count === 0 && (int) $customer?->iqs_returned_count === 0,
+            // Delivered out of delivered + returned with IQS; no finished order yet = no data (never passes).
+            'own_success_rate' => ($d = (int) $customer?->iqs_delivered_count) + ($r = (int) $customer?->iqs_returned_count) > 0 ? round($d * 100 / ($d + $r), 2) : null,
             'own_delivered_count' => (int) $customer?->iqs_delivered_count,
             'own_return_count' => (int) $customer?->iqs_returned_count,
             'imported_delivered_count' => $customer ? $customer->importedCounts()['delivered'] : 0,

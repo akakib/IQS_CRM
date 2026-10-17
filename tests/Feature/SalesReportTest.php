@@ -73,7 +73,7 @@ class SalesReportTest extends TestCase
         $this->assertSame([1, 1], [(int) $wa->orders, (int) $wa->ret]);
 
         // The popups: a channel's, an item's and a day's orders.
-        $this->get(route('sales-report.orders', ['channel' => 'whatsapp']))->assertOk()->assertSee($c->order_no)->assertSee('Returning');
+        $this->get(route('sales-report.orders', ['channel' => 'whatsapp']))->assertOk()->assertSee($c->order_no)->assertSee('Repeat customer');
         $this->get(route('sales-report.orders', ['item' => $oil->id]))->assertOk()->assertSee($b->order_no)->assertDontSee($a->order_no)->assertSee('Returned: 0');
         $this->get(route('sales-report.orders', ['day' => today()->toDateString()]))->assertOk()->assertSee('3 orders');
         $this->get(route('sales-report.orders'))->assertNotFound();

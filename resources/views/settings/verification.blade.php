@@ -11,7 +11,7 @@
 @endphp
 
 <x-layouts.app :heading="__('Verification rules')">
-    <p class="mb-4 text-sm text-gray-500">{{ __('Checked on every new order, top to bottom: the first rule whose conditions all pass decides. Staff cannot skip the call by choice; only these rules can. Pair a success rate with a minimum parcel count: 1 of 1 is 100% but says little.') }}</p>
+    <p class="mb-4 text-sm text-gray-500">{{ __('Checked on every new order, top to bottom: the first rule that matches decides (all its conditions, or any one when the rule says so). Staff cannot skip the call by choice; only these rules can. Pair a success rate with a minimum parcel count: 1 of 1 is 100% but says little.') }}</p>
 
     <div class="grid gap-6 xl:grid-cols-3">
         <div class="space-y-3 xl:col-span-2">
@@ -26,6 +26,8 @@
                                 @empty
                                     <span class="text-gray-400">{{ __('No conditions: matches everything left') }}</span>
                                 @endforelse
+                                @if (($r->match_mode ?? 'all') === 'any' && count($conditions[$r->id] ?? []) > 1)<span class="ml-1 font-semibold text-gray-700">· {{ __('any one is enough') }}</span>@endif
+                                @if ($r->outcome === 'hold_for_advance')<span class="ml-1 text-amber-700">· {{ __('Advance: :a', ['a' => match ($r->advance_type ?? 'delivery') { 'fixed' => '৳'.number_format((float) $r->advance_value), 'percent' => rtrim(rtrim(number_format((float) $r->advance_value, 2), '0'), '.').'% '.__('of total'), default => __('delivery charge') }]) }}</span>@endif
                                 @if ($r->applies_to_channel !== 'all')<span class="ml-1 text-gray-400">· {{ \App\Models\Order::channelLabel($r->applies_to_channel) }}</span>@endif
                             </p>
                         </div>

@@ -75,6 +75,57 @@ class VerificationTest extends TestCase
         $this->assertSame((float) $order->delivery_charge, (float) $order->advance_required);
     }
 
+    public function test_a_record_verified_website_order_is_set_to_record_verified_on_the_website(): void
+    {
+        \App\Services\Catalog\Store\FakeStoreDriver::$sent = [];
+        $order = $this->order('01712345678', 1, ['external_ref' => '9901']);
+        $this->assertSame('record_verified', $this->key($order));
+        $this->app->terminate(); // sent after the response
+        $this->assertContains(['order' => '9901', 'status' => 'record-verified'], \App\Services\Catalog\Store\FakeStoreDriver::$sent);
+        $order->refresh();
+        $this->assertSame('record-verified', $order->external_status);
+        $this->assertNotNull($order->website_pushed_at);
+        $this->assertNull($order->website_push_error);
+
+        // The website refused: the reason stays on the order, the desk offers Send to website, and it goes once the website takes it.
+        $mock = \Mockery::mock(\App\Services\Catalog\Store\StoreDriver::class);
+        $mock->shouldReceive('setOrderStatus')->once()->andThrow(new \RuntimeException('HTTP 500'));
+        $mock->shouldReceive('setOrderStatus')->once();
+        $this->app->instance(\App\Services\Catalog\Store\StoreDriver::class, $mock);
+        $order->forceFill(['external_status' => 'processing'])->save();
+        $this->assertFalse(app(\App\Services\Orders\WebsiteStatusPush::class)->push($order));
+        $this->assertSame('HTTP 500', $order->fresh()->website_push_error);
+        $this->actingAs($this->owner())->post(route('orders.website-status', $order))->assertSessionHas('success');
+        $this->assertNull($order->fresh()->website_push_error);
+        // Never moves a finished website order back.
+        $order->forceFill(['external_status' => 'completed'])->save();
+        $this->assertFalse(app(\App\Services\Orders\WebsiteStatusPush::class)->applies($order->fresh()));
+    }
+
+    public function test_a_rule_can_pass_on_any_one_condition_and_ask_a_set_advance(): void
+    {
+        DB::table('verification_rules')->update(['is_active' => false]);
+        $rule = DB::table('verification_rules')->insertGetId(['name' => 'Ours or Steadfast', 'priority' => 1, 'outcome' => 'record_verified', 'applies_to_channel' => 'all',
+            'match_mode' => 'any', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('verification_rule_conditions')->insert([
+            ['rule_id' => $rule, 'field' => 'own_success_rate', 'operator' => '>=', 'value' => '80', 'provider_id' => null],
+            ['rule_id' => $rule, 'field' => 'any_provider_success_rate', 'operator' => '>=', 'value' => '99', 'provider_id' => null],
+        ]);
+        DB::table('verification_rules')->insert(['name' => 'Rest pay 20%', 'priority' => 2, 'outcome' => 'hold_for_advance', 'applies_to_channel' => 'all',
+            'match_mode' => 'all', 'advance_type' => 'percent', 'advance_value' => 20, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+        // Steadfast 92% (under 99) and nothing with us yet: neither passes, so 20% of the total in advance.
+        $held = $this->order('01712345678');
+        $this->assertSame('hold', $this->key($held));
+        $this->assertEquals(ceil((float) $held->grand_total * 0.2), (float) $held->advance_required);
+
+        // With us 4 of 5 delivered (80%): one condition is enough (counts set after the order, as delivery would).
+        Customer::find($held->customer_id)->forceFill(['iqs_delivered_count' => 4, 'iqs_returned_count' => 1])->save();
+        $this->assertSame('record_verified', app(VerificationEngine::class)->evaluate($held->fresh())['outcome']);
+        DB::table('verification_rules')->where('id', $rule)->update(['match_mode' => 'all']);
+        $this->assertSame('hold_for_advance', app(VerificationEngine::class)->evaluate($held->fresh())['outcome']);
+    }
+
     public function test_advance_hold_needs_the_delivery_charge_or_an_admins_yes(): void
     {
         (new \Database\Seeders\RoleSeeder)->run();

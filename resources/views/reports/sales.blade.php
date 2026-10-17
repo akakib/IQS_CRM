@@ -101,7 +101,7 @@
         @else
             <div class="grid gap-3 sm:grid-cols-2">
                 <div class="rounded-xl border-l-4 border-primary bg-gray-50 p-3">
-                    <p class="text-sm text-gray-600">{{ __('Returning customers (bought before)') }}</p>
+                    <p class="text-sm text-gray-600">{{ __('Repeat customers (bought before)') }}</p>
                     <p class="text-2xl font-bold tabular-nums text-gray-900">{{ $retPct }}%</p>
                     <p class="text-sm tabular-nums text-gray-600">{{ trans_choice(':n order|:n orders', $all['ret'], ['n' => $all['ret']]) }} · {{ $money($all['retMoney']) }}</p>
                 </div>
@@ -112,7 +112,7 @@
                 </div>
             </div>
             <div class="mt-3 flex h-3 overflow-hidden rounded-full bg-gray-100"><span class="bg-primary" style="width: {{ $retPct }}%"></span><span class="bg-primary/30" style="width: {{ 100 - $retPct }}%"></span></div>
-            <p class="mt-2 flex gap-4 text-xs text-gray-500"><span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-primary"></i>{{ __('Returning') }}</span><span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-primary/30"></i>{{ __('New') }}</span></p>
+            <p class="mt-2 flex gap-4 text-xs text-gray-500"><span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-primary"></i>{{ __('Repeat customers') }}</span><span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-primary/30"></i>{{ __('New customers') }}</span></p>
 
             <div class="mt-2">
                 @foreach ($channels as $c)
@@ -122,7 +122,7 @@
                         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-[11px] font-bold text-gray-500">{{ $short[$c->channel] ?? strtoupper(substr((string) $c->channel, 0, 2)) }}</span>
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-semibold text-gray-900">{{ $label }}</span>
-                            <span class="block text-xs text-gray-500">{{ __(':a% of orders · :b% returning', ['a' => (int) round($c->orders / $all['orders'] * 100), 'b' => $p]) }}</span>
+                            <span class="block text-xs text-gray-500">{{ __(':a% of orders · :b% repeat customers', ['a' => (int) round($c->orders / $all['orders'] * 100), 'b' => $p]) }}</span>
                         </span>
                         <span class="text-right tabular-nums">
                             <span class="block text-sm text-gray-900">{{ trans_choice(':n order|:n orders', $c->orders, ['n' => $c->orders]) }} <span class="font-semibold text-primary">›</span></span>

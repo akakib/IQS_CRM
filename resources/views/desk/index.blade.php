@@ -313,6 +313,14 @@
                                         </button>
                                     @endif
                                 </div>
+                                @if ($order->website_push_error && app(\App\Services\Orders\WebsiteStatusPush::class)->applies($order))
+                                    {{-- The website did not take Record verified: say why and send it again. --}}
+                                    <form method="POST" action="{{ route('orders.website-status', $order) }}" class="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                        @csrf
+                                        <span>{{ __('Website order not set to Record verified: :e', ['e' => \Illuminate\Support\Str::limit($order->website_push_error, 90)]) }}</span>
+                                        <button class="lockable rounded-lg border border-amber-300 bg-white px-2.5 py-1 font-semibold text-amber-900 hover:bg-amber-100">{{ __('Send to website') }}</button>
+                                    </form>
+                                @endif
                                 <h2 class="mt-1 text-2xl font-semibold text-gray-900">{{ $order->ship_name }}</h2>
                                 <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
                             </div>

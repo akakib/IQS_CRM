@@ -87,7 +87,8 @@ class WooWebhookTest extends TestCase
         $order = Order::firstWhere('external_ref', '5001');
         $this->assertNotNull($order);
         $this->assertDatabaseHas('order_payments', ['order_id' => $order->id, 'transaction_id' => 'BK1', 'status' => 'verified']);
-        $this->assertSame('processing', $order->external_status);
+        // Record-verified by the rules, so the website order was set to Record verified as well.
+        $this->assertSame('record-verified', $order->external_status);
         $this->assertSame(1, DB::table('order_payments')->where('order_id', $order->id)->count());
 
         // 3. Woo sends the same paid order twice more (retries, an admin note): nothing is added twice.

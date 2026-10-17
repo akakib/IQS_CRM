@@ -20,4 +20,10 @@ class FakeStoreDriver implements StoreDriver
         self::$sent[] = ['external_product_id' => $link->external_product_id, 'external_variant_id' => $link->external_variant_id] + $payload;
         Log::info('[fake store] '.json_encode(end(self::$sent)));
     }
+
+    public function setOrderStatus(string $orderId, string $status): void
+    {
+        self::$sent[] = ['order' => $orderId, 'status' => $status];
+        Log::info('[fake store] '.json_encode(end(self::$sent)));
+    }
 }

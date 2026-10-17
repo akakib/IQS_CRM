@@ -92,6 +92,8 @@ Use these; never write a second version.
 |---|---|
 | Change an order's status | `Orders/OrderStateMachine::transition()` (checks transitions, writes the note, runs listeners) |
 | Decide Record verified / skip the call | `Orders/VerificationEngine` (rules are rows in `verification_rules`) |
+| Rule: all conditions or any one; advance amount | `verification_rules.match_mode` (all / any), `advance_type` (delivery / fixed / percent) + `advance_value`, `VerificationEngine::advanceFor` |
+| Website order set to Record verified on the website | `Orders/WebsiteStatusPush` (status slug `record-verified`, after the response on record_verified; `website_push_error` + Send to website on the desk, `orders.website-status`). The website then fires its own Meta Purchase, so untick Website in Settings > Tracking to avoid counting it twice |
 | Customer counts (orders, delivered, returned) | `Customers/CustomerStats::refresh()` (section 4) |
 | A customer's whole story (sales, timeline, channels) | `Customers/CustomerJourney::build()` |
 | Find the customer a search is about | `Customers/CustomerFinder::find()` |

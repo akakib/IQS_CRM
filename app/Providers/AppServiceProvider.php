@@ -94,6 +94,14 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        // A website order record-verified here is set to Record verified on the website too (after the response).
+        \App\Services\Orders\OrderStateMachine::listen(function ($order, $from, $to) {
+            if ($to['key'] === 'record_verified' && app(\App\Services\Orders\WebsiteStatusPush::class)->applies($order)) {
+                $id = $order->id;
+                app()->terminating(fn () => app(\App\Services\Orders\WebsiteStatusPush::class)->push(\App\Models\Order::find($id)));
+            }
+        });
+
         \App\Services\Orders\OrderStateMachine::listen(fn ($order, $from, $to, $user = null) => app(\App\Services\Points\PointHooks::class)->transition($order, $from, $to, $user));
 
         \App\Services\Orders\OrderStateMachine::listen(fn ($order, $from, $to, $user = null) => app(\App\Services\Orders\DeskService::class)->onTransition($order, $from, $to, $user));

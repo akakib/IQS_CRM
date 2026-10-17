@@ -1,6 +1,7 @@
 @php($input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none')
 
-<x-layouts.app :heading="__('Google Drive')">
+<x-layouts.app :heading="__('Connections')">
+    <x-connections-tabs active="drive" />
     <p class="mb-4 text-sm text-gray-500">{{ __('Call recordings go to "Call Record" and call-log screenshots to "Call SS" in the business Google Drive, as soon as the call is saved. IQS makes its own folders there and can see only the files it puts in them. Files still open from IQS for the caller and managers.') }}</p>
 
     <div class="grid gap-6 lg:grid-cols-2">

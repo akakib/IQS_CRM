@@ -23,7 +23,7 @@ class SteadfastWebhookController extends Controller
         $given = (string) $request->bearerToken();
         $valid = collect(CourierAccount::webhookTokens('steadfast'))->contains(fn ($t) => hash_equals($t, $given));
         if (! $valid) {
-            // Remembered so Settings > Courier accounts can say "Steadfast called, but the token did not match".
+            // Remembered so Settings > Connections > Courier can say "Steadfast called, but the token did not match".
             Cache::put('steadfast:webhook:rejected', now()->toIso8601String(), now()->addDays(30));
 
             return response()->json(['message' => 'Invalid token'], 401);

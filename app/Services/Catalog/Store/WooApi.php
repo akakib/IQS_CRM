@@ -41,7 +41,7 @@ class WooApi
     {
         $c = $this->config();
         if (! $c) {
-            throw new RuntimeException(__('Website API keys are not set (Settings > Website connection).'));
+            throw new RuntimeException(__('Website API keys are not set (Settings > Connections > Website).'));
         }
         $response = Http::withBasicAuth($c['key'], $c['secret'])->acceptJson()->timeout(30)
             ->get(rtrim($c['url'], '/').'/wp-json/wc/v3/'.ltrim($path, '/'), $query);

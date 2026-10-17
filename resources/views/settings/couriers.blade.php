@@ -2,7 +2,8 @@
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
 @endphp
 
-<x-layouts.app :heading="__('Courier accounts')">
+<x-layouts.app :heading="__('Connections')">
+    <x-connections-tabs active="courier" />
     <p class="mb-4 text-sm text-gray-500">{{ __('Steadfast API keys (merchant panel > API). Saved encrypted; only the first and last letters are ever shown again. To change a key, type the new one; leave it empty to keep the saved one.') }}</p>
 
     @unless ($liveBooking)

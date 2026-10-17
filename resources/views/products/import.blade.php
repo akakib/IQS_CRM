@@ -12,7 +12,7 @@
                 <x-confirm-modal id="website-pull-confirm" :verb="__('Pull now')" :danger="false"
                     :message="__('Every product on the website is read and saved here (matched by website id, then SKU). Names, prices, stock status, images and SEO here are replaced by the website\'s. Nothing is sent to the website.')" />
             @else
-                <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('Save the website API keys first:') }} <a href="{{ route('settings.integrations') }}" class="font-medium underline">{{ __('Settings > Website connection') }}</a></p>
+                <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ __('Save the website API keys first:') }} <a href="{{ route('settings.integrations') }}" class="font-medium underline">{{ __('Settings > Connections > Website') }}</a></p>
             @endif
         </x-card>
 

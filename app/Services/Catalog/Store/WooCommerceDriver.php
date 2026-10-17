@@ -63,7 +63,7 @@ class WooCommerceDriver implements StoreDriver
     public function setOrderStatus(string $orderId, string $status): void
     {
         if (blank($this->config['url'] ?? null) || blank($this->config['key'] ?? null) || blank($this->config['secret'] ?? null)) {
-            throw new RuntimeException('WooCommerce is not configured (Settings > Website connection).');
+            throw new RuntimeException('WooCommerce is not configured (Settings > Connections > Website).');
         }
         $this->put('orders/'.rawurlencode($orderId), ['status' => $status]);
     }

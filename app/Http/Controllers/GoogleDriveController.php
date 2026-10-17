@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\View\View;
 use RuntimeException;
 
-/** Settings > Google Drive: the keys (typed by the owner), connecting the account, and a test upload. */
+/** Settings > Connections > Google Drive: the keys (typed by the owner), connecting the account, and a test upload. */
 class GoogleDriveController extends Controller
 {
     public function __construct(private GoogleDriveService $drive) {}

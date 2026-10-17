@@ -16,8 +16,6 @@ class IntegrationController extends Controller
         return view('settings.integrations', [
             'webhookUrl' => route('webhooks.woocommerce'),
             'secret' => (string) config('store.woocommerce.webhook_secret'),
-            'steadfastUrl' => route('webhooks.steadfast'),
-            'steadfastToken' => (string) config('courier.steadfast.webhook_token'),
             // Is the website really calling us? Saved by the webhook endpoint itself.
             'wooPing' => Cache::get('woo:webhook:ping'),
             'wooAccepted' => Cache::get('woo:webhook:accepted'),

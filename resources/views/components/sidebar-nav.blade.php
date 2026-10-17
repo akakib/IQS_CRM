@@ -13,7 +13,7 @@
             if (! \Illuminate\Support\Facades\Route::has($route) || ($can && ! $user->can($can))) {
                 continue;
             }
-            $isActive = request()->routeIs($active);
+            $isActive = request()->routeIs(...(array) $active);
             $activeGroup = $isActive ? $key : $activeGroup;
             $visible[] = ['label' => __($itemLabel), 'url' => route($route), 'active' => $isActive, 'icon' => $item[4] ?? 'dot'];
         }

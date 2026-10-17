@@ -726,7 +726,7 @@ class DeskService
                 $order->update(['book_after' => now()->addMinutes(5), 'booking_error' => mb_substr($error, 0, 255), 'updated_at' => now()]);
                 if (Cache::add('courier:auth-alert', 1, now()->addMinutes(30))) {
                     $this->notifications->send('booking_failed', __('The courier refused the API keys'),
-                        __('No order can be booked until the keys are fixed in Settings > Courier accounts. Waiting orders are booked by themselves after that.'), [
+                        __('No order can be booked until the keys are fixed in Settings > Connections > Courier. Waiting orders are booked by themselves after that.'), [
                             'link' => route('settings.couriers'), 'user_ids' => $this->managerIds(),
                         ]);
                 }

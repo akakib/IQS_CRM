@@ -45,7 +45,7 @@ class CourierManager
         return app()->environment(['testing', 'staging', 'local']) && ! config('courier.allow_real_in_local');
     }
 
-    /** Keys typed in Settings > Courier accounts win over the server .env. */
+    /** Keys typed in Settings > Connections > Courier win over the server .env. */
     private function savedKeys(string $courier): array
     {
         try {

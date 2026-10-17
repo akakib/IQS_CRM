@@ -42,7 +42,7 @@ class WooOrderSweep
     {
         $result = ['new' => 0, 'updated' => 0, 'checked' => 0, 'busy' => false, 'error' => null];
         if (! $this->api->configured()) {
-            return ['error' => __('Website API keys are not set (Settings > Website connection).')] + $result;
+            return ['error' => __('Website API keys are not set (Settings > Connections > Website).')] + $result;
         }
         $lock = Cache::lock('woo:sweep:running', 120);
         if (! $lock->get()) {

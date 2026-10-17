@@ -72,9 +72,8 @@ return [
         // Ad tracking (settings.tracking) hidden from the menu for now (2026-10-17, client demo); the page and the events still work.
         ['Statuses & reasons', 'settings.reasons', 'settings.reasons*', 'settings.view', 'tag'],
         ['Activity log', 'activity.index', 'activity.*', 'activity.view', 'document'],
-        ['Website connection', 'settings.integrations', 'settings.integrations*', 'access.manage', 'globe'],
-        ['Google Drive', 'settings.google-drive', 'settings.google-drive*', 'access.manage', 'download'],
-        ['Courier accounts', 'settings.couriers', 'settings.couriers*', 'access.manage', 'truck'],
+        // Website, courier and Google Drive: one page with a tab each (x-connections-tabs).
+        ['Connections', 'settings.integrations', ['settings.integrations*', 'settings.couriers*', 'settings.google-drive*'], 'access.manage', 'globe'],
         ['System health', 'health', 'health', 'access.manage', 'heart'],
         ['Components (dev)', 'dev.components', 'dev.*', 'access.manage', 'code'],
     ]],

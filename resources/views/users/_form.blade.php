@@ -64,6 +64,7 @@
         <p class="mb-3 text-xs text-gray-500">{{ __('Leave a box empty to use the shop setting. Website orders 0 = this person gets no website orders (for example chat only).') }}</p>
         <div class="grid gap-x-4 grid-cols-2 md:grid-cols-4">
             <x-form.input name="desk_limit" type="number" min="0" max="50" :label="__('Orders at a time')" :value="$user->desk_limit" :placeholder="__('Shop: :n', ['n' => settings('desk.active_limit')])" />
+            <x-form.input name="desk_hold_limit" type="number" min="0" max="50" :label="__('Holds at a time')" :value="$user->desk_hold_limit" :placeholder="__('Shop: :n', ['n' => settings('desk.hold_limit')])" />
             <x-form.input name="desk_timer_minutes" type="number" min="1" max="240" :label="__('Time limit (min)')" :value="$user->desk_timer_minutes" :placeholder="__('Shop: :n', ['n' => settings('desk.action_timer_minutes')])" />
             <x-form.input name="desk_extend_minutes" type="number" min="1" max="60" :label="__('Extra time (min)')" :value="$user->desk_extend_minutes" :placeholder="__('Shop: :n', ['n' => settings('desk.extend_minutes')])" />
             <x-form.input name="desk_extend_daily_limit" type="number" min="0" max="100" :label="__('Extra times a day')" :value="$user->desk_extend_daily_limit" :placeholder="__('Shop: :n', ['n' => settings('desk.extend_daily_limit')])" />

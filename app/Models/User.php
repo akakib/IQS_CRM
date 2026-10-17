@@ -33,6 +33,7 @@ class User extends Authenticatable
         'telegram_user_id',
         'is_active',
         'desk_limit',
+        'desk_hold_limit',
         'desk_timer_minutes',
         'desk_extend_minutes',
         'desk_extend_daily_limit',

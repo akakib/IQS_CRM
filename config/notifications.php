@@ -28,6 +28,7 @@ return [
         'order_assigned' => ['An order was given to you', 'normal'],
         'orders_unassigned' => ['Orders waiting and nobody is active', 'urgent'],
         'booking_failed' => ['Courier booking failed', 'urgent'],
+        'hold_limit_request' => ['More holds asked for, or the answer', 'normal'],
         'scan_stopped' => ['A parcel was stopped at handover', 'urgent'],
         'return_problem' => ['Returned parcel: item damaged or missing, or not back in time', 'urgent'],
         'order_held_by_packer' => ['Packer put an order on hold', 'urgent'],

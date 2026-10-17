@@ -117,6 +117,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/sync-website', [OrderController::class, 'syncWebsite'])->middleware('can:orders.reassign')->name('orders.sync-website');
     // Order management desk (moderators). New orders are only ever given by Take next.
     Route::get('/desk', [DeskController::class, 'index'])->middleware('can:orders.edit')->name('desk.index');
+    Route::post('/desk/hold-limit', [\App\Http\Controllers\HoldLimitController::class, 'ask'])->middleware(['can:orders.edit', 'throttle:10,1'])->name('hold-limits.ask');
+    Route::get('/hold-limits', [\App\Http\Controllers\HoldLimitController::class, 'index'])->middleware('can:orders.approve')->name('hold-limits.index');
+    Route::post('/hold-limits/{id}', [\App\Http\Controllers\HoldLimitController::class, 'decide'])->whereNumber('id')->middleware('can:orders.approve')->name('hold-limits.decide');
     Route::post('/desk/next', [DeskController::class, 'takeNext'])->middleware('can:orders.take')->name('desk.next');
     Route::get('/desk/notice/{order}', [DeskController::class, 'fromNotice'])->whereNumber('order')->name('desk.notice');
     Route::get('/desk/pulse', [DeskController::class, 'pulse'])->middleware('can:orders.take')->name('desk.pulse');

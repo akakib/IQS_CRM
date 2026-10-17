@@ -505,6 +505,17 @@
                         @if ($actions)
                             {{-- The form holds only the note; the buttons below belong to it through form="desk-act",
                                  so the bar can stick to the bottom of the card without covering the order on a phone. --}}
+                            @error('hold_limit')
+                                {{-- At the hold limit: ask the manager for more, with the reason (HoldLimitController). --}}
+                                <div class="mx-5 mb-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                    <p>{{ $message }}</p>
+                                    <form method="POST" action="{{ route('hold-limits.ask') }}" class="mt-2 flex flex-wrap gap-2">
+                                        @csrf
+                                        <input name="reason" required maxlength="300" placeholder="{{ __('Why do you need more holds?') }}" class="{{ $input }} min-w-0 flex-1">
+                                        <button class="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark">{{ __('Ask your manager') }}</button>
+                                    </form>
+                                </div>
+                            @enderror
                             <form id="desk-act" method="POST" action="{{ route('desk.act', $order) }}" class="px-5 pb-4">
                                 @csrf
                                 <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">

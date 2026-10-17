@@ -432,14 +432,15 @@ class DeskService
         if (! $date) {
             throw ValidationException::withMessages(['hold_expected_date' => __('Choose the date to follow up: when the customer said, or when to call again.')]);
         }
-        $limit = (int) settings('desk.hold_limit');
+        $limit = $this->rules->holdLimit($user->id);
         if ($limit < 1 || $user->can('orders.approve')) {
             return;
         }
         $held = DB::table('orders')->where('moderator_id', $user->id)->where('status_id', OrderStatus::idFor('hold'))->where('id', '!=', $order->id)
             ->where(fn ($q) => $q->whereNull('hold_reason_id')->orWhere('hold_reason_id', '!=', (int) $this->advanceReasonId()))->count();
         if ($held >= $limit) {
-            throw ValidationException::withMessages(['reason_id' => __('You already hold :n orders on hold. Settle one of them first (call, confirm or cancel).', ['n' => $held])]);
+            // hold_limit: the desk then offers "Ask your manager for more" (HoldLimitController).
+            throw ValidationException::withMessages(['hold_limit' => __('You already hold :n orders on hold. Settle one of them first (call, confirm or cancel), or ask your manager for more.', ['n' => $held])]);
         }
     }
 

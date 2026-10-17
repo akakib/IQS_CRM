@@ -81,7 +81,7 @@ class UserController extends Controller
         }
         if ($user->is($actor) && ! $actor->isOwner()) {
             // Own desk limits and timer are set by someone else.
-            unset($data['desk_limit'], $data['desk_timer_minutes'], $data['desk_extend_minutes'], $data['desk_extend_daily_limit']);
+            unset($data['desk_limit'], $data['desk_hold_limit'], $data['desk_timer_minutes'], $data['desk_extend_minutes'], $data['desk_extend_daily_limit']);
         }
         $passwordReset = filled($data['password'] ?? null);
         $this->savePhoto($request, $user);

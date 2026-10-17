@@ -359,8 +359,9 @@ class DeskTest extends TestCase
 
         // The limit (2): the third is refused, so Hold cannot empty the hands for the next batch.
         $this->act($orders[2], 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])
-            ->assertSessionHasErrors(['reason_id' => 'You already hold 2 orders on hold. Settle one of them first (call, confirm or cancel).']);
+            ->assertSessionHasErrors(['hold_limit' => 'You already hold 2 orders on hold. Settle one of them first (call, confirm or cancel), or ask your manager for more.']);
         $this->assertSame('record_verified', $this->key($orders[2]));
+
 
         // A manager is not limited (the order page), but still gives a date.
         $boss = $this->manager();
@@ -368,6 +369,39 @@ class DeskTest extends TestCase
             ->assertSessionHasErrors('hold_expected_date');
         $this->post("/orders/{$orders[2]->id}/transition", ['to' => 'hold', 'reason_id' => $reason, 'lock_version' => $orders[2]->fresh()->lock_version, 'hold_expected_date' => today()->addDay()->toDateString()]);
         $this->assertSame('hold', $this->key($orders[2]));
+
+        // A shop manager (the Manager role, who approves).
+        $chief = User::factory()->create(['name' => 'Chief']);
+        $role = $this->role(['orders.view' => 'all', 'orders.edit', 'orders.approve'], [], 'Shop manager');
+        DB::table('roles')->where('id', $role->id)->update(['system_key' => 'manager']);
+        $chief->roles()->attach($role->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $boss = $chief;
+        // At the limit, Mahim asks the manager with a reason; a second ask waits; the manager gives 4, so a third hold goes through.
+        $orders[2]->forceFill(['moderator_id' => null])->save();
+        $fourth = $this->web();
+        $this->desk()->assign($fourth->id, $this->mahim->id, 'claimed');
+        if ($this->key($fourth) === 'new') {
+            app(\App\Services\Orders\OrderStateMachine::class)->transition($fourth->fresh(), 'record_verified', $this->mahim);
+        }
+        $this->actingAs($this->mahim);
+        $this->act($fourth->fresh(), 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])->assertSessionHasErrors('hold_limit');
+        $this->get(route('desk.index', ['order' => $fourth->id]))->assertSee('Ask your manager');
+        $this->post(route('hold-limits.ask'), ['reason' => 'Eid week, many customers ask to wait'])->assertSessionHas('success');
+        $this->post(route('hold-limits.ask'), ['reason' => 'again'])->assertSessionHas('error');
+        $req = DB::table('hold_limit_requests')->first();
+        $this->assertSame([2, 'pending'], [(int) $req->current_limit, $req->status]);
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $boss->id]);
+        $this->post(route('hold-limits.decide', $req->id), ['approve' => 1, 'new_limit' => 4])->assertForbidden();
+        $this->actingAs($boss)->get(route('hold-limits.index'))->assertOk()->assertSee('Eid week');
+        $this->post(route('hold-limits.decide', $req->id), ['approve' => 1, 'new_limit' => 4])->assertSessionHas('success');
+        $this->assertSame(4, (int) $this->mahim->fresh()->desk_hold_limit);
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->mahim->id]);
+        app()->forgetInstance(\App\Services\Work\DeskRules::class);
+        app()->forgetInstance(\App\Services\Orders\DeskService::class);
+        $this->actingAs($this->mahim);
+        $this->act($fourth->fresh(), 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])->assertSessionHasNoErrors();
+        $this->assertSame('hold', $this->key($fourth));
     }
 
     public function test_on_arrival_an_order_goes_to_whoever_was_free_longest_with_chat_and_shift_rules(): void

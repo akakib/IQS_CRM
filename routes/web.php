@@ -118,6 +118,7 @@ Route::middleware('auth')->group(function () {
     // Order management desk (moderators). New orders are only ever given by Take next.
     Route::get('/desk', [DeskController::class, 'index'])->middleware('can:orders.edit')->name('desk.index');
     Route::post('/desk/hold-limit', [\App\Http\Controllers\HoldLimitController::class, 'ask'])->middleware(['can:orders.edit', 'throttle:10,1'])->name('hold-limits.ask');
+    Route::get('/upsell', \App\Http\Controllers\UpsellReportController::class)->middleware('can:orders.edit')->name('upsell.index');
     Route::get('/hold-limits', [\App\Http\Controllers\HoldLimitController::class, 'index'])->middleware('can:orders.approve')->name('hold-limits.index');
     Route::post('/hold-limits/{id}', [\App\Http\Controllers\HoldLimitController::class, 'decide'])->whereNumber('id')->middleware('can:orders.approve')->name('hold-limits.decide');
     Route::post('/desk/next', [DeskController::class, 'takeNext'])->middleware('can:orders.take')->name('desk.next');

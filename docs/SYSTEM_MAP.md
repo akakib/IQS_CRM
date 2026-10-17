@@ -213,6 +213,18 @@ and row opens its orders in one popup (`sales-report.orders` → `orders()`), an
 All items opens there too. Print / PDF and Excel give the step's items. How much
 an item holds is `product_variants.size_qty / size_unit` (grams or ml), read from the names (`Units::sizeFromName`).
 
+**Upsell** (`Reports/UpsellReport`, `/upsell`): on a website order, while it is verified by call (New, Record verified,
+No answer at the time of the edit), items added or more of one and the total went up; it counts for whoever made the
+edit (order_amendments.requested_by). Entry and price fixes are not upsells. Earned = delivered; cancelled or returned
+= lost. Managers (analysis.view) see everyone; staff see their own (also on My points).
+
+**Delivery issues, who has them** (`DeliveryIssueService::whoHandles`, `reroute`): the order's person at work, else the
+colleague at work with the fewest open issues, else managers; on a break or off shift they move on. Anyone working orders
+may solve any open issue; solving a colleague's order's issue earns +4 (`issue_solved`).
+
+**More holds** (`HoldLimitController`, `users.desk_hold_limit`): at the hold limit a person asks with a reason, a manager
+sets their own number (More holds page, or Staff page).
+
 **Ending a hold, one rule** (`OrderService::resumeTarget`): advance paid or allowed, stock back, or the button in Order
 management. Confirmed when the order was confirmed before the hold, or was taken in a chat or call (confirmed in that
 talk) with no rule asking for a person and no other open order of the customer; else Call (a website order nobody

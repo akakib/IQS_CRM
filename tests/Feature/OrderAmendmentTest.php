@@ -91,6 +91,32 @@ class OrderAmendmentTest extends TestCase
         $this->assertSame('100.00', $order->fresh()->discount_total);
     }
 
+    public function test_upsell_counts_items_added_on_a_website_order_while_verifying_for_the_one_who_added(): void
+    {
+        $web = $this->order();
+        $web->forceFill(['channel' => 'web'])->save();
+        $this->setStatus($web, 'record_verified');
+        // On the call: one more Dates and a Nuts added (customer asked).
+        app(OrderEditor::class)->request($web->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 3], ['variant_id' => $this->nuts->id, 'qty' => 1]]], $this->reason('customer_request'), $this->agent, $web->fresh()->lock_version);
+        // Not upsells: an entry fix, a chat order, an edit after Confirmed.
+        app(OrderEditor::class)->request($web->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 4], ['variant_id' => $this->nuts->id, 'qty' => 1]]], $this->reason('entry_error'), $this->agent, $web->fresh()->lock_version);
+        $chat = $this->order();
+        app(OrderEditor::class)->request($chat, ['items' => [['variant_id' => $this->dates->id, 'qty' => 5]]], $this->reason('customer_request'), $this->agent, $chat->lock_version);
+        $this->setStatus($web, 'confirmed');
+        app(OrderEditor::class)->request($web->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 6], ['variant_id' => $this->nuts->id, 'qty' => 1]]], $this->reason('customer_request'), $this->agent, $web->fresh()->lock_version);
+
+        $rows = app(\App\Services\Reports\UpsellReport::class)->rows(today()->toDateString(), today()->toDateString());
+        $this->assertCount(1, $rows);
+        $this->assertEquals(1000.0, (float) $rows[0]->amount_diff); // 600 + 400
+        $this->assertSame(['Dates +1', 'Nuts ×1'], $rows[0]->added);
+        $this->assertSame('open', $rows[0]->state);
+
+        // Delivered: earned. Mahim sees it on My points and on his own Upsell page.
+        $this->setStatus($web, 'delivered');
+        $this->actingAs($this->agent)->get(route('points.mine'))->assertOk()->assertSee('My upsell this month')->assertSee('৳1,000');
+        $this->get(route('upsell.index'))->assertOk()->assertSee('My upsell')->assertSee($web->order_no);
+    }
+
     public function test_a_website_order_keeps_its_sold_delivery_charge_until_the_delivery_area_changes(): void
     {
         $zone = fn (string $key) => DB::table('delivery_zones')->where('system_key', $key)->value('id');

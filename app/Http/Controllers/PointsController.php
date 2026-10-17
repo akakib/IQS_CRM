@@ -113,8 +113,14 @@ class PointsController extends Controller
         $base = DB::table('point_ledger')->where('point_ledger.user_id', $request->user()->id)
             ->whereBetween('point_ledger.created_at', [$start, $start->copy()->endOfMonth()]);
 
+        // The same month's upsell of this person (website orders, during the verifying call).
+        $upsell = app(\App\Services\Reports\UpsellReport::class)->rows($start->toDateString(), $start->copy()->endOfMonth()->toDateString(), $request->user()->id);
+
         return view('points.mine', [
             'month' => $month,
+            'upsellWon' => (float) $upsell->where('state', 'won')->sum('amount_diff'),
+            'upsellOpen' => (float) $upsell->where('state', 'open')->sum('amount_diff'),
+            'upsellOrders' => $upsell->pluck('order_id')->unique()->count(),
             'totals' => (clone $base)->selectRaw('status, SUM(points) as total, COUNT(*) as n')->groupBy('status')->get()->keyBy('status'),
             'entries' => (clone $base)->leftJoin('orders as o', 'o.id', '=', 'point_ledger.order_id')
                 ->orderByDesc('point_ledger.id')->select('point_ledger.*', 'o.order_no')->paginate($perPage)->withQueryString(),

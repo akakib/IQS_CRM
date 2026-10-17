@@ -26,6 +26,13 @@
         <x-stat-tile :label="__('Removed')" :value="$revoked" :hint="__('Order not delivered or dispute upheld')" class="col-span-2 md:col-span-1" />
     </div>
 
+    {{-- My upsell this month: extra money added on website orders while verifying them (UpsellReport). --}}
+    <a href="{{ route('upsell.index', ['from' => $month.'-01', 'to' => min(now()->toDateString(), \Illuminate\Support\Carbon::parse($month.'-01')->endOfMonth()->toDateString())]) }}"
+        class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary bg-primary-soft px-4 py-3 hover:bg-primary-soft/70">
+        <span><span class="block text-sm font-semibold text-gray-700">{{ __('My upsell this month') }}</span><span class="block text-xs text-gray-600">{{ trans_choice(':n order|:n orders', $upsellOrders, ['n' => $upsellOrders]) }}</span></span>
+        <span class="text-right tabular-nums"><span class="block text-2xl font-bold text-gray-900">৳{{ number_format($upsellWon) }}</span><span class="block text-xs text-gray-600">{{ __('delivered · ৳:m on the way', ['m' => number_format($upsellOpen)]) }} <span class="font-semibold text-primary">›</span></span></span>
+    </a>
+
     @if ($entries->isEmpty())
         <div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-500">{{ __('No points this month yet.') }}</div>
     @else

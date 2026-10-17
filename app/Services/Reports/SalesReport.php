@@ -31,17 +31,21 @@ class SalesReport
         };
     }
 
-    /** Orders, money, grams and ml at each step; and how many of them were cancelled or returned since. */
+    /**
+     * Orders, money, grams and ml at each step. A step counts what happened in the dates (an order confirmed
+     * today stays in today's Confirmed), so what became of them since is told beside it: now cancelled,
+     * on hold, or returned. An order held and confirmed again counts once (its first confirm).
+     */
     public function summary(string $from, string $to): array
     {
-        $gone = OrderStatus::idsFor(['cancelled', 'returned']);
+        $now = fn (string $key) => 'COALESCE(SUM(CASE WHEN o.status_id IN ('.implode(',', array_map('intval', OrderStatus::idsFor([$key]) ?: [0])).') THEN 1 ELSE 0 END), 0)';
         $out = [];
         foreach (array_keys(self::STAGES) as $stage) {
             $orders = DB::table('orders as o')->joinSub($this->stage($stage, $from, $to), 's', 's.order_id', '=', 'o.id')
-                ->selectRaw('COUNT(*) as orders, COALESCE(SUM(o.grand_total), 0) as money, COALESCE(SUM(CASE WHEN o.status_id IN ('.implode(',', $gone ?: [0]).') THEN 1 ELSE 0 END), 0) as gone')
+                ->selectRaw('COUNT(*) as orders, COALESCE(SUM(o.grand_total), 0) as money, '.$now('cancelled').' as cancelled, '.$now('hold').' as hold, '.$now('returned').' as returned')
                 ->first();
             $amount = $this->items($stage, $from, $to)->selectRaw($this->gramsSql().' as grams, '.$this->mlSql().' as ml')->first();
-            $out[$stage] = ['orders' => (int) $orders->orders, 'money' => (float) $orders->money, 'gone' => (int) $orders->gone,
+            $out[$stage] = ['orders' => (int) $orders->orders, 'money' => (float) $orders->money, 'cancelled' => (int) $orders->cancelled, 'hold' => (int) $orders->hold, 'returned' => (int) $orders->returned,
                 'grams' => (float) ($amount->grams ?? 0), 'ml' => (float) ($amount->ml ?? 0)];
         }
 
@@ -52,8 +56,9 @@ class SalesReport
     public function products(string $stage, string $from, string $to): Collection
     {
         return $this->items($stage, $from, $to)->join('products as p', 'p.id', '=', 'v.product_id')
-            ->groupBy('v.id', 'p.name', 'v.name', 'v.sku')
-            ->selectRaw('v.id, p.name as product, v.name as variant, v.sku, SUM(i.qty) as qty, '.$this->gramsSql().' as grams, '.$this->mlSql().' as ml, SUM(i.line_total) as money')
+            ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
+            ->groupBy('v.id', 'p.name', 'v.name', 'v.sku', 'v.availability_status', 'c.name')
+            ->selectRaw('v.id, p.name as product, v.name as variant, v.sku, v.availability_status as stock, c.name as category, SUM(i.qty) as qty, '.$this->gramsSql().' as grams, '.$this->mlSql().' as ml, SUM(i.line_total) as money')
             ->orderByDesc('money')->get();
     }
 
@@ -67,6 +72,55 @@ class SalesReport
 
         return $orders->map(fn ($r, $p) => (object) ['period' => $p, 'orders' => (int) $r->orders, 'money' => (float) $r->money,
             'grams' => (float) ($amount[$p]->grams ?? 0), 'ml' => (float) ($amount[$p]->ml ?? 0)])->sortKeysDesc()->values();
+    }
+
+    /**
+     * Where the orders at this step came from: per channel, how many and the money, and how many of
+     * them were from returning customers (an earlier order of theirs was delivered). One grouped query.
+     */
+    public function channels(string $stage, string $from, string $to): Collection
+    {
+        $returning = $this->returningSql();
+
+        return DB::table('orders as o')->joinSub($this->stage($stage, $from, $to), 's', 's.order_id', '=', 'o.id')
+            ->groupBy('o.channel')
+            ->selectRaw("o.channel, COUNT(*) as orders, COALESCE(SUM(o.grand_total), 0) as money,
+                SUM(CASE WHEN $returning THEN 1 ELSE 0 END) as ret, COALESCE(SUM(CASE WHEN $returning THEN o.grand_total ELSE 0 END), 0) as ret_money")
+            ->orderByDesc('orders')->get();
+    }
+
+    /**
+     * The orders behind a number on the page, for its popup: one day (or month), one item, or one channel
+     * at this step. At most 200, oldest first; with how many there are and how many came back (returned).
+     *
+     * @param  array{day?: string, item?: int, channel?: string}  $only
+     */
+    public function orders(string $stage, string $from, string $to, array $only): array
+    {
+        $returned = implode(',', array_map('intval', OrderStatus::idsFor(['returned']) ?: [0]));
+        $q = DB::table('orders as o')->joinSub($this->stage($stage, $from, $to), 's', 's.order_id', '=', 'o.id')
+            ->when($only['day'] ?? null, fn ($q, $d) => $q->whereRaw('substr(s.at, 1, '.strlen($d).') = ?', [$d]))
+            ->when($only['channel'] ?? null, fn ($q, $c) => $q->where('o.channel', $c))
+            ->when($only['item'] ?? null, fn ($q, $v) => $q->whereExists(fn ($e) => $e->from('order_items as x')->whereColumn('x.order_id', 'o.id')->where('x.variant_id', $v)));
+        $count = (clone $q)->selectRaw("COUNT(*) as n, COALESCE(SUM(CASE WHEN o.status_id IN ($returned) THEN 1 ELSE 0 END), 0) as returned")->first();
+        $item = (int) ($only['item'] ?? 0);
+        $rows = $q->join('customers as cu', 'cu.id', '=', 'o.customer_id')->leftJoin('users as u', 'u.id', '=', 'o.moderator_id')
+            ->selectRaw('o.id, o.order_no, o.channel, o.status_id, o.grand_total, s.at, cu.name as customer, u.name as moderator, CASE WHEN '.$this->returningSql().' THEN 1 ELSE 0 END as is_returning,
+                (SELECT COUNT(*) FROM order_items x WHERE x.order_id = o.id) as lines,
+                (SELECT SUM(x.qty) FROM order_items x WHERE x.order_id = o.id AND x.variant_id = ?) as item_qty', [$item])
+            ->orderBy('s.at')->limit(200)->get();
+        $first = DB::table('order_items as x')->join('product_variants as v', 'v.id', '=', 'x.variant_id')->join('products as p', 'p.id', '=', 'v.product_id')
+            ->whereIn('x.order_id', $rows->pluck('id'))->orderBy('x.id')->get(['x.order_id', 'p.name'])->unique('order_id')->pluck('name', 'order_id');
+
+        return ['rows' => $rows->each(fn ($r) => $r->first_item = $first[$r->id] ?? null), 'count' => (int) $count->n, 'returned' => (int) $count->returned];
+    }
+
+    /** An earlier order of the same customer was delivered (fully or partly). */
+    private function returningSql(): string
+    {
+        $ids = implode(',', array_map('intval', OrderStatus::idsFor(['delivered', 'partial_delivered']) ?: [0]));
+
+        return "EXISTS (SELECT 1 FROM orders o2 WHERE o2.customer_id = o.customer_id AND o2.id < o.id AND o2.status_id IN ($ids))";
     }
 
     /** The order lines of the orders at this step, with their item. */

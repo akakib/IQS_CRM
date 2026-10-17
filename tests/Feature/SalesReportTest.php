@@ -58,7 +58,31 @@ class SalesReportTest extends TestCase
 
         // The page: the three side by side, the chosen step's items, by day; Print / PDF and Excel.
         $this->actingAs($owner)->get(route('sales-report.index'))->assertOk()
-            ->assertSeeInOrder(['Confirmed', '2', 'Packed', '1', 'Delivered', '1'])->assertSee('2 kg · 2 L')->assertSee('Dates 500g')->assertSee('1.5 kg')->assertSee('By day');
+            ->assertSeeInOrder(['Confirmed', '2', 'Packed', '1', 'Delivered', '1'])->assertSee('2 kg · 2 L')->assertSee('Dates 500g')->assertSee('1.5 kg')
+            ->assertSee('Confirmed by day')->assertSee('Where the orders came from')->assertSee('Messenger');
+
+        // Where they came from: both new customers; then a third order by the first (delivered) customer is returning.
+        $sales = app(\App\Services\Reports\SalesReport::class);
+        $this->assertSame([2, 0], [(int) $sales->channels('confirmed', today()->toDateString(), today()->toDateString())[0]->orders, (int) $sales->channels('confirmed', today()->toDateString(), today()->toDateString())[0]->ret]);
+        DB::table('orders')->where('id', $a->id)->update(['status_id' => \App\Models\OrderStatus::idFor('delivered')]);
+        $c = app(OrderService::class)->create(['channel' => 'whatsapp', 'customer_id' => $a->customer_id, 'phone' => '01712000001', 'name' => 'C1', 'address_line' => 'R',
+            'items' => [['variant_id' => $dates->id, 'qty' => 1]]], null);
+        $sm->transition($c->fresh(), 'record_verified', null, 'rule');
+        $sm->transition($c->fresh(), 'confirmed', $owner);
+        $wa = $sales->channels('confirmed', today()->toDateString(), today()->toDateString())->firstWhere('channel', 'whatsapp');
+        $this->assertSame([1, 1], [(int) $wa->orders, (int) $wa->ret]);
+
+        // The popups: a channel's, an item's and a day's orders.
+        $this->get(route('sales-report.orders', ['channel' => 'whatsapp']))->assertOk()->assertSee($c->order_no)->assertSee('Returning');
+        $this->get(route('sales-report.orders', ['item' => $oil->id]))->assertOk()->assertSee($b->order_no)->assertDontSee($a->order_no)->assertSee('Returned: 0');
+        $this->get(route('sales-report.orders', ['day' => today()->toDateString()]))->assertOk()->assertSee('3 orders');
+        $this->get(route('sales-report.orders'))->assertNotFound();
+
+        // Cancelled after it was confirmed: still in today's Confirmed (it was confirmed today), told beside it and in the popup.
+        DB::table('orders')->where('id', $b->id)->update(['status_id' => \App\Models\OrderStatus::idFor('cancelled')]);
+        $this->assertSame([3, 1, 0], [$sales->summary(today()->toDateString(), today()->toDateString())['confirmed']['orders'], $sales->summary(today()->toDateString(), today()->toDateString())['confirmed']['cancelled'], $sales->summary(today()->toDateString(), today()->toDateString())['confirmed']['hold']]);
+        $this->get(route('sales-report.index'))->assertSee('Since then: 1 cancelled');
+        $this->get(route('sales-report.orders', ['item' => $oil->id]))->assertSee('Now cancelled');
         $this->get(route('sales-report.index', ['stage' => 'packed']))->assertOk()->assertSee('1.5 kg')->assertDontSee('Oil 1 L');
         $this->get(route('sales-report.print', ['stage' => 'confirmed']))->assertOk()->assertSee('Sales: Confirmed')->assertSee('Oil 1 L');
         $this->get(route('sales-report.excel'))->assertOk()->assertDownload();

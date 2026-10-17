@@ -95,6 +95,8 @@ class ProductService
             $variant->availability_status = $row['availability_status'];
         }
         $variant->search_text = ProductVariant::searchTextFor($product->name, $variant->name, $variant->sku, $variant->barcode);
+        // How much one holds, from the names (for sales in kg and litres).
+        [$variant->size_qty, $variant->size_unit] = \App\Support\Units::sizeFromName($variant->name === 'Default' ? null : $variant->name, $product->name) ?? [null, null];
         $variant->save();
 
         $changed = $this->savePrices($variant, $row['prices'] ?? [], $this->lists, $userId, $source);

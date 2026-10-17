@@ -41,6 +41,47 @@ class Units
         };
     }
 
+    /**
+     * The size of one item as written in its name ("500g", "3kg", "350 gm", "600ml", "1.5 L", "৫০০ গ্রাম"):
+     * [amount, 'g' | 'ml'], kilos and litres turned into grams and ml. The first name that has one wins
+     * (the variant's, then the product's). Null when no name says it.
+     *
+     * @return array{0: float, 1: string}|null
+     */
+    public static function sizeFromName(?string ...$names): ?array
+    {
+        $bn = ['০' => '0', '১' => '1', '২' => '2', '৩' => '3', '৪' => '4', '৫' => '5', '৬' => '6', '৭' => '7', '৮' => '8', '৯' => '9'];
+        foreach ($names as $name) {
+            $text = strtr((string) $name, $bn);
+            if (preg_match('/(\d+(?:[.,]\d+)?)\s*(kgs?|kilo|gms?|grams?|g|ml|ltrs?|litres?|liters?|l|কেজি|গ্রাম|মিলি|লিটার)(?![a-z])/iu', $text, $m)) {
+                $qty = (float) str_replace(',', '.', $m[1]);
+                $unit = mb_strtolower($m[2]);
+                [$times, $as] = match (true) {
+                    in_array($unit, ['kg', 'kgs', 'kilo', 'কেজি'], true) => [1000, 'g'],
+                    in_array($unit, ['ml', 'মিলি'], true) => [1, 'ml'],
+                    in_array($unit, ['l', 'ltr', 'ltrs', 'litre', 'litres', 'liter', 'liters', 'লিটার'], true) => [1000, 'ml'],
+                    default => [1, 'g'],
+                };
+                if ($qty > 0) {
+                    return [round($qty * $times, 3), $as];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Grams and ml in the big unit once there is enough: "42.5 kg", "750 g", "3.6 L", "250 ml". */
+    public static function amount(float $grams, float $ml = 0): string
+    {
+        $one = fn (float $n, string $small, string $big) => $n >= 1000
+            ? rtrim(rtrim(number_format($n / 1000, 2, '.', ','), '0'), '.').' '.$big
+            : rtrim(rtrim(number_format($n, 1, '.', ','), '0'), '.').' '.$small;
+        $parts = array_filter([$grams > 0 ? $one($grams, 'g', 'kg') : null, $ml > 0 ? $one($ml, 'ml', 'L') : null]);
+
+        return $parts ? implode(' · ', $parts) : '-';
+    }
+
     /** Shipping weight of one order line, in grams. */
     public static function weight(float $qty, ?string $unit, ?int $weightEach): int
     {

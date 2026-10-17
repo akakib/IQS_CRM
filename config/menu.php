@@ -43,6 +43,7 @@ return [
         ['Return report', 'returns-report.index', 'returns-report.*', 'orders.reassign', 'refresh'],
         ['Packers', 'packers-report.index', 'packers-report.*', 'packaging.manage', 'box'],
         ['Team Activity', 'work-time.index', 'work-time.*', 'orders.reassign', 'clock'],
+        ['Sales report', 'sales-report.index', 'sales-report.*', 'analysis.view', 'chart'],
         ['Order P&L', 'analysis.index', 'analysis.*', 'analysis.view', 'calculator'],
     ]],
     'marketing' => ['Marketing', [

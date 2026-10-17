@@ -67,6 +67,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [ReportController::class, 'dashboard'])->name('dashboard');
     Route::get('/kpi', [ReportController::class, 'kpi'])->name('kpi.index'); // own numbers for everyone; kpi.view sees the team
     Route::get('/analysis', [ReportController::class, 'analysis'])->middleware('can:analysis.view')->name('analysis.index');
+    Route::middleware('can:analysis.view')->controller(\App\Http\Controllers\SalesReportController::class)->group(function () {
+        Route::get('/sales-report', 'index')->name('sales-report.index');
+        Route::get('/sales-report/print', 'print')->name('sales-report.print');
+        Route::get('/sales-report/excel', 'excel')->name('sales-report.excel');
+    });
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

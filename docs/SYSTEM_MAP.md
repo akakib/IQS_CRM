@@ -202,6 +202,10 @@ Communication > Customer calls (a customer called or I will call; the number fro
 duration: it is the recording's own length, else the clock since the call started. A started, unsaved call
 follows the caller to every page (`x-call-live-bar`, kept in the browser) until it is saved.
 
+**Sales report** (`SalesReport`, Analysis): Confirmed, Packed and Delivered side by side for the dates (each on its
+own day), orders, money and kg / litres; one step's items below, by day or month; Print / PDF and Excel. How much
+an item holds is `product_variants.size_qty / size_unit` (grams or ml), read from the names (`Units::sizeFromName`).
+
 **Ending a hold, one rule** (`OrderService::resumeTarget`): advance paid or allowed, stock back, or the button in Order
 management. Confirmed when the order was confirmed before the hold, or was taken in a chat or call (confirmed in that
 talk) with no rule asking for a person and no other open order of the customer; else Call (a website order nobody

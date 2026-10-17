@@ -69,7 +69,7 @@ return [
         ['Verification rules', 'settings.verification', 'settings.verification*', 'settings.view', 'check'],
         ['Communication channels', 'settings.chat-channels', 'settings.chat-channels*', 'settings.view', 'phone'],
         ['Delivery charges', 'settings.charges', 'settings.charges*', 'settings.view', 'cash'],
-        ['Ad tracking', 'settings.tracking', 'settings.tracking*', 'settings.view', 'cursor'],
+        // Ad tracking (settings.tracking) hidden from the menu for now (2026-10-17, client demo); the page and the events still work.
         ['Statuses & reasons', 'settings.reasons', 'settings.reasons*', 'settings.view', 'tag'],
         ['Activity log', 'activity.index', 'activity.*', 'activity.view', 'document'],
         ['Website connection', 'settings.integrations', 'settings.integrations*', 'access.manage', 'globe'],

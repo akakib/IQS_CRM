@@ -203,7 +203,12 @@ duration: it is the recording's own length, else the clock since the call starte
 follows the caller to every page (`x-call-live-bar`, kept in the browser) until it is saved.
 
 **Sales report** (`SalesReport`, Analysis): Confirmed, Packed and Delivered side by side for the dates (each on its
-own day), orders, money and kg / litres; one step's items below, by day or month; Print / PDF and Excel. How much
+own day), orders, money and kg / litres, up or down against the same number of days before, and what became of
+them since (now cancelled, on hold, returned; an order held and confirmed again counts once). Below, for the chosen
+step: where the orders came from (`channels()`: per channel, returning = an earlier order of the customer was
+delivered, else new), bars by day (by month past 62 days), top items (out-of-stock flagged), categories. Every bar
+and row opens its orders in one popup (`sales-report.orders` → `orders()`), an order opens inside it (desk embed);
+All items opens there too. Print / PDF and Excel give the step's items. How much
 an item holds is `product_variants.size_qty / size_unit` (grams or ml), read from the names (`Units::sizeFromName`).
 
 **Ending a hold, one rule** (`OrderService::resumeTarget`): advance paid or allowed, stock back, or the button in Order

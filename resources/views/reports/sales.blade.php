@@ -86,7 +86,9 @@
             </a>
         @endforeach
     </div>
-    <p class="mb-5 mt-2 text-xs text-gray-500">{{ __('▲▼ against the :n days before (:a to :b).', ['n' => $days, 'a' => \Illuminate\Support\Carbon::parse($before[0])->format('d M'), 'b' => \Illuminate\Support\Carbon::parse($before[1])->format('d M')]) }}</p>
+    <p class="mb-5 mt-2 text-xs text-gray-500">{{ $days === 1
+        ? __('▲▼ against the day before (:a).', ['a' => \Illuminate\Support\Carbon::parse($before[0])->format('d M')])
+        : __('▲▼ against the :n days before (:a to :b).', ['n' => $days, 'a' => \Illuminate\Support\Carbon::parse($before[0])->format('d M'), 'b' => \Illuminate\Support\Carbon::parse($before[1])->format('d M')]) }}</p>
 
     {{-- Where the orders came from: returning or new customer, and per channel. --}}
     <section class="mb-5 rounded-2xl border border-gray-200 bg-white p-4">

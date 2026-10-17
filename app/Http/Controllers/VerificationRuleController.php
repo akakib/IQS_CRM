@@ -132,6 +132,14 @@ class VerificationRuleController extends Controller
     /** Order page: run the checks again (e.g. after a phone or amount change). */
     public function rerun(Order $order, Request $request, VerificationEngine $engine): RedirectResponse|\Illuminate\Http\JsonResponse
     {
+        // Run checks again / Check again (the desk, when Steadfast was busy): staff who work the order, once a minute per order,
+        // so repeated presses do not keep Steadfast busy.
+        abort_unless($request->user()->can('orders.approve') || $order->moderator_id === $request->user()->id, 403);
+        if (! \Illuminate\Support\Facades\Cache::add('verify-again:'.$order->id, 1, 60)) {
+            $wait = __('Checked a moment ago. Try again in a minute.');
+
+            return $request->expectsJson() ? response()->json(['message' => $wait], 429) : back()->with('error', $wait);
+        }
         $wasNew = \App\Models\OrderStatus::map()[$order->status_id]['key'] === 'new';
         $outcome = $engine->run($order, $request->user(), true); // pressed by hand: ask Steadfast again, not yesterday's answer
         $message = $wasNew ? __('Checks run again: :o.', ['o' => str_replace('_', ' ', $outcome)]) : __('Checks run again. Status unchanged.');

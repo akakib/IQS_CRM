@@ -428,7 +428,9 @@ class DeskController extends Controller
             'talked' => $notes->contains(fn ($n) => $n->note_type === 'call' && (json_decode((string) $n->meta, true)['call_outcome'] ?? null) === 'answered' && $n->created_at >= today()->toDateTimeString()),
             'duplicates' => $duplicates,
             // Steadfast history as read when the checks ran (one row, no call to Steadfast here).
-            'steadfast' => collect(json_decode((string) DB::table('verification_runs')->where('order_id', $order->id)->latest('id')->value('inputs_snapshot'), true)['providers'] ?? [])->firstWhere('key', 'steadfast'),
+            'steadfast' => $steadfast = collect($providers = json_decode((string) DB::table('verification_runs')->where('order_id', $order->id)->latest('id')->value('inputs_snapshot'), true)['providers'] ?? null)->firstWhere('key', 'steadfast'),
+            // The checks ran but Steadfast did not answer (busy, HTTP 429, down): say so, with Check again.
+            'steadfastMissed' => $providers !== null && ! $steadfast,
             'heldBy' => $heldBy,
             'heldFrom' => $heldFrom ?? null,
             // Ending this hold goes to Confirmed (Send to packaging) or to Call (Resume): the one rule in OrderService.

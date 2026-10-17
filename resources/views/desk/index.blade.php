@@ -371,6 +371,12 @@
                                 @if ($s = $detail['steadfast'])
                                     <p class="mt-2 text-sm text-gray-700">{{ __('Steadfast') }}: <x-steadfast-line :provider="$s" /></p>
                                     <x-steadfast-detail :detail="$s['detail'] ?? null" />
+                                @elseif ($detail['steadfastMissed'])
+                                    <form method="POST" action="{{ route('orders.verify', $order) }}" class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                                        @csrf
+                                        <span class="text-amber-700">{{ __('Steadfast: not checked (busy)') }}</span>
+                                        <button class="lockable rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:border-primary hover:text-primary">{{ __('Check again') }}</button>
+                                    </form>
                                 @endif
                             </div>
                             <div class="rounded-lg border border-gray-200 p-4">

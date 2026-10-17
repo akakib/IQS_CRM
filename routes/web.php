@@ -318,7 +318,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/settings/verification/{rule}', [VerificationRuleController::class, 'update'])->whereNumber('rule')->name('settings.verification.update');
         Route::delete('/settings/verification/{rule}', [VerificationRuleController::class, 'destroy'])->whereNumber('rule')->name('settings.verification.destroy');
     });
-    Route::post('/orders/{order}/verify', [VerificationRuleController::class, 'rerun'])->middleware('can:orders.approve')->name('orders.verify');
+    Route::post('/orders/{order}/verify', [VerificationRuleController::class, 'rerun'])->middleware('can:orders.edit')->name('orders.verify');
 
     Route::get('/settings/tracking', [TrackingSettingsController::class, 'index'])->middleware('can:settings.view')->name('settings.tracking');
     Route::put('/settings/tracking/{event}', [TrackingSettingsController::class, 'update'])->whereNumber('event')->middleware('can:settings.edit')->name('settings.tracking.update');

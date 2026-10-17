@@ -26,6 +26,14 @@ class WebsiteStatusPush
         return $order->channel === 'web' && filled($order->external_ref) && ! in_array((string) $order->external_status, self::LEAVE, true);
     }
 
+    /** A person may send it: a website order IQS has record-verified (or moved past), not one still new, held or ended. */
+    public function canSend(Order $order): bool
+    {
+        $key = \App\Models\OrderStatus::map()[$order->status_id]['key'] ?? null;
+
+        return $this->applies($order) && ! in_array($key, ['new', 'hold', 'cancelled', 'returned'], true);
+    }
+
     /** Send it now; true when the website took it. */
     public function push(Order $order, ?User $by = null): bool
     {

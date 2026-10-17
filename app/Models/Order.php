@@ -56,6 +56,7 @@ class Order extends Model
             'courier_mismatch_at' => 'datetime',
             'verified_at' => 'datetime',
             'confirmed_at' => 'datetime',
+            'website_pushed_at' => 'datetime',
             'pickup_date' => 'date',
             'hold_expected_date' => 'date',
             'had_setback' => 'boolean',

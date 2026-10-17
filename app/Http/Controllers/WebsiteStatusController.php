@@ -7,12 +7,12 @@ use App\Services\Orders\WebsiteStatusPush;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
-/** Send to website: try again to set a record-verified website order to Record verified there. */
+/** Set on website: an employee sets a record-verified website order to Record verified on the website (again, if it failed). */
 class WebsiteStatusController extends Controller
 {
     public function __invoke(Request $request, Order $order, WebsiteStatusPush $push): RedirectResponse
     {
-        abort_unless($push->applies($order), 404);
+        abort_unless($push->canSend($order), 404);
 
         return $push->push($order, $request->user())
             ? back()->with('success', __('Website order set to Record verified.'))

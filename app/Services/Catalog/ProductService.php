@@ -72,6 +72,7 @@ class ProductService
     {
         $this->lists ??= DB::table('price_lists')->pluck('id', 'system_key');
         $oldCost = $variant->exists ? $variant->cost_price : null;
+        $oldName = $variant->exists ? $variant->name : null;
         $order = (int) ($row['sort_order'] ?? $variant->sort_order ?? 0);
 
         $variant->fill([
@@ -95,8 +96,14 @@ class ProductService
             $variant->availability_status = $row['availability_status'];
         }
         $variant->search_text = ProductVariant::searchTextFor($product->name, $variant->name, $variant->sku, $variant->barcode);
-        // How much one holds, from the names (for sales in kg and litres).
-        [$variant->size_qty, $variant->size_unit] = \App\Support\Units::sizeFromName($variant->name === 'Default' ? null : $variant->name, $product->name) ?? [null, null];
+        // How much one holds (for sales in kg and litres): as set on the product page (g, ml, or none = counted in pieces);
+        // else read from the names, for a new item, a renamed one or one with no size yet (an import keeps a size set by hand).
+        if (in_array($row['size_unit'] ?? null, ['g', 'ml', 'none'], true)) {
+            [$variant->size_qty, $variant->size_unit] = $row['size_unit'] !== 'none' && (float) ($row['size_qty'] ?? 0) > 0
+                ? [(float) $row['size_qty'], $row['size_unit']] : [null, null];
+        } elseif (! $variant->exists || $variant->size_unit === null || $oldName !== $variant->name) {
+            [$variant->size_qty, $variant->size_unit] = \App\Support\Units::sizeFromName($variant->name === 'Default' ? null : $variant->name, $product->name) ?? [null, null];
+        }
         $variant->save();
 
         $changed = $this->savePrices($variant, $row['prices'] ?? [], $this->lists, $userId, $source);

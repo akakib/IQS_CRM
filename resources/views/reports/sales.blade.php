@@ -17,8 +17,10 @@
         'money' => (float) $p->money, 'qty' => (float) $p->qty, 'amount' => (float) $p->grams + (float) $p->ml,
         'moneyText' => $money($p->money), 'qtyText' => $num($p->qty), 'amountText' => Units::amount((float) $p->grams, (float) $p->ml),
         'out' => $p->stock === 'out_of_stock'])->values();
-    $cats = $products->groupBy(fn ($p) => $p->category ?: __('No category'))->map->sum('money')->sortDesc();
-    $catTotal = max(1, $cats->sum());
+    $cats = app(SalesReport::class)->categories($products);
+    $catTotal = max(1, $cats->sum('money'));
+    // 12.5 kg · 2 L · 5 pcs: weight and volume apart, pieces for what has no size.
+    $howMuch = fn (array $a) => collect([$a['grams'] + $a['ml'] > 0 ? Units::amount($a['grams'], $a['ml']) : null, $a['pcs'] > 0 ? $num($a['pcs']).' '.__('pcs') : null])->filter()->join(' · ') ?: '-';
     $days = \Illuminate\Support\Carbon::parse($from)->diffInDays(\Illuminate\Support\Carbon::parse($to)) + 1;
 @endphp
 
@@ -38,7 +40,8 @@
                 this.html = r.ok ? await r.text() : @js('<p class="py-6 text-center text-sm text-red-600">'.e(__('Could not load the orders. Try again.')).'</p>');
             } finally { this.loading = false }
         },
-        showAll() { this.title = @js(__('All items')); this.order = null; this.html = this.$refs.allItems.innerHTML; this.pop = true },
+        showAll() { this.showTpl('allItems', @js(__('All items'))) },
+        showTpl(ref, title) { this.title = title; this.order = null; this.html = this.$refs[ref].innerHTML; this.pop = true },
         pick(e) { const b = e.target.closest('[data-order]'); if (b) this.order = { id: b.dataset.order, no: b.dataset.no } },
     }" @keydown.escape.window="pop = false">
 
@@ -185,20 +188,43 @@
         {{-- Categories: the share of the money. --}}
         <section class="rounded-2xl border border-gray-200 bg-white p-4">
             <h2 class="mb-2 text-base font-semibold text-gray-900">{{ __('By category') }}</h2>
-            @forelse ($cats as $name => $v)
-                <div class="grid grid-cols-[7.5rem_minmax(0,1fr)_2.75rem] items-center gap-3 py-1.5 text-sm">
-                    <span class="truncate text-gray-800">{{ $name }}</span>
-                    <span class="h-2 overflow-hidden rounded-full bg-gray-100"><span class="block h-full rounded-full bg-primary/40" style="width: {{ $v / $catTotal * 100 }}%"></span></span>
-                    <span class="text-right font-semibold tabular-nums text-gray-600">{{ (int) round($v / $catTotal * 100) }}%</span>
-                </div>
+            @forelse ($cats as $ci => $c)
+                {{-- Tap: the category's items with their sizes (template cat-N below, no extra request). --}}
+                <button type="button" @click="showTpl('cat{{ $ci }}', @js($c['name']))" class="grid w-full grid-cols-[7.5rem_minmax(0,1fr)_3.75rem] items-center gap-3 rounded-lg px-1 py-1.5 text-left text-sm hover:bg-gray-50">
+                    <span class="min-w-0"><span class="block truncate text-gray-800">{{ $c['name'] }}</span><span class="block truncate text-xs text-gray-500">{{ $howMuch($c) }}</span></span>
+                    <span class="h-2 overflow-hidden rounded-full bg-gray-100"><span class="block h-full rounded-full bg-primary/40" style="width: {{ $c['money'] / $catTotal * 100 }}%"></span></span>
+                    <span class="text-right font-semibold tabular-nums text-gray-600">{{ (int) round($c['money'] / $catTotal * 100) }}% <span class="text-primary">›</span></span>
+                </button>
             @empty
                 <p class="py-4 text-center text-sm text-gray-500">{{ __('Nothing :s in these dates.', ['s' => $stageWord]) }}</p>
             @endforelse
-            @if ($cats->isNotEmpty())<p class="mt-2 text-xs text-gray-500">{{ __(':m in all, from each item\'s category.', ['m' => $money($cats->sum())]) }}</p>@endif
+            @if ($cats->isNotEmpty())<p class="mt-2 text-xs text-gray-500">{{ __(':m in all. Tap a category for its items by size.', ['m' => $money($cats->sum('money'))]) }}</p>@endif
         </section>
     </div>
 
     {{-- Every item of this step, shown in the popup (All items). --}}
+    {{-- Each category's items by size, shown in the popup. --}}
+    @foreach ($cats as $ci => $c)
+        <template x-ref="cat{{ $ci }}">
+            <p class="mb-2 text-sm text-gray-600">{{ $howMuch($c) }} · {{ $money($c['money']) }}</p>
+            <ul class="divide-y divide-gray-100">
+                @foreach ($c['items'] as $it)
+                    <li class="py-2.5 text-sm">
+                        <div class="flex items-start justify-between gap-3">
+                            <button type="button" @click="show({ product: {{ $it['product_id'] }} }, @js($it['name']))" class="min-w-0 text-left font-medium text-gray-900 hover:text-primary">{{ $it['name'] }} <span class="text-primary">›</span></button>
+                            <span class="shrink-0 text-right tabular-nums"><span class="block font-semibold text-gray-900">{{ $howMuch($it) }}</span><span class="block text-xs text-gray-500">{{ $money($it['money']) }}</span></span>
+                        </div>
+                        <p class="mt-1 flex flex-wrap gap-1.5 text-xs text-gray-600">
+                            @foreach ($it['sizes'] as $s)
+                                <span class="rounded-full bg-gray-100 px-2 py-0.5">{{ $s['label'] ? $s['label'].' ' : '' }}{{ $s['qty'] }}@if ($s['unsized']) <span class="text-amber-700">· {{ __('size not set') }}</span>@endif</span>
+                            @endforeach
+                        </p>
+                    </li>
+                @endforeach
+            </ul>
+        </template>
+    @endforeach
+
     <template x-ref="allItems">
         <ul class="divide-y divide-gray-100">
             @foreach ($products as $p)

@@ -78,6 +78,14 @@ class SalesReportTest extends TestCase
         $this->get(route('sales-report.orders', ['day' => today()->toDateString()]))->assertOk()->assertSee('3 orders');
         $this->get(route('sales-report.orders'))->assertNotFound();
 
+        // By category: the item with its sizes (kg apart from litres), and the item's orders across its sizes.
+        $cat = $sales->categories($sales->products('confirmed', today()->toDateString(), today()->toDateString()))->firstWhere('name', 'No category');
+        $dates = collect($cat['items'])->firstWhere('name', 'Dates 500g');
+        $this->assertSame([2500.0, 0.0], [$dates['grams'], $dates['ml']]);
+        $this->assertSame([2000.0, 2000.0], [$cat['grams'] - 500, $cat['ml']]);
+        $this->get(route('sales-report.index'))->assertSee('Tap a category for its items by size.');
+        $this->get(route('sales-report.orders', ['product' => $dates['product_id']]))->assertOk()->assertSee($a->order_no)->assertSee($c->order_no);
+
         // Cancelled after it was confirmed: still in today's Confirmed (it was confirmed today), told beside it and in the popup.
         DB::table('orders')->where('id', $b->id)->update(['status_id' => \App\Models\OrderStatus::idFor('cancelled')]);
         $this->assertSame([3, 1, 0], [$sales->summary(today()->toDateString(), today()->toDateString())['confirmed']['orders'], $sales->summary(today()->toDateString(), today()->toDateString())['confirmed']['cancelled'], $sales->summary(today()->toDateString(), today()->toDateString())['confirmed']['hold']]);

@@ -57,9 +57,30 @@ class SalesReport
     {
         return $this->items($stage, $from, $to)->join('products as p', 'p.id', '=', 'v.product_id')
             ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
-            ->groupBy('v.id', 'p.name', 'v.name', 'v.sku', 'v.availability_status', 'c.name')
-            ->selectRaw('v.id, p.name as product, v.name as variant, v.sku, v.availability_status as stock, c.name as category, SUM(i.qty) as qty, '.$this->gramsSql().' as grams, '.$this->mlSql().' as ml, SUM(i.line_total) as money')
+            ->groupBy('v.id', 'p.id', 'p.name', 'v.name', 'v.sku', 'v.unit', 'v.size_qty', 'v.size_unit', 'v.availability_status', 'c.name')
+            ->selectRaw('v.id, p.id as product_id, p.name as product, v.name as variant, v.sku, v.unit, v.size_qty, v.size_unit, v.availability_status as stock, c.name as category, SUM(i.qty) as qty, '.$this->gramsSql().' as grams, '.$this->mlSql().' as ml, SUM(i.line_total) as money')
             ->orderByDesc('money')->get();
+    }
+
+    /**
+     * The sold items (from products()) by category, then by item with its sizes: Dates 38.5 kg > Ajwa Large
+     * 12.5 kg > 3kg ×3, 1kg ×2. Grams and ml are added up apart (never mixed); an item with no size counts in
+     * pieces. Most money first at each level. No query: it reshapes what products() returned.
+     */
+    public function categories(Collection $products): Collection
+    {
+        $sum = fn (Collection $rows) => ['money' => (float) $rows->sum('money'), 'grams' => (float) $rows->sum('grams'), 'ml' => (float) $rows->sum('ml'),
+            'pcs' => (float) $rows->filter(fn ($r) => (float) $r->grams + (float) $r->ml == 0)->sum('qty')];
+
+        return $products->groupBy(fn ($r) => $r->category ?: __('No category'))->map(fn ($rows, $cat) => ['name' => $cat] + $sum($rows) + [
+            'items' => $rows->groupBy('product_id')->map(fn ($v) => ['name' => $v->first()->product, 'product_id' => $v->first()->product_id] + $sum($v) + [
+                'sizes' => $v->sortByDesc('money')->map(fn ($r) => [
+                    'label' => $r->variant !== 'Default' ? $r->variant : ($r->size_unit ? \App\Support\Units::amount($r->size_unit === 'g' ? (float) $r->size_qty : 0, $r->size_unit === 'ml' ? (float) $r->size_qty : 0) : null),
+                    'qty' => \App\Support\Units::qty($r->qty, $r->unit),
+                    'unsized' => $r->size_unit === null && ! \App\Support\Units::measured($r->unit),
+                ])->values()->all(),
+            ])->sortByDesc('money')->values()->all(),
+        ])->sortByDesc('money')->values();
     }
 
     /** By day or by month: orders, money, grams and ml at this step. Newest first. */
@@ -93,7 +114,7 @@ class SalesReport
      * The orders behind a number on the page, for its popup: one day (or month), one item, or one channel
      * at this step. At most 200, oldest first; with how many there are and how many came back (returned).
      *
-     * @param  array{day?: string, item?: int, channel?: string}  $only
+     * @param  array{day?: string, item?: int, product?: int, channel?: string}  $only
      */
     public function orders(string $stage, string $from, string $to, array $only): array
     {
@@ -101,7 +122,8 @@ class SalesReport
         $q = DB::table('orders as o')->joinSub($this->stage($stage, $from, $to), 's', 's.order_id', '=', 'o.id')
             ->when($only['day'] ?? null, fn ($q, $d) => $q->whereRaw('substr(s.at, 1, '.strlen($d).') = ?', [$d]))
             ->when($only['channel'] ?? null, fn ($q, $c) => $q->where('o.channel', $c))
-            ->when($only['item'] ?? null, fn ($q, $v) => $q->whereExists(fn ($e) => $e->from('order_items as x')->whereColumn('x.order_id', 'o.id')->where('x.variant_id', $v)));
+            ->when($only['item'] ?? null, fn ($q, $v) => $q->whereExists(fn ($e) => $e->from('order_items as x')->whereColumn('x.order_id', 'o.id')->where('x.variant_id', $v)))
+            ->when($only['product'] ?? null, fn ($q, $p) => $q->whereExists(fn ($e) => $e->from('order_items as x')->join('product_variants as xv', 'xv.id', '=', 'x.variant_id')->whereColumn('x.order_id', 'o.id')->where('xv.product_id', $p)));
         $count = (clone $q)->selectRaw("COUNT(*) as n, COALESCE(SUM(CASE WHEN o.status_id IN ($returned) THEN 1 ELSE 0 END), 0) as returned")->first();
         $item = (int) ($only['item'] ?? 0);
         $rows = $q->join('customers as cu', 'cu.id', '=', 'o.customer_id')->leftJoin('users as u', 'u.id', '=', 'o.moderator_id')

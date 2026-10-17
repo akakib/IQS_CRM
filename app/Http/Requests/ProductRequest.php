@@ -41,6 +41,8 @@ class ProductRequest extends FormRequest
             'variants.*.unit' => ['required', Rule::in(\App\Support\Units::keys())],
             'variants.*.pack_qty' => ['required', 'numeric', 'gt:0', 'max:1000000'],
             'variants.*.weight_g' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'variants.*.size_unit' => ['nullable', Rule::in(['g', 'ml', 'none'])],
+            'variants.*.size_qty' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
             'variants.*.cost_price' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
             'variants.*.is_active' => ['boolean'],
             'variants.*.prices' => ['array'],

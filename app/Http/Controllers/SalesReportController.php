@@ -56,6 +56,7 @@ class SalesReportController extends Controller
         $only = array_filter([
             'day' => preg_match('/^\d{4}-\d{2}(-\d{2})?$/', (string) $request->query('day')) ? $request->query('day') : null,
             'item' => (int) $request->query('item') ?: null,
+            'product' => (int) $request->query('product') ?: null,
             'channel' => array_key_exists((string) $request->query('channel'), Order::CHANNELS) ? $request->query('channel') : null,
         ]);
         abort_if($only === [], 404);

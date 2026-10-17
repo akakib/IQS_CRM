@@ -2,7 +2,7 @@
     $blankPrices = $priceLists->mapWithKeys(fn ($l) => [$l->system_key => ['regular' => '', 'sale' => '']])->all();
     $initialVariants = old('variants', $variants ?: [[
         'id' => null, 'name' => 'Default', 'sku' => '', 'barcode' => '', 'shelf_code' => '', 'unit' => 'pcs', 'pack_qty' => 1,
-        'weight_g' => '', 'cost_price' => '', 'is_active' => true, 'prices' => $blankPrices,
+        'weight_g' => '', 'cost_price' => '', 'is_active' => true, 'prices' => $blankPrices, 'size_qty' => '', 'size_unit' => '',
     ]]);
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
     $small = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none';
@@ -50,7 +50,7 @@
             x-data="{
                 rows: {{ \Illuminate\Support\Js::from($initialVariants) }},
                 blank: {{ \Illuminate\Support\Js::from($blankPrices) }},
-                add() { this.rows.push({ id: null, name: '', sku: '', barcode: '', shelf_code: '', unit: 'pcs', pack_qty: 1, weight_g: '', cost_price: '', is_active: true, prices: JSON.parse(JSON.stringify(this.blank)) }) },
+                add() { this.rows.push({ id: null, name: '', sku: '', barcode: '', shelf_code: '', unit: 'pcs', pack_qty: 1, weight_g: '', cost_price: '', size_qty: '', size_unit: '', is_active: true, prices: JSON.parse(JSON.stringify(this.blank)) }) },
             }">
             <div class="space-y-4">
                 <template x-for="(row, i) in rows" :key="i">
@@ -96,6 +96,19 @@
                                 </div>
                             </div>
                             <label class="text-xs text-gray-500"><span x-text="row.unit === 'pcs' ? @js(__('Pieces')) : @js(__('Grams'))"></span><input type="number" step="0.001" min="0.001" :name="`variants[${i}][pack_qty]`" x-model="row.pack_qty" required class="{{ $small }} mt-1"></label>
+                            {{-- How much one holds, for the Sales report in kg and litres. Empty on a new item: read from the name. --}}
+                            <div class="col-span-2 text-xs text-gray-500">{{ __('Size (one holds)') }}
+                                <input type="hidden" :name="`variants[${i}][size_unit]`" :value="row.size_unit">
+                                <div class="mt-1 flex gap-1">
+                                    <input type="number" step="0.001" min="0" :name="`variants[${i}][size_qty]`" x-model="row.size_qty" x-show="row.size_unit === 'g' || row.size_unit === 'ml'"
+                                        :placeholder="row.size_unit === 'ml' ? '500' : '1000'" class="{{ $small }} min-w-0 flex-1">
+                                    <div class="flex shrink-0 overflow-hidden rounded-md border border-gray-300 text-xs">
+                                        @foreach (['g' => 'g', 'ml' => 'ml', 'none' => __('pcs')] as $su => $sl)
+                                            <button type="button" @click="row.size_unit = @js($su)" class="px-2 py-1.5" :class="row.size_unit === @js($su) ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50'">{{ $sl }}</button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                             <label class="text-xs text-gray-500">{{ __('Ship weight (g)') }}<input type="number" min="0" :name="`variants[${i}][weight_g]`" x-model="row.weight_g" class="{{ $small }} mt-1"></label>
                             @if ($canSeeCost)
                                 <label class="text-xs text-gray-500">{{ __('Cost price') }}<input type="number" step="0.01" min="0" :name="`variants[${i}][cost_price]`" x-model="row.cost_price" class="{{ $small }} mt-1"></label>

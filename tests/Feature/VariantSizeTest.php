@@ -25,10 +25,12 @@ class VariantSizeTest extends TestCase
         $service->saveVariant($v->product, $v, $row + ['size_unit' => 'g', 'size_qty' => 750], null);
         $this->assertSame([750.0, 'g'], [(float) $v->fresh()->size_qty, $v->fresh()->size_unit]);
 
-        // An import (no size sent) keeps it; "pcs" clears it.
+        // An import (no size sent) keeps it; "pcs" says it is counted in pieces (not "size not set").
         $service->saveVariant($v->product, $v->fresh(), $row, null, 'import');
         $this->assertSame('g', $v->fresh()->size_unit);
         $service->saveVariant($v->product, $v->fresh(), $row + ['size_unit' => 'none'], null);
-        $this->assertNull($v->fresh()->size_unit);
+        $this->assertSame([null, 'pc'], [$v->fresh()->size_qty, $v->fresh()->size_unit]);
+        $service->saveVariant($v->product, $v->fresh(), $row, null, 'import');
+        $this->assertSame('pc', $v->fresh()->size_unit);
     }
 }

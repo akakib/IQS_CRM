@@ -96,11 +96,11 @@ class ProductService
             $variant->availability_status = $row['availability_status'];
         }
         $variant->search_text = ProductVariant::searchTextFor($product->name, $variant->name, $variant->sku, $variant->barcode);
-        // How much one holds (for sales in kg and litres): as set on the product page (g, ml, or none = counted in pieces);
+        // How much one holds (for sales in kg and litres): as set on the product page (g, ml, or none = counted in pieces, kept as 'pc');
         // else read from the names, for a new item, a renamed one or one with no size yet (an import keeps a size set by hand).
         if (in_array($row['size_unit'] ?? null, ['g', 'ml', 'none'], true)) {
             [$variant->size_qty, $variant->size_unit] = $row['size_unit'] !== 'none' && (float) ($row['size_qty'] ?? 0) > 0
-                ? [(float) $row['size_qty'], $row['size_unit']] : [null, null];
+                ? [(float) $row['size_qty'], $row['size_unit']] : [null, 'pc'];
         } elseif (! $variant->exists || $variant->size_unit === null || $oldName !== $variant->name) {
             [$variant->size_qty, $variant->size_unit] = \App\Support\Units::sizeFromName($variant->name === 'Default' ? null : $variant->name, $product->name) ?? [null, null];
         }

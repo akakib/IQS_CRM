@@ -75,7 +75,7 @@ class SalesReport
         return $products->groupBy(fn ($r) => $r->category ?: __('No category'))->map(fn ($rows, $cat) => ['name' => $cat] + $sum($rows) + [
             'items' => $rows->groupBy('product_id')->map(fn ($v) => ['name' => $v->first()->product, 'product_id' => $v->first()->product_id] + $sum($v) + [
                 'sizes' => $v->sortByDesc('money')->map(fn ($r) => [
-                    'label' => $r->variant !== 'Default' ? $r->variant : ($r->size_unit ? \App\Support\Units::amount($r->size_unit === 'g' ? (float) $r->size_qty : 0, $r->size_unit === 'ml' ? (float) $r->size_qty : 0) : null),
+                    'label' => $r->variant !== 'Default' ? $r->variant : (in_array($r->size_unit, ['g', 'ml'], true) ? \App\Support\Units::amount($r->size_unit === 'g' ? (float) $r->size_qty : 0, $r->size_unit === 'ml' ? (float) $r->size_qty : 0) : null),
                     'qty' => \App\Support\Units::qty($r->qty, $r->unit),
                     'unsized' => $r->size_unit === null && ! \App\Support\Units::measured($r->unit),
                 ])->values()->all(),

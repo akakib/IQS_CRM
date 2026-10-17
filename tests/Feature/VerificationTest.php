@@ -96,9 +96,9 @@ class VerificationTest extends TestCase
         $order->forceFill(['external_status' => 'processing'])->save();
         $this->assertFalse(app(\App\Services\Orders\WebsiteStatusPush::class)->push($order));
         $this->assertSame('HTTP 500', $order->fresh()->website_push_error);
-        $this->actingAs($this->owner())->get(route('desk.index', ['order' => $order->id]))->assertSee('Website status:')->assertSee('Set Record verified on website')->assertSee('Not set: HTTP 500');
+        $this->actingAs($this->owner())->get(route('desk.index', ['order' => $order->id]))->assertSee('Website status:')->assertSee('Woo Record Verified')->assertSee('Not set: HTTP 500');
         $this->post(route('orders.website-status', $order))->assertSessionHas('success');
-        $this->get(route('desk.index', ['order' => $order->id]))->assertSee('Record Verified')->assertDontSee('Set Record verified on website');
+        $this->get(route('desk.index', ['order' => $order->id]))->assertSee('Record Verified')->assertDontSee('Woo Record Verified');
         $this->assertNull($order->fresh()->website_push_error);
         // Never moves a finished website order back.
         $order->forceFill(['external_status' => 'completed'])->save();

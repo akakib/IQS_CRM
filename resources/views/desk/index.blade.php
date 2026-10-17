@@ -323,7 +323,7 @@
                                         <span>{{ __('Website status:') }} <b>{{ \Illuminate\Support\Str::headline((string) ($order->external_status ?: __('not known'))) }}</b>@if ($order->external_status === \App\Services\Orders\WebsiteStatusPush::STATUS && $order->website_pushed_at) <span class="text-green-700">✓ {{ __('set :t', ['t' => $order->website_pushed_at->format('d M, g:i A')]) }}</span>@endif</span>
                                         @if ($order->website_push_error)<span>· {{ __('Not set: :e', ['e' => \Illuminate\Support\Str::limit($order->website_push_error, 90)]) }}</span>@endif
                                         @if ($push->canSend($order))
-                                            <button class="lockable rounded-lg border border-gray-300 bg-white px-2.5 py-1 font-semibold text-gray-800 hover:border-primary hover:text-primary">{{ __('Set Record verified on website') }}</button>
+                                            <button class="lockable rounded-lg border border-gray-300 bg-white px-2.5 py-1 font-semibold text-gray-800 hover:border-primary hover:text-primary">{{ __('Woo Record Verified') }}</button>
                                         @endif
                                     </form>
                                 @endif

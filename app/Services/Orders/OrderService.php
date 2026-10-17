@@ -354,11 +354,9 @@ class OrderService
         if ($allow) {
             $order->forceFill(['advance_waived_by' => $by->id, 'advance_waived_at' => now(), 'advance_waiver_requested_at' => null])->save();
             $machine = app(OrderStateMachine::class);
-            $wasConfirmed = $machine->heldFrom($order) === 'confirmed';
-            $confirmedInTalk = $order->channel !== 'web' && ! $this->askedForReview($order) && ! $this->openDuplicate($order);
-            $to = $wasConfirmed || $confirmedInTalk ? 'confirmed' : 'record_verified';
+            $to = $this->resumeTarget($order);
             $machine->transition($order, $to, $by, 'user', null,
-                __('Allowed without advance by :n', ['n' => $by->name]).(! $wasConfirmed && $confirmedInTalk ? ' · '.__('Confirmed in the chat or call it was taken in') : ''));
+                __('Allowed without advance by :n', ['n' => $by->name]).($to === 'confirmed' && $machine->heldFrom($order) !== 'confirmed' ? ' · '.__('Confirmed in the chat or call it was taken in') : ''));
         } else {
             $order->forceFill(['advance_waiver_requested_at' => null])->save();
             $this->note($order, 'system', __('Without advance refused by :n: it waits for the advance.', ['n' => $by->name]), $by);
@@ -369,6 +367,21 @@ class OrderService
                     'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$asker],
                 ]);
         }
+    }
+
+    /**
+     * Where an order on hold goes when the hold ends (advance allowed, stock back, Resume): Confirmed when it was
+     * confirmed before the hold, or when it was taken in a chat or call (confirmed in that talk) and nothing asks
+     * for a person first (a rule's manual review, the same customer's open order). Else Call: a website order
+     * nobody has confirmed with the customer yet.
+     */
+    public function resumeTarget(Order $order): string
+    {
+        if (app(OrderStateMachine::class)->heldFrom($order) === 'confirmed') {
+            return 'confirmed';
+        }
+
+        return $order->channel !== 'web' && ! $this->askedForReview($order) && ! $this->openDuplicate($order) ? 'confirmed' : 'record_verified';
     }
 
     /** A verification rule asked for a person to look at this order first (e.g. a blocked customer). */

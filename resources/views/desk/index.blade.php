@@ -456,7 +456,7 @@
                                 in_array($key, ['record_verified', 'no_answer'], true) => [['confirm', $order->channel === 'web' ? __('Call verified') : __('Confirm'), 'v', 'primary'], ['no_response', __('No response'), 'n', 'secondary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 $key === 'hold' => [match (true) {
                                     $detail['consignment'] && ! $order->taken_back_at => ['back_to_packaging', __('Back to packaging'), 'p', 'primary'],
-                                    $detail['heldFrom'] === 'confirmed' => ['back_to_send', __('Send to packaging'), 'p', 'primary'],
+                                    $detail['resumeTo'] === 'confirmed' => ['back_to_send', __('Send to packaging'), 'p', 'primary'],
                                     default => ['resume', __('Resume, call next'), 'r', 'primary'],
                                 }, ['cancel', __('Cancel'), 'x', 'danger-outline']],
                                 $key === 'confirmed' && $order->booking_state === 'none' => [['send', __('Send to packaging'), 'p', 'primary'], ['hold', __('Hold'), 'h', 'secondary'], ['cancel', __('Cancel'), 'x', 'danger-outline']],

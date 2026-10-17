@@ -429,6 +429,8 @@ class DeskController extends Controller
             'steadfast' => collect(json_decode((string) DB::table('verification_runs')->where('order_id', $order->id)->latest('id')->value('inputs_snapshot'), true)['providers'] ?? [])->firstWhere('key', 'steadfast'),
             'heldBy' => $heldBy,
             'heldFrom' => $heldFrom ?? null,
+            // Ending this hold goes to Confirmed (Send to packaging) or to Call (Resume): the one rule in OrderService.
+            'resumeTo' => $key === 'hold' ? $this->orders->resumeTarget($order) : null,
             'openDuplicates' => $duplicates->filter(fn ($d) => ! (OrderStatus::map()[$d->status_id]['final'] ?? false) && OrderStatus::map()[$d->status_id]['key'] !== 'cancelled')->values(),
             'parcel' => $parcel = $order->active_shipment_id ? DB::table('shipments')->where('id', $order->active_shipment_id)->first(['consignment_id', 'courier', 'courier_status']) : null,
             'consignment' => $parcel?->consignment_id,

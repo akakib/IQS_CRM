@@ -62,7 +62,11 @@ class AvailabilityEffects
                 continue;
             }
             try {
-                $this->machine->transition($order, 'confirmed', null, 'system', null, __('Stock arrived: released (first come, first served).'));
+                if ($this->orders->resumeTarget($order) === 'confirmed') {
+                    $this->machine->transition($order, 'confirmed', null, 'system', null, __('Stock arrived: released (first come, first served).'));
+                } else {
+                    $this->machine->transition($order, 'record_verified', null, 'system', null, __('Stock arrived: call the customer before it is booked.'));
+                }
                 $released[] = $order->id;
             } catch (\Illuminate\Validation\ValidationException $e) {
                 // This order cannot move on by itself (an advance to check, a parcel to delete): it stays on hold, its person is told.

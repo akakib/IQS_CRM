@@ -332,6 +332,27 @@ class PackagingTest extends TestCase
         $this->assertDatabaseHas('restock_releases', ['variant_id' => $this->dates->id]);
     }
 
+    public function test_back_in_stock_a_website_order_nobody_called_goes_to_call_a_chat_order_to_confirmed(): void
+    {
+        $sm = app(OrderStateMachine::class);
+        $web = app(OrderService::class)->create(['channel' => 'web', 'phone' => '01712345671', 'name' => 'W', 'address_line' => 'R',
+            'items' => [['variant_id' => $this->dates->id, 'qty' => 1]]], null, 'webhook');
+        $chat = app(OrderService::class)->create(['channel' => 'messenger', 'phone' => '01712345672', 'name' => 'C', 'address_line' => 'R',
+            'items' => [['variant_id' => $this->dates->id, 'qty' => 1]]], $this->desk);
+        $sm->transition($chat, 'record_verified', null, 'rule');
+        $this->actingAs($this->desk)->post('/products/availability', ['ids' => [$this->dates->id], 'status' => 'out_of_stock']);
+        $this->assertSame(['hold', 'hold'], [$this->key($web), $this->key($chat)]); // held before anyone confirmed
+
+        // Order management offers what ending the hold will do: the chat order goes on, the website order is called first.
+        $this->get(route('desk.index', ['order' => $chat->id]))->assertSee('Send to packaging')->assertDontSee('Resume, call next');
+        $this->get(route('desk.index', ['order' => $web->id]))->assertSee('Resume, call next');
+
+        $this->post('/products/availability', ['ids' => [$this->dates->id], 'status' => 'in_stock']);
+        $this->assertSame('record_verified', $this->key($web)); // never booked before a call
+        $this->assertDatabaseHas('order_notes', ['order_id' => $web->id, 'body' => 'Hold → Record verified · Stock arrived: call the customer before it is booked.']);
+        $this->assertSame('ready_for_packaging', $this->key($chat)); // confirmed in the chat: on to booking
+    }
+
     public function test_telegram_picked_button_counts_for_the_linked_packer(): void
     {
         config(['services.telegram.webhook_secret' => 'tg-secret']);

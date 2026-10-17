@@ -106,7 +106,7 @@ class SalesReport
         $item = (int) ($only['item'] ?? 0);
         $rows = $q->join('customers as cu', 'cu.id', '=', 'o.customer_id')->leftJoin('users as u', 'u.id', '=', 'o.moderator_id')
             ->selectRaw('o.id, o.order_no, o.channel, o.status_id, o.grand_total, s.at, cu.name as customer, u.name as moderator, CASE WHEN '.$this->returningSql().' THEN 1 ELSE 0 END as is_returning,
-                (SELECT COUNT(*) FROM order_items x WHERE x.order_id = o.id) as lines,
+                (SELECT COUNT(*) FROM order_items x WHERE x.order_id = o.id) as line_count,
                 (SELECT SUM(x.qty) FROM order_items x WHERE x.order_id = o.id AND x.variant_id = ?) as item_qty', [$item])
             ->orderBy('s.at')->limit(200)->get();
         $first = DB::table('order_items as x')->join('product_variants as v', 'v.id', '=', 'x.variant_id')->join('products as p', 'p.id', '=', 'v.product_id')

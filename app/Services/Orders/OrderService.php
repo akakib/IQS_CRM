@@ -468,13 +468,13 @@ class OrderService
         $machine = app(OrderStateMachine::class);
         if (OrderStatus::map()[$order->status_id]['key'] === 'hold' && (int) $order->hold_reason_id === (int) $advanceHold
             && (float) $order->advance_verified > 0 && $machine->advanceSettled($order) && ! $this->hasUncheckedAdvance($order) && ! $order->taken_back_at) {
-            // Held after Confirmed, or (a website order) already called while asking for the advance: on to booking.
-            // Not called yet: to Call (address check, upsell). Chat orders: their moderator presses Confirm.
-            // Same customer with another open order: never booked by itself (two parcels, two charges); the
-            // moderator confirms by hand, where Confirm asks "merge first?".
+            // Where it goes is the one hold rule (resumeTarget): held after Confirmed, or taken in a chat or call
+            // (confirmed in that talk): on to booking. A website order already called while asking for the advance
+            // goes on too; not called yet: to Call (address check, upsell). Same customer with another open order:
+            // never booked by itself (two parcels, two charges); the moderator confirms by hand ("merge first?").
             $called = $order->channel === 'web' && DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'call')->exists();
             $duplicate = $this->openDuplicate($order);
-            $machine->transition($order, ($machine->heldFrom($order) === 'confirmed' || $called) && ! $duplicate ? 'confirmed' : 'record_verified', null, 'rule', null,
+            $machine->transition($order, ($this->resumeTarget($order) === 'confirmed' || $called) && ! $duplicate ? 'confirmed' : 'record_verified', null, 'rule', null,
                 $duplicate ? __('Advance received. Same customer has :no open: merge or confirm by hand.', ['no' => $duplicate]) : __('Advance received'));
         }
     }

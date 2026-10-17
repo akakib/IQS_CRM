@@ -297,7 +297,7 @@ class AdvanceHoldTest extends TestCase
         $this->assertDatabaseHas('app_notifications', ['title' => "Order {$held->order_no} was given to you (ask for the advance)"]);
     }
 
-    public function test_chat_orders_on_advance_hold_are_released_to_their_moderator_to_confirm(): void
+    public function test_chat_orders_on_advance_hold_go_on_to_booking_once_the_advance_is_in(): void
     {
         $this->actingAs($this->mod);
         $order = app(OrderService::class)->create([
@@ -307,7 +307,7 @@ class AdvanceHoldTest extends TestCase
         app(VerificationEngine::class)->run($order);
         $this->assertSame('hold', $this->key($order));
         $this->post("/orders/{$order->id}/payments", ['called' => 1, 'advance' => ['method_id' => $this->bkash(), 'amount' => (float) $order->fresh()->advance_required, 'transaction_id' => 'CHAT1']]);
-        $this->assertSame('record_verified', $this->key($order)); // not booked by itself: the moderator confirms in the chat
+        $this->assertContains($this->key($order), ['confirmed', 'ready_for_packaging']); // confirmed in the chat: on to booking, no second call
         $this->assertSame($this->mod->id, $order->fresh()->moderator_id);
     }
 

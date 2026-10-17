@@ -202,7 +202,7 @@ Communication > Customer calls (a customer called or I will call; the number fro
 duration: it is the recording's own length, else the clock since the call started. A started, unsaved call
 follows the caller to every page (`x-call-live-bar`, kept in the browser) until it is saved.
 
-**Ending a hold, one rule** (`OrderService::resumeTarget`): advance allowed, stock back, or the button in Order
+**Ending a hold, one rule** (`OrderService::resumeTarget`): advance paid or allowed, stock back, or the button in Order
 management. Confirmed when the order was confirmed before the hold, or was taken in a chat or call (confirmed in that
 talk) with no rule asking for a person and no other open order of the customer; else Call (a website order nobody
 has confirmed with the customer is never booked before a call).

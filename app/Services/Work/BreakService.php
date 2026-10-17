@@ -61,6 +61,8 @@ class BreakService
             }
             DB::table('orders')->where('moderator_id', $user->id)->whereNotNull('action_due_at')->update(['action_due_at' => null]);
         });
+        // Their open delivery issues go to a colleague at work now (one courier number: anyone can solve it).
+        app(\App\Services\Orders\DeliveryIssueService::class)->reroute($user->id);
     }
 
     public function end(User $user): void

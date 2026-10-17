@@ -141,7 +141,28 @@ class HotlineTest extends TestCase
         app(\App\Services\PermissionService::class)->bump();
         $this->actingAs($this->owner())->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'address', 'verdict' => 'true']);
         $second = DB::table('delivery_issues')->whereNull('resolved_at')->value('id');
-        $this->actingAs($other)->post("/issues/{$second}/resolve", ['resolution' => 'solved'])->assertForbidden();
+        // One courier number: any colleague may solve it, sees both people on the list, and earns the points for helping.
+        (new \Database\Seeders\PointsSeeder)->run();
+        $this->actingAs($other)->get('/issues')->assertOk()->assertSee($this->order->order_no);
+        $this->post("/issues/{$second}/resolve", ['resolution' => 'solved'])->assertSessionHas('success');
+        $this->assertSame($other->id, (int) DB::table('delivery_issues')->where('id', $second)->value('resolved_by'));
+        $this->assertEquals(4, DB::table('point_ledger')->where('user_id', $other->id)->where('trigger_key', 'issue_solved')->sum('points'));
+    }
+
+    public function test_an_issue_goes_to_a_free_colleague_and_moves_on_when_its_person_takes_a_break(): void
+    {
+        // The order's person is away (no shift): the issue goes to the colleague at work, not only to managers.
+        $helper = User::factory()->create(['last_seen_at' => now()]);
+        $helper->roles()->attach(DB::table('roles')->where('system_key', 'moderator')->value('id'));
+        app(\App\Services\PermissionService::class)->bump();
+        $service = app(\App\Services\Orders\DeliveryIssueService::class);
+        DB::table('users')->where('id', $this->order->moderator_id)->update(['is_active' => false]);
+        $id = $service->open($this->order->fresh(), 'address', null, null, null);
+        $this->assertSame($helper->id, (int) DB::table('delivery_issues')->where('id', $id)->value('assigned_to'));
+
+        // The helper goes on a break: nobody else is at work, so it moves to the managers.
+        $this->assertSame(1, $service->reroute($helper->id));
+        $this->assertNull(DB::table('delivery_issues')->where('id', $id)->value('assigned_to'));
     }
 
     public function test_small_issue_is_saved_on_the_timeline(): void

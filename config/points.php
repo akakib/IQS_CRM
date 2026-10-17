@@ -21,12 +21,14 @@ return [
         'amendment' => ['Order changed after confirming', 'Quality', ['blame', 'after_pack']],
         'order_reassigned' => ['Order moved to someone else', 'Quality', ['blame']],
         'issue_escalated' => ['Delivery issue not handled in time', 'Quality', []],
+        'issue_solved' => ['Delivery issue solved', 'Delivery', ['others_order']],
         'fake_status' => ['Fake status (confirmed by a manager)', 'Quality', []],
     ],
 
     // Condition fields shown in the rule editor.
     'fields' => [
         'minutes_waiting' => 'Minutes the order waited before being taken',
+        'others_order' => 'Not their own order: helped a colleague (true/false)',
         'minutes_since_claim' => 'Minutes from taking to confirming (time the customer made us wait is not counted)',
         'minutes_since_release' => 'Minutes from batch release to packed',
         'channel' => 'Order channel (web, messenger, whatsapp, phone)',

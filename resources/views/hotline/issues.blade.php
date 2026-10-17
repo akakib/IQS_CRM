@@ -5,7 +5,7 @@
 <x-layouts.app :heading="$all ? __('Delivery issues') : __('My delivery issues')">
     <x-courier-resync class="mb-3" />
     <x-list.filter-bar :list="$list" :action="route('issues.index')" :placeholder="__('Order no, phone or CN')" :results="$issues" :noun="[__('issue'), __('issues')]">
-        <x-simple-select name="show" :options="['all' => __('All open'), 'overdue' => __('Overdue')]" :value="$list->filter('show') ?? 'all'" />
+        <x-simple-select name="show" :options="['all' => __('All open'), 'mine' => __('Mine'), 'overdue' => __('Overdue')]" :value="$list->filter('show') ?? 'all'" />
         @if ($all)<x-simple-select name="person" :options="['' => __('Anyone')] + $people" :value="$list->filter('person') ?? ''" />@endif
     </x-list.filter-bar>
 
@@ -23,7 +23,12 @@
                         <span class="text-sm text-gray-600">· {{ $i->ship_name }} · ৳{{ number_format((float) $i->cod_amount) }}</span>
                         <p class="text-sm text-gray-800">{{ \App\Support\Labels::issueType($i->issue_type) }}{{ $i->note ? ': '.$i->note : '' }}</p>
                         @if ($i->rider_phone)<a href="tel:{{ $i->rider_phone }}" class="text-xs text-primary">☎ {{ __('Rider') }} {{ $i->rider_phone }}</a>@endif
-                        @if ($all)<p class="text-xs text-gray-500">{{ __('Assigned to') }}: {{ $i->moderator ?? '-' }}</p>@endif
+                        {{-- Everyone on it: the order's person and, when different, who has the issue now. --}}
+                        <p class="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                            @if ($i->order_moderator)<span class="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-0.5 pr-2" title="{{ __('Order') }}"><x-avatar :name="$i->order_moderator" :photo="$i->order_moderator_photo" size="xs" /> {{ $i->order_moderator }} <span class="text-gray-400">· {{ __('order') }}</span></span>@endif
+                            @if ($i->assigned_to && $i->assigned_to !== $i->order_moderator_id)<span class="inline-flex items-center gap-1 rounded-full bg-amber-50 py-0.5 pl-0.5 pr-2" title="{{ __('Issue') }}"><x-avatar :name="$i->moderator" :photo="$i->moderator_photo" size="xs" /> {{ $i->moderator }} <span class="text-amber-700">· {{ __('issue') }}</span></span>@endif
+                            @if (! $i->assigned_to)<span class="rounded-full bg-red-50 px-2 py-0.5 text-red-700">{{ __('Managers') }}</span>@endif
+                        </p>
                     </div>
                     <x-badge :color="$due->isPast() ? 'red' : 'amber'">{{ $due->isPast() ? __('Overdue :t', ['t' => $due->diffForHumans(null, true)]) : __('Due in :t', ['t' => $due->diffForHumans(null, true)]) }}</x-badge>
                 </div>

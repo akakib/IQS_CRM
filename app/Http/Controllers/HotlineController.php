@@ -76,21 +76,23 @@ class HotlineController extends Controller
     public function issues(Request $request): View
     {
         $user = $request->user();
-        $all = $user->can('orders.approve');
+        // Everyone working orders sees every open issue (anyone may solve one); Mine narrows to their own.
+        $all = true;
 
-        $list = \App\Support\Lists\ListState::from($request, ['sla_due_at'], ['show' => ['all', 'overdue'], 'person' => 'int'], 'asc');
+        $list = \App\Support\Lists\ListState::from($request, ['sla_due_at'], ['show' => ['all', 'overdue', 'mine'], 'person' => 'int'], 'asc');
         $q = trim($list->search);
         $digits = preg_replace('/\D/', '', $q);
         $issues = DB::table('delivery_issues as i')->join('orders as o', 'o.id', '=', 'i.order_id')->leftJoin('users as u', 'u.id', '=', 'i.assigned_to')
             ->whereNull('i.resolved_at')
-            ->when(! $all, fn ($w) => $w->where('i.assigned_to', $user->id))
+            ->leftJoin('users as om', 'om.id', '=', 'o.moderator_id')
+            ->when($list->filter('show') === 'mine', fn ($w) => $w->where('i.assigned_to', $user->id))
             ->when($list->filter('show') === 'overdue', fn ($w) => $w->where('i.sla_due_at', '<', now()))
             ->when($all && $list->filter('person'), fn ($w, $p) => $w->where('i.assigned_to', $p))
             ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('o.order_no', strtoupper($q))->when($digits, fn ($d) => $d->orWhere('o.ship_phone', 'like', $digits.'%'))
                 // A CN or tracking code (any parcel of the order, also an older one).
                 ->when(strlen((string) $digits) >= 5 || preg_match('/^[A-Z]{2,}\w{6,}$/i', $q), fn ($d) => $d->orWhereIn('i.order_id', DB::table('shipments')->select('order_id')->where('consignment_id', $digits ?: $q)->orWhere('tracking_code', strtoupper($q))))))
             ->orderBy('i.sla_due_at')
-            ->select(['i.*', 'o.order_no', 'o.ship_name', 'o.cod_amount', 'u.name as moderator'])
+            ->select(['i.*', 'o.order_no', 'o.ship_name', 'o.cod_amount', 'u.name as moderator', 'u.photo_path as moderator_photo', 'o.moderator_id as order_moderator_id', 'om.name as order_moderator', 'om.photo_path as order_moderator_photo'])
             ->paginate($list->perPage)->withQueryString();
         $people = $all ? DB::table('delivery_issues as i')->join('users as u', 'u.id', '=', 'i.assigned_to')->whereNull('i.resolved_at')
             ->distinct()->orderBy('u.name')->pluck('u.name', 'u.id')->all() : [];

@@ -103,9 +103,15 @@ class PointHooks
         $this->engine->fire('amendment', $order, ['blame' => $blame, 'after_pack' => $afterPack], ['order_moderator' => $order->moderator_id ?? $order->created_by]);
     }
 
-    public function escalated(Order $order): void
+    public function escalated(Order $order, ?int $holderId = null): void
     {
-        $this->engine->fire('issue_escalated', $order, [], ['order_moderator' => $order->moderator_id]);
+        $this->engine->fire('issue_escalated', $order, [], ['order_moderator' => $holderId ?? $order->moderator_id]);
+    }
+
+    /** Someone solved a delivery issue; others_order: it was not their own order (they helped a colleague). */
+    public function issueSolved(Order $order, int $userId): void
+    {
+        $this->engine->fire('issue_solved', $order, ['others_order' => $order->moderator_id !== $userId], ['actor' => $userId]);
     }
 
     /** The moderator asked for extra minutes on the action timer. */

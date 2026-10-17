@@ -13,7 +13,7 @@ class EscalateDeliveryIssues extends Command
 
     public function handle(DeliveryIssueService $issues): int
     {
-        $this->info($issues->escalate().' escalated.');
+        $this->info($issues->reroute().' moved, '.$issues->escalate().' escalated.'); // away first, then overdue
 
         return self::SUCCESS;
     }

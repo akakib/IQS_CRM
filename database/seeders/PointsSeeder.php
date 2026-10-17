@@ -27,6 +27,7 @@ class PointsSeeder extends Seeder
             ['amendment', 'Entry error fixed after packaging', -2, 'order_moderator', 'immediate', false, [['blame', '=', 'sales'], ['after_pack', '=', 'true']]],
             ['order_reassigned', 'Order taken away for own mistake', -1, 'previous_moderator', 'immediate', false, [['blame', '=', 'sales']]],
             ['issue_escalated', 'Delivery issue not handled in time', -1, 'order_moderator', 'immediate', false, []],
+            ['issue_solved', 'Solved a delivery issue of a colleague\'s order', 4, 'actor', 'immediate', false, [['others_order', '=', 'true']]],
             ['timer_extended', 'Took extra time on the timer', -0.5, 'actor', 'immediate', false, []],
             ['timer_beaten', 'Finished an order within the time limit', 0, 'actor', 'immediate', false, []],
             ['timer_missed', 'Went over the time limit on an order', 0, 'actor', 'immediate', false, []],

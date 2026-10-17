@@ -311,6 +311,26 @@ class AdvanceHoldTest extends TestCase
         $this->assertSame($this->mod->id, $order->fresh()->moderator_id);
     }
 
+    public function test_a_chat_order_allowed_without_advance_is_confirmed_a_website_order_goes_to_call(): void
+    {
+        // Taken in a chat: confirmed in that talk, so allowed without advance it goes on to Confirmed.
+        $this->actingAs($this->mod);
+        $chat = app(OrderService::class)->create([
+            'channel' => 'whatsapp', 'phone' => '01899999989', 'name' => 'Chat', 'address_line' => 'Road 1',
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
+        ], $this->mod);
+        app(VerificationEngine::class)->run($chat);
+        $this->assertSame('hold', $this->key($chat));
+        $this->actingAs($this->admin)->post("/orders/{$chat->id}/advance-waiver/decide", ['decision' => 'allow']);
+        $this->assertContains($this->key($chat), ['confirmed', 'ready_for_packaging']); // confirmed, and on to booking
+        $this->assertDatabaseHas('order_notes', ['order_id' => $chat->id, 'body' => 'Hold → Confirmed · Allowed without advance by '.$this->admin->name.' · Confirmed in the chat or call it was taken in']);
+
+        // A website order: nobody talked to the customer yet, so it goes to Call.
+        $web = $this->web(7);
+        $this->post("/orders/{$web->id}/advance-waiver/decide", ['decision' => 'allow']);
+        $this->assertSame('record_verified', $this->key($web));
+    }
+
     public function test_paid_then_cancelled_is_owed_back_given_back_or_kept_as_credit_for_the_next_order(): void
     {
         $sm = app(OrderStateMachine::class);

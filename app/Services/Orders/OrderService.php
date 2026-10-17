@@ -342,24 +342,41 @@ class OrderService
             ]);
     }
 
-    /** An admin allows (the order goes to Call) or refuses (it keeps waiting for the advance). */
+    /**
+     * An admin allows (the order goes on) or refuses (it keeps waiting for the advance). Allowed, it goes back
+     * to Confirmed when it was confirmed before the hold, or when it was taken in a chat or call (confirmed in
+     * that talk) and nothing asks for a person first (a rule's manual review, the same customer's open order).
+     * Else to Call.
+     */
     public function decideAdvanceWaiver(Order $order, User $by, bool $allow): void
     {
         $asker = $order->advance_waiver_requested_by;
         if ($allow) {
             $order->forceFill(['advance_waived_by' => $by->id, 'advance_waived_at' => now(), 'advance_waiver_requested_at' => null])->save();
             $machine = app(OrderStateMachine::class);
-            $machine->transition($order, $machine->heldFrom($order) === 'confirmed' ? 'confirmed' : 'record_verified', $by, 'user', null, __('Allowed without advance by :n', ['n' => $by->name]));
+            $wasConfirmed = $machine->heldFrom($order) === 'confirmed';
+            $confirmedInTalk = $order->channel !== 'web' && ! $this->askedForReview($order) && ! $this->openDuplicate($order);
+            $to = $wasConfirmed || $confirmedInTalk ? 'confirmed' : 'record_verified';
+            $machine->transition($order, $to, $by, 'user', null,
+                __('Allowed without advance by :n', ['n' => $by->name]).(! $wasConfirmed && $confirmedInTalk ? ' · '.__('Confirmed in the chat or call it was taken in') : ''));
         } else {
             $order->forceFill(['advance_waiver_requested_at' => null])->save();
             $this->note($order, 'system', __('Without advance refused by :n: it waits for the advance.', ['n' => $by->name]), $by);
         }
         if ($asker && $asker !== $by->id) {
             app(\App\Services\NotificationService::class)->send('payment_to_check', ($allow ? __('Allowed without advance: :no', ['no' => $order->order_no]) : __('Advance still needed: :no', ['no' => $order->order_no])),
-                $allow ? __(':n allowed it. It is in your Call tab.', ['n' => $by->name]) : __(':n refused. Ask the customer for the delivery charge.', ['n' => $by->name]), [
+                $allow ? ($to === 'confirmed' ? __(':n allowed it. It goes on to booking.', ['n' => $by->name]) : __(':n allowed it. It is in your Call tab.', ['n' => $by->name])) : __(':n refused. Ask the customer for the delivery charge.', ['n' => $by->name]), [
                     'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$asker],
                 ]);
         }
+    }
+
+    /** A verification rule asked for a person to look at this order first (e.g. a blocked customer). */
+    private function askedForReview(Order $order): bool
+    {
+        $run = DB::table('verification_runs')->where('order_id', $order->id)->orderByDesc('id')->first(['outcome', 'matched_rule_id']);
+
+        return $run && $run->outcome === 'manual_review' && $run->matched_rule_id;
     }
 
     /**

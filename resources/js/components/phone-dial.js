@@ -7,6 +7,7 @@
 // call follows the caller to other pages (the yellow bar, iqs-call-live).
 // Call verified on the desk (call-then-confirm): the panel opens with Talked picked; saved as Talked,
 // the order is confirmed (the desk form, action confirm). Already talked on this order: confirmed at once.
+// Any call saved on a desk order: No answer or Busy presses No response; Wrong number opens Cancel with that reason.
 export default function phoneDial(phone, orderId = null, urls = {}) {
     const token = () => document.querySelector('meta[name=csrf-token]').content;
     const LIVE = 'iqs-call-live';
@@ -103,7 +104,8 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
                 });
                 const d = await r.json();
                 if (!r.ok) { this.error = Object.values(d.errors || {})[0]?.[0] || d.message || 'Could not save.'; return; }
-                const confirm = this.thenConfirm && this.form.outcome === 'answered';
+                const outcome = this.form.outcome;
+                const confirm = this.thenConfirm && outcome === 'answered';
                 if (this.form.outcome === 'answered') this.talked = true;
                 this.saved = d.message;
                 this.after = false;
@@ -117,6 +119,8 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
                 window.dispatchEvent(new CustomEvent('proof-clear', { detail: urls.proof }));
                 this.thenConfirm = false;
                 if (confirm) this.confirmOrder();
+                else if (outcome === 'no_answer' || outcome === 'busy') document.querySelector('[form=desk-act][name=action][value=no_response]')?.click();
+                else if (outcome === 'wrong') window.dispatchEvent(new CustomEvent('desk-cancel-wrong'));
             } catch {
                 this.error = 'Could not save. Check the connection.';
             } finally {

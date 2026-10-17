@@ -34,6 +34,8 @@
 <div x-data="{
         reasonMode: null, reason: null,
         openReason(mode) { this.reasonMode = mode; this.reason = null },
+        // A call saved as Wrong number: Cancel opens with Wrong number picked (only where Cancel is offered).
+        wrongNumber(id) { if (document.querySelector('[data-key=x]')) { this.openReason('cancel'); this.reason = id } },
         keys(e) {
             if (e.ctrlKey || e.metaKey || e.altKey || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
             // Every shortcut needs Shift, so a stray key press never acts on an order.
@@ -56,7 +58,7 @@
             const btn = this.$root.querySelector(`[data-key='${k}']:not([disabled])`);
             if (btn) { btn.click(); e.preventDefault() }
         },
-    }" @keydown.window="keys($event)">
+    }" @keydown.window="keys($event)" @desk-cancel-wrong.window="wrongNumber({{ (int) array_search('Wrong number', $reasons['cancel'] ?? []) }})">
 
     {{-- New orders: nobody picks; "Take next" always gives the oldest one. --}}
     @unless ($embed)

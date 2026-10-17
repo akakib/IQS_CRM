@@ -89,6 +89,7 @@ class OrderConfigSeeder extends Seeder
         ['cancel', 'Out of stock', 'none', 'out_of_stock', 'manual'],
         ['cancel', 'Price or offer issue', 'sales', 'price_issue', 'manual'],
         ['cancel', 'Could not reach customer', 'customer', 'unreachable', 'manual'],
+        ['cancel', 'Wrong number', 'customer', 'wrong_number', 'manual'],
         ['cancel', 'Entry mistake', 'sales', 'entry_error', 'manual'],
         ['cancel', 'No advance payment', 'customer', 'no_advance', 'manual'],
         ['cancel', 'Cancelled on the website', 'customer', 'website_cancelled', 'manual'],

@@ -22,6 +22,7 @@ return [
         'order_reassigned' => ['Order moved to someone else', 'Quality', ['blame']],
         'issue_escalated' => ['Delivery issue not handled in time', 'Quality', []],
         'issue_solved' => ['Delivery issue solved', 'Delivery', ['others_order']],
+        'order_helped' => ['Confirmed a colleague\'s order while they were away', 'Confirmation', []],
         'fake_status' => ['Fake status (confirmed by a manager)', 'Quality', []],
     ],
 

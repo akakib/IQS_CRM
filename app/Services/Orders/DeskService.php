@@ -962,6 +962,47 @@ class DeskService
     }
 
     /** @return list<int> */
+    /**
+     * A call due now (No response time came, or a hold's date) while the order's person is away (break, off shift,
+     * not seen): a free colleague gets it to call. covered_for_id keeps whose order it is; delivery points stay theirs.
+     * @return int orders handed over
+     */
+    public function coverAway(): int
+    {
+        $free = $this->activeModerators();
+        $due = DB::table('orders')->whereNotNull('moderator_id')->whereNotIn('moderator_id', $free ?: [0])
+            ->where(fn ($q) => $q->where(fn ($n) => $n->where('status_id', OrderStatus::idFor('no_answer'))->where('next_call_at', '<=', now()))
+                ->orWhere(fn ($h) => $h->where('status_id', OrderStatus::idFor('hold'))->whereNotNull('hold_expected_date')->where('hold_expected_date', '<=', today())
+                    ->where(fn ($r) => $r->whereNull('hold_reason_id')->orWhere('hold_reason_id', '!=', (int) $this->advanceReasonId()))))
+            ->orderBy('id')->limit(50)->get(['id', 'order_no', 'moderator_id', 'covered_for_id']);
+        $moved = 0;
+        foreach ($due as $o) {
+            $helper = collect($free)->reject(fn ($id) => $id === $o->moderator_id)->sortBy(fn ($id) => [$this->inHand($id), $id])->first();
+            if (! $helper) {
+                break; // nobody at work: it waits; the hold-date notice goes to the managers as before
+            }
+            $owner = $o->covered_for_id ?? $o->moderator_id;
+            $updated = DB::table('orders')->where('id', $o->id)->where('moderator_id', $o->moderator_id)->update([
+                'moderator_id' => $helper, 'covered_for_id' => $helper === $owner ? null : $owner, 'assigned_at' => now(),
+                'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now(),
+            ]);
+            if (! $updated) {
+                continue;
+            }
+            DB::table('order_assignments')->where('order_id', $o->id)->where('user_id', $o->moderator_id)->whereNull('ended_at')->update(['ended_at' => now(), 'ended_reason' => 'away']);
+            DB::table('order_assignments')->insert(['order_id' => $o->id, 'user_id' => $helper, 'role' => 'moderator', 'how' => 'reassigned', 'reason' => 'covering: away', 'started_at' => now()]);
+            $names = DB::table('users')->whereIn('id', [$owner, $helper, $o->moderator_id])->pluck('name', 'id');
+            $this->systemNote($o->id, __(':a is away: :b calls it now. Still :c\'s order.', ['a' => $names[$o->moderator_id] ?? '-', 'b' => $names[$helper] ?? '-', 'c' => $names[$owner] ?? '-']), null, ['covered_for' => $owner]);
+            $this->notifications->send('order_assigned', __(':no to call: :n is away', ['no' => $o->order_no, 'n' => $names[$o->moderator_id] ?? '-']),
+                __('It stays :n\'s order. Confirm it to earn the help points.', ['n' => $names[$owner] ?? '-']), [
+                    'link' => route('desk.index', ['order' => $o->id]), 'subject' => ['order', $o->id], 'user_ids' => [$helper],
+                ]);
+            $moved++;
+        }
+
+        return $moved;
+    }
+
     public function managerIds(): array
     {
         return DB::table('user_roles as ur')->join('roles as r', 'r.id', '=', 'ur.role_id')

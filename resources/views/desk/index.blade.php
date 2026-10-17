@@ -300,6 +300,10 @@
                                             @if ($order->moderator)<x-avatar :name="$order->moderator->name" :photo="$order->moderator->photo_path" size="xs" /> {{ $order->moderator_id === auth()->id() ? __('You') : $order->moderator->name }}@else<span class="px-1.5">{{ __('Nobody') }}</span>@endif
                                         </span>
                                     @endif
+                                    @if ($order->covered_for_id && $order->covered_for_id !== $order->moderator_id)
+                                        {{-- Covering for someone away: whose order it still is. --}}
+                                        <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">{{ __(':n\'s order', ['n' => \App\Models\User::whereKey($order->covered_for_id)->value('name') ?? '-']) }}</span>
+                                    @endif
                                     @if ($order->packer)
                                             <span class="inline-flex items-center gap-1 rounded-full bg-purple-50 py-0.5 pl-0.5 pr-2 text-xs text-purple-800" title="{{ __('Packaging') }}">
                                                 <x-avatar :name="$order->packer->name" :photo="$order->packer->photo_path" size="xs" /> {{ $order->packer->name }}

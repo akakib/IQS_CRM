@@ -28,6 +28,10 @@ class PointHooks
             $this->engine->fire($trigger, $order, $this->context($trigger, $order, $actor), $this->people($trigger, $order, $actor));
             if ($trigger === 'order_confirmed') {
                 $this->flagFastConfirm($order, $actor);
+                // Covering for an away colleague: the one who confirmed it earns order_helped; the order stays the colleague's.
+                if ($actor && $order->covered_for_id && $order->covered_for_id !== $actor->id) {
+                    $this->engine->fire('order_helped', $order, [], ['actor' => $actor->id]);
+                }
             }
         }
 
@@ -73,7 +77,7 @@ class PointHooks
     {
         return match ($trigger) {
             'order_packed' => ['packer' => $this->labelScanned($order) ? $actor?->id : null],
-            'order_delivered', 'order_partial', 'order_returned' => ['order_moderator' => $order->confirmed_by ?? $order->moderator_id, 'packer' => $this->packer($order)],
+            'order_delivered', 'order_partial', 'order_returned' => ['order_moderator' => $order->covered_for_id ?? $order->confirmed_by ?? $order->moderator_id, 'packer' => $this->packer($order)],
             default => ['order_moderator' => $order->moderator_id, 'actor' => $actor?->id],
         };
     }

@@ -286,6 +286,30 @@ class DeskTest extends TestCase
         $this->assertSame($this->mahim->id, $a->fresh()->moderator_id);
     }
 
+    public function test_a_due_call_back_goes_to_a_free_colleague_while_its_person_is_away_and_stays_theirs(): void
+    {
+        $o = $this->web();
+        $this->desk()->assign($o->id, $this->mahim->id, 'claimed');
+        app(\App\Services\Orders\OrderStateMachine::class)->transition($o->fresh(), 'record_verified', $this->mahim);
+        app(\App\Services\Orders\OrderStateMachine::class)->transition($o->fresh(), 'no_answer', $this->mahim);
+        DB::table('orders')->where('id', $o->id)->update(['next_call_at' => now()->subMinute()]);
+
+        // Mahim is away (not seen), Rima is at work: Rima gets it to call; it stays Mahim's order.
+        DB::table('users')->where('id', $this->rima->id)->update(['last_seen_at' => now()]);
+        DB::table('users')->where('id', $this->mahim->id)->update(['last_seen_at' => now()->subHour()]);
+        $this->assertSame(1, $this->desk()->coverAway());
+        $o->refresh();
+        $this->assertSame([$this->rima->id, $this->mahim->id], [$o->moderator_id, $o->covered_for_id]);
+        $this->actingAs($this->rima)->get(route('desk.index', ['order' => $o->id]))->assertSee("Mahim's order");
+
+        // Rima confirms: +3 for helping; the delivery points stay Mahim's.
+        app(\App\Services\Orders\OrderStateMachine::class)->transition($o->fresh(), 'confirmed', $this->rima);
+        $this->assertEquals(3, DB::table('point_ledger')->where('user_id', $this->rima->id)->where('trigger_key', 'order_helped')->sum('points'));
+        app(\App\Services\Points\PointHooks::class)->transition($o->fresh(), ['key' => 'handed_over', 'final' => false], ['key' => 'delivered', 'final' => true], null);
+        $this->assertSame(1, DB::table('point_ledger')->where('user_id', $this->mahim->id)->where('trigger_key', 'order_delivered')->count());
+        $this->assertSame(0, DB::table('point_ledger')->where('user_id', $this->rima->id)->where('trigger_key', 'order_delivered')->count());
+    }
+
     public function test_no_response_returns_after_each_delay_then_cancels(): void
     {
         $a = $this->web();

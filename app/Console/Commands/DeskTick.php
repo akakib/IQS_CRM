@@ -27,6 +27,7 @@ class DeskTick extends Command
         $released = $desk->sweepExpired();
         $desk->armUntouchedAll();
         $assigned = $desk->autoAssign();
+        $desk->coverAway(); // a call-back or hold date due while its person is away: a free colleague calls
         $desk->followUpHolds();
         if (Cache::add('woo:sweep', 1, now()->addMinutes(9))) {
             app(\App\Services\Orders\WooOrderSweep::class)->run(); // website orders a webhook did not bring

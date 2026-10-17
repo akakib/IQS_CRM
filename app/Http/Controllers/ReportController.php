@@ -38,7 +38,18 @@ class ReportController extends Controller
                 : [__('My delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->where('assigned_to', $user->id)->count(), route('issues.index'), null];
         }
         if ($user->can('packaging.view')) {
+            // The packer's day: what is left to pack, what waits for the rider, returns to take in, items not found.
+            if (! $shop) {
+                $tiles[] = [__('To pack'), DB::table('orders')->where('status_id', OrderStatus::idFor('ready_for_packaging'))->count(), route('packaging.index'), null];
+            }
             $tiles[] = [__('Packed today'), $todayEvents('packed')->count(), route('packaging.index'), null];
+            if (! $shop) {
+                $tiles[] = [__('I packed today'), $todayEvents('packed')->where('e.user_id', $user->id)->count(), route('packaging.index'), null];
+                $tiles[] = [__('Waiting for the rider'), DB::table('orders')->whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->count(), route('handover.index'), null];
+                $tiles[] = [__('Returns to receive'), DB::table('orders')->where('status_id', OrderStatus::idFor('returned'))->whereNull('return_received_at')->count(), route('returns.index'), null];
+                $notFound = DB::table('stock_issue_reports')->where('status', 'open')->count();
+                $tiles[] = [__('Items not found'), $notFound, route('packaging.issues'), $notFound ? 'down' : null];
+            }
         }
         if ($user->can('orders.view')) {
             $tiles[] = $shop
@@ -51,9 +62,13 @@ class ReportController extends Controller
         }
         $myPoints = (float) DB::table('point_ledger')->where('user_id', $user->id)->where('status', 'final')->where('created_at', '>=', now()->startOfMonth())->sum('points');
 
-        // Out of stock, first thing, for whoever may put items back in stock (newest first; search; pages).
+        // Out of stock, first thing, for the person who puts items back in stock (the packer: newest first; search;
+        // pages). Managers and the owner get one tile with the count instead; the list is on Stock status.
         $outOfStock = null;
-        if ($user->can('products.availability')) {
+        if ($user->can('products.availability') && $shop) {
+            $oos = \App\Models\ProductVariant::where('availability_status', 'out_of_stock')->whereHas('product', fn ($p) => $p->where('status', 'active'))->count();
+            $tiles[] = [__('Out of stock'), $oos, route('products.availability'), $oos ? 'down' : null];
+        } elseif ($user->can('products.availability')) {
             $sq = trim((string) $request->query('oos'));
             $outOfStock = \App\Models\ProductVariant::with('product:id,name')->where('availability_status', 'out_of_stock')
                 ->whereHas('product', fn ($p) => $p->where('status', 'active'))

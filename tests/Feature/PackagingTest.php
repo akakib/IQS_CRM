@@ -340,13 +340,18 @@ class PackagingTest extends TestCase
         $this->assertDatabaseHas('app_notifications', ['user_id' => $this->packer->id, 'type_id' => $type, 'title' => 'Out of stock: '.$this->dates->product->name]);
         $this->assertDatabaseMissing('app_notifications', ['user_id' => $this->desk->id, 'type_id' => $type]);
 
-        // The dashboard lists it for whoever may put it back, with Back in stock; not for the packer.
-        $this->get('/dashboard')->assertOk()->assertSee('Out of stock')->assertSee($this->dates->product->name)->assertSee('Back in stock');
-        $this->actingAs($this->packer)->get('/dashboard')->assertOk()->assertDontSee('Back in stock');
+        // The owner sees one tile with the count (the list is on Stock status); a packer without the right sees nothing of it.
+        $this->get('/dashboard')->assertOk()->assertSee('Out of stock')->assertSee(route('products.availability'), false)->assertDontSee('Back in stock');
+        $this->actingAs($this->packer)->get('/dashboard')->assertOk()->assertDontSee('Back in stock')->assertSee('To pack')->assertSee('Returns to receive');
+        // The person who puts stock back (Ridoy) gets the full list with Back in stock.
+        $stock = User::factory()->create(['name' => 'Stock keeper']);
+        $stock->roles()->attach($this->role(['products.availability', 'packaging.view'], [], 'Stock keeper')->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->actingAs($stock)->get('/dashboard')->assertOk()->assertSee($this->dates->product->name)->assertSee('Back in stock');
 
         $this->actingAs($this->desk)->post('/products/availability', ['ids' => [$this->dates->id], 'status' => 'in_stock'])->assertSessionHas('success');
         $this->assertDatabaseHas('app_notifications', ['user_id' => $this->packer->id, 'type_id' => $type, 'title' => 'Back in stock: '.$this->dates->product->name]);
-        $this->get('/dashboard')->assertSee('Nothing is out of stock.');
+        $this->actingAs($stock)->get('/dashboard')->assertSee('Nothing is out of stock.');
     }
 
     public function test_back_in_stock_a_website_order_nobody_called_goes_to_call_a_chat_order_to_confirmed(): void

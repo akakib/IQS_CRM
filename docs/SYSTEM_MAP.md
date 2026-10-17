@@ -1,4 +1,4 @@
-# IQS CRM: System Map
+# T5 CRM: System Map
 
 What the system does, where each part lives, and which piece is the one source of truth for each job.
 Read this before building anything: if a page, service, component or number below already does the job,

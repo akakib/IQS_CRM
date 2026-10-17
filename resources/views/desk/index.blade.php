@@ -279,6 +279,8 @@
                 <x-courier-cancel :order="$order" />
                 <x-take-back :order="$order" class="mb-3" />
                 <x-advance-wait :order="$order" />
+                {{-- Opened from Order activity: where the parcel is, in the courier's words, and its tracking link. --}}
+                @if ($embed)<x-parcel-track :order="$order" class="mb-3" />@endif
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">

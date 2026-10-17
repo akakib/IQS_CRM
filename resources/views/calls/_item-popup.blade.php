@@ -2,7 +2,7 @@
 <div x-show="item.open" x-cloak @keydown.escape.window="item.open = false"
     class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
     <div class="absolute inset-0 bg-black/40" @click="item.open = false"></div>
-    <div class="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl" role="dialog" aria-modal="true" x-transition>
+    <div class="relative max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl" role="dialog" aria-modal="true" x-transition>
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
                 <p class="truncate text-base font-semibold text-gray-900" x-text="item.d.name || @js(__('Loading...'))"></p>

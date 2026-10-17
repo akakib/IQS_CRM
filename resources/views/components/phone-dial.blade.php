@@ -32,12 +32,12 @@
 
             <template x-teleport="body">
                 <div x-show="sheet" x-cloak class="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 sm:items-center sm:p-6" role="dialog" aria-modal="true" @keydown.escape.window="sheet = false">
-                    <div class="flex max-h-[94vh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl">
-                        <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+                    <div class="flex max-h-[88dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl">
+                        <div class="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
                             <h3 class="text-base font-semibold text-gray-900">{{ $orderNo ? __('Call about :no', ['no' => $orderNo]) : __('After the call') }}</h3>
                             <button type="button" @click="sheet = false" class="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50" aria-label="{{ __('Close') }}">&times;</button>
                         </div>
-                        <div class="space-y-4 overflow-y-auto px-4 py-4">
+                        <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
                             <div class="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2.5">
                                 <span class="min-w-0"><span class="block truncate font-semibold text-gray-900">{{ $name }}</span><span class="block font-mono text-sm text-gray-500">{{ $phone }}</span></span>
                                 <a href="tel:{{ $phone }}" class="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-green-600 px-4 text-sm font-semibold text-white hover:bg-green-700 md:hidden"><x-icon name="phone" class="h-4 w-4" /> {{ __('Call') }}</a>
@@ -71,7 +71,7 @@
                             <textarea x-model="form.note" rows="2" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base sm:text-sm focus:border-primary focus:outline-none"></textarea>
                             <p x-show="error" x-cloak class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" x-text="error"></p>
                         </div>
-                        <div class="border-t border-gray-100 px-4 py-3">
+                        <div class="shrink-0 border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                             <button type="button" @click="save()" :disabled="saving" class="w-full rounded-xl bg-primary px-4 py-3 text-base font-semibold text-white hover:bg-primary-dark disabled:opacity-60" x-text="saving ? @js(__('Saving...')) : @js(__('Save'))"></button>
                         </div>
                     </div>

@@ -555,7 +555,7 @@
                 @foreach (['hold' => __('Put on hold: why?'), 'cancel' => __('Cancel the order: why?')] as $mode => $title)
                     <div x-show="reasonMode === '{{ $mode }}'" x-cloak data-reason-popup class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
                         <div class="absolute inset-0 bg-black/40"></div>
-                        <form method="POST" action="{{ route('desk.act', $order) }}" class="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-xl">
+                        <form method="POST" action="{{ route('desk.act', $order) }}" class="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-xl">
                             @csrf
                             <input type="hidden" name="action" value="{{ $mode }}">
                             <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">

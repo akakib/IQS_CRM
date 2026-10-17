@@ -121,7 +121,7 @@
     {{-- The popup: closes only with Close. --}}
     <template x-teleport="body">
         <div x-show="open" x-cloak class="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">
-            <div class="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+            <div class="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
                     <h3 class="text-base font-semibold text-gray-900" x-text="title"></h3>
                     <button type="button" @click="open = false; html = ''" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Close') }}</button>

@@ -51,9 +51,10 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
         },
 
         // keepalive: the request still goes out when the tel: link hands over to the dialer.
-        started() {
+        // open = false (Copy, QR on a PC): the call starts quietly; "Call not saved · Finish it" opens the panel after.
+        started(open = true) {
             if (!this.orderId) return;
-            this.sheet = true;
+            if (open) this.sheet = true;
             this.saved = '';
             if (this.after) return this.starting;
             this.after = true;
@@ -131,7 +132,7 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
         async toggleQr() {
             if (!this.qr) this.qr = await window.iqsQr(this.phone);
             this.showQr = !this.showQr;
-            if (this.showQr) this.started();
+            if (this.showQr) this.started(false);
         },
 
         async copy() {
@@ -139,10 +140,15 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
                 await navigator.clipboard.writeText(this.phone);
                 this.copied = true;
             } catch {
-                this.copied = false;
+                // Clipboard blocked (not focused, older browser): the old way, a hidden text box.
+                const t = document.createElement('textarea');
+                t.value = this.phone; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+                document.body.appendChild(t); t.select();
+                try { this.copied = document.execCommand('copy'); } catch { this.copied = false; }
+                t.remove();
             }
             setTimeout(() => (this.copied = false), 1500);
-            this.started();
+            this.started(false);
         },
     };
 }

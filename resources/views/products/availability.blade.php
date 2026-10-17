@@ -22,7 +22,7 @@
     @if ($variants->isEmpty())
         <x-empty-state :message="__('Nothing here.')" />
     @else
-        <x-list.selectable :ids="$variants->pluck('id')">
+        <x-list.selectable :ids="$variants->pluck('id')" persist="availability">
             <x-list.table>
                 <x-slot:head>
                     <th class="w-8"></th>

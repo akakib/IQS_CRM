@@ -121,9 +121,10 @@ class ProductService
     public function setAvailability(array $variantIds, string $status, ?int $userId, ?string $expectedDate = null, ?string $note = null, string $source = 'manual'): int
     {
         $changed = 0;
+        $names = [];
 
-        DB::transaction(function () use ($variantIds, $status, $userId, $expectedDate, $note, $source, &$changed) {
-            $variants = ProductVariant::whereIn('id', $variantIds)->lockForUpdate()->get();
+        DB::transaction(function () use ($variantIds, $status, $userId, $expectedDate, $note, $source, &$changed, &$names) {
+            $variants = ProductVariant::with('product:id,name')->whereIn('id', $variantIds)->lockForUpdate()->get();
 
             foreach ($variants as $variant) {
                 if ($variant->availability_status === $status && ! $expectedDate) {
@@ -151,11 +152,32 @@ class ProductService
                     $this->sync->queue($variant->id, ['stock_status']);
                     app(\App\Services\Orders\AvailabilityEffects::class)->changed($variant->id, $from, $status);
                     $changed++;
+                    $names[] = trim(($variant->product?->name ?? '').($variant->name !== 'Default' ? ' · '.$variant->name : ''));
                 }
             }
         });
+        $this->tellEveryone($status, $names, $userId);
 
         return $changed;
+    }
+
+    /** Out of stock, pre-order or back in stock: one notice to everyone (not the person who did it). */
+    private function tellEveryone(string $status, array $names, ?int $userId): void
+    {
+        if ($names === []) {
+            return;
+        }
+        $n = count($names);
+        $title = match ($status) {
+            'out_of_stock' => $n === 1 ? __('Out of stock: :i', ['i' => $names[0]]) : __(':n items out of stock', ['n' => $n]),
+            'backorder' => $n === 1 ? __('Pre-order now: :i', ['i' => $names[0]]) : __(':n items on pre-order', ['n' => $n]),
+            default => $n === 1 ? __('Back in stock: :i', ['i' => $names[0]]) : __(':n items back in stock', ['n' => $n]),
+        };
+        $body = $n === 1 ? null : implode(', ', array_slice($names, 0, 5)).($n > 5 ? ' '.__('and :m more', ['m' => $n - 5]) : '');
+        app(\App\Services\NotificationService::class)->send('stock_changed', $title, $body, [
+            'user_ids' => \App\Models\User::where('is_active', true)->pluck('id')->all(),
+            'except_user_ids' => array_filter([$userId]),
+        ]);
     }
 
     /** @return list<string> sync fields that changed */

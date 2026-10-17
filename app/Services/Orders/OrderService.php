@@ -538,5 +538,6 @@ class OrderService
             'order_id' => $order->id, 'user_id' => $userId, 'role' => 'moderator', 'how' => $how,
             'assigned_by' => $by, 'reason_id' => $reasonId, 'started_at' => now(),
         ]);
+        $this->notifications->settle('new_order', 'order', $order->id); // someone has it: nothing left to take
     }
 }

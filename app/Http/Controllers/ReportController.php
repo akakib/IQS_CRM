@@ -39,7 +39,19 @@ class ReportController extends Controller
         }
         $myPoints = (float) DB::table('point_ledger')->where('user_id', $user->id)->where('status', 'final')->where('created_at', '>=', now()->startOfMonth())->sum('points');
 
-        return view('dashboard', ['tiles' => $tiles, 'myPoints' => $myPoints, 'myWorking' => DB::table('orders')->where('moderator_id', $user->id)
+        // Out of stock, first thing, for whoever may put items back in stock (newest first; search; pages).
+        $outOfStock = null;
+        if ($user->can('products.availability')) {
+            $sq = trim((string) $request->query('oos'));
+            $outOfStock = \App\Models\ProductVariant::with('product:id,name')->where('availability_status', 'out_of_stock')
+                ->whereHas('product', fn ($p) => $p->where('status', 'active'))
+                ->when($sq !== '', fn ($w) => $w->where(fn ($s) => $s->where('sku', 'like', $sq.'%')->orWhere('name', 'like', '%'.$sq.'%')
+                    ->orWhereHas('product', fn ($p) => $p->where('name', 'like', '%'.$sq.'%'))))
+                ->orderByDesc('oos_marked_at')->orderByDesc('id')
+                ->paginate(20, ['id', 'product_id', 'name', 'sku', 'oos_marked_at'], 'oos_page')->withQueryString()->fragment('out-of-stock');
+        }
+
+        return view('dashboard', ['tiles' => $tiles, 'myPoints' => $myPoints, 'outOfStock' => $outOfStock, 'myWorking' => DB::table('orders')->where('moderator_id', $user->id)
             ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->get(['id', 'order_no', 'ship_name'])]);
     }
 

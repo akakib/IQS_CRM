@@ -1067,6 +1067,6 @@ class DeskTest extends TestCase
         DB::table('app_notifications')->insert(['user_id' => $this->mahim->id, 'type_id' => DB::table('notification_types')->where('system_key', 'new_order')->value('id'),
             'priority' => 'normal', 'title' => 'New order '.$a->order_no, 'subject_type' => 'order', 'subject_id' => $a->id, 'created_at' => now(), 'updated_at' => now()]);
         app(\App\Services\Orders\DeskService::class)->assign($a->id, $this->mahim->id, 'auto');
-        $this->assertSame(0, DB::table('app_notifications')->where('subject_id', $a->id)->where('title', 'New order '.$a->order_no)->whereNull('read_at')->count());
+        $this->assertSame(0, DB::table('app_notifications')->where('subject_id', $a->id)->where('title', 'New order '.$a->order_no)->count()); // gone: one order, one notice
     }
 }

@@ -192,9 +192,7 @@ class DeskService
             'order_id' => $orderId, 'user_id' => $userId, 'role' => 'moderator', 'how' => $how, 'assigned_by' => $by, 'started_at' => now(),
         ]);
         // Someone has it now: the "New order" notice is no longer anyone's to act on (the taker gets "given to you").
-        DB::table('app_notifications')->where('subject_type', 'order')->where('subject_id', $orderId)->whereNull('read_at')
-            ->whereIn('type_id', DB::table('notification_types')->where('system_key', 'new_order')->select('id'))
-            ->update(['read_at' => now(), 'acted_at' => now(), 'updated_at' => now()]);
+        $this->notifications->settle('new_order', 'order', $orderId);
         $name = DB::table('users')->where('id', $userId)->value('name');
         $this->systemNote($orderId, $how === 'auto' ? __('Given to :n automatically (nobody took it).', ['n' => $name]) : __(':n took the order.', ['n' => $name]), $how === 'auto' ? null : $userId);
         if ($how !== 'auto') {

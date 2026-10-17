@@ -10,6 +10,7 @@
 return [
     'types' => [
         'new_order' => ['New order to take', 'normal'],
+        'stock_changed' => ['Item out of stock or back in stock', 'normal'],
         'order_needs_repack' => ['Order edited after packaging (repack)', 'urgent'],
         'delivery_issue' => ['Delivery issue from rider or courier', 'urgent'],
         'stock_issue_reported' => ['Packer could not find an item', 'urgent'],

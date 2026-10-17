@@ -101,6 +101,22 @@ class NotificationService
     }
 
     /** @return array<int, array{in_app: bool, telegram: bool, sms: bool}> user id => channels */
+    /**
+     * A notice that no longer asks anything of anyone (e.g. "New order" once someone has the order; the taker
+     * gets "given to you"): gone from every bell, so one order shows one notice. A grouped notice that also
+     * stands for other orders stays, marked done.
+     */
+    public function settle(string $typeKey, string $subjectType, int $subjectId): void
+    {
+        $type = DB::table('notification_types')->where('system_key', $typeKey)->value('id');
+        if (! $type) {
+            return;
+        }
+        $rows = DB::table('app_notifications')->where('type_id', $type)->where('subject_type', $subjectType)->where('subject_id', $subjectId);
+        (clone $rows)->where('group_count', '<=', 1)->delete();
+        (clone $rows)->whereNull('read_at')->update(['read_at' => now(), 'acted_at' => now(), 'updated_at' => now()]);
+    }
+
     private function recipients(int $typeId, array $opts): array
     {
         $rules = DB::table('notification_rules')->where('type_id', $typeId)->where('is_active', true)->get();

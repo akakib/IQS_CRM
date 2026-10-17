@@ -332,6 +332,23 @@ class PackagingTest extends TestCase
         $this->assertDatabaseHas('restock_releases', ['variant_id' => $this->dates->id]);
     }
 
+    public function test_stock_out_and_back_in_tells_everyone_and_the_dashboard_lists_what_is_out(): void
+    {
+        $type = DB::table('notification_types')->where('system_key', 'stock_changed')->value('id');
+        $this->actingAs($this->desk)->post('/products/availability', ['ids' => [$this->dates->id], 'status' => 'out_of_stock']);
+        // Everyone hears it, not the person who did it.
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->packer->id, 'type_id' => $type, 'title' => 'Out of stock: '.$this->dates->product->name]);
+        $this->assertDatabaseMissing('app_notifications', ['user_id' => $this->desk->id, 'type_id' => $type]);
+
+        // The dashboard lists it for whoever may put it back, with Back in stock; not for the packer.
+        $this->get('/dashboard')->assertOk()->assertSee('Out of stock')->assertSee($this->dates->product->name)->assertSee('Back in stock');
+        $this->actingAs($this->packer)->get('/dashboard')->assertOk()->assertDontSee('Back in stock');
+
+        $this->actingAs($this->desk)->post('/products/availability', ['ids' => [$this->dates->id], 'status' => 'in_stock'])->assertSessionHas('success');
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->packer->id, 'type_id' => $type, 'title' => 'Back in stock: '.$this->dates->product->name]);
+        $this->get('/dashboard')->assertSee('Nothing is out of stock.');
+    }
+
     public function test_back_in_stock_a_website_order_nobody_called_goes_to_call_a_chat_order_to_confirmed(): void
     {
         $sm = app(OrderStateMachine::class);

@@ -135,7 +135,7 @@ class WooCsvImporter
 
         $images = array_values(array_filter(array_map('trim', explode(',', (string) ($row['Images'] ?? '')))));
         $this->products->saveProduct($product, [
-            'name' => trim($row['Name']),
+            'name' => trim(html_entity_decode((string) $row['Name'], ENT_QUOTES | ENT_HTML5, 'UTF-8')), // the website API sends "&amp;\"
             'slug' => $product->slug,
             'category_id' => $this->category((string) ($row['Categories'] ?? '')),
             'short_description' => $row['Short description'] ?? null ?: null,

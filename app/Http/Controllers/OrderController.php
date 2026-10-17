@@ -269,7 +269,7 @@ class OrderController extends Controller
     public function note(Order $order, Request $request): RedirectResponse|JsonResponse
     {
         abort_unless(Order::visibleTo($request->user())->whereKey($order->id)->exists(), 403);
-        $data = $request->validate(['type' => ['required', Rule::in(['manual', 'call', 'chat'])], 'body' => ['required', 'string', 'max:2000']]);
+        $data = $request->validate(['type' => ['required', Rule::in(['manual', 'chat'])], 'body' => ['required', 'string', 'max:2000']]);
         $this->orders->note($order, $data['type'], $data['body'], $request->user());
 
         // Added from a page that stays open (Order management): send back the entry so it can slide into the history.

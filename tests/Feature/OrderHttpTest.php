@@ -149,7 +149,8 @@ class OrderHttpTest extends TestCase
     {
         $order = $this->webOrder();
         $this->actingAs($this->owner());
-        $this->post("/orders/{$order->id}/notes", ['type' => 'call', 'body' => 'Called, will confirm tonight'])->assertSessionHas('success');
+        $this->post("/orders/{$order->id}/notes", ['type' => 'call', 'body' => 'Called'])->assertSessionHasErrors('type'); // calls go through the call panel
+        $this->post("/orders/{$order->id}/notes", ['type' => 'chat', 'body' => 'Called, will confirm tonight'])->assertSessionHas('success');
         $this->get("/orders/{$order->id}")->assertSee('Called, will confirm tonight');
 
         foreach (range(1, 30) as $i) {

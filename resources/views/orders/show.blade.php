@@ -153,15 +153,16 @@
 
             {{-- One timeline: status changes, edits, calls, payments, all with person and time. --}}
             <x-card :title="__('Timeline')">
-                <form method="POST" action="{{ route('orders.notes', $order) }}" class="mb-4 flex flex-col gap-2 md:flex-row" x-data="{ type: 'call' }">
+                <form method="POST" action="{{ route('orders.notes', $order) }}" class="mb-4 flex flex-col gap-2 md:flex-row" x-data="{ type: 'manual' }">
                     @csrf
                     <input type="hidden" name="type" :value="type">
                     <div class="flex shrink-0 gap-1">
-                        @foreach (['call' => __('Call'), 'chat' => __('Chat'), 'manual' => __('Note')] as $key => $label)
+                        {{-- No Call here: calls are logged from the call panel (outcome, how happy, proof), so they count. --}}
+                        @foreach (['manual' => __('Note'), 'chat' => __('Chat')] as $key => $label)
                             <button type="button" @click="type = @js($key)" class="rounded-lg border px-2.5 py-2 text-xs" :class="type === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
                         @endforeach
                     </div>
-                    <input name="body" required maxlength="2000" placeholder="{{ __('What happened? e.g. called, customer will confirm tonight') }}" class="{{ $input }}">
+                    <input name="body" required maxlength="2000" placeholder="{{ __('e.g. asked in chat to change the address') }}" class="{{ $input }}">
                     <x-button class="shrink-0">{{ __('Add') }}</x-button>
                 </form>
                 <div id="order-timeline"><x-timeline :entries="$notes" with-year /></div>

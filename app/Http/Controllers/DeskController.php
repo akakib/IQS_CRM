@@ -424,6 +424,8 @@ class DeskController extends Controller
         return [
             'items' => $items,
             'notes' => $notes,
+            // A Talked call saved on this order today (from the history above): Call verified confirms without the call panel.
+            'talked' => $notes->contains(fn ($n) => $n->note_type === 'call' && (json_decode((string) $n->meta, true)['call_outcome'] ?? null) === 'answered' && $n->created_at >= today()->toDateTimeString()),
             'duplicates' => $duplicates,
             // Steadfast history as read when the checks ran (one row, no call to Steadfast here).
             'steadfast' => collect(json_decode((string) DB::table('verification_runs')->where('order_id', $order->id)->latest('id')->value('inputs_snapshot'), true)['providers'] ?? [])->firstWhere('key', 'steadfast'),

@@ -353,7 +353,8 @@
                         <div class="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                             <div class="min-w-0 rounded-lg border border-gray-200 p-4 sm:col-span-2 2xl:col-span-1">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Phone') }}</p>
-                                <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" :order-id="$order->id" :name="$order->ship_name" :order-no="$order->order_no" />
+                                <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" :order-id="$order->id" :name="$order->ship_name" :order-no="$order->order_no"
+                                    :talked="$detail['talked']" />
                             </div>
                             <div class="rounded-lg border border-gray-200 p-4">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Customer history') }}</p>
@@ -514,6 +515,12 @@
                                     @if ($action === 'confirm' && $detail['openDuplicates']->isNotEmpty())
                                         {{-- The courier is booked right away: a second open order of the same customer is merged first, not shipped twice. --}}
                                         <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="$dispatch('open-confirm', { id: 'confirm-duplicate', form: 'desk-act' })"
+                                            class="whitespace-nowrap w-full py-3 text-base xl:w-auto xl:flex-1">
+                                            {{ $label }} <kbd class="hidden rounded bg-white/20 px-1.5 text-[11px] uppercase sm:inline">⇧{{ $k }}</kbd>
+                                        </x-button>
+                                    @elseif ($action === 'confirm' && $order->channel === 'web' && auth()->user()->canSeeField('customer_contact'))
+                                        {{-- Call verified: the call panel first (Talked), saving it confirms the order (phone-dial askConfirm). --}}
+                                        <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="$dispatch('call-then-confirm')"
                                             class="whitespace-nowrap w-full py-3 text-base xl:w-auto xl:flex-1">
                                             {{ $label }} <kbd class="hidden rounded bg-white/20 px-1.5 text-[11px] uppercase sm:inline">⇧{{ $k }}</kbd>
                                         </x-button>

@@ -5,6 +5,8 @@
 // what happened, how happy, the recording or screenshot, a note). How long it
 // took comes from the recording, else from the clock. Until it is saved the
 // call follows the caller to other pages (the yellow bar, iqs-call-live).
+// Call verified on the desk (call-then-confirm): the panel opens with Talked picked; saved as Talked,
+// the order is confirmed (the desk form, action confirm). Already talked on this order: confirmed at once.
 export default function phoneDial(phone, orderId = null, urls = {}) {
     const token = () => document.querySelector('meta[name=csrf-token]').content;
     const LIVE = 'iqs-call-live';
@@ -25,9 +27,13 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
         saved: '',
         error: '',
         form: blank(),
+        thenConfirm: false,
+        clockless: false,
+        talked: !!urls.talked,
 
         init() {
             if (!this.orderId) return;
+            this.$watch('sheet', (open) => { if (!open && !this.saving) this.thenConfirm = false; });
             // Back on this order with its call not saved yet: the panel comes back.
             try {
                 const live = JSON.parse(localStorage.getItem(LIVE) || 'null');
@@ -61,6 +67,25 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
             return this.starting;
         },
 
+        // Call verified: log the call first (Talked), then the order is confirmed.
+        askConfirm() {
+            if (this.talked) return this.confirmOrder();
+            this.thenConfirm = true;
+            if (!this.after) this.clockless = true; // the call was not started here: no made-up length, only the recording's
+            this.started();
+            if (!this.form.outcome) this.form.outcome = 'answered';
+        },
+
+        confirmOrder() {
+            const f = document.getElementById('desk-act');
+            if (!f) return;
+            f.querySelectorAll('input[name=action]').forEach((i) => i.remove());
+            const a = document.createElement('input');
+            a.type = 'hidden'; a.name = 'action'; a.value = 'confirm';
+            f.appendChild(a);
+            f.requestSubmit();
+        },
+
         async save() {
             this.error = '';
             if (!this.form.outcome) { this.error = 'Pick what happened.'; return; }
@@ -69,7 +94,7 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
                 if (!this.callId) await (this.starting || this.started());
                 if (!this.callId) { this.error = 'Could not start the call log. Check the connection.'; return; }
                 // With the recording or screenshot (multipart, so PATCH rides on POST).
-                const fd = window.iqsFormData({ ...this.form, ...window.iqsMinSec(window.iqsCallSeconds(urls.proof, this.startedAt)), _method: 'PATCH' });
+                const fd = window.iqsFormData({ ...this.form, ...window.iqsMinSec(window.iqsCallSeconds(urls.proof, this.clockless ? null : this.startedAt)), _method: 'PATCH' });
                 window.iqsAddProof(fd, urls.proof);
                 const r = await fetch(urls.finish.replace(/\/0$/, '/' + this.callId), {
                     method: 'POST',
@@ -78,8 +103,11 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
                 });
                 const d = await r.json();
                 if (!r.ok) { this.error = Object.values(d.errors || {})[0]?.[0] || d.message || 'Could not save.'; return; }
+                const confirm = this.thenConfirm && this.form.outcome === 'answered';
+                if (this.form.outcome === 'answered') this.talked = true;
                 this.saved = d.message;
                 this.after = false;
+                this.clockless = false;
                 this.sheet = false;
                 this.callId = null;
                 this.starting = null;
@@ -87,6 +115,8 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
                 this.form = blank();
                 try { localStorage.removeItem(LIVE); } catch {}
                 window.dispatchEvent(new CustomEvent('proof-clear', { detail: urls.proof }));
+                this.thenConfirm = false;
+                if (confirm) this.confirmOrder();
             } catch {
                 this.error = 'Could not save. Check the connection.';
             } finally {

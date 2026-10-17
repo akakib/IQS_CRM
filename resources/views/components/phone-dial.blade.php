@@ -4,7 +4,8 @@
      (what happened, how happy, the recording or screenshot, a note), the same
      as the call list. How long it took comes by itself.
      <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" :order-id="$order->id" :name="$order->ship_name" :order-no="$order->order_no" /> --}}
-@props(['phone', 'alt' => null, 'orderId' => null, 'name' => null, 'orderNo' => null])
+@props(['phone', 'alt' => null, 'orderId' => null, 'name' => null, 'orderNo' => null, 'talked' => false])
+{{-- talked: a Talked call is already saved on this order today, so Call verified (call-then-confirm) confirms at once. --}}
 
 @php
     use App\Http\Controllers\CustomerCallController;
@@ -13,7 +14,7 @@
     $faces = [0 => '😠', 25 => '🙁', 50 => '😐', 75 => '🙂', 100 => '😍'];
 @endphp
 
-<div x-data="phoneDial({{ \Illuminate\Support\Js::from($visible ? $phone : '') }}, {{ \Illuminate\Support\Js::from($orderId) }}, {{ \Illuminate\Support\Js::from(['start' => route('customer-calls.start'), 'finish' => route('customer-calls.finish', 0), 'proof' => 'proof-order-'.$orderId, 'name' => $name]) }})" {{ $attributes }}>
+<div x-data="phoneDial({{ \Illuminate\Support\Js::from($visible ? $phone : '') }}, {{ \Illuminate\Support\Js::from($orderId) }}, {{ \Illuminate\Support\Js::from(['start' => route('customer-calls.start'), 'finish' => route('customer-calls.finish', 0), 'proof' => 'proof-order-'.$orderId, 'name' => $name, 'talked' => $talked]) }})" @call-then-confirm.window="askConfirm()" {{ $attributes }}>
     @if ($visible)
         <a href="tel:{{ $phone }}" @click="started()" class="block font-mono text-xl font-semibold tracking-wide text-gray-900 hover:text-primary">{{ $phone }}</a>
         @if ($alt)<a href="tel:{{ $alt }}" @click="started()" class="block font-mono text-sm text-gray-500 hover:text-primary">{{ $alt }}</a>@endif

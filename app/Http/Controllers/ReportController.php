@@ -18,20 +18,32 @@ class ReportController extends Controller
     {
         $user = $request->user();
         $today = today()->toDateString();
-        $todayCount = fn (string $key) => DB::table('order_events')->where('to_status_id', OrderStatus::idFor($key))->whereBetween('created_at', [$today.' 00:00:00', $today.' 23:59:59'])->count();
+        // Who sees the whole shop: managers and owners (all orders). Everyone else sees their own numbers,
+        // so each tile counts what its link opens. Waiting to be taken is the shared queue for everyone.
+        $shop = $user->permissionScope('orders.view') === 'all';
+        $todayEvents = fn (string $key) => DB::table('order_events as e')->where('e.to_status_id', OrderStatus::idFor($key))->whereBetween('e.created_at', [$today.' 00:00:00', $today.' 23:59:59']);
         $tiles = [];
 
         if ($user->can('orders.view')) {
-            $tiles[] = [__('Orders today'), DB::table('orders')->where('created_at', '>=', $today)->count(), route('orders.index'), null];
+            $tiles[] = $shop
+                ? [__('Orders today'), DB::table('orders')->where('created_at', '>=', $today)->count(), route('orders.index'), null]
+                : [__('My orders today'), DB::table('orders')->where('created_at', '>=', $today)->where('moderator_id', $user->id)->count(), route('orders.index', ['tab' => 'mine']), null];
             $tiles[] = [__('Waiting to be taken'), app(\App\Services\Orders\DeskService::class)->whereWaiting(DB::table('orders'))->count(), route('desk.index'), null];
-            $tiles[] = [__('Confirmed today'), $todayCount('confirmed'), null, null];
-            $tiles[] = [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null];
+            $tiles[] = $shop
+                ? [__('Confirmed today'), $todayEvents('confirmed')->count(), null, null]
+                : [__('I confirmed today'), $todayEvents('confirmed')->where('e.user_id', $user->id)->count(), null, null];
+            // The same issues as the list it opens: all of them for those who see all, else their own.
+            $tiles[] = $user->can('orders.approve')
+                ? [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null]
+                : [__('My delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->where('assigned_to', $user->id)->count(), route('issues.index'), null];
         }
         if ($user->can('packaging.view')) {
-            $tiles[] = [__('Packed today'), $todayCount('packed'), route('packaging.index'), null];
+            $tiles[] = [__('Packed today'), $todayEvents('packed')->count(), route('packaging.index'), null];
         }
         if ($user->can('orders.view')) {
-            $tiles[] = [__('Delivered today'), $todayCount('delivered'), null, null];
+            $tiles[] = $shop
+                ? [__('Delivered today'), $todayEvents('delivered')->count(), null, null]
+                : [__('My orders delivered today'), $todayEvents('delivered')->join('orders as o', 'o.id', '=', 'e.order_id')->where('o.moderator_id', $user->id)->count(), null, null];
         }
         if ($user->can('points.manage')) {
             $open = DB::table('integrity_flags')->where('status', 'open')->count() + DB::table('point_ledger')->where('dispute_status', 'open')->count();

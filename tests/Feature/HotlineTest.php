@@ -161,6 +161,20 @@ class HotlineTest extends TestCase
         $this->get(route('riders-report.index'))->assertOk()->assertSee('Address wrong or not found');
     }
 
+    public function test_the_dashboard_counts_a_moderators_own_numbers_and_the_shop_for_managers(): void
+    {
+        $owner = $this->owner();
+        $this->actingAs($owner)->post("/hotline/{$this->order->id}/issue", ['issue_type' => 'address', 'verdict' => 'true']); // the agent's order: their issue
+        DB::table('delivery_issues')->insert(['order_id' => $this->order->id, 'issue_type' => 'other', 'note' => 'Someone else', 'assigned_to' => null, 'created_at' => now(), 'updated_at' => now()]);
+
+        // The moderator: their own numbers, each the same as the list it opens.
+        $this->actingAs($this->agent)->get('/dashboard')->assertOk()
+            ->assertSeeInOrder(['My orders today', '1'])->assertSeeInOrder(['I confirmed today', '1'])->assertSeeInOrder(['My delivery issues', '1'])
+            ->assertDontSee('Open delivery issues')->assertSee('Waiting to be taken');
+        // The owner: the whole shop.
+        $this->actingAs($owner)->get('/dashboard')->assertSee('Orders today')->assertSee('Confirmed today')->assertSeeInOrder(['Open delivery issues', '2'])->assertDontSee('My orders today');
+    }
+
     public function test_parcel_status_and_rider_calls_find_the_parcel_the_same_way(): void
     {
         $this->actingAs($this->owner());

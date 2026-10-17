@@ -54,6 +54,13 @@ class OrderController extends Controller
             ->addSelect(['courier' => DB::table('shipments')->select('courier')->whereColumn('shipments.id', 'orders.active_shipment_id')->limit(1),
                 'courier_status' => DB::table('shipments')->select('courier_status')->whereColumn('shipments.id', 'orders.active_shipment_id')->limit(1)])
             ->with('moderator:id,name')
+            // Status Cancelled: why, by whom and when; the newest cancel first (unless sorted by total).
+            ->when($list->filter('status') === 'cancelled', function ($w) {
+                $last = fn () => DB::table('order_events as e')->whereColumn('e.order_id', 'orders.id')->where('e.to_status_id', OrderStatus::idFor('cancelled'))->orderByDesc('e.id')->limit(1);
+                $w->addSelect(['cancelled_at' => $last()->select('e.created_at'),
+                    'cancel_reason' => $last()->join('status_reasons as r', 'r.id', '=', 'e.reason_id')->select('r.label_en'),
+                    'cancelled_by' => $last()->join('users as u', 'u.id', '=', 'e.user_id')->select('u.name')]);
+            })
             ->when($tab === 'take', fn ($w) => app(\App\Services\Orders\DeskService::class)->whereWaiting($w))
             ->when($tab === 'mine', fn ($w) => $w->where('moderator_id', $user->id)->whereNotIn('status_id', $finals))
             ->when($list->filter('status'), fn ($w, $k) => $w->where('status_id', OrderStatus::idFor($k)))
@@ -71,7 +78,7 @@ class OrderController extends Controller
                     ->orWhere('ship_name', 'like', $q.'%')
                     ->when($byCn, fn ($s) => $s->orWhereIn('id', $byCn)));
             })
-            ->tap(fn ($w) => $list->applySort($w));
+            ->tap(fn ($w) => $list->filter('status') === 'cancelled' && $list->sort === 'id' ? $w->orderByDesc('cancelled_at')->orderByDesc('id') : $list->applySort($w));
         $orders = (clone $query)->simplePaginate($list->perPage)->withQueryString();
         // How many match, counted only up to the cap (shown as "10,000+"): cheap even on a big table.
         $total = DB::query()->fromSub((clone $query)->reorder()->setEagerLoads([])->select('orders.id')->limit(self::COUNT_CAP + 1), 'x')->count();

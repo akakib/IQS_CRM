@@ -114,6 +114,11 @@ class OrderHttpTest extends TestCase
         $this->post('/desk/next')->assertSessionHas('success');
         $this->assertSame($this->agent->id, $order->fresh()->moderator_id);
         $this->get('/orders?tab=mine')->assertSee($order->order_no);
+
+        // Cancelled: found by the status filter with why, by whom and when.
+        $reason = DB::table('status_reasons')->where('reason_type', 'cancel')->where('system_key', 'unreachable')->value('id');
+        app(\App\Services\Orders\OrderStateMachine::class)->transition($order->fresh(), 'cancelled', $this->agent, 'user', $reason);
+        $this->get('/orders?tab=all&status=cancelled')->assertOk()->assertSee($order->order_no)->assertSee('Could not reach customer · by '.$this->agent->name, false);
     }
 
     public function test_owner_moves_status_from_the_order_page_with_reason(): void

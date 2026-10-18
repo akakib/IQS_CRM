@@ -45,7 +45,7 @@
                 <b>{{ $o->ship_name }}</b> · {{ $o->ship_phone }}{{ $o->ship_alt_phone ? ' / '.$o->ship_alt_phone : '' }}<br>
                 {{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}
             </div>
-            <div class="items">{{ $o->items->map(fn ($i) => $i->name_snapshot.' '.\App\Support\Units::qty($i->qty, $i->unit))->join(' · ') }}</div>
+            <div class="items">@foreach ($o->items as $i)<span>{{ $i->name_snapshot }}{{ ($s = \App\Support\Units::itemSize($i)) ? ' '.$s : '' }} <b>{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b>{{ $loop->last ? '' : ' · ' }}</span>@endforeach</div>
             @if ($l)
                 <div class="codes">
                     {!! \App\Support\Barcode\Code128::svg($l->barcode, 2, 60) !!}
@@ -54,5 +54,19 @@
             @endif
         </div>
     @endforeach
+<script>
+    // A long item list that does not fit on the sticker: drop the last items until it fits and say how many more (the A4 sheet has them all).
+    document.querySelectorAll('.items').forEach(function (box) {
+        var spans = Array.from(box.children), cut = 0;
+        if (box.scrollHeight <= box.clientHeight) return;
+        var more = document.createElement('b');
+        box.appendChild(more);
+        while (spans.length > 1 && box.scrollHeight > box.clientHeight) {
+            spans.pop().remove();
+            cut++;
+            more.textContent = ' +' + cut + ' more, see packing sheet';
+        }
+    });
+</script>
 </body>
 </html>

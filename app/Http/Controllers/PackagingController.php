@@ -186,7 +186,7 @@ class PackagingController extends Controller
             ->update(['printed_at' => now(), 'printed_by' => $request->user()->id]);
 
         return view('shipping.labels', [
-            'orders' => Order::whereKey($order->id)->with('items:id,order_id,name_snapshot,qty,unit')->get(),
+            'orders' => Order::whereKey($order->id)->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,size_qty,size_unit')->get(),
             'labels' => DB::table('shipment_labels as l')->join('shipments as s', 's.id', '=', 'l.shipment_id')
                 ->where('l.order_id', $order->id)->whereNull('l.voided_at')
                 ->get(['l.order_id', 'l.barcode', 'l.cod_on_label', 's.consignment_id', 's.courier'])->keyBy('order_id'),
@@ -225,7 +225,7 @@ class PackagingController extends Controller
             return redirect()->route('packaging.index')->with('error', __('No new label to print.'));
         }
 
-        $orders = Order::whereIn('id', $ids)->with('items:id,order_id,name_snapshot,qty,unit')->get();
+        $orders = Order::whereIn('id', $ids)->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,size_qty,size_unit')->get();
         $labels = DB::table('shipment_labels as l')->join('shipments as s', 's.id', '=', 'l.shipment_id')
             ->whereIn('l.order_id', $ids)->whereNull('l.voided_at')
             ->get(['l.order_id', 'l.barcode', 'l.cod_on_label', 's.consignment_id', 's.courier'])->keyBy('order_id');
@@ -254,7 +254,7 @@ class PackagingController extends Controller
                 ->where('o.status_id', OrderStatus::idFor('ready_for_packaging'))->when($hide !== '', fn ($q) => $q->whereRaw($hide))
                 ->orderBy('o.packaging_sent_at')->orderBy('o.id')->limit(200)->get(['l.order_id', 'l.barcode', 'l.voided_at']);
         }
-        $orders = Order::whereIn('id', $printed->pluck('order_id'))->with('items:id,order_id,name_snapshot,qty,unit')->get()->keyBy('id');
+        $orders = Order::whereIn('id', $printed->pluck('order_id'))->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,size_qty,size_unit')->get()->keyBy('id');
         $current = DB::table('shipment_labels')->whereIn('order_id', $printed->pluck('order_id'))->whereNull('voided_at')->pluck('barcode', 'order_id');
         $rows = $printed->filter(fn ($l) => isset($orders[$l->order_id]))->map(fn ($l) => (object) [
             'label' => $l->barcode, 'order' => $orders[$l->order_id], 'changed' => $l->voided_at !== null, 'current' => $current[$l->order_id] ?? null,
@@ -280,7 +280,7 @@ class PackagingController extends Controller
         return view('packaging.batch', [
             'batch' => $row,
             'lines' => $batches->pickList($batch),
-            'orders' => Order::where('batch_id', $batch)->with('items:id,order_id,name_snapshot,qty,unit')
+            'orders' => Order::where('batch_id', $batch)->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,size_qty,size_unit')
                 ->get(['id', 'order_no', 'status_id', 'stock_issue_flag', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address']),
             'statuses' => OrderStatus::map(),
         ]);

@@ -25,6 +25,8 @@
         .area { font-size: 12px; color: #333; }
         .items div { margin: 0.5mm 0; }
         .items b { font-size: 16px; }
+        .items .size { font-size: 14px; font-weight: bold; border: 1.5px solid #000; border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+        .items .qty { font-size: 16px; font-weight: bold; white-space: nowrap; }
         .box { width: 9mm; height: 9mm; border: 2px solid #000; margin: auto; }
         .changed td { background: #fff3cd; }
         .warn { font-size: 13px; font-weight: bold; margin-bottom: 1mm; }
@@ -32,7 +34,7 @@
     </style>
 </head>
 <body>
-    <div class="toolbar"><button onclick="window.print()">{{ __('Print the packing sheet (:n orders)', ['n' => $rows->count()]) }}</button></div>
+    <div class="toolbar"><button onclick="window.print()">{{ __('Print the packing sheet') }}</button></div>
     <div class="head">
         <h1>{{ __('Packing sheet') }}</h1>
         <span>{{ now()->format('d M Y, g:i A') }} · {{ trans_choice(':n order|:n orders', $rows->count(), ['n' => $rows->count()]) }}</span>
@@ -50,7 +52,8 @@
                     <td class="items">
                         @if ($r->changed)<div class="warn">{{ __('CHANGED: use the new label :l', ['l' => $r->current ?? '-']) }}</div>@endif
                         @foreach ($r->order->items as $i)
-                            <div><b>{{ $i->name_snapshot }}</b> {{ \App\Support\Units::qty($i->qty, $i->unit) }}</div>
+                            @php($size = \App\Support\Units::itemSize($i))
+                            <div><b>{{ $i->name_snapshot }}</b>@if ($size) <span class="size">{{ $size }}</span>@endif <span class="qty">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</span></div>
                         @endforeach
                     </td>
                     <td style="text-align:right;white-space:nowrap">৳{{ number_format((float) $r->order->cod_amount) }}</td>

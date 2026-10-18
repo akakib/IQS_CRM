@@ -82,6 +82,17 @@ class Units
         return $parts ? implode(' · ', $parts) : '-';
     }
 
+    /** The size of one piece of an order line ("700 g", "1 kg", "800 ml"), for the packer; null when sold by weight or no size. */
+    public static function itemSize(object $item): ?string
+    {
+        $v = $item->variant ?? null;
+        if (self::measured($item->unit ?? null) || ! $v || ! in_array($v->size_unit, ['g', 'ml'], true) || (float) $v->size_qty <= 0) {
+            return null;
+        }
+
+        return self::amount($v->size_unit === 'g' ? (float) $v->size_qty : 0, $v->size_unit === 'ml' ? (float) $v->size_qty : 0);
+    }
+
     /** Shipping weight of one order line, in grams. */
     public static function weight(float $qty, ?string $unit, ?int $weightEach): int
     {

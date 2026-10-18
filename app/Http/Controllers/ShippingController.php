@@ -73,7 +73,7 @@ class ShippingController extends Controller
     public function labels(Request $request): View
     {
         $numbers = array_filter(array_map('trim', explode(',', (string) $request->query('orders'))));
-        $orders = Order::whereIn('order_no', $numbers)->with('items:id,order_id,name_snapshot,qty,unit')->get()->sortBy(fn ($o) => array_search($o->order_no, $numbers));
+        $orders = Order::whereIn('order_no', $numbers)->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,size_qty,size_unit')->get()->sortBy(fn ($o) => array_search($o->order_no, $numbers));
         $labels = DB::table('shipment_labels as l')->join('shipments as s', 's.id', '=', 'l.shipment_id')
             ->whereIn('l.order_id', $orders->pluck('id'))->whereNull('l.voided_at')
             ->get(['l.order_id', 'l.barcode', 'l.cod_on_label', 's.consignment_id', 's.courier'])->keyBy('order_id');

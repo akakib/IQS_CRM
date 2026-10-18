@@ -28,7 +28,12 @@
         @if ($orderId)
             <p x-show="saved" x-cloak class="mt-2 text-xs font-medium text-emerald-700" x-text="saved"></p>
             {{-- The panel was closed with the call not saved: one tap brings it back. --}}
-            <button type="button" x-show="after && ! sheet" x-cloak @click="sheet = true" class="mt-2 inline-flex min-h-8 items-center rounded-lg bg-amber-100 px-3 text-xs font-semibold text-amber-900">⏱ {{ __('Call not saved') }} · {{ __('Finish it') }}</button>
+            <span x-show="after && ! sheet" x-cloak class="mt-2 inline-flex flex-wrap items-center gap-2" x-data="{ sure: false }">
+                <button type="button" @click="sheet = true" class="inline-flex min-h-8 items-center rounded-lg bg-amber-100 px-3 text-xs font-semibold text-amber-900">⏱ {{ __('Call not saved') }} · {{ __('Finish it') }}</button>
+                {{-- Not really called (pressed by mistake): drop it, nothing is saved. --}}
+                <button type="button" x-show="! sure" @click="sure = true" class="text-xs font-semibold text-amber-800 underline">{{ __('Discard') }}</button>
+                <button type="button" x-show="sure" @click="discard(); sure = false" class="inline-flex min-h-8 items-center rounded-lg bg-amber-800 px-3 text-xs font-semibold text-white">{{ __('Yes, discard') }}</button>
+            </span>
 
             <template x-teleport="body">
                 <div x-show="sheet" x-cloak class="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 sm:items-center sm:p-6" role="dialog" aria-modal="true" @keydown.escape.window="sheet = false">

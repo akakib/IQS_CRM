@@ -94,7 +94,8 @@
             },
             async lookup() {
                 const phone = this.normalizePhone(this.phone);
-                if (!/^01[3-9]\d{8}$/.test(phone)) { this.customer = null; this.sf = null; return; }
+                {{-- A saved address belongs to the customer of this number only: no customer, no saved address (a draft or another number could leave one behind, hiding the address box). --}}
+                if (!/^01[3-9]\d{8}$/.test(phone)) { this.customer = null; this.sf = null; this.addressId = null; this.addrAuto = false; return; }
                 if (this.phone !== phone) this.phone = phone;
                 this.looking = true;
                 try {
@@ -105,10 +106,12 @@
                     if (d.found) {
                         if (!this.name || this.nameAuto) { this.name = d.name; this.nameAuto = true; }
                         const def = d.addresses.find(a => a.is_default) || d.addresses[0];
-                        if (def && (!this.addressId || this.addrAuto)) { this.addressId = def.id; this.zoneId = def.zone_id; this.addrAuto = true; }
+                        const mine = d.addresses.some(a => a.id == this.addressId);
+                        if (def && (!this.addressId || this.addrAuto || !mine)) { this.addressId = def.id; this.zoneId = def.zone_id; this.addrAuto = true; }
+                        else if (!def) { this.addressId = null; this.addrAuto = false; }
                     } else {
                         if (this.nameAuto) { this.name = ''; this.nameAuto = false; }
-                        if (this.addrAuto) { this.addressId = null; this.addrAuto = false; }
+                        this.addressId = null; this.addrAuto = false;
                     }
                 } catch (e) {}
                 this.looking = false; this.recharge();
@@ -223,8 +226,8 @@
                             </label>
                         </div>
                     </template>
-                    <input type="hidden" name="customer_address_id" :value="addressId || ''">
-                    <div x-show="!addressId" class="space-y-2">
+                    <input type="hidden" name="customer_address_id" :value="customer ? (addressId || '') : ''">
+                    <div x-show="!addressId || !customer" class="space-y-2">
                         <textarea name="address_line" rows="2" maxlength="500" placeholder="{{ __('House, road, area') }}" class="{{ $input }}">{{ old('address_line') }}</textarea>
                         <div class="grid grid-cols-2 gap-2">
                             <x-simple-select name="district" :options="['' => __('District')] + array_combine($districts, $districts)" :value="(string) old('district', '')" searchable full-width class="w-full" />

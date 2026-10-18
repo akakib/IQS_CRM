@@ -78,6 +78,13 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
             if (!this.form.outcome) this.form.outcome = 'answered';
         },
 
+        // The call was not really made (pressed by mistake) or cannot be finished: stop carrying it. Nothing is saved.
+        discard() {
+            this.after = false; this.sheet = false; this.callId = null; this.starting = null; this.startedAt = null;
+            this.thenConfirm = false; this.clockless = false; this.form = blank();
+            try { localStorage.removeItem(LIVE); } catch {}
+        },
+
         confirmOrder() {
             const f = document.getElementById('desk-act');
             if (!f) return;
@@ -103,6 +110,8 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
                     headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token() },
                     body: fd,
                 });
+                // The call (or its order) no longer exists: stop carrying it, it can never be saved.
+                if (r.status === 404) { this.after = false; this.sheet = false; this.callId = null; this.starting = null; try { localStorage.removeItem(LIVE); } catch {} this.error = ''; this.saved = 'This call no longer exists.'; return; }
                 const d = await r.json();
                 if (!r.ok) { this.error = Object.values(d.errors || {})[0]?.[0] || d.message || 'Could not save.'; return; }
                 const outcome = this.form.outcome;

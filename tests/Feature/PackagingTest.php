@@ -87,6 +87,27 @@ class PackagingTest extends TestCase
         $this->postJson("/packaging/orders/{$o->id}/pack", ['items' => DB::table('order_items')->where('order_id', $o->id)->pluck('id')->all()])->assertJson(['ok' => true]);
     }
 
+    public function test_a_manager_pauses_packaging_booking_goes_on_and_the_packer_gets_the_orders_on_resume(): void
+    {
+        $before = $this->booked('01712345601', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $this->travel(1)->minutes();
+        $this->actingAs($this->desk)->post(route('packaging.pause'))->assertSessionHas('success');
+        $this->travel(1)->minutes();
+        $during = $this->booked('01712345602', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $this->assertSame('ready_for_packaging', $this->key($during)); // booked as usual
+
+        // The packer sees only what came before the pause, and nothing about a pause; the manager sees it all.
+        $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSee($before->order_no)->assertDontSee($during->order_no)->assertDontSee('Resume packaging')->assertDontSee('orders waiting'); // (the manager's flash message rides this test's shared session)
+        $this->actingAs($this->desk)->get('/packaging')->assertSee('Packaging paused')->assertSee('1 order waiting')->assertSee($during->order_no);
+        $this->actingAs($this->packer)->post(route('packaging.pause'))->assertForbidden();
+
+        // Resume: it reaches the packer now, and the packing clock starts now.
+        $this->travel(30)->minutes();
+        $this->actingAs($this->desk)->post(route('packaging.pause'))->assertSessionHas('success', 'Packaging resumed: 1 orders sent to the packers.');
+        $this->assertTrue($during->fresh()->packaging_sent_at->gte(now()->subSecond()));
+        $this->actingAs($this->packer)->get('/packaging')->assertSee($during->order_no);
+    }
+
     public function test_release_posts_one_pick_list_sorted_by_shelf_without_customer_details(): void
     {
         $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);

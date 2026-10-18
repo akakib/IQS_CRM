@@ -62,6 +62,21 @@
         </span>
     </div>
 
+    @if ($controlsPause)
+        {{-- Managers only: stop new orders reaching the packers' list (booking goes on). The packers are not told. --}}
+        <form method="POST" action="{{ route('packaging.pause') }}" @class(['mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm',
+            'border-amber-300 bg-amber-50 text-amber-900' => $pause, 'border-gray-200 bg-white text-gray-700' => ! $pause])>
+            @csrf
+            @if ($pause)
+                <span><b>{{ __('Packaging paused') }}</b> · {{ __('since :t by :n', ['t' => Carbon::parse($pause->paused_at)->format('g:i A'), 'n' => $pause->by ?? '-']) }} · {{ trans_choice(':n order waiting|:n orders waiting', $held, ['n' => $held]) }}</span>
+                <x-button size="sm">{{ __('Resume packaging') }}</x-button>
+            @else
+                <span>{{ __('New booked orders go to the packers now.') }}</span>
+                <x-button size="sm" variant="secondary">{{ __('Pause packaging') }}</x-button>
+            @endif
+        </form>
+    @endif
+
     @if ($canManage)
         <details class="mb-4 rounded-xl border border-gray-200 bg-white">
             <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700">{{ __('Set today\'s packers') }}</summary>

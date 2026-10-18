@@ -213,6 +213,10 @@ and row opens its orders in one popup (`sales-report.orders` → `orders()`), an
 All items opens there too. Print / PDF and Excel give the step's items. How much
 an item holds is `product_variants.size_qty / size_unit` (grams or ml), read from the names (`Units::sizeFromName`).
 
+**Pause packaging** (`Packaging/PackagingPause`, `packaging_pauses`): a manager stops new orders reaching the packers'
+list; calls, confirming and booking go on. Orders booked while paused stay Ready for packaging but are hidden from the
+packers' list and To pack count (the packers are not told). Resume sets their packaging_sent_at to now.
+
 **Upsell** (`Reports/UpsellReport`, `/upsell`): on a website order, while it is verified by call (New, Record verified,
 No answer at the time of the edit), items added or more of one and the total went up; it counts for whoever made the
 edit (order_amendments.requested_by). Entry and price fixes are not upsells. Earned = delivered; cancelled or returned

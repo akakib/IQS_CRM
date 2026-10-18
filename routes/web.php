@@ -250,6 +250,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/handover/{session}/print', [\App\Http\Controllers\OrderExportController::class, 'handoverPrint'])->whereNumber('session')->name('handover.print');
     });
     Route::post('/packaging/shift', [PackagingController::class, 'shift'])->middleware('can:packaging.manage')->name('packaging.shift');
+    Route::post('/packaging/pause', [PackagingController::class, 'pause'])->name('packaging.pause'); // managers (checked inside)
     Route::middleware('can:packaging.create')->group(function () {
         Route::post('/packaging/scan', [PackagingController::class, 'scan'])->name('packaging.scan.post');
         Route::post('/returns/find', [\App\Http\Controllers\ReturnController::class, 'find'])->name('returns.find');

@@ -44,6 +44,12 @@ class PackagingController extends Controller
         $red = "(o.packed_version IS NOT NULL AND o.packed_version < o.current_version AND o.status_id IN ({$packed}))";
         $orange = "(o.label_version < o.current_version AND o.status_id IN ({$rfp}, {$packed}))";
         $inQueue = "(o.status_id = {$rfp} OR {$red} OR {$orange})";
+        // Paused by a manager: what was booked since stays out of the packers' list (managers still see it all).
+        $pause = app(\App\Services\Packaging\PackagingPause::class);
+        $controls = $pause->canControl($user);
+        if (! $controls && ($hide = $pause->visibleSql('o')) !== '') {
+            $inQueue = "({$inQueue} AND {$hide})";
+        }
 
         $counts = (array) DB::table('orders as o')->whereRaw($inQueue)->selectRaw(
             "COUNT(*) as `all`, SUM(CASE WHEN {$red} THEN 1 ELSE 0 END) as red,
@@ -88,7 +94,26 @@ class PackagingController extends Controller
             'toUnpack' => DB::table('orders as o')->leftJoin('users as p', 'p.id', '=', 'o.unpack_packer_id')->whereNotNull('o.unpack_needed_at')
                 ->orderBy('o.unpack_needed_at')->limit(50)->get(['o.id', 'o.order_no', 'o.unpack_needed_at', 'o.unpack_packer_id', 'p.name as packer']),
             'openIssues' => DB::table('stock_issue_reports')->where('status', 'open')->count(),
+            'pause' => $controls ? $pause->active() : null,
+            'held' => $controls ? $pause->heldCount() : 0,
+            'controlsPause' => $controls,
         ]);
+    }
+
+    /** Pause packaging / Resume (managers): see PackagingPause. */
+    public function pause(Request $request, \App\Services\Packaging\PackagingPause $pause, ActivityLogger $logger): RedirectResponse
+    {
+        abort_unless($pause->canControl($request->user()), 403);
+        if ($pause->active()) {
+            $n = $pause->resume($request->user());
+            $logger->log('packaging.resumed', null, null, ['released' => $n]);
+
+            return back()->with('success', __('Packaging resumed: :n orders sent to the packers.', ['n' => $n]));
+        }
+        $pause->pause($request->user());
+        $logger->log('packaging.paused');
+
+        return back()->with('success', __('Packaging paused. Orders are still booked; packers get them when you resume.'));
     }
 
     /** The packer opened a taken-back or cancelled box and put the items back. */

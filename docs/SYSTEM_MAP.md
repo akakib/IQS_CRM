@@ -222,6 +222,8 @@ print_run; the A4 sheet lists those orders in sticker order (label ID, items, CO
 scan of a label marks it applied. Edits while packing need no manager (edit_policy free for ready_for_packaging, packed,
 ready_for_pickup); OrderEditor sends an urgent order_needs_repack telling the packer: repack / replace the label /
 print the new label, with the old and new label IDs. Scanning an old label names the new one.
+Printing from the packaging list: Print on a row (one order, again if needed), tick rows + Print selected (several,
+one print_run so the A4 sheet matches), or Print new labels (every label not printed yet). All go through packaging.labels.
 
 **Upsell** (`Reports/UpsellReport`, `/upsell`): on a website order, while it is verified by call (New, Record verified,
 No answer at the time of the edit), items added or more of one and the total went up; it counts for whoever made the

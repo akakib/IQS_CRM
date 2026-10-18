@@ -136,6 +136,29 @@ class PackagingTest extends TestCase
         $this->get(route('packaging.sheet', ['run' => $run]))->assertSee('CHANGED: use the new label '.$newLabel);
     }
 
+    public function test_one_or_several_picked_orders_print_again_and_the_others_are_left_alone(): void
+    {
+        $a = $this->booked('01712345631', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $b = $this->booked('01712345632', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $c = $this->booked('01712345633', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $this->actingAs($this->packer)->get(route('packaging.index'))->assertOk()->assertSee('Print selected');
+
+        // One order: only its label, and it can be printed again.
+        $this->get(route('packaging.labels', ['orders' => $b->id]))->assertOk()->assertSee($this->label($b))->assertDontSee($this->label($a));
+        $first = DB::table('shipment_labels')->where('order_id', $b->id)->value('print_run');
+        $this->assertNull(DB::table('shipment_labels')->where('order_id', $a->id)->value('printed_at'));
+
+        // Several, in the picked order; the reprint joins the new run so its A4 sheet lists them all.
+        $this->travel(2)->seconds();
+        $this->get(route('packaging.labels', ['orders' => $c->id.','.$b->id]))->assertOk()->assertSeeInOrder([$this->label($c), $this->label($b)]);
+        $run = DB::table('shipment_labels')->where('order_id', $c->id)->value('print_run');
+        $this->assertNotSame($first, $run);
+        $this->get(route('packaging.sheet', ['run' => $run]))->assertSee($this->label($b))->assertSee($this->label($c))->assertDontSee($this->label($a));
+
+        // A picked order that is not in the packaging queue prints nothing.
+        $this->get(route('packaging.labels', ['orders' => '999999']))->assertRedirect(route('packaging.index'));
+    }
+
     public function test_release_posts_one_pick_list_sorted_by_shelf_without_customer_details(): void
     {
         $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
@@ -179,7 +202,7 @@ class PackagingTest extends TestCase
         // The edit itself issued the new label (unprinted), so the packer can print it without asking anyone.
         $this->assertDatabaseHas('shipment_labels', ['barcode' => $order->order_no.'-2', 'voided_at' => null, 'printed_at' => null]);
         $this->postJson('/packaging/scan', ['code' => $old])->assertJson(['ok' => false])->assertJsonFragment(['result' => 'blocked']); // voided now
-        $this->post("/packaging/{$order->id}/label")->assertOk()->assertSee($order->order_no.'-2');
+        $this->get(route('packaging.labels', ['orders' => $order->id]))->assertOk()->assertSee($order->order_no.'-2');
         $this->assertNotNull(DB::table('shipment_labels')->where('barcode', $order->order_no.'-2')->value('printed_at'));
         $this->postJson('/packaging/scan', ['code' => $order->order_no.'-2'])->assertJson(['ok' => true, 'level' => 'edited'])->assertJsonPath('checklist.repack', true);
         $this->assertSame('repack', $order->fresh()->packMark()); // still red until the items are ticked again

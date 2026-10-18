@@ -9,7 +9,8 @@
 <div class="mx-auto max-w-3xl"
     x-data="{
         last: null, list: null, ticked: [], busy: false, holding: false, holdReason: null,
-        open: null, previews: {},
+        open: null, previews: {}, picked: [],
+        printPicked(ids) { window.open(@js(route('packaging.labels')) + '?orders=' + ids.join(','), '_blank'); setTimeout(() => location.reload(), 1500) },
         async peek(id) {
             if (this.open === id) { this.open = null; return }
             this.open = id;
@@ -198,8 +199,12 @@
         @forelse ($queue as $o)
             <div @class(['overflow-hidden rounded-xl border bg-white',
                 'border-red-300' => $o->is_red, 'border-orange-300' => ! $o->is_red && $o->is_orange, 'border-gray-200' => ! $o->is_red && ! $o->is_orange])>
-                {{-- Tap to see what is inside. Looking does not start packaging; scanning the label does. --}}
-                <button type="button" @click="peek({{ $o->id }})" @class(['flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-gray-50', 'bg-red-50/40' => $o->is_red])>
+                {{-- Tick to print several labels at once; Print prints this one. Tap the rest to see what is inside. Looking does not start packaging; scanning the label does. --}}
+                <div @class(['flex items-stretch', 'bg-red-50/40' => $o->is_red])>
+                <label class="flex shrink-0 cursor-pointer items-center pl-4 pr-1" title="{{ __('Pick to print') }}">
+                    <input type="checkbox" value="{{ $o->id }}" x-model="picked" class="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary">
+                </label>
+                <button type="button" @click="peek({{ $o->id }})" class="flex min-w-0 flex-1 items-center justify-between gap-3 p-4 pl-3 text-left hover:bg-gray-50">
                     <span class="min-w-0">
                         <span class="flex flex-wrap items-center gap-2">
                             <span class="font-mono text-base font-bold text-gray-900">{{ $o->order_no }}</span>
@@ -220,6 +225,10 @@
                         <svg class="h-4 w-4 text-gray-400 transition-transform" :class="open === {{ $o->id }} && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                     </span>
                 </button>
+                <span class="flex shrink-0 items-center pr-3">
+                    <button type="button" @click="printPicked([{{ $o->id }}])" class="rounded-lg border border-primary px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary hover:text-white">{{ __('Print') }}</button>
+                </span>
+                </div>
 
                 <div x-show="open === {{ $o->id }}" x-cloak class="border-t border-gray-100 bg-gray-50/60 px-4 py-3">
                     <template x-if="!previews[{{ $o->id }}]"><p class="text-sm text-gray-400">{{ __('Loading…') }}</p></template>
@@ -243,13 +252,9 @@
                                     <span>{{ __('To start packaging, scan its label.') }}<span x-show="!previews[{{ $o->id }}].label_printed"> · {{ __('not printed yet') }}</span></span>
                                 </template>
                                 <template x-if="previews[{{ $o->id }}].label && !previews[{{ $o->id }}].label_current">
-                                    <span class="font-medium text-orange-700">{{ __('The order changed: print the new label, then scan it.') }}</span>
+                                    <span class="font-medium text-orange-700">{{ __('The order changed: press Print for the new label, then scan it.') }}</span>
                                 </template>
                             </p>
-                            <form x-show="previews[{{ $o->id }}].label && (!previews[{{ $o->id }}].label_current || !previews[{{ $o->id }}].label_printed)" method="POST" action="{{ route('packaging.label', $o->id) }}" target="_blank" class="mt-2" @submit="setTimeout(() => location.reload(), 1500)">
-                                @csrf
-                                <button class="rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-primary hover:text-white" x-text="previews[{{ $o->id }}].label_current ? @js(__('Print label')) : @js(__('Print new label'))"></button>
-                            </form>
                         </div>
                     </template>
                 </div>
@@ -259,5 +264,13 @@
         @endforelse
     </div>
     <div class="mt-4">{{ $queue->links() }}</div>
+
+    {{-- Picked orders: print their labels together (with their A4 packing sheet). --}}
+    <div x-show="picked.length" x-cloak class="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white px-4 py-3 shadow-lg">
+        <div class="mx-auto flex max-w-3xl items-center justify-between gap-3">
+            <button type="button" @click="picked = []" class="text-sm font-medium text-gray-600 hover:underline">{{ __('Clear') }}</button>
+            <button type="button" @click="printPicked(picked)" class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white hover:bg-primary-dark" x-text="@js(__('Print selected')) + ' (' + picked.length + ')'"></button>
+        </div>
+    </div>
 </div>
 </x-layouts.app>

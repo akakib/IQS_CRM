@@ -170,7 +170,7 @@ class OrderAmendmentTest extends TestCase
         $this->assertStringContainsString('reason: Customer request', $note);
     }
 
-    public function test_change_after_booking_waits_for_a_manager_then_applies(): void
+    public function test_change_after_booking_applies_at_once_without_a_manager(): void
     {
         $order = $this->order();
         $this->setStatus($order, 'ready_for_packaging');
@@ -178,13 +178,10 @@ class OrderAmendmentTest extends TestCase
         $result = app(OrderEditor::class)->request($order->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 1]]],
             $this->reason('customer_request'), $this->agent, $order->fresh()->lock_version);
 
-        $this->assertFalse($result['applied']);
-        $this->assertSame(1, $order->fresh()->current_version);
-        $this->assertDatabaseHas('order_amendments', ['id' => $result['amendment_id'], 'approval_status' => 'pending']);
-
-        app(OrderEditor::class)->decide($order, $result['amendment_id'], true, $this->owner());
+        $this->assertTrue($result['applied']);
         $this->assertSame(2, $order->fresh()->current_version);
         $this->assertSame('1.000', $order->fresh()->items->first()->qty);
+        $this->assertDatabaseHas('order_amendments', ['id' => $result['amendment_id'], 'approval_status' => 'not_required']);
     }
 
     public function test_content_edit_after_packaging_marks_repack_and_alerts(): void

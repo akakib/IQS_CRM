@@ -70,6 +70,12 @@ class ScanService
             return $this->log('packaging', null, $code, $order, $label, $this->fail('blocked', __('Old label: the order changed. Print the new label first.')), $by);
         }
 
+        // Scanned at packing = this label is on the box (first time only).
+        if (! $label->applied_at) {
+            DB::table('shipment_labels')->where('id', $label->id)->update(['applied_at' => now(), 'applied_by' => $by->id, 'updated_at' => now()]);
+            $this->orders->note($order, 'system', __('Label :l on the box (scanned by :n).', ['l' => $label->barcode, 'n' => $by->name]), $by);
+        }
+
         if ((int) $order->packer_id !== $by->id) {
             $previous = $order->packer_id ? DB::table('users')->where('id', $order->packer_id)->value('name') : null;
             $order->forceFill(['packer_id' => $by->id, 'packaging_started_at' => now()])->save();
@@ -247,7 +253,11 @@ class ScanService
             return [$label, $order, $this->fail('blocked', __('Do not pack: :r. Put the items back on the shelf.', ['r' => (string) $label->void_reason]))];
         }
         if ($label->voided_at) {
-            return [$label, $order, $this->fail('blocked', __('Old label: replace it. :r', ['r' => (string) $label->void_reason]))];
+            $new = DB::table('shipment_labels')->where('order_id', $label->order_id)->whereNull('voided_at')->value('barcode');
+
+            return [$label, $order, $this->fail('blocked', $new
+                ? __('Old label :o: use the new label :n. :r', ['o' => $label->barcode, 'n' => $new, 'r' => (string) $label->void_reason])
+                : __('Old label: replace it. :r', ['r' => (string) $label->void_reason]))];
         }
 
         return [$label, $order, null];

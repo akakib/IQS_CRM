@@ -236,6 +236,7 @@ Route::middleware('auth')->group(function () {
         // GET only: Route::redirect answers every verb and, once routes are cached, swallowed the scan POST below.
         Route::get('/packaging/scan', fn () => redirect('/packaging'))->name('packaging.scan');
         Route::get('/packaging/labels', [PackagingController::class, 'labels'])->name('packaging.labels');
+        Route::get('/packaging/sheet', [PackagingController::class, 'sheet'])->name('packaging.sheet');
         Route::post('/packaging/{order}/label', [PackagingController::class, 'label'])->name('packaging.label');
         Route::get('/packaging/orders/{order}', [PackagingController::class, 'preview'])->name('packaging.preview');
         Route::get('/packaging/batches/{batch}', [PackagingController::class, 'batch'])->whereNumber('batch')->name('packaging.batch');

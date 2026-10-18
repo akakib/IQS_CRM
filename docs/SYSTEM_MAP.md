@@ -217,6 +217,12 @@ an item holds is `product_variants.size_qty / size_unit` (grams or ml), read fro
 list; calls, confirming and booking go on. Orders booked while paused stay Ready for packaging but are hidden from the
 packers' list and To pack count (the packers are not told). Resume sets their packaging_sent_at to now.
 
+**Packing sheet + label on** (`/packaging/sheet`, `shipment_labels.print_run/applied_at`): each label print gets a
+print_run; the A4 sheet lists those orders in sticker order (label ID, items, COD, Packed and Label on boxes). The first
+scan of a label marks it applied. Edits while packing need no manager (edit_policy free for ready_for_packaging, packed,
+ready_for_pickup); OrderEditor sends an urgent order_needs_repack telling the packer: repack / replace the label /
+print the new label, with the old and new label IDs. Scanning an old label names the new one.
+
 **Upsell** (`Reports/UpsellReport`, `/upsell`): on a website order, while it is verified by call (New, Record verified,
 No answer at the time of the edit), items added or more of one and the total went up; it counts for whoever made the
 edit (order_amendments.requested_by). Entry and price fixes are not upsells. Earned = delivered; cancelled or returned

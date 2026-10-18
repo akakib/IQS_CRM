@@ -108,6 +108,34 @@ class PackagingTest extends TestCase
         $this->actingAs($this->packer)->get('/packaging')->assertSee($during->order_no);
     }
 
+    public function test_labels_print_with_an_a4_sheet_the_scan_marks_the_label_on_and_an_edit_tells_the_packer_what_to_do(): void
+    {
+        $a = $this->booked('01712345611', [['variant_id' => $this->dates->id, 'qty' => 2]]);
+        $b = $this->booked('01712345612', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $labelA = $this->label($a);
+
+        // One print: the stickers, and the A4 sheet of the same orders with the same label IDs and big item lines.
+        $page = $this->actingAs($this->packer)->get(route('packaging.labels'))->assertOk()->assertSee('Packing sheet (A4)');
+        $run = DB::table('shipment_labels')->where('barcode', $labelA)->value('print_run');
+        $this->assertNotNull($run);
+        $this->get(route('packaging.sheet', ['run' => $run]))->assertOk()->assertSeeInOrder([$labelA, 'Dates', $this->label($b)])->assertSee('Label on');
+
+        // The label is on the box when the packer scans it.
+        $this->postJson('/packaging/scan', ['code' => $labelA])->assertJson(['ok' => true]);
+        $this->assertNotNull(DB::table('shipment_labels')->where('barcode', $labelA)->value('applied_at'));
+
+        // Edited now (no manager needed): the packers hear it at once with the old and new label; the old one names the new one.
+        $type = DB::table('notification_types')->where('system_key', 'order_needs_repack')->value('id');
+        DB::table('notification_rules')->insert(['type_id' => $type, 'target' => 'user', 'user_id' => $this->packer->id, 'channel_in_app' => true, 'channel_telegram' => false, 'channel_sms' => false, 'is_active' => true]);
+        app(\App\Services\Orders\OrderEditor::class)->request($a->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 3]]],
+            DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'customer_request')->value('id'), $this->desk, $a->fresh()->lock_version);
+        $newLabel = $this->label($a);
+        $this->assertNotSame($labelA, $newLabel);
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->packer->id, 'type_id' => $type, 'title' => $a->order_no.' edited after packaging: repack']); // items changed and the label is already on the box
+        $this->postJson('/packaging/scan', ['code' => $labelA])->assertJson(['ok' => false])->assertJsonFragment(['message' => "Old label {$labelA}: use the new label {$newLabel}. Order edited (version 2)"]);
+        $this->get(route('packaging.sheet', ['run' => $run]))->assertSee('CHANGED: use the new label '.$newLabel);
+    }
+
     public function test_release_posts_one_pick_list_sorted_by_shelf_without_customer_details(): void
     {
         $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);

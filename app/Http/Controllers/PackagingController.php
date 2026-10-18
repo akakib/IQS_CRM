@@ -229,10 +229,38 @@ class PackagingController extends Controller
         $labels = DB::table('shipment_labels as l')->join('shipments as s', 's.id', '=', 'l.shipment_id')
             ->whereIn('l.order_id', $ids)->whereNull('l.voided_at')
             ->get(['l.order_id', 'l.barcode', 'l.cod_on_label', 's.consignment_id', 's.courier'])->keyBy('order_id');
+        // One print run: the A4 packing sheet lists these same orders, in this order.
+        $run = now()->format('ymdHis').substr((string) $request->user()->id, -4);
         DB::table('shipment_labels')->whereIn('order_id', $ids)->whereNull('voided_at')->whereNull('printed_at')
-            ->update(['printed_at' => now(), 'printed_by' => $request->user()->id]);
+            ->update(['printed_at' => now(), 'printed_by' => $request->user()->id, 'print_run' => $run]);
+        $orders = $orders->sortBy(fn ($o) => $ids->search($o->id))->values();
 
-        return view('shipping.labels', ['orders' => $orders, 'labels' => $labels]);
+        return view('shipping.labels', ['orders' => $orders, 'labels' => $labels, 'run' => $run]);
+    }
+
+    /**
+     * The A4 packing sheet: the orders of one label print (?run=), or, without one, everything now in the
+     * packers' list. Same order as the stickers; a label replaced since (the order changed) is flagged.
+     */
+    public function sheet(Request $request): View
+    {
+        $run = preg_match('/^\d{10,20}$/', (string) $request->query('run')) ? $request->query('run') : null;
+        if ($run) {
+            $printed = DB::table('shipment_labels')->where('print_run', $run)->orderBy('printed_at')->orderBy('id')->get(['order_id', 'barcode', 'voided_at']);
+        } else {
+            $pause = app(\App\Services\Packaging\PackagingPause::class);
+            $hide = $pause->canControl($request->user()) ? '' : $pause->visibleSql('o');
+            $printed = DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')->whereNull('l.voided_at')
+                ->where('o.status_id', OrderStatus::idFor('ready_for_packaging'))->when($hide !== '', fn ($q) => $q->whereRaw($hide))
+                ->orderBy('o.packaging_sent_at')->orderBy('o.id')->limit(200)->get(['l.order_id', 'l.barcode', 'l.voided_at']);
+        }
+        $orders = Order::whereIn('id', $printed->pluck('order_id'))->with('items:id,order_id,name_snapshot,qty,unit')->get()->keyBy('id');
+        $current = DB::table('shipment_labels')->whereIn('order_id', $printed->pluck('order_id'))->whereNull('voided_at')->pluck('barcode', 'order_id');
+        $rows = $printed->filter(fn ($l) => isset($orders[$l->order_id]))->map(fn ($l) => (object) [
+            'label' => $l->barcode, 'order' => $orders[$l->order_id], 'changed' => $l->voided_at !== null, 'current' => $current[$l->order_id] ?? null,
+        ])->values();
+
+        return view('packaging.sheet', ['rows' => $rows]);
     }
 
     // ── Batches (older flow, kept for bulk pick lists; not in the menu) ──

@@ -161,8 +161,10 @@ class OrderEditor
         $this->orders->snapshot($order, $version, $by->id);
 
         // The old label no longer scans: have the new one ready so the packer can print it without asking anyone.
+        $oldLabel = null; $newLabel = null;
         if ($order->active_shipment_id && in_array($order->status_id, OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']), true)) {
-            app(\App\Services\Courier\BookingService::class)->issueLabel($order, $order->active_shipment_id, null, __('Order edited (version :v)', ['v' => $version]));
+            $oldLabel = DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')->orderByDesc('id')->first(['barcode', 'printed_at', 'applied_at']);
+            $newLabel = app(\App\Services\Courier\BookingService::class)->issueLabel($order, $order->active_shipment_id, null, __('Order edited (version :v)', ['v' => $version]));
         }
 
         $reason = DB::table('status_reasons')->where('id', $a->reason_id)->value('label_en');
@@ -184,9 +186,18 @@ class OrderEditor
                     'user_ids' => array_values(array_unique(array_filter([$order->moderator_id, $by->id, ...app(\App\Services\Orders\DeskService::class)->managerIds()]))),
                 ]);
         }
-        if ($wasPacked && $a->edit_class === 'content') {
-            $this->notifications->send('order_needs_repack', __(':no edited after packaging: repack', ['no' => $order->order_no]), $this->describe(json_decode($a->changes, true)), [
-                'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+        // The packers hear at once what this edit means for a box or a label already made.
+        $changes = $this->describe(json_decode($a->changes, true));
+        $labels = $oldLabel ? __('Old label :o, new label :n.', ['o' => $oldLabel->barcode, 'n' => $newLabel]) : '';
+        $title = match (true) {
+            ($wasPacked || $oldLabel?->applied_at) && $a->edit_class === 'content' => __(':no edited after packaging: repack', ['no' => $order->order_no]),
+            $wasPacked || $oldLabel?->applied_at => __(':no edited: replace the label', ['no' => $order->order_no]),
+            (bool) $oldLabel?->printed_at => __(':no edited: print the new label', ['no' => $order->order_no]).($a->edit_class === 'content' ? ' '.__('(items changed, check the box)') : ''),
+            default => null,
+        };
+        if ($title) {
+            $this->notifications->send('order_needs_repack', $title, trim($changes.'. '.$labels), [
+                'link' => route('packaging.index'), 'subject' => ['order', $order->id], 'priority' => 'urgent',
             ]);
         }
     }

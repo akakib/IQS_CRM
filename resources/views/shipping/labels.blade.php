@@ -27,7 +27,8 @@
     </style>
 </head>
 <body>
-    <div class="toolbar"><button onclick="window.print()">{{ __('Print :n labels', ['n' => $orders->count()]) }}</button></div>
+    <div class="toolbar"><button onclick="window.print()">{{ __('Print :n labels', ['n' => $orders->count()]) }}</button>
+        @isset($run)<a href="{{ route('packaging.sheet', ['run' => $run]) }}" target="_blank" style="margin-left:8px;display:inline-block;border:1px solid #14532d;color:#14532d;border-radius:8px;padding:9px 16px;font-size:14px;text-decoration:none">{{ __('Packing sheet (A4)') }}</a>@endisset</div>
 
     @foreach ($orders as $o)
         @php($l = $labels[$o->id] ?? null)

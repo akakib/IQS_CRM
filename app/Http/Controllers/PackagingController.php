@@ -40,23 +40,12 @@ class PackagingController extends Controller
         // No list set today = everyone with packaging access works (so a forgotten list never stops the shop).
         $working = $onDuty->isEmpty() || $onDuty->has($user->id) || $canManage;
 
-        $rfp = OrderStatus::idFor('ready_for_packaging');
-        $packed = implode(',', OrderStatus::idsFor(['packed', 'ready_for_pickup']));
-        $red = "(o.packed_version IS NOT NULL AND o.packed_version < o.current_version AND o.status_id IN ({$packed}))";
-        $orange = "(o.label_version < o.current_version AND o.status_id IN ({$rfp}, {$packed}))";
-        $inQueue = "(o.status_id = {$rfp} OR {$red} OR {$orange})";
-        // Paused by a manager: what was booked since stays out of the packers' list (managers still see it all).
+        // The list and its counts (the dashboard's To pack tile reads the same): paused orders stay out for the packers.
+        $queue = app(\App\Services\Packaging\PackingQueue::class);
+        ['sql' => $inQueue, 'red' => $red, 'orange' => $orange, 'rfp' => $rfp] = $queue->sql($user);
+        $counts = $queue->counts($user);
         $pause = app(\App\Services\Packaging\PackagingPause::class);
         $controls = $pause->canControl($user);
-        if (! $controls && ($hide = $pause->visibleSql('o')) !== '') {
-            $inQueue = "({$inQueue} AND {$hide})";
-        }
-
-        $counts = (array) DB::table('orders as o')->whereRaw($inQueue)->selectRaw(
-            "COUNT(*) as `all`, SUM(CASE WHEN {$red} THEN 1 ELSE 0 END) as red,
-             SUM(CASE WHEN o.status_id = {$rfp} AND o.packer_id IS NULL THEN 1 ELSE 0 END) as waiting,
-             SUM(CASE WHEN o.packer_id = ? THEN 1 ELSE 0 END) as mine", [$user->id])->first();
-        $counts = array_map('intval', $counts);
 
         $filter = in_array($request->query('show'), ['red', 'waiting', 'mine'], true) ? $request->query('show') : 'all';
         $queue = DB::table('orders as o')

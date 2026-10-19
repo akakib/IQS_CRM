@@ -28,7 +28,7 @@ class OwnerSummary extends Command
             .__('Confirmed: :c · Cancelled: :x', ['c' => $count('confirmed'), 'x' => $count('cancelled')])."\n"
             .__('Delivered: :d · Returned: :r', ['d' => $t['delivered'], 'r' => $t['orders'] - $t['delivered']])."\n"
             .__('Revenue: :r', ['r' => $tk($t['revenue'])])."\n"
-            .__('Ad cost: :a', ['a' => $tk((float) DB::table('ad_spend_daily')->where('spend_date', $day)->sum('bdt_cost'))])."\n"
+            .__('Ad cost: :a', ['a' => $tk($t['ad_cost'] ?? 0)])."\n"
             .__('Profit after ads: :p', ['p' => $tk($t['profit'])])."\n"
             .__('Still waiting to be taken: :n', ['n' => DB::table('orders')->whereNull('moderator_id')->where('status_id', OrderStatus::idFor('new'))->count()]);
 

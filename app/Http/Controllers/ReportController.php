@@ -35,20 +35,19 @@ class ReportController extends Controller
             // The same issues as the list it opens: all of them for those who see all, else their own.
             $tiles[] = $user->can('orders.approve')
                 ? [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null]
-                : [__('My delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->where('assigned_to', $user->id)->count(), route('issues.index'), null];
+                : [__('My delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->where('assigned_to', $user->id)->count(), route('issues.index', ['show' => 'mine']), null];
         }
         if ($user->can('packaging.view')) {
             // The packer's day: what is left to pack, what waits for the rider, returns to take in, items not found.
             if (! $shop) {
-                $pause = app(\App\Services\Packaging\PackagingPause::class);
-                $hide = $pause->canControl($user) ? '' : $pause->visibleSql('orders'); // paused: what came since is not counted for the packers
-                $tiles[] = [__('To pack'), DB::table('orders')->where('status_id', OrderStatus::idFor('ready_for_packaging'))->when($hide !== '', fn ($q) => $q->whereRaw($hide))->count(), route('packaging.index'), null];
+                // The same number as "All" on the packaging page (repacks and new labels included, paused orders out).
+                $tiles[] = [__('To pack'), app(\App\Services\Packaging\PackingQueue::class)->counts($user)['all'], route('packaging.index'), null];
             }
             $tiles[] = [__('Packed today'), $todayEvents('packed')->count(), route('packaging.index'), null];
             if (! $shop) {
                 $tiles[] = [__('I packed today'), $todayEvents('packed')->where('e.user_id', $user->id)->count(), route('packaging.index'), null];
                 $tiles[] = [__('Waiting for the rider'), DB::table('orders')->whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->count(), route('handover.index'), null];
-                $tiles[] = [__('Returns to receive'), DB::table('orders')->where('status_id', OrderStatus::idFor('returned'))->whereNull('return_received_at')->count(), route('returns.index'), null];
+                $tiles[] = [__('Returns to receive'), DB::table('orders')->whereIn('status_id', OrderStatus::idsFor(\App\Services\Packaging\ReturnService::STATES))->whereNull('return_received_at')->count(), route('returns.index'), null]; // as the Returns page counts it
                 $notFound = DB::table('stock_issue_reports')->where('status', 'open')->count();
                 $tiles[] = [__('Items not found'), $notFound, route('packaging.issues'), $notFound ? 'down' : null];
             }

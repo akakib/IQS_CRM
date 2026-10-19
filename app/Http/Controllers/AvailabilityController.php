@@ -24,7 +24,8 @@ class AvailabilityController extends Controller
         $status = $list->filter('status') ?? 'out_of_stock';
         $q = mb_strtolower($list->search);
 
-        $variants = ProductVariant::query()
+        $active = fn ($w) => $w->whereHas('product', fn ($p) => $p->where('status', 'active')); // archived products are not stock to watch
+        $variants = ProductVariant::query()->tap($active)
             ->select(['id', 'product_id', 'sku', 'name', 'availability_status', 'expected_restock_date', 'oos_marked_by', 'oos_marked_at', 'oos_review_at'])
             ->with(['product:id,name', 'markedBy:id,name'])
             ->when($status === 'review', fn ($w) => $w->where('availability_status', '!=', 'in_stock')->where('oos_review_at', '<=', now()))
@@ -34,8 +35,8 @@ class AvailabilityController extends Controller
             ->paginate($list->perPage)
             ->withQueryString();
 
-        $counts = ProductVariant::query()->selectRaw('availability_status, COUNT(*) as n')->groupBy('availability_status')->pluck('n', 'availability_status');
-        $reviewDue = ProductVariant::where('availability_status', '!=', 'in_stock')->where('oos_review_at', '<=', now())->count();
+        $counts = ProductVariant::query()->tap($active)->selectRaw('availability_status, COUNT(*) as n')->groupBy('availability_status')->pluck('n', 'availability_status');
+        $reviewDue = ProductVariant::query()->tap($active)->where('availability_status', '!=', 'in_stock')->where('oos_review_at', '<=', now())->count();
 
         return view('products.availability', compact('variants', 'list', 'status', 'counts', 'reviewDue'));
     }

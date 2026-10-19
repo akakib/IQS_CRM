@@ -93,13 +93,6 @@ class CustomerController extends Controller
         return redirect()->route('customers.show', array_filter(['customer' => $customer, 'embed' => $request->boolean('embed') ?: null]))->with('success', __('Customer saved.'));
     }
 
-    public function destroy(Customer $customer): RedirectResponse
-    {
-        $customer->delete();
-
-        return redirect()->route('customers.index')->with('success', __('Customer deleted.'));
-    }
-
     public function merge(Request $request, Customer $customer): RedirectResponse
     {
         $data = $request->validate(['duplicate_phone' => ['required', 'string']]);

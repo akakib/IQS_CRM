@@ -114,10 +114,10 @@ class RoleManagementTest extends TestCase
         $staff = User::factory()->create();
         $staff->roles()->attach($this->role(['staff.view', 'staff.edit'])->id);
 
-        $this->post("/users/{$staff->id}/access/overrides", ['permission' => 'staff.export', 'effect' => 'allow', 'reason' => 'Month end'])->assertSessionHas('success');
+        $this->post("/users/{$staff->id}/access/overrides", ['permission' => 'staff.delete', 'effect' => 'allow', 'reason' => 'Month end'])->assertSessionHas('success');
         $this->post("/users/{$staff->id}/access/overrides", ['permission' => 'staff.edit', 'effect' => 'deny', 'reason' => 'Under review'])->assertSessionHas('success');
 
-        $this->assertTrue($staff->fresh()->can('staff.export'));
+        $this->assertTrue($staff->fresh()->can('staff.delete'));
         $this->assertFalse($staff->fresh()->can('staff.edit'));
 
         $deny = DB::table('user_permissions')->where('effect', 'deny')->value('id');

@@ -8,10 +8,10 @@
 
 return [
     'modules' => [
-        'staff' => ['view', 'create', 'edit', 'delete', 'export'],
+        'staff' => ['view', 'create', 'edit', 'delete'],
         'locations' => ['view', 'create', 'edit', 'delete'],
-        'products' => ['view', 'create', 'edit', 'delete', 'export', 'availability'],
-        'customers' => ['view', 'create', 'edit', 'delete', 'export', 'import'],
+        'products' => ['view', 'create', 'edit', 'delete', 'availability'],
+        'customers' => ['view', 'create', 'edit', 'import'],
         'orders' => ['view', 'create', 'edit', 'approve', 'export', 'reassign', 'take'],
         'payments' => ['verify'],
         'shipping' => ['view', 'create'],

@@ -176,14 +176,14 @@ class PermissionTest extends TestCase
     public function test_temporary_access_ends_exactly_at_expiry_even_when_cached(): void
     {
         $user = User::factory()->create();
-        $this->override($user, 'staff.export', 'allow', ['expires_at' => now()->addMinutes(10)]);
+        $this->override($user, 'staff.delete', 'allow', ['expires_at' => now()->addMinutes(10)]);
 
-        $this->assertTrue($user->can('staff.export'));
+        $this->assertTrue($user->can('staff.delete'));
 
         $this->travel(11)->minutes();
         app()->forgetInstance(PermissionService::class); // a new request
 
-        $this->assertFalse($user->fresh()->can('staff.export'));
+        $this->assertFalse($user->fresh()->can('staff.delete'));
     }
 
     public function test_future_role_is_not_active_yet(): void

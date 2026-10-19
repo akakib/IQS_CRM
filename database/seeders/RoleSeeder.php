@@ -27,7 +27,7 @@ class RoleSeeder extends Seeder
         'dollar_keeper' => ['Dollar Keeper', 'USD purchases and ad spend.', [], ['customer_contact', 'salary']],
         'packaging' => ['Packaging', 'Picks and packs orders at the shop.', ['products.view', 'packaging.view', 'packaging.create'], ['customer_contact', 'cost_price', 'profit', 'salary']],
         'store_keeper' => ['Store Keeper', 'Receives and moves stock.', ['locations.view', 'products.view'], ['customer_contact', 'profit', 'salary']],
-        'hr' => ['HR', 'Staff records, attendance and payroll.', ['staff.view', 'staff.create', 'staff.edit', 'staff.export'], ['customer_contact', 'cost_price', 'profit']],
+        'hr' => ['HR', 'Staff records, attendance and payroll.', ['staff.view', 'staff.create', 'staff.edit'], ['customer_contact', 'cost_price', 'profit']],
     ];
 
     /**

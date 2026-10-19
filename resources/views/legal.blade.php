@@ -2,7 +2,7 @@
 @php
     $privacy = $page === 'privacy';
     $updated = '15 October 2026';
-    $contact = 'official.iqbalstore@gmail.com';
+    $contact = settings('store.contact_email');
 @endphp
 <!DOCTYPE html>
 <html lang="en">

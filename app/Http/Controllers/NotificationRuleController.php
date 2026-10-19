@@ -19,7 +19,7 @@ class NotificationRuleController extends Controller
 
     public function index(): View
     {
-        $types = DB::table('notification_types')->orderBy('id')->get();
+        $types = DB::table('notification_types')->whereIn('system_key', array_keys(config('notifications.types')))->orderBy('id')->get();
         $rules = DB::table('notification_rules as nr')
             ->leftJoin('roles as r', 'r.id', '=', 'nr.role_id')
             ->leftJoin('users as u', 'u.id', '=', 'nr.user_id')

@@ -11,6 +11,8 @@ return [
     // Printed on the parcel label as the sender (the only place the shop's own name is shown).
     'store.label_name' => ['string', 'Iqbal Store', 'Sender name on parcel labels', 'Store', ['required', 'string', 'max:100']],
     'store.hotline' => ['string', '', 'Rider hotline number', 'Store', ['nullable', 'regex:/^01[3-9]\d{8}$/']],
+    // Shown on the public Privacy and Terms pages as the address customers write to.
+    'store.contact_email' => ['string', 'official.iqbalstore@gmail.com', 'Contact email on the Privacy and Terms pages', 'Store', ['required', 'email', 'max:120']],
     'appearance.primary_color' => ['string', '#0d542b', 'Main colour (buttons, links, the current page in the menu)', 'Appearance', ['required', 'regex:/^#[0-9a-fA-F]{6}$/']],
     'appearance.font' => ['string', 'Figtree', 'Font', 'Appearance', ['required', 'string', 'max:40']],
     'store.logo' => ['string', '', 'Logo', 'Store', ['nullable', 'image', 'max:1024']],

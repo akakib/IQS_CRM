@@ -291,11 +291,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/customers/steadfast', [CustomerController::class, 'steadfast'])->middleware('can:customers.view')->name('customers.steadfast');
     Route::post('/customers/{customer}/merge', [CustomerController::class, 'merge'])->middleware('can:customers.edit')->name('customers.merge');
     Route::post('/customers/{customer}/fraud-check', [CustomerController::class, 'fraudCheck'])->middleware('can:customers.view')->name('customers.fraud-check');
-    Route::resource('customers', CustomerController::class)
+    Route::resource('customers', CustomerController::class)->except('destroy')
         ->middlewareFor(['index', 'show'], 'can:customers.view')
         ->middlewareFor(['create', 'store'], 'can:customers.create')
-        ->middlewareFor(['edit', 'update'], 'can:customers.edit')
-        ->middlewareFor('destroy', 'can:customers.delete');
+        ->middlewareFor(['edit', 'update'], 'can:customers.edit');
 
     Route::resource('users', UserController::class)->except(['show', 'destroy'])
         ->middlewareFor('index', 'can:staff.view')

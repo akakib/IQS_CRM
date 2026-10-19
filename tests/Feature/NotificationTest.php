@@ -35,6 +35,22 @@ class NotificationTest extends TestCase
         return app(NotificationService::class);
     }
 
+    public function test_default_rules_send_a_point_dispute_to_the_managers_and_shop_alarms_to_telegram(): void
+    {
+        DB::table('notification_rules')->delete();
+        (new \Database\Seeders\RoleSeeder)->run();
+        (new NotificationSeeder)->run();
+        $manager = User::factory()->create();
+        $manager->roles()->attach(DB::table('roles')->where('system_key', 'manager')->value('id'));
+        app(\App\Services\PermissionService::class)->bump();
+
+        $this->assertSame(1, $this->service()->send('points_review', 'Rakin disputed a point'));
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $manager->id, 'title' => 'Rakin disputed a point']);
+        $rule = DB::table('notification_rules as r')->join('notification_types as t', 't.id', '=', 'r.type_id')->where('t.system_key', 'booking_failed')->first(['r.channel_telegram']);
+        $this->assertTrue((bool) $rule->channel_telegram);
+        $this->assertSame(0, DB::table('notification_types')->whereIn('system_key', ['courier_action_pending', 'oos_review_due', 'hold_expected_date_passed'])->where('is_active', true)->count());
+    }
+
     public function test_rule_for_a_role_notifies_every_user_with_that_role(): void
     {
         $role = $this->role([], [], 'Moderator');

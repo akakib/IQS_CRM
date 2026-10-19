@@ -29,7 +29,11 @@ class SyncNotificationTypes extends Command
             }
         }
 
-        $this->info("{$added} notification types added.");
+        // Types removed from config are switched off (never deleted: old notifications may point at them) and leave the matrix.
+        $retired = DB::table('notification_types')->whereNotIn('system_key', array_keys(config('notifications.types')))
+            ->where('is_active', true)->update(['is_active' => false, 'updated_at' => $now]);
+
+        $this->info("{$added} notification types added, {$retired} retired.");
 
         return self::SUCCESS;
     }

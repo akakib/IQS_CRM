@@ -15,13 +15,25 @@ class NotificationSeeder extends Seeder
         'order_needs_repack' => [['role', 'packaging', true, true], ['role', 'manager', true, false]],
         'delivery_issue' => [['order_moderator', null, true, true]],
         'stock_issue_reported' => [['role', 'owner', true, true], ['role', 'manager', true, false]],
-        'hold_expected_date_passed' => [['order_moderator', null, true, false], ['role', 'manager', true, false]],
         'amendment_pending_approval' => [['role', 'manager', true, false]],
-        'courier_action_pending' => [['role', 'manager', true, true]],
         'sync_failed' => [['role', 'manager', true, false]],
-        'oos_review_due' => [['role', 'owner', true, false]],
         'vendor_payment_due' => [['role', 'dollar_keeper', true, false], ['role', 'owner', true, false]],
+        'points_review' => [['role', 'manager', true, false]],
+        'booking_failed' => [['role', 'manager', true, true]],
+        'courier_cancel_needed' => [['role', 'manager', true, true]],
+        'cod_update_needed' => [['role', 'manager', true, true]],
+        'scan_stopped' => [['role', 'manager', true, true]],
+        'order_held_by_packer' => [['role', 'manager', true, true]],
+        'return_problem' => [['role', 'manager', true, true]],
+        'orders_unassigned' => [['role', 'manager', true, true]],
+        'hold_limit_request' => [['role', 'manager', true, false]],
     ];
+
+    /** The rules a type gets when it has none yet (an installed system keeps the admin's matrix for the rest). */
+    public static function defaultsFor(string $type): array
+    {
+        return self::DEFAULT_RULES[$type] ?? [];
+    }
 
     public function run(): void
     {

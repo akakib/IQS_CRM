@@ -36,7 +36,7 @@ class SalesReportController extends Controller
                 $r = $found[$key] ?? null;
 
                 return ['key' => $key, 'label' => $d->format($by === 'month' ? 'M' : 'j'), 'title' => $d->format($by === 'month' ? 'M Y' : 'd M, D'),
-                    'orders' => $r->orders ?? 0, 'money' => $r->money ?? 0, 'kg' => round((($r->grams ?? 0) + ($r->ml ?? 0)) / 1000, 2)];
+                    'orders' => $r->orders ?? 0, 'money' => $r->money ?? 0, 'kg' => round(($r->grams ?? 0) / 1000, 2)]; // weight only: litres are not kilos
             })->values();
 
         return view('reports.sales', [

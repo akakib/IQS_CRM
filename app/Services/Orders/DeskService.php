@@ -550,6 +550,16 @@ class DeskService
         return $assigned;
     }
 
+    /**
+     * At work right now: active, not on a break and, when shifts are respected (Settings > Desk), inside their shift.
+     * The one rule for "may this person be given something" (delivery issues, cover, escalation).
+     */
+    public function atWork(User $user): bool
+    {
+        return (bool) $user->is_active && ! $user->current_break_id
+            && (! settings('desk.respect_shifts') || $this->calendar->isWorking($user->id));
+    }
+
     /** @return list<int> moderators at work right now: seen recently, not on a break, inside their shift */
     public function activeModerators(): array
     {
@@ -1005,8 +1015,8 @@ class DeskService
 
     public function managerIds(): array
     {
-        return DB::table('user_roles as ur')->join('roles as r', 'r.id', '=', 'ur.role_id')
-            ->whereIn('r.system_key', ['manager', 'owner'])->whereNull('r.deleted_at')->distinct()->pluck('ur.user_id')->all();
+        return DB::table('user_roles as ur')->join('roles as r', 'r.id', '=', 'ur.role_id')->join('users as u', 'u.id', '=', 'ur.user_id')
+            ->whereIn('r.system_key', ['manager', 'owner'])->whereNull('r.deleted_at')->where('u.is_active', true)->distinct()->pluck('ur.user_id')->all();
     }
 
     private function systemNote(int $orderId, string $body, ?int $userId, array $meta = []): void

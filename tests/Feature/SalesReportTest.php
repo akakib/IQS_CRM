@@ -56,6 +56,14 @@ class SalesReportTest extends TestCase
         $this->assertSame([1, 1500.0, 0.0], [$s['packed']['orders'], $s['packed']['grams'], $s['packed']['ml']]);
         $this->assertSame([1, 1500.0], [$s['delivered']['orders'], $s['delivered']['grams']]);
 
+        // A line sold by the kilo or the litre counts in its own measure (1.5 kg = 1500 g, 2 l = 2000 ml), never in the other.
+        DB::table('order_items')->where('order_id', $b->id)->where('variant_id', $dates->id)->update(['qty' => 1.5, 'unit' => 'kg']);
+        DB::table('order_items')->where('order_id', $b->id)->where('variant_id', $oil->id)->update(['qty' => 2, 'unit' => 'l']);
+        $s = app(\App\Services\Reports\SalesReport::class)->summary(today()->toDateString(), today()->toDateString());
+        $this->assertSame([3000.0, 2000.0], [$s['confirmed']['grams'], $s['confirmed']['ml']]);
+        DB::table('order_items')->where('order_id', $b->id)->where('variant_id', $dates->id)->update(['qty' => 1, 'unit' => 'pcs']);
+        DB::table('order_items')->where('order_id', $b->id)->where('variant_id', $oil->id)->update(['qty' => 2, 'unit' => 'pcs']);
+
         // The page: the three side by side, the chosen step's items, by day; Print / PDF and Excel.
         $this->actingAs($owner)->get(route('sales-report.index'))->assertOk()
             ->assertSeeInOrder(['Confirmed', '2', 'Packed', '1', 'Delivered', '1'])->assertSee('2 kg · 2 L')->assertSee('Dates 500g')->assertSee('1.5 kg')

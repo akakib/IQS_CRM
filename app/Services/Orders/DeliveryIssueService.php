@@ -121,7 +121,7 @@ class DeliveryIssueService
 
     private function atWork(\App\Models\User $user): bool
     {
-        return $user->is_active && ! $user->current_break_id && app(\App\Services\Work\WorkCalendar::class)->isWorking($user->id);
+        return app(DeskService::class)->atWork($user);
     }
 
     /** Past-SLA issues go to managers once. @return int how many escalated */
@@ -131,15 +131,14 @@ class DeliveryIssueService
             ->whereNull('i.resolved_at')->whereNull('i.escalated_at')->where('i.sla_due_at', '<=', now())
             ->get(['i.id', 'i.order_id', 'i.issue_type', 'i.assigned_to', 'o.order_no']);
 
-        $managers = DB::table('user_roles as ur')->join('roles as r', 'r.id', '=', 'ur.role_id')
-            ->whereIn('r.system_key', ['manager', 'owner'])->whereNull('r.deleted_at')->distinct()->pluck('ur.user_id')->all();
+        $managers = app(DeskService::class)->managerIds();
 
         foreach ($due as $i) {
             DB::table('delivery_issues')->where('id', $i->id)->update(['escalated_at' => now(), 'updated_at' => now()]);
             $order = Order::find($i->order_id);
             // A minus point only for someone who had the issue while at work; a shift that ended or a break just hands it on.
             $person = $i->assigned_to ? \App\Models\User::find($i->assigned_to) : null;
-            $atWork = $person && $person->is_active && ! $person->current_break_id && app(\App\Services\Work\WorkCalendar::class)->isWorking($person->id);
+            $atWork = $person && $this->atWork($person);
             $this->orders->note($order, 'rider', $atWork ? __('Issue not handled in time: sent to managers.') : __('Issue still open and its person is off work: sent to managers.'), null, ['delivery_issue_id' => $i->id]);
             if ($atWork) {
                 app(\App\Services\Points\PointHooks::class)->escalated($order, $person->id); // the person it was with, not always the order's

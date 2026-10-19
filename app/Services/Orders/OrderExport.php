@@ -2,6 +2,7 @@
 
 namespace App\Services\Orders;
 
+use App\Models\Order;
 use App\Models\OrderStatus;
 use App\Models\User;
 use App\Support\Permissions\Mask;
@@ -51,9 +52,8 @@ class OrderExport
                     $q->orWhereRaw('('.$stage['sql'].')', $stage['bind']);
                 }
             }))
-            // Same visibility as everywhere: someone who sees only their own orders exports only those.
-            ->when($user->permissionScope('orders.view') !== 'all', fn ($q) => $q->where(fn ($q) => $q->where('o.moderator_id', $user->id)
-                ->orWhere(fn ($q) => $q->whereNull('o.moderator_id')->whereIn('o.status_id', OrderStatus::idsFor(['new', 'record_verified'])))));
+            // Same visibility as everywhere (Order::scopeVisibleTo): own orders plus the unclaimed ones; no scope at all exports nothing.
+            ->whereIn('o.id', Order::query()->visibleTo($user)->select('orders.id'));
     }
 
     /** @return array{orders: int, total: float, cod: float} */

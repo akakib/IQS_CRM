@@ -25,8 +25,8 @@ class RoasReport
             ->selectRaw('spend_date, SUM(spend_usd) as usd, SUM(bdt_cost) as bdt, SUM(messages) as messages, SUM(reported_value) as reported, SUM(unfunded_usd) as unfunded')
             ->get()->keyBy(fn ($r) => substr((string) $r->spend_date, 0, 10));
 
-        $confirmedOrLater = implode(',', array_map('intval', OrderStatus::idsFor(['confirmed', 'ready_for_packaging', 'packed', 'ready_for_pickup', 'handed_over', 'in_transit', 'delivered', 'partial_delivered']))) ?: '0';
-        $delivered = implode(',', array_map('intval', OrderStatus::idsFor(['delivered', 'partial_delivered']))) ?: '0';
+        $confirmedOrLater = implode(',', array_map('intval', OrderStatus::groupIds('confirmed_or_later'))) ?: '0'; // a returned order was confirmed too
+        $delivered = implode(',', array_map('intval', OrderStatus::groupIds('delivered'))) ?: '0';
 
         $orders = DB::table('orders')->where('channel', '!=', 'b2b')->whereBetween('created_at', [$from.' 00:00:00', $to.' 23:59:59'])
             ->groupByRaw('DATE(created_at)')

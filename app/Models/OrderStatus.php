@@ -57,6 +57,29 @@ class OrderStatus extends Model
         return array_values(array_map(fn ($s) => $s['id'], array_filter(self::map(), fn ($s) => in_array($s['key'], $keys, true))));
     }
 
+    /**
+     * The status keys of one named group, so every report reads the same list:
+     * delivered = the customer kept it (all or part); packaging = in the shop; closed = nothing more happens.
+     *
+     * @return list<string>
+     */
+    public static function group(string $name): array
+    {
+        return match ($name) {
+            'delivered' => ['delivered', 'partial_delivered'],
+            'packaging' => ['ready_for_packaging', 'packed', 'ready_for_pickup'],
+            'with_courier' => ['handed_over', 'in_transit'],
+            'confirmed_or_later' => ['confirmed', 'ready_for_packaging', 'packed', 'ready_for_pickup', 'handed_over', 'in_transit', 'delivered', 'partial_delivered', 'returned'],
+            'closed' => ['delivered', 'partial_delivered', 'returned', 'cancelled'],
+        };
+    }
+
+    /** @return list<int> */
+    public static function groupIds(string $name): array
+    {
+        return self::idsFor(self::group($name));
+    }
+
     public static function forget(): void
     {
         Cache::forget('order_statuses:map');

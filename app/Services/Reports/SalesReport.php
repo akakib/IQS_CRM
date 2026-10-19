@@ -152,14 +152,25 @@ class SalesReport
             ->join('product_variants as v', 'v.id', '=', 'i.variant_id');
     }
 
-    /** Grams of a line: sold by weight (g) as is, else pieces times the item's size in grams. */
+    /** Grams of a line: sold by weight (g or kg) as is, else pieces times the item's size in grams. */
     private function gramsSql(): string
     {
-        return "COALESCE(SUM(CASE WHEN i.unit = 'g' THEN i.qty WHEN v.size_unit = 'g' THEN i.qty * v.size_qty ELSE 0 END), 0)";
+        return $this->amountSql('g');
     }
 
     private function mlSql(): string
     {
-        return "COALESCE(SUM(CASE WHEN i.unit <> 'g' AND v.size_unit = 'ml' THEN i.qty * v.size_qty ELSE 0 END), 0)";
+        return $this->amountSql('ml');
+    }
+
+    /** The CASE for one measure (g or ml) from Units::GRAMS_PER: a line sold in the other measure counts 0 here. */
+    private function amountSql(string $small): string
+    {
+        $big = $small === 'g' ? 'kg' : 'l';
+        $other = $small === 'g' ? "'ml', 'l'" : "'g', 'kg'";
+        $per = \App\Support\Units::GRAMS_PER[$big];
+
+        return "COALESCE(SUM(CASE WHEN i.unit = '{$small}' THEN i.qty WHEN i.unit = '{$big}' THEN i.qty * {$per} WHEN i.unit IN ({$other}) THEN 0"
+            ." WHEN v.size_unit = '{$small}' THEN i.qty * v.size_qty ELSE 0 END), 0)";
     }
 }

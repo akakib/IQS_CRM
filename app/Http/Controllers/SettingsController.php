@@ -17,6 +17,9 @@ class SettingsController extends Controller
     {
         $groups = [];
         foreach (config('settings') as $key => [$type, $default, $label, $group]) {
+            if ($group === 'Delivery') {
+                continue; // edited on Settings > Delivery charges, with the area rules
+            }
             $groups[$group][$key] = ['type' => $type, 'label' => __($label), 'value' => $this->settings->get($key)];
         }
 

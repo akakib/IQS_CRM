@@ -54,9 +54,11 @@ class ReturnReportController extends Controller
             ->selectRaw('name_snapshot as name, COUNT(DISTINCT order_id) as parcels, SUM(qty) as qty')->orderByDesc('parcels')->limit(50)->get();
 
         $rate = fn (int $ret, int $del) => $ret + $del ? round($ret * 100 / ($ret + $del)) : null;
-        $delByPerson = $delivered->countBy('moderator_id');
-        $byPerson = $orders->groupBy('moderator_id')->map(fn ($g, $id) => ['name' => $g->first()->person ?? __('Nobody'), 'returned' => $g->count(),
-            'delivered' => (int) ($delByPerson[$id] ?? 0), 'rate' => $rate($g->count(), (int) ($delByPerson[$id] ?? 0))])->sortByDesc('returned')->values();
+        // Per person: the same numbers as KPI and Scorecard (credited to who confirmed; a partial delivery counts as delivered).
+        $byPerson = collect(app(\App\Services\Reports\KpiScorecard::class)->build($from->toDateString(), $to->toDateString())['rows'])
+            ->filter(fn ($r) => $r['returned'] > 0 || $r['delivered'] > 0)
+            ->map(fn ($r) => ['name' => $r['name'], 'returned' => $r['returned'], 'delivered' => $r['delivered'], 'rate' => $r['return_rate']])
+            ->sortByDesc('returned')->values();
         $delByArea = $delivered->countBy('ship_district');
         $byArea = $orders->groupBy(fn ($o) => $o->ship_district ?: __('Unknown'))->map(fn ($g, $d) => ['name' => $d, 'returned' => $g->count(),
             'delivered' => (int) ($delByArea[$d] ?? 0), 'rate' => $rate($g->count(), (int) ($delByArea[$d] ?? 0))])->sortByDesc('returned')->values();

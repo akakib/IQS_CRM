@@ -32,6 +32,19 @@ class SalesReport
     }
 
     /**
+     * Orders at one step in the dates, each once; for one person: packed by the packer, confirmed by whoever confirmed
+     * it, delivered by the order's moderator. The dashboard tiles and the Telegram summaries read this, so they
+     * always agree with this report.
+     */
+    public function count(string $stage, string $from, string $to, ?int $userId = null): int
+    {
+        $col = ['packed' => 'packer_id', 'delivered' => 'moderator_id'][$stage] ?? 'confirmed_by';
+
+        return DB::query()->fromSub($this->stage($stage, $from, $to), 's')
+            ->when($userId, fn ($q) => $q->whereIn('s.order_id', DB::table('orders')->select('id')->where($col, $userId)))->count();
+    }
+
+    /**
      * Orders, money, grams and ml at each step. A step counts what happened in the dates (an order confirmed
      * today stays in today's Confirmed), so what became of them since is told beside it: now cancelled,
      * on hold, or returned. An order held and confirmed again counts once (its first confirm).

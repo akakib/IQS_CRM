@@ -21,7 +21,9 @@ class ReportController extends Controller
         // Who sees the whole shop: managers and owners (all orders). Everyone else sees their own numbers,
         // so each tile counts what its link opens. Waiting to be taken is the shared queue for everyone.
         $shop = $user->permissionScope('orders.view') === 'all';
-        $todayEvents = fn (string $key) => DB::table('order_events as e')->where('e.to_status_id', OrderStatus::idFor($key))->whereBetween('e.created_at', [$today.' 00:00:00', $today.' 23:59:59']);
+        // Each order once per step, as the Sales report counts it (a re-confirm after a hold or a repack is not two).
+        $sales = app(\App\Services\Reports\SalesReport::class);
+        $todayCount = fn (string $stage, ?int $userId = null) => $sales->count($stage, $today, $today, $userId);
         $tiles = [];
 
         if ($user->can('orders.view')) {
@@ -30,8 +32,8 @@ class ReportController extends Controller
                 : [__('My orders today'), DB::table('orders')->where('created_at', '>=', $today)->where('moderator_id', $user->id)->count(), route('orders.index', ['tab' => 'mine']), null];
             $tiles[] = [__('Waiting to be taken'), app(\App\Services\Orders\DeskService::class)->whereWaiting(DB::table('orders'))->count(), route('desk.index'), null];
             $tiles[] = $shop
-                ? [__('Confirmed today'), $todayEvents('confirmed')->count(), null, null]
-                : [__('I confirmed today'), $todayEvents('confirmed')->where('e.user_id', $user->id)->count(), null, null];
+                ? [__('Confirmed today'), $todayCount('confirmed'), null, null]
+                : [__('I confirmed today'), $todayCount('confirmed', $user->id), null, null];
             // The same issues as the list it opens: all of them for those who see all, else their own.
             $tiles[] = $user->can('orders.approve')
                 ? [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null]
@@ -43,9 +45,9 @@ class ReportController extends Controller
                 // The same number as "All" on the packaging page (repacks and new labels included, paused orders out).
                 $tiles[] = [__('To pack'), app(\App\Services\Packaging\PackingQueue::class)->counts($user)['all'], route('packaging.index'), null];
             }
-            $tiles[] = [__('Packed today'), $todayEvents('packed')->count(), route('packaging.index'), null];
+            $tiles[] = [__('Packed today'), $todayCount('packed'), route('packaging.index'), null];
             if (! $shop) {
-                $tiles[] = [__('I packed today'), $todayEvents('packed')->where('e.user_id', $user->id)->count(), route('packaging.index'), null];
+                $tiles[] = [__('I packed today'), $todayCount('packed', $user->id), route('packaging.index'), null];
                 $tiles[] = [__('Waiting for the rider'), DB::table('orders')->whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->count(), route('handover.index'), null];
                 $tiles[] = [__('Returns to receive'), DB::table('orders')->whereIn('status_id', OrderStatus::idsFor(\App\Services\Packaging\ReturnService::STATES))->whereNull('return_received_at')->count(), route('returns.index'), null]; // as the Returns page counts it
                 $notFound = DB::table('stock_issue_reports')->where('status', 'open')->count();
@@ -54,8 +56,8 @@ class ReportController extends Controller
         }
         if ($user->can('orders.view')) {
             $tiles[] = $shop
-                ? [__('Delivered today'), $todayEvents('delivered')->count(), null, null]
-                : [__('My orders delivered today'), $todayEvents('delivered')->join('orders as o', 'o.id', '=', 'e.order_id')->where('o.moderator_id', $user->id)->count(), null, null];
+                ? [__('Delivered today'), $todayCount('delivered'), null, null]
+                : [__('My orders delivered today'), $todayCount('delivered', $user->id), null, null];
         }
         if ($user->can('points.manage')) {
             $open = DB::table('integrity_flags')->where('status', 'open')->count() + DB::table('point_ledger')->where('dispute_status', 'open')->count();

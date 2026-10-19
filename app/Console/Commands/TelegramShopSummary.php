@@ -23,7 +23,7 @@ class TelegramShopSummary extends Command
 
         $text = '🧾 <b>'.__('End of day :d', ['d' => today()->format('d M')])."</b>\n"
             .__('Batches: :n', ['n' => DB::table('batches')->whereDate('released_at', today())->count()])."\n"
-            .__('Packed: :n', ['n' => $count('packed')])."\n"
+            .__('Packed: :n', ['n' => DB::table('orders')->whereDate('packed_at', today())->count()])."\n"
             .__('Handed over: :n', ['n' => $count('handed_over')])."\n"
             .__('Still in the shop: :n', ['n' => $waiting])
             .($missing ? "\n⚠️ ".__('Missing-item reports open: :n', ['n' => $missing]) : '');

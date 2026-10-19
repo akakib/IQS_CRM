@@ -25,12 +25,12 @@ class OwnerSummary extends Command
 
         $text = '📊 <b>'.__('IQS, :d', ['d' => date('d M', strtotime($day))])."</b>\n"
             .__('New orders: :n', ['n' => DB::table('orders')->whereBetween('created_at', $range)->count()])."\n"
-            .__('Confirmed: :c · Cancelled: :x', ['c' => $count('confirmed'), 'x' => $count('cancelled')])."\n"
+            .__('Confirmed: :c · Cancelled: :x', ['c' => app(\App\Services\Reports\SalesReport::class)->count('confirmed', $day, $day), 'x' => $count('cancelled')])."\n"
             .__('Delivered: :d · Returned: :r', ['d' => $t['delivered'], 'r' => $t['orders'] - $t['delivered']])."\n"
             .__('Revenue: :r', ['r' => $tk($t['revenue'])])."\n"
             .__('Ad cost: :a', ['a' => $tk($t['ad_cost'] ?? 0)])."\n"
             .__('Profit after ads: :p', ['p' => $tk($t['profit'])])."\n"
-            .__('Still waiting to be taken: :n', ['n' => DB::table('orders')->whereNull('moderator_id')->where('status_id', OrderStatus::idFor('new'))->count()]);
+            .__('Still waiting to be taken: :n', ['n' => app(\App\Services\Orders\DeskService::class)->whereWaiting(DB::table('orders'))->count()]);
 
         $issues = DB::table('delivery_issues')->whereNull('resolved_at')->count();
         $flags = DB::table('integrity_flags')->where('status', 'open')->count();

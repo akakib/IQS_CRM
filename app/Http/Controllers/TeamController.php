@@ -27,10 +27,11 @@ class TeamController extends Controller
     {
         $s = fn (string $key) => OrderStatus::idFor($key);
         $waitingIds = [$s('new'), $s('record_verified'), $s('no_answer')];
+        $desk = app(\App\Services\Orders\DeskService::class);
         $now = now();
 
-        // Unassigned by age.
-        $age = (array) DB::table('orders')->whereNull('moderator_id')->whereIn('status_id', $waitingIds)->selectRaw(
+        // Unassigned by age: the same "waiting to be taken" as the Desk, Orders and dashboard.
+        $age = (array) $desk->whereWaiting(DB::table('orders'))->selectRaw(
             'COUNT(*) as total,
              SUM(CASE WHEN COALESCE(queue_since, created_at) > ? THEN 1 ELSE 0 END) as fresh,
              SUM(CASE WHEN COALESCE(queue_since, created_at) <= ? AND COALESCE(queue_since, created_at) > ? THEN 1 ELSE 0 END) as mid,
@@ -106,7 +107,7 @@ class TeamController extends Controller
 
         $orders = DB::table('orders as o')->leftJoin('users as m', 'm.id', '=', 'o.moderator_id');
         $since = 'COALESCE(o.queue_since, o.created_at)';
-        $waiting = fn ($q) => $q->whereNull('o.moderator_id')->whereIn('o.status_id', [$s('new'), $s('record_verified'), $s('no_answer')]);
+        $waiting = fn ($q) => app(\App\Services\Orders\DeskService::class)->whereWaiting($q, 'o');
         match ($box) {
             'waiting' => $waiting($orders),
             'fresh' => $waiting($orders)->whereRaw("{$since} > ?", [$now->copy()->subMinutes(5)]),

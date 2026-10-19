@@ -27,11 +27,11 @@ class ReturnController extends Controller
         $list = ListState::from($request, ['id'], ['tab' => ['waiting', 'received']], 'desc');
         $tab = $list->filter('tab') ?? 'waiting';
         $q = trim($list->search);
-        $digits = preg_replace('/\D/', '', $q);
+        $digits = \App\Support\Phone::searchPrefix($q);
         $states = OrderStatus::idsFor(ReturnService::STATES);
 
         $base = DB::table('orders as o')->whereIn('o.status_id', $states)
-            ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('o.order_no', strtoupper($q))->when($digits, fn ($d) => $d->orWhere('o.ship_phone', 'like', $digits.'%'))));
+            ->when($q !== '', fn ($w) => $w->where(fn ($s) => \App\Support\Phone::orWhereOrder($s->where('o.order_no', strtoupper($q)), $digits)));
         $rows = (clone $base)->when($tab === 'waiting', fn ($w) => $w->whereNull('o.return_received_at'), fn ($w) => $w->whereNotNull('o.return_received_at'))
             ->leftJoin('users as u', 'u.id', '=', 'o.return_received_by')->leftJoin('shipments as s', 's.id', '=', 'o.active_shipment_id')
             ->orderByDesc($tab === 'waiting' ? 'o.id' : 'o.return_received_at')

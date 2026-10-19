@@ -23,13 +23,13 @@ class CustomerController extends Controller
     public function index(Request $request): View
     {
         $list = ListState::from($request, ['created_at', 'name', 'orders_count'], ['risk' => ['normal', 'watch', 'blocked']], 'desc');
-        $digits = preg_replace('/\D/', '', $list->search);
+        $digits = (string) Phone::searchPrefix($list->search);
 
         // A number search hits the unique phone index; a name search is a prefix match.
         $customers = Customer::query()
             ->select(['id', 'name', 'primary_phone', 'risk_level', 'orders_count', 'delivered_count', 'returned_count', 'created_at'])
             ->when($list->search !== '' && strlen($digits) >= 4, fn ($q) => $q->whereIn('id', DB::table('customer_phones')->select('customer_id')
-                ->where('phone', 'like', (Phone::normalize($digits) ?? (str_starts_with($digits, '0') ? $digits : '0'.ltrim($digits, '0'))).'%')))
+                ->where('phone', 'like', $digits.'%')))
             ->when($list->search !== '' && strlen($digits) < 4, fn ($q) => $q->where('name', 'like', $list->search.'%'))
             ->when($list->filter('risk'), fn ($q, $r) => $q->where('risk_level', $r))
             ->tap(fn ($q) => $list->applySort($q))

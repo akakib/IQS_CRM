@@ -37,8 +37,8 @@ class PaymentController extends Controller
             ->when($list->filter('method'), fn ($w, $m) => $w->where('p.method_id', $m))
             ->when($list->filter('from'), fn ($w, $d) => $w->where('p.received_at', '>=', $d.' 00:00:00'))
             ->when($list->filter('to'), fn ($w, $d) => $w->where('p.received_at', '<=', $d.' 23:59:59'))
-            ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('p.transaction_id', $q)->orWhere('o.order_no', strtoupper($q))
-                ->orWhere('o.ship_phone', 'like', preg_replace('/\D/', '', $q).'%')->orWhere('p.sender_number', 'like', preg_replace('/\D/', '', $q).'%')));
+            ->when($q !== '', fn ($w) => $w->where(fn ($s) => \App\Support\Phone::orWhereOrder($s->where('p.transaction_id', $q)->orWhere('o.order_no', strtoupper($q)), $prefix = \App\Support\Phone::searchPrefix($q))
+                ->when($prefix, fn ($d) => $d->orWhere('p.sender_number', 'like', $prefix.'%'))));
 
         $summary = (clone $base)->selectRaw('COUNT(*) as n, COALESCE(SUM(p.amount), 0) as total')->first();
         $payments = (clone $base)->join('payment_methods as m', 'm.id', '=', 'p.method_id')->leftJoin('users as u', 'u.id', '=', 'p.created_by')

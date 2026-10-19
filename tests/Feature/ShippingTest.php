@@ -68,6 +68,10 @@ class ShippingTest extends TestCase
 
         $this->get('/shipping')->assertOk()->assertSee($a->order_no)->assertSee('Test mode');
         $this->get('/shipping?q='.$a->order_no)->assertOk()->assertSee($a->order_no)->assertDontSee($b->order_no); // one search for both lists
+        $this->get('/shipping?q='.urlencode('+880 1712'))->assertOk()->assertSee($a->order_no)->assertDontSee($b->order_no); // as people paste it
+        $this->get('/shipping?q='.urlencode('০১৮১২'))->assertOk()->assertSee($b->order_no)->assertDontSee($a->order_no); // Bangla digits
+        $b->forceFill(['ship_alt_phone' => '01999999999'])->save();
+        $this->get('/shipping?q=01999')->assertOk()->assertSee($b->order_no)->assertDontSee($a->order_no); // the second phone too
         $this->post('/shipping/book', ['ids' => [$a->id, $b->id]])
             // Stays on Courier booking; the labels open in their own tab from the banner.
             ->assertRedirect(route('shipping.index').'#booked')

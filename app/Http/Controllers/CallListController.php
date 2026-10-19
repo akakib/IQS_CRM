@@ -212,7 +212,8 @@ class CallListController extends Controller
             ->when($ranged, fn ($q) => $q->whereIn('i.id', $this->callsInRange($list, $f)->select('cc.call_list_item_id')))
             ->when($f['q'] !== '', function ($q) use ($f) {
                 $phone = \App\Support\Phone::normalize($f['q']);
-                $q->where(fn ($w) => $phone ? $w->where('i.phone', $phone) : $w->where('i.name', 'like', '%'.$f['q'].'%')->orWhere('i.phone', 'like', '%'.preg_replace('/\D/', '', $f['q']).'%'));
+                $prefix = \App\Support\Phone::searchPrefix($f['q']);
+                $q->where(fn ($w) => $phone ? $w->where('i.phone', $phone) : $w->where('i.name', 'like', '%'.$f['q'].'%')->when($prefix, fn ($d) => $d->orWhere('i.phone', 'like', $prefix.'%')));
             })
             ->when($f['state'] === 'not_called', fn ($q) => $q->where('i.attempts', 0)->where('i.state', '!=', 'in_hand'))
             ->when(in_array($f['state'], ['in_hand', 'later', 'done'], true), fn ($q) => $q->where('i.state', $f['state']))
@@ -441,7 +442,8 @@ class CallListController extends Controller
         $calls = $base()->join('call_lists as l', 'l.id', '=', 'i.call_list_id')->leftJoin('orders as o', 'o.id', '=', 'i.order_id')
             ->when($f['q'] !== '', function ($q) use ($f) {
                 $phone = \App\Support\Phone::normalize($f['q']);
-                $q->where(fn ($w) => $phone ? $w->where('i.phone', $phone) : $w->where('i.name', 'like', '%'.$f['q'].'%')->orWhere('i.phone', 'like', '%'.preg_replace('/\D/', '', $f['q']).'%'));
+                $prefix = \App\Support\Phone::searchPrefix($f['q']);
+                $q->where(fn ($w) => $phone ? $w->where('i.phone', $phone) : $w->where('i.name', 'like', '%'.$f['q'].'%')->when($prefix, fn ($d) => $d->orWhere('i.phone', 'like', $prefix.'%')));
             })
             ->when($f['day'] === 'today', fn ($q) => $q->where('cc.started_at', '>=', today()))
             ->when($f['day'] === 'yesterday', fn ($q) => $q->whereBetween('cc.started_at', [today()->subDay(), today()]))

@@ -27,6 +27,27 @@ final class Phone
         return preg_match('/^01[3-9]\d{8}$/', $digits) ? $digits : null;
     }
 
+    /**
+     * The start of a number as someone typed it, ready for a LIKE search: "+880 17", "88017", "১৭১২", "017 12" all
+     * become "0171…"; null when there is no digit. Used by every list that searches orders by phone.
+     */
+    public static function searchPrefix(?string $input): ?string
+    {
+        $digits = preg_replace('/\D/', '', self::englishDigits((string) $input));
+        if ($digits === '') {
+            return null;
+        }
+        $digits = preg_replace('/^(?:00|0)?880?(?=0?1[3-9])/', '', $digits);
+
+        return preg_match('/^1[3-9]/', $digits) ? '0'.$digits : $digits;
+    }
+
+    /** OR-conditions for an order's phone or second phone starting with what was typed (the orders table alias). */
+    public static function orWhereOrder(object $w, ?string $prefix, string $alias = 'o'): object
+    {
+        return $prefix === null ? $w : $w->orWhere("{$alias}.ship_phone", 'like', $prefix.'%')->orWhere("{$alias}.ship_alt_phone", 'like', $prefix.'%');
+    }
+
     public static function isValid(?string $input): bool
     {
         return self::normalize($input) !== null;

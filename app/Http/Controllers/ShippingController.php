@@ -18,10 +18,10 @@ class ShippingController extends Controller
     {
         $list = \App\Support\Lists\ListState::from($request, ['id'], [], 'asc');
         $q = trim($list->search);
-        $digits = preg_replace('/\D/', '', $q);
+        $digits = \App\Support\Phone::searchPrefix($q);
         // One search for both lists: order no, phone, or area.
         $find = fn ($w) => $w->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('order_no', strtoupper($q))->orWhere('ship_district', 'like', '%'.$q.'%')
-            ->orWhere('ship_thana', 'like', '%'.$q.'%')->when($digits, fn ($d) => $d->orWhere('ship_phone', 'like', $digits.'%'))));
+            ->orWhere('ship_thana', 'like', '%'.$q.'%')->tap(fn ($d) => \App\Support\Phone::orWhereOrder($d, $digits, 'orders'))));
         $orders = Order::query()
             ->select(['id', 'order_no', 'channel', 'status_id', 'ship_name', 'ship_thana', 'ship_district', 'cod_amount', 'total_weight_g', 'confirmed_at', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address'])
             ->where('status_id', OrderStatus::idFor('confirmed'))->tap($find)

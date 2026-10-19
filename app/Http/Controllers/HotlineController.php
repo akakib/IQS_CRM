@@ -81,14 +81,14 @@ class HotlineController extends Controller
 
         $list = \App\Support\Lists\ListState::from($request, ['sla_due_at'], ['show' => ['all', 'overdue', 'mine'], 'person' => 'int'], 'asc');
         $q = trim($list->search);
-        $digits = preg_replace('/\D/', '', $q);
+        $digits = \App\Support\Phone::searchPrefix($q);
         $issues = DB::table('delivery_issues as i')->join('orders as o', 'o.id', '=', 'i.order_id')->leftJoin('users as u', 'u.id', '=', 'i.assigned_to')
             ->whereNull('i.resolved_at')
             ->leftJoin('users as om', 'om.id', '=', 'o.moderator_id')
             ->when($list->filter('show') === 'mine', fn ($w) => $w->where('i.assigned_to', $user->id))
             ->when($list->filter('show') === 'overdue', fn ($w) => $w->where('i.sla_due_at', '<', now()))
             ->when($all && $list->filter('person'), fn ($w, $p) => $w->where('i.assigned_to', $p))
-            ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('o.order_no', strtoupper($q))->when($digits, fn ($d) => $d->orWhere('o.ship_phone', 'like', $digits.'%'))
+            ->when($q !== '', fn ($w) => $w->where(fn ($s) => \App\Support\Phone::orWhereOrder($s->where('o.order_no', strtoupper($q)), $digits)
                 // A CN or tracking code (any parcel of the order, also an older one).
                 ->when(strlen((string) $digits) >= 5 || preg_match('/^[A-Z]{2,}\w{6,}$/i', $q), fn ($d) => $d->orWhereIn('i.order_id', DB::table('shipments')->select('order_id')->where('consignment_id', $digits ?: $q)->orWhere('tracking_code', strtoupper($q))))))
             ->orderBy('i.sla_due_at')

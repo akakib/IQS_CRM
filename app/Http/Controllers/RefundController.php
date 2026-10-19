@@ -23,15 +23,15 @@ class RefundController extends Controller
         $list = ListState::from($request, ['updated_at', 'refund_due'], ['tab' => ['owed', 'done']], 'desc');
         $tab = $list->filter('tab') ?? 'owed';
         $q = trim($list->search);
-        $digits = preg_replace('/\D/', '', $q);
+        $digits = \App\Support\Phone::searchPrefix($q);
 
         $owed = DB::table('orders as o')->where('o.refund_due', '>', 0)
-            ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('o.order_no', strtoupper($q))->when($digits, fn ($d) => $d->orWhere('o.ship_phone', 'like', $digits.'%'))))
+            ->when($q !== '', fn ($w) => $w->where(fn ($s) => \App\Support\Phone::orWhereOrder($s->where('o.order_no', strtoupper($q)), $digits)))
             ->orderByDesc('o.updated_at')
             ->select(['o.id', 'o.order_no', 'o.ship_name', 'o.ship_phone', 'o.status_id', 'o.refund_due', 'o.advance_verified', 'o.customer_id', 'o.updated_at']);
         $done = DB::table('order_payments as p')->join('orders as o', 'o.id', '=', 'p.order_id')->join('payment_methods as m', 'm.id', '=', 'p.method_id')
             ->leftJoin('users as u', 'u.id', '=', 'p.created_by')->where('p.payment_type', 'refund')
-            ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('o.order_no', strtoupper($q))->orWhere('p.transaction_id', $q)->when($digits, fn ($d) => $d->orWhere('o.ship_phone', 'like', $digits.'%'))))
+            ->when($q !== '', fn ($w) => $w->where(fn ($s) => \App\Support\Phone::orWhereOrder($s->where('o.order_no', strtoupper($q))->orWhere('p.transaction_id', $q), $digits)))
             ->orderByDesc('p.id')
             ->select(['p.id', 'p.amount', 'p.transaction_id', 'p.note', 'p.created_at', 'm.system_key', 'm.name as method', 'u.name as person', 'o.id as order_id', 'o.order_no', 'o.ship_name', 'o.ship_phone']);
 

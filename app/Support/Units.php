@@ -50,9 +50,8 @@ class Units
      */
     public static function sizeFromName(?string ...$names): ?array
     {
-        $bn = ['০' => '0', '১' => '1', '২' => '2', '৩' => '3', '৪' => '4', '৫' => '5', '৬' => '6', '৭' => '7', '৮' => '8', '৯' => '9'];
         foreach ($names as $name) {
-            $text = strtr((string) $name, $bn);
+            $text = Phone::englishDigits((string) $name);
             if (preg_match('/(\d+(?:[.,]\d+)?)\s*(kgs?|kilo|gms?|grams?|g|ml|ltrs?|litres?|liters?|l|কেজি|গ্রাম|মিলি|লিটার)(?![a-z])/iu', $text, $m)) {
                 $qty = (float) str_replace(',', '.', $m[1]);
                 $unit = mb_strtolower($m[2]);

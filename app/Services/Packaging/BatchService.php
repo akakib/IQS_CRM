@@ -22,8 +22,9 @@ class BatchService
     /** @param list<int>|null $orderIds null = every booked order not yet in a batch */
     public function release(?array $orderIds, User $by): ?int
     {
+        $hide = app(PackagingPause::class)->visibleSql('orders'); // paused: what came since stays out of the shop's pick list
         $ids = Order::where('status_id', OrderStatus::idFor('ready_for_packaging'))->whereNull('batch_id')
-            ->when($orderIds !== null, fn ($q) => $q->whereIn('id', $orderIds))->pluck('id');
+            ->when($orderIds !== null, fn ($q) => $q->whereIn('id', $orderIds))->when($hide !== '', fn ($q) => $q->whereRaw($hide))->pluck('id');
         if ($ids->isEmpty()) {
             return null;
         }

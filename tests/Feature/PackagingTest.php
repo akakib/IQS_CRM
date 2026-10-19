@@ -100,6 +100,16 @@ class PackagingTest extends TestCase
         $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSee($before->order_no)->assertDontSee($during->order_no)->assertDontSee('Resume packaging')->assertDontSee('orders waiting'); // (the manager's flash message rides this test's shared session)
         $this->actingAs($this->desk)->get('/packaging')->assertSee('Packaging paused')->assertSee('1 order waiting')->assertSee($during->order_no);
         $this->actingAs($this->packer)->post(route('packaging.pause'))->assertForbidden();
+        // Nor by ID, the A4 sheet, the shop pick list or the shop Telegram digest.
+        $this->getJson('/packaging/orders/'.$during->id)->assertNotFound();
+        $this->getJson('/packaging/orders/'.$before->id)->assertOk();
+        $this->get(route('packaging.sheet'))->assertSee($before->order_no)->assertDontSee($during->order_no);
+        $this->actingAs($this->desk)->post('/packaging/release')->assertRedirect();
+        $this->assertNull($during->fresh()->batch_id);
+        $this->assertNotNull($before->fresh()->batch_id);
+        TelegramService::$sent = [];
+        \Illuminate\Support\Facades\Artisan::call('telegram:shop-summary');
+        $this->assertStringContainsString('Still in the shop: 1', TelegramService::$sent[0]['text']);
 
         // Resume: it reaches the packer now, and the packing clock starts now.
         $this->travel(30)->minutes();
@@ -176,6 +186,21 @@ class PackagingTest extends TestCase
         $this->assertStringContainsString('[A1] Nuts', $msg['text']);
         $this->assertStringNotContainsString('01712345678', $msg['text']);
         $this->assertStringNotContainsString('Karim', $msg['text']);
+    }
+
+    public function test_a_packer_holds_only_the_order_in_their_hands(): void
+    {
+        $order = $this->booked('01712345641', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $reason = DB::table('status_reasons')->where('reason_type', 'hold')->value('id');
+        $this->actingAs($this->packer)->post("/packaging/orders/{$order->id}/hold", ['reason_id' => $reason])->assertSessionHasErrors('order');
+        $this->assertSame('ready_for_packaging', $this->key($order->fresh()));
+
+        $confirmed = app(OrderService::class)->create(['channel' => 'messenger', 'phone' => '01712345642', 'name' => 'Karim', 'address_line' => 'Road 1', 'items' => [['variant_id' => $this->dates->id, 'qty' => 1]]], $this->desk);
+        $this->post("/packaging/orders/{$confirmed->id}/hold", ['reason_id' => $reason])->assertSessionHasErrors('order'); // not in packaging at all
+
+        $this->postJson('/packaging/scan', ['code' => $this->label($order)])->assertJson(['ok' => true]);
+        $this->post("/packaging/orders/{$order->id}/hold", ['reason_id' => $reason])->assertSessionHas('success');
+        $this->assertSame('hold', $this->key($order->fresh()));
     }
 
     public function test_scan_to_pack_then_edit_marks_red_and_repack_with_new_label_clears_it(): void

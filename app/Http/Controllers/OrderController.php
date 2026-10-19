@@ -348,6 +348,7 @@ class OrderController extends Controller
     public function decideWaiver(Order $order, Request $request): RedirectResponse
     {
         $data = $request->validate(['decision' => ['required', 'in:allow,refuse']]);
+        abort_if((int) $order->advance_waiver_requested_by === $request->user()->id, 403, __('Your own request is decided by another manager.'));
         $this->orders->decideAdvanceWaiver($order, $request->user(), $data['decision'] === 'allow');
 
         return back()->with('success', $data['decision'] === 'allow' ? __(':no goes on without advance.', ['no' => $order->order_no]) : __(':no keeps waiting for the advance.', ['no' => $order->order_no]));

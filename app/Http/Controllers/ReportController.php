@@ -40,7 +40,8 @@ class ReportController extends Controller
         if ($user->can('packaging.view')) {
             // The packer's day: what is left to pack, what waits for the rider, returns to take in, items not found.
             if (! $shop) {
-                $hide = app(\App\Services\Packaging\PackagingPause::class)->visibleSql('orders'); // paused: what came since is not counted
+                $pause = app(\App\Services\Packaging\PackagingPause::class);
+                $hide = $pause->canControl($user) ? '' : $pause->visibleSql('orders'); // paused: what came since is not counted for the packers
                 $tiles[] = [__('To pack'), DB::table('orders')->where('status_id', OrderStatus::idFor('ready_for_packaging'))->when($hide !== '', fn ($q) => $q->whereRaw($hide))->count(), route('packaging.index'), null];
             }
             $tiles[] = [__('Packed today'), $todayEvents('packed')->count(), route('packaging.index'), null];

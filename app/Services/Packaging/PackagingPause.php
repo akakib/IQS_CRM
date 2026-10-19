@@ -44,9 +44,21 @@ class PackagingPause
 
     public function heldCount(): int
     {
+        return $this->active() ? $this->held()->count() : 0;
+    }
+
+    /** True when this order is one the packers must not see yet. */
+    public function hidden(\App\Models\Order $order): bool
+    {
         $p = $this->active();
 
-        return $p ? DB::table('orders')->where('status_id', OrderStatus::idFor('ready_for_packaging'))->where('packaging_sent_at', '>=', $p->paused_at)->count() : 0;
+        return $p && (int) $order->status_id === OrderStatus::idFor('ready_for_packaging') && $order->packaging_sent_at && $order->packaging_sent_at->gte($p->paused_at);
+    }
+
+    /** The orders booked since the pause began (only meaningful while paused). */
+    private function held(): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('orders')->where('status_id', OrderStatus::idFor('ready_for_packaging'))->where('packaging_sent_at', '>=', $this->active()->paused_at);
     }
 
     public function pause(User $by): void
@@ -66,8 +78,7 @@ class PackagingPause
         }
 
         return DB::transaction(function () use ($p, $by) {
-            $held = DB::table('orders')->where('status_id', OrderStatus::idFor('ready_for_packaging'))->where('packaging_sent_at', '>=', $p->paused_at)
-                ->update(['packaging_sent_at' => now()]);
+            $held = $this->held()->update(['packaging_sent_at' => now()]);
             DB::table('packaging_pauses')->where('id', $p->id)->update(['resumed_by' => $by->id, 'resumed_at' => now(), 'held' => $held]);
             $this->loaded = false;
 

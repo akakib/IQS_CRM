@@ -223,7 +223,11 @@ scan of a label marks it applied. Edits while packing need no manager (edit_poli
 ready_for_pickup); OrderEditor sends an urgent order_needs_repack telling the packer: repack / replace the label /
 print the new label, with the old and new label IDs. Scanning an old label names the new one.
 Printing from the packaging list: Print on a row (one order, again if needed), tick rows + Print selected (several,
-one print_run so the A4 sheet matches), or Print new labels (every label not printed yet). All go through packaging.labels.
+one print_run so the A4 sheet matches), or Print new labels (every label not printed yet). Every print, including
+Courier booking's shipping.labels, goes through `Packaging/LabelPrinter` (current label first, one print_run).
+The pause hides paused orders everywhere the packers look: list, JSON preview, A4 sheet, batch pick list, shop
+Telegram digest and end-of-day summary. A packer may hold only the order they scanned (packaging group only);
+hold-limit and advance-waiver requests are never decided by the person who asked.
 
 **Upsell** (`Reports/UpsellReport`, `/upsell`): on a website order, while it is verified by call (New, Record verified,
 No answer at the time of the edit), items added or more of one and the total went up; it counts for whoever made the

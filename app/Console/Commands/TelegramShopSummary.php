@@ -17,7 +17,8 @@ class TelegramShopSummary extends Command
     public function handle(TelegramService $telegram): int
     {
         $count = fn (string $key) => DB::table('order_events')->where('to_status_id', OrderStatus::idFor($key))->whereDate('created_at', today())->count();
-        $waiting = DB::table('orders')->whereIn('status_id', OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']))->count();
+        $hide = app(\App\Services\Packaging\PackagingPause::class)->visibleSql('orders'); // paused orders are not in the shop yet
+        $waiting = DB::table('orders')->whereIn('status_id', OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']))->when($hide !== '', fn ($q) => $q->whereRaw($hide))->count();
         $missing = DB::table('stock_issue_reports')->where('status', 'open')->count();
 
         $text = '🧾 <b>'.__('End of day :d', ['d' => today()->format('d M')])."</b>\n"

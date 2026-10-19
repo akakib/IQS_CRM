@@ -53,7 +53,9 @@ class DeskTick extends Command
         }
         Cache::forever('desk:digest_at', now()->toIso8601String());
 
-        $reached = DB::table('orders')->where('packaging_sent_at', '>', $since)->count();
+        // Paused: the orders booked since are not in the shop's list yet, so the shop group does not hear of them.
+        $hide = app(\App\Services\Packaging\PackagingPause::class)->visibleSql('orders');
+        $reached = DB::table('orders')->where('packaging_sent_at', '>', $since)->when($hide !== '', fn ($q) => $q->whereRaw($hide))->count();
         $lines = [];
         $event = fn (string $key) => DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')
             ->where('e.created_at', '>', $since)->where('e.to_status_id', OrderStatus::idFor($key))->whereNotNull('o.packaging_sent_at');
@@ -73,7 +75,7 @@ class DeskTick extends Command
         if ($reached === 0 && $lines === []) {
             return;
         }
-        $waiting = DB::table('orders')->where('status_id', OrderStatus::idFor('ready_for_packaging'))->count();
+        $waiting = DB::table('orders')->where('status_id', OrderStatus::idFor('ready_for_packaging'))->when($hide !== '', fn ($q) => $q->whereRaw($hide))->count();
         $telegram->send(config('services.telegram.shop_chat_id'),
             '📦 '.__(':n new for packaging · :w waiting in total', ['n' => $reached, 'w' => $waiting]).($lines ? "\n".implode("\n", $lines) : ''));
     }

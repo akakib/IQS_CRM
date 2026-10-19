@@ -82,8 +82,10 @@ class ShippingTest extends TestCase
             $this->assertDatabaseHas('shipment_labels', ['order_id' => $o->id, 'barcode' => $o->order_no.'-1', 'voided_at' => null]);
         }
 
-        $this->get('/shipping/labels?orders='.$a->order_no)->assertOk()->assertSee($a->order_no.'-1')->assertSee('<svg', false);
-        $this->assertNotNull(DB::table('shipment_labels')->where('order_id', $a->id)->value('printed_at'));
+        $this->get('/shipping/labels?orders='.$a->order_no)->assertOk()->assertSee($a->order_no.'-1')->assertSee('<svg', false)->assertSee('Packing sheet (A4)');
+        $label = DB::table('shipment_labels')->where('order_id', $a->id)->first();
+        $this->assertNotNull($label->printed_at);
+        $this->assertNotNull($label->print_run); // same print path as Packaging: the A4 sheet lists it
     }
 
     public function test_booking_twice_does_not_create_a_second_parcel(): void

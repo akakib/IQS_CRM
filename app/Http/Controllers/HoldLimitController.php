@@ -49,6 +49,7 @@ class HoldLimitController extends Controller
     public function decide(Request $request, int $id): RedirectResponse
     {
         $row = DB::table('hold_limit_requests')->where('id', $id)->where('status', 'pending')->first() ?? abort(404);
+        abort_if((int) $row->user_id === $request->user()->id, 403, __('Your own request is decided by another manager.'));
         $data = $request->validate(['approve' => ['required', 'boolean'], 'new_limit' => ['required_if:approve,1', 'nullable', 'integer', 'min:1', 'max:50']]);
         $person = User::findOrFail($row->user_id);
         $approve = (bool) $data['approve'];

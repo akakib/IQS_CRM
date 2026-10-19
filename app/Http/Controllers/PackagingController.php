@@ -8,7 +8,8 @@ use App\Models\StatusReason;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\Packaging\BatchService;
-use App\Services\Courier\BookingService;
+use App\Services\Packaging\LabelPrinter;
+use App\Services\Packaging\PackagingPause;
 use App\Services\Packaging\ScanService;
 use App\Services\Packaging\StockIssueService;
 use Illuminate\Http\JsonResponse;
@@ -162,8 +163,10 @@ class PackagingController extends Controller
      * Tap a card in the queue: what is in the order (items and shelves) and
      * which label to scan. Looking does not claim it; scanning the label does.
      */
-    public function preview(Order $order, ScanService $scans): JsonResponse
+    public function preview(Order $order, Request $request, ScanService $scans, PackagingPause $pause): JsonResponse
     {
+        abort_unless(in_array($order->status_id, LabelPrinter::queueStatuses(), true), 404);
+        abort_if(! $pause->canControl($request->user()) && $pause->hidden($order), 404);
         $label = DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')->first(['barcode', 'printed_at', 'order_version']);
         $repack = $order->packMark() === 'repack';
 
@@ -199,41 +202,15 @@ class PackagingController extends Controller
      * Print labels: the orders picked in the list (?orders=1,2,3, one or many, printed before or not), or every
      * label not printed yet. A picked order that changed since its label gets the new label first.
      */
-    public function labels(Request $request, BookingService $booking): View|RedirectResponse
+    public function labels(Request $request, LabelPrinter $printer): View|RedirectResponse
     {
-        $rfp = OrderStatus::idFor('ready_for_packaging');
-        $inQueue = [$rfp, ...OrderStatus::idsFor(['packed', 'ready_for_pickup'])];
-        $picked = collect(explode(',', (string) $request->query('orders')))->map(fn ($v) => (int) $v)->filter()->unique()->take(100)->values();
-        if ($picked->isNotEmpty()) {
-            $pause = app(\App\Services\Packaging\PackagingPause::class);
-            $hide = $pause->canControl($request->user()) ? '' : $pause->visibleSql('orders');
-            $found = Order::whereIn('id', $picked)->whereIn('status_id', $inQueue)->whereNotNull('active_shipment_id')
-                ->when($hide !== '', fn ($q) => $q->whereRaw($hide))->get();
-            foreach ($found->filter(fn ($o) => (int) $o->label_version !== (int) $o->current_version) as $o) {
-                $booking->issueLabel($o, $o->active_shipment_id, null, __('Order edited (version :v)', ['v' => $o->current_version]));
-            }
-            $ids = $picked->intersect($found->pluck('id'))->values();
-        } else {
-            $ids = DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')
-                ->whereNull('l.voided_at')->whereNull('l.printed_at')->whereIn('o.status_id', $inQueue)
-                ->orderBy('o.packaging_sent_at')->limit(100)->pluck('o.id');
-        }
-        if ($ids->isEmpty()) {
+        $picked = collect(explode(',', (string) $request->query('orders')))->filter();
+        $print = $picked->isNotEmpty() ? $printer->picked($picked, $request->user()) : $printer->fresh($request->user());
+        if (! $print) {
             return redirect()->route('packaging.index')->with('error', $picked->isNotEmpty() ? __('These orders have no label to print.') : __('No new label to print.'));
         }
 
-        $orders = Order::whereIn('id', $ids)->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,size_qty,size_unit')->get();
-        $labels = DB::table('shipment_labels as l')->join('shipments as s', 's.id', '=', 'l.shipment_id')
-            ->whereIn('l.order_id', $ids)->whereNull('l.voided_at')
-            ->get(['l.order_id', 'l.barcode', 'l.cod_on_label', 's.consignment_id', 's.courier'])->keyBy('order_id');
-        // One print run: the A4 packing sheet lists these same orders, in this order.
-        $run = now()->format('ymdHis').substr((string) $request->user()->id, -4);
-        DB::table('shipment_labels')->whereIn('order_id', $ids)->whereNull('voided_at')
-            ->when($picked->isEmpty(), fn ($q) => $q->whereNull('printed_at'))
-            ->update(['printed_at' => now(), 'printed_by' => $request->user()->id, 'print_run' => $run]);
-        $orders = $orders->sortBy(fn ($o) => $ids->search($o->id))->values();
-
-        return view('shipping.labels', ['orders' => $orders, 'labels' => $labels, 'run' => $run]);
+        return view('shipping.labels', $print);
     }
 
     /**
@@ -243,11 +220,12 @@ class PackagingController extends Controller
     public function sheet(Request $request): View
     {
         $run = preg_match('/^\d{10,20}$/', (string) $request->query('run')) ? $request->query('run') : null;
+        $pause = app(PackagingPause::class);
+        $hide = $pause->canControl($request->user()) ? '' : $pause->visibleSql('o');
         if ($run) {
-            $printed = DB::table('shipment_labels')->where('print_run', $run)->orderBy('printed_at')->orderBy('id')->get(['order_id', 'barcode', 'voided_at']);
+            $printed = DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')->where('l.print_run', $run)
+                ->when($hide !== '', fn ($q) => $q->whereRaw($hide))->orderBy('l.printed_at')->orderBy('l.id')->get(['l.order_id', 'l.barcode', 'l.voided_at']);
         } else {
-            $pause = app(\App\Services\Packaging\PackagingPause::class);
-            $hide = $pause->canControl($request->user()) ? '' : $pause->visibleSql('o');
             $printed = DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')->whereNull('l.voided_at')
                 ->where('o.status_id', OrderStatus::idFor('ready_for_packaging'))->when($hide !== '', fn ($q) => $q->whereRaw($hide))
                 ->orderBy('o.packaging_sent_at')->orderBy('o.id')->limit(200)->get(['l.order_id', 'l.barcode', 'l.voided_at']);

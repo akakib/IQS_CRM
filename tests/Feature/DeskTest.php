@@ -420,6 +420,9 @@ class DeskTest extends TestCase
         $this->actingAs($boss)->get(route('hold-limits.index'))->assertOk()->assertSee('Eid week');
         $this->post(route('hold-limits.decide', $req->id), ['approve' => 1, 'new_limit' => 4])->assertSessionHas('success');
         $this->assertSame(4, (int) $this->mahim->fresh()->desk_hold_limit);
+        // A manager's own request is decided by someone else.
+        DB::table('hold_limit_requests')->insert(['user_id' => $boss->id, 'current_limit' => 2, 'reason' => 'mine', 'status' => 'pending', 'created_at' => now(), 'updated_at' => now()]);
+        $this->post(route('hold-limits.decide', DB::table('hold_limit_requests')->where('user_id', $boss->id)->value('id')), ['approve' => 1, 'new_limit' => 9])->assertForbidden();
         $this->assertDatabaseHas('app_notifications', ['user_id' => $this->mahim->id]);
         app()->forgetInstance(\App\Services\Work\DeskRules::class);
         app()->forgetInstance(\App\Services\Orders\DeskService::class);

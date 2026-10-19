@@ -158,6 +158,12 @@ class ScanService
     /** A packer cannot finish the order (item missing, damaged): Hold with a reason; the moderator and managers are told. */
     public function hold(Order $order, int $reasonId, ?string $note, User $by): void
     {
+        if (! in_array($order->status_id, LabelPrinter::queueStatuses(), true)) {
+            throw ValidationException::withMessages(['order' => __('Only an order in packaging can be held here.')]);
+        }
+        if ((int) $order->packer_id !== $by->id && ! $by->can('packaging.manage')) {
+            throw ValidationException::withMessages(['order' => __('Scan the label first: only the packer holding the order can put it on hold.')]);
+        }
         $this->machine->transition($order, 'hold', $by, 'scan', $reasonId, $note);
         $order->forceFill(['packer_id' => null, 'packaging_started_at' => null])->save();
 

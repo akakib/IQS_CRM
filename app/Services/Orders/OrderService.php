@@ -453,7 +453,7 @@ class OrderService
                 'amount_diff' => round((float) $order->cod_amount - $oldCod, 2), 'requested_by' => $by->id,
                 'courier_action' => 'update_cod', 'applied_at' => now(), 'created_at' => now(), 'updated_at' => now(),
             ]);
-            if (in_array($order->status_id, OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']), true)) {
+            if (in_array($order->status_id, OrderStatus::groupIds('packaging'), true)) {
                 app(\App\Services\Courier\BookingService::class)->issueLabel($order, $shipment->id, null, __('COD changed by a payment'));
             }
             app(\App\Services\NotificationService::class)->send('cod_update_needed', __('Update the COD of :no at the courier', ['no' => $order->order_no]),

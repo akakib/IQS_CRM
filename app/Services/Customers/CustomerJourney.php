@@ -20,7 +20,7 @@ class CustomerJourney
     public function build(Customer $customer, User $user): array
     {
         $statuses = OrderStatus::map();
-        $delivered = OrderStatus::idsFor(['delivered', 'partial_delivered']);
+        $delivered = OrderStatus::groupIds('delivered');
         $returned = OrderStatus::idsFor(['returned']);
         $cancelled = OrderStatus::idsFor(['cancelled']);
 

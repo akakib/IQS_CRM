@@ -22,7 +22,7 @@ class CustomerStats
         if ($ids->isEmpty()) {
             return;
         }
-        $delivered = OrderStatus::idsFor(['delivered', 'partial_delivered']);
+        $delivered = OrderStatus::groupIds('delivered');
         $returned = OrderStatus::idsFor(['returned']);
         foreach ($ids->chunk(500) as $chunk) {
             $own = DB::table('orders')->whereIn('customer_id', $chunk)->groupBy('customer_id')

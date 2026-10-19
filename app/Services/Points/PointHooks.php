@@ -183,7 +183,7 @@ class PointHooks
      */
     private function followUp(Order $order): array
     {
-        $delivered = OrderStatus::idsFor(['delivered', 'partial_delivered']);
+        $delivered = OrderStatus::groupIds('delivered');
         $previous = DB::table('orders')->where('customer_id', $order->customer_id)->where('id', '<', $order->id)->orderByDesc('id')
             ->get(['status_id', 'created_at']);
 

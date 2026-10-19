@@ -31,7 +31,7 @@ class OrderProfit
     /** One row per settled order (a subquery to group on). */
     public function orders(string $from, string $to, ?string $channel = null): Builder
     {
-        $delivered = OrderStatus::idsFor(['delivered', 'partial_delivered']);
+        $delivered = OrderStatus::groupIds('delivered');
         $settled = OrderStatus::idsFor(['delivered', 'partial_delivered', 'returned']);
         $pct = (float) settings('analysis.cod_fee_percent') / 100;
         $packaging = (float) settings('orders.packaging_cost');

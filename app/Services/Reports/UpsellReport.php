@@ -19,7 +19,7 @@ class UpsellReport
     public function rows(string $from, string $to, ?int $userId = null): Collection
     {
         $fixes = DB::table('status_reasons')->where('reason_type', 'amendment')->whereIn('system_key', ['entry_error', 'price_error'])->pluck('id')->all() ?: [0];
-        $won = OrderStatus::idsFor(['delivered', 'partial_delivered']);
+        $won = OrderStatus::groupIds('delivered');
         $lost = OrderStatus::idsFor(['cancelled', 'returned']);
 
         return DB::table('order_amendments as a')->join('orders as o', 'o.id', '=', 'a.order_id')->join('users as u', 'u.id', '=', 'a.requested_by')

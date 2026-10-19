@@ -217,6 +217,12 @@ an item holds is `product_variants.size_qty / size_unit` (grams or ml), read fro
 list; calls, confirming and booking go on. Orders booked while paused stay Ready for packaging but are hidden from the
 packers' list and To pack count (the packers are not told). Resume sets their packaging_sent_at to now.
 
+**One definition per number** (audit of 19 Oct, `docs/AUDIT_2026-10-19.md`): confirmed / packed / delivered counts come
+from `SalesReport::count` (first event per order; packed by packed_at), per-person delivered and return rates from
+`KpiScorecard` (credited to who confirmed; partial counts as delivered), "waiting to be taken" from
+`DeskService::whereWaiting`, the packers' list from `Packaging/PackingQueue`, status lists from `OrderStatus::group`,
+phone search from `Phone::searchPrefix`, "at work" from `DeskService::atWork`. Do not write a second copy of any of these.
+
 **Packing sheet + label on** (`/packaging/sheet`, `shipment_labels.print_run/applied_at`): each label print gets a
 print_run; the A4 sheet lists those orders in sticker order (label ID, items, COD, Packed and Label on boxes). The first
 scan of a label marks it applied. Edits while packing need no manager (edit_policy free for ready_for_packaging, packed,

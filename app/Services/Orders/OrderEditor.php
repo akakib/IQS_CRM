@@ -162,7 +162,7 @@ class OrderEditor
 
         // The old label no longer scans: have the new one ready so the packer can print it without asking anyone.
         $oldLabel = null; $newLabel = null;
-        if ($order->active_shipment_id && in_array($order->status_id, OrderStatus::idsFor(['ready_for_packaging', 'packed', 'ready_for_pickup']), true)) {
+        if ($order->active_shipment_id && in_array($order->status_id, OrderStatus::groupIds('packaging'), true)) {
             $oldLabel = DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')->orderByDesc('id')->first(['barcode', 'printed_at', 'applied_at']);
             $newLabel = app(\App\Services\Courier\BookingService::class)->issueLabel($order, $order->active_shipment_id, null, __('Order edited (version :v)', ['v' => $version]));
         }

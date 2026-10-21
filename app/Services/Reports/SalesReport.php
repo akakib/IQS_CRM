@@ -96,6 +96,77 @@ class SalesReport
         ])->sortByDesc('money')->values();
     }
 
+    /**
+     * My list: for each product or category one person watches, the orders, pieces and money at this step today,
+     * in the last 7 days and in the last 30 days (today included), per channel and in total, with the stock now.
+     * Two grouped queries plus the names, whatever the list's length.
+     *
+     * @return list<array{id: int, kind: string, ref: int, name: string, channels: array, total: array, stock: array}>
+     */
+    public function watch(int $userId, string $stage): array
+    {
+        $watch = DB::table('sales_watch_items')->where('user_id', $userId)->orderByDesc('id')->get(['id', 'kind', 'ref_id']);
+        if ($watch->isEmpty()) {
+            return [];
+        }
+        $productIds = $watch->where('kind', 'product')->pluck('ref_id')->all();
+        $categoryIds = $watch->where('kind', 'category')->pluck('ref_id')->all();
+        $names = ['product' => DB::table('products')->whereIn('id', $productIds)->pluck('name', 'id'), 'category' => DB::table('categories')->whereIn('id', $categoryIds)->pluck('name', 'id')];
+        $mine = fn ($q) => $q->where(fn ($w) => $w->whereIn('p.id', $productIds ?: [0])->orWhereIn('p.category_id', $categoryIds ?: [0]));
+
+        $today = today()->toDateString();
+        $week = today()->subDays(6)->toDateString();
+        $buckets = ['today' => $today, 'week' => $week, 'month' => today()->subDays(29)->toDateString()];
+        $pcs = "CASE WHEN i.unit IN ('g', 'kg', 'ml', 'l') THEN 0 ELSE i.qty END";
+        $select = ['p.id as product_id', 'p.category_id', 'o.channel'];
+        foreach ($buckets as $b => $since) {
+            $in = "s.at >= '{$since} 00:00:00'"; // a date built here, not typed by anyone
+            $select[] = "COUNT(DISTINCT CASE WHEN {$in} THEN i.order_id END) as {$b}_orders";
+            $select[] = "COALESCE(SUM(CASE WHEN {$in} THEN {$pcs} END), 0) as {$b}_pcs";
+            $select[] = "COALESCE(SUM(CASE WHEN {$in} THEN i.line_total END), 0) as {$b}_money";
+        }
+        $rows = $this->items($stage, $buckets['month'], $today)->join('products as p', 'p.id', '=', 'v.product_id')->join('orders as o', 'o.id', '=', 'i.order_id')
+            ->tap($mine)->groupBy('p.id', 'p.category_id', 'o.channel')->selectRaw(implode(', ', $select))->get();
+
+        // Stock now, per product: how many sizes are in or out, and the counted pieces where they were counted.
+        $stock = DB::table('product_variants as v')->join('products as p', 'p.id', '=', 'v.product_id')->whereNull('v.deleted_at')->where('v.is_active', true)
+            ->tap($mine)->groupBy('p.id', 'p.category_id')
+            ->selectRaw("p.id, p.category_id, COUNT(*) as sizes, SUM(CASE WHEN v.availability_status = 'out_of_stock' THEN 1 ELSE 0 END) as out_sizes,
+                SUM(CASE WHEN v.availability_status = 'backorder' THEN 1 ELSE 0 END) as pre_sizes, SUM(v.stock_qty) as counted")->get();
+
+        $keys = [];
+        foreach (array_keys($buckets) as $b) {
+            array_push($keys, "{$b}_orders", "{$b}_pcs", "{$b}_money");
+        }
+        $empty = fn () => array_fill_keys($keys, 0);
+        $add = function (array $into, object $r) use ($buckets) {
+            foreach (array_keys($buckets) as $b) {
+                foreach (['orders', 'pcs', 'money'] as $m) {
+                    $into["{$b}_{$m}"] += (float) $r->{"{$b}_{$m}"};
+                }
+            }
+
+            return $into;
+        };
+
+        return $watch->map(function ($w) use ($rows, $stock, $names, $empty, $add) {
+            $mineRows = $rows->filter(fn ($r) => $w->kind === 'product' ? (int) $r->product_id === (int) $w->ref_id : (int) $r->category_id === (int) $w->ref_id);
+            $channels = [];
+            $total = $empty();
+            foreach ($mineRows as $r) {
+                $channels[$r->channel] = $add($channels[$r->channel] ?? $empty(), $r);
+                $total = $add($total, $r);
+            }
+            uasort($channels, fn ($a, $b) => $b['month_money'] <=> $a['month_money']);
+            $s = $stock->filter(fn ($r) => $w->kind === 'product' ? (int) $r->id === (int) $w->ref_id : (int) $r->category_id === (int) $w->ref_id);
+
+            return ['id' => (int) $w->id, 'kind' => $w->kind, 'ref' => (int) $w->ref_id, 'name' => $names[$w->kind][$w->ref_id] ?? __('Removed'),
+                'channels' => $channels, 'total' => $total,
+                'stock' => ['products' => $s->count(), 'sizes' => (int) $s->sum('sizes'), 'out' => (int) $s->sum('out_sizes'), 'pre' => (int) $s->sum('pre_sizes'),
+                    'counted' => $s->whereNotNull('counted')->isEmpty() ? null : (float) $s->sum('counted')]];
+        })->values()->all();
+    }
+
     /** By day or by month: orders, money, grams and ml at this step. Newest first. */
     public function periods(string $stage, string $from, string $to, string $by): Collection
     {

@@ -106,4 +106,57 @@ class SalesReportTest extends TestCase
         $staff = User::factory()->create();
         $this->actingAs($staff)->get(route('sales-report.index'))->assertForbidden();
     }
+
+    public function test_my_list_shows_each_watched_product_and_category_by_channel_for_today_7_and_30_days(): void
+    {
+        (new CatalogSeeder)->run();
+        (new CustomerSeeder)->run();
+        (new OrderConfigSeeder)->run();
+        \App\Models\OrderStatus::forget();
+        $this->travelTo(now()->setTime(12, 0));
+        $cat = DB::table('categories')->insertGetId(['name' => 'Dates', 'slug' => 'dates-watch', 'created_at' => now(), 'updated_at' => now()]);
+        Product::factory()->withVariant(500, ['sku' => 'AJWA'])->create(['name' => 'Ajwa', 'category_id' => $cat]);
+        Product::factory()->withVariant(300, ['sku' => 'HONEY'])->create(['name' => 'Honey']);
+        $ajwa = ProductVariant::firstWhere('sku', 'AJWA');
+        $honey = ProductVariant::firstWhere('sku', 'HONEY');
+        $owner = $this->owner();
+        $sm = app(OrderStateMachine::class);
+        $sell = function (string $channel, array $items, string $phone) use ($owner, $sm) {
+            $o = app(OrderService::class)->create(['channel' => $channel, 'phone' => $phone, 'name' => 'C', 'address_line' => 'R', 'items' => $items], null);
+            $sm->transition($o->fresh(), 'record_verified', null, 'rule');
+            $sm->transition($o->fresh(), 'confirmed', $owner);
+        };
+
+        $this->travel(-10)->days();
+        $sell('web', [['variant_id' => $ajwa->id, 'qty' => 1]], '01712000001'); // 10 days ago: only in 30 days
+        $this->travelBack();
+        $this->travelTo(now()->setTime(12, 0));
+        $sell('web', [['variant_id' => $ajwa->id, 'qty' => 2]], '01712000002');
+        $sell('whatsapp', [['variant_id' => $ajwa->id, 'qty' => 1], ['variant_id' => $honey->id, 'qty' => 3]], '01712000003');
+
+        DB::table('product_variants')->where('id', $honey->id)->update(['availability_status' => 'out_of_stock']); // sold out after
+        $this->actingAs($owner)->getJson(route('sales-report.watch.options', ['q' => 'Dat']))->assertOk()->assertJsonFragment(['value' => 'category:'.$cat, 'sub' => 'Category']);
+        $this->post(route('sales-report.watch.add'), ['item' => 'category:'.$cat])->assertSessionHas('success');
+        $this->post(route('sales-report.watch.add'), ['item' => 'product:'.$honey->product_id])->assertSessionHas('success');
+        $this->post(route('sales-report.watch.add'), ['item' => 'product:'.$honey->product_id]); // twice: still once
+
+        $rows = collect(app(\App\Services\Reports\SalesReport::class)->watch($owner->id, 'confirmed'))->keyBy('name');
+        $this->assertCount(2, $rows);
+        $dates = $rows['Dates'];
+        $this->assertSame([2.0, 2.0, 3.0], [$dates['total']['today_orders'], $dates['total']['week_orders'], $dates['total']['month_orders']]);
+        $this->assertSame([1.0, 2.0], [$dates['channels']['web']['today_orders'], $dates['channels']['web']['month_orders']]);
+        $this->assertSame(1.0, $dates['channels']['whatsapp']['today_orders']);
+        $this->assertSame(1000.0, $dates['channels']['web']['today_money']);
+        $this->assertSame([3.0, 900.0], [$rows['Honey']['total']['month_pcs'], $rows['Honey']['total']['month_money']]);
+        $this->assertSame(1, $rows['Honey']['stock']['out']);
+
+        $this->get(route('sales-report.index', ['tab' => 'mine']))->assertOk()->assertSee('My list')->assertSeeInOrder(['Honey', 'Out of stock', 'WhatsApp'])->assertSee('Last 30 days');
+        $this->get(route('sales-report.index'))->assertOk()->assertSee('My list');
+
+        // Each person's own list; nobody removes another's.
+        $other = $this->owner(['email' => 'other@example.com']);
+        $this->actingAs($other)->get(route('sales-report.index', ['tab' => 'mine']))->assertSee('Your list is empty');
+        $this->delete(route('sales-report.watch.remove', DB::table('sales_watch_items')->value('id')));
+        $this->assertSame(2, DB::table('sales_watch_items')->where('user_id', $owner->id)->count());
+    }
 }

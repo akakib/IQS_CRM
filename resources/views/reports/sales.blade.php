@@ -45,6 +45,8 @@
         pick(e) { const b = e.target.closest('[data-order]'); if (b) this.order = { id: b.dataset.order, no: b.dataset.no } },
     }" @keydown.escape.window="pop = false">
 
+    <x-tabs :tabs="['all' => [__('All sales'), route('sales-report.index', $q())], 'mine' => [__('My list'), route('sales-report.index', ['tab' => 'mine', 'stage' => $stage])]]" active="all" />
+
     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div class="flex flex-wrap items-center gap-2">
             @foreach ($presets as $label => [$f, $t])

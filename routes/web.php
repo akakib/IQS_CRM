@@ -70,6 +70,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:analysis.view')->controller(\App\Http\Controllers\SalesReportController::class)->group(function () {
         Route::get('/sales-report', 'index')->name('sales-report.index');
         Route::get('/sales-report/orders', 'orders')->name('sales-report.orders');
+        Route::get('/sales-report/my-list/options', 'watchOptions')->name('sales-report.watch.options');
+        Route::post('/sales-report/my-list', 'watchAdd')->name('sales-report.watch.add');
+        Route::delete('/sales-report/my-list/{item}', 'watchRemove')->whereNumber('item')->name('sales-report.watch.remove');
         Route::get('/sales-report/print', 'print')->name('sales-report.print');
         Route::get('/sales-report/excel', 'excel')->name('sales-report.excel');
     });

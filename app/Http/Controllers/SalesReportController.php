@@ -23,6 +23,10 @@ class SalesReportController extends Controller
     public function index(Request $request): View
     {
         [$from, $to, $stage] = $this->filters($request);
+        if ($request->query('tab') === 'mine') {
+            // My list: the products and categories this person keeps an eye on, today, 7 and 30 days, per channel.
+            return view('reports.sales-mine', ['stage' => $stage, 'rows' => $this->sales->watch($request->user()->id, $stage)]);
+        }
         $start = Carbon::parse($from);
         $days = $start->diffInDays(Carbon::parse($to)) + 1;
         $by = $days > 62 ? 'month' : 'day';
@@ -47,6 +51,37 @@ class SalesReportController extends Controller
             'products' => $this->sales->products($stage, $from, $to),
             'bars' => $bars,
         ]);
+    }
+
+    /** My list: products and categories to pick from (?q=), as the search box wants them. */
+    public function watchOptions(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $q = trim((string) $request->query('q'));
+        $like = '%'.$q.'%';
+        $cats = \Illuminate\Support\Facades\DB::table('categories')->when($q !== '', fn ($w) => $w->where('name', 'like', $like))->orderBy('name')->limit(6)->get(['id', 'name']);
+        $products = \Illuminate\Support\Facades\DB::table('products as p')->whereNull('p.deleted_at')->where('p.status', '!=', 'archived')
+            ->when($q !== '', fn ($w) => $w->whereExists(fn ($e) => $e->from('product_variants as v')->whereColumn('v.product_id', 'p.id')->where('v.search_text', 'like', mb_strtolower($like))))
+            ->orderBy('p.name')->limit(14)->get(['p.id', 'p.name']);
+
+        return response()->json($cats->map(fn ($c) => ['value' => 'category:'.$c->id, 'label' => $c->name, 'sub' => __('Category')])
+            ->concat($products->map(fn ($p) => ['value' => 'product:'.$p->id, 'label' => $p->name, 'sub' => __('Product')]))->values());
+    }
+
+    public function watchAdd(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $data = $request->validate(['item' => ['required', 'regex:/^(product|category):\d+$/']]);
+        [$kind, $id] = explode(':', $data['item']);
+        abort_unless(\Illuminate\Support\Facades\DB::table($kind === 'product' ? 'products' : 'categories')->where('id', $id)->exists(), 404);
+        \Illuminate\Support\Facades\DB::table('sales_watch_items')->insertOrIgnore(['user_id' => $request->user()->id, 'kind' => $kind, 'ref_id' => (int) $id, 'created_at' => now()]);
+
+        return back()->with('success', __('Added to My list.'));
+    }
+
+    public function watchRemove(Request $request, int $item): \Illuminate\Http\RedirectResponse
+    {
+        \Illuminate\Support\Facades\DB::table('sales_watch_items')->where('id', $item)->where('user_id', $request->user()->id)->delete(); // only your own list
+
+        return back()->with('success', __('Removed from My list.'));
     }
 
     /** A popup's orders: one day (or month), one item or one channel at the chosen step. */

@@ -210,7 +210,9 @@ them since (now cancelled, on hold, returned; an order held and confirmed again 
 step: where the orders came from (`channels()`: per channel, returning = an earlier order of the customer was
 delivered, else new), bars by day (by month past 62 days), top items (out-of-stock flagged), categories. Every bar
 and row opens its orders in one popup (`sales-report.orders` → `orders()`), an order opens inside it (desk embed);
-All items opens there too. Print / PDF and Excel give the step's items. How much
+All items opens there too. Print / PDF and Excel give the step's items. Tab **My list** (`?tab=mine`,
+`sales_watch_items`, one list per person): watched products and categories with orders, pieces and money today, last 7
+and last 30 days per channel and in total, plus stock now (`SalesReport::watch`, two grouped queries). How much
 an item holds is `product_variants.size_qty / size_unit` (grams or ml), read from the names (`Units::sizeFromName`).
 
 **Pause packaging** (`Packaging/PackagingPause`, `packaging_pauses`): a manager stops new orders reaching the packers'

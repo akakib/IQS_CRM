@@ -29,7 +29,7 @@ class StockController extends Controller
             ->when($show === 'not_counted', fn ($w) => $w->whereNull('stock_qty'))
             ->when($show === 'low', fn ($w) => $w->where('stock_qty', '>', 0)->where('stock_qty', '<=', 5))
             ->when($show === 'zero', fn ($w) => $w->where('stock_qty', '<=', 0))
-            ->when($q !== '', fn ($w) => $w->where('search_text', 'like', '%'.$q.'%'))
+            ->when($q !== '', fn ($w) => \App\Support\ProductSearch::apply($w, $q))
             ->tap(fn ($w) => $list->applySort($w))
             ->paginate($list->perPage)
             ->withQueryString();

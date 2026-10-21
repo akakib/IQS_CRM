@@ -60,7 +60,7 @@ class SalesReportController extends Controller
         $like = '%'.$q.'%';
         $cats = \Illuminate\Support\Facades\DB::table('categories')->when($q !== '', fn ($w) => $w->where('name', 'like', $like))->orderBy('name')->limit(6)->get(['id', 'name']);
         $products = \Illuminate\Support\Facades\DB::table('products as p')->whereNull('p.deleted_at')->where('p.status', '!=', 'archived')
-            ->when($q !== '', fn ($w) => $w->whereExists(fn ($e) => $e->from('product_variants as v')->whereColumn('v.product_id', 'p.id')->where('v.search_text', 'like', mb_strtolower($like))))
+            ->when($q !== '', fn ($w) => $w->whereIn('p.id', \App\Support\ProductSearch::apply(\Illuminate\Support\Facades\DB::table('product_variants')->select('product_id'), $q)))
             ->orderBy('p.name')->limit(14)->get(['p.id', 'p.name']);
 
         return response()->json($cats->map(fn ($c) => ['value' => 'category:'.$c->id, 'label' => $c->name, 'sub' => __('Category')])

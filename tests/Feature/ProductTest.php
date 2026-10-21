@@ -235,4 +235,24 @@ class ProductTest extends TestCase
         $this->assertSame(0, Product::whereNotNull('category_id')->count());
         $this->assertSame(1, Product::count());
     }
+
+    public function test_a_search_finds_words_that_mean_the_same_and_the_description(): void
+    {
+        $this->actingAs($this->owner());
+        Product::factory()->withVariant(500, ['sku' => 'KALMI'])->create(['name' => 'কালমি খেজুর (Black Maryam)']);
+        Product::factory()->withVariant(900, ['sku' => 'SAUDI'])->create(['name' => 'Saudi Premium', 'description' => '<p>Soft Saudi <b>dates</b> from Madinah.</p>']);
+        Product::factory()->withVariant(300, ['sku' => 'HONEY'])->create(['name' => 'Sundarban Honey']);
+
+        $names = fn (string $q) => collect($this->getJson(route('products.search', ['q' => $q]))->assertOk()->json())->pluck('label')->all();
+        $this->assertEqualsCanonicalizing(['কালমি খেজুর (Black Maryam)', 'Saudi Premium'], $names('খেজুর')); // the name in Bangla, the description in English
+        $this->assertContains('কালমি খেজুর (Black Maryam)', $names('dates'));
+        $this->assertContains('কালমি খেজুর (Black Maryam)', $names('khejur'));
+        $this->assertSame(['Sundarban Honey'], $names('মধু'));
+        $this->get(route('products.index', ['q' => 'খেজুর']))->assertOk()->assertSee('Saudi Premium')->assertDontSee('Sundarban Honey');
+
+        // A new group from Settings works at once.
+        app(\App\Services\SettingsService::class)->set(['search.words' => "সুন্দরবন, sundarban"]);
+        $this->assertSame(['Sundarban Honey'], $names('সুন্দরবন'));
+        $this->get(route('settings.edit'))->assertOk()->assertSee('Search words');
+    }
 }

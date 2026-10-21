@@ -37,8 +37,7 @@ class ProductController extends Controller
                 'variants' => fn ($v) => $v->select(['id', 'product_id', 'name', 'sku', 'availability_status', 'is_active']),
                 'variants.prices' => fn ($p) => $p->where('price_list_id', $onlineId)->select(['variant_id', 'price_list_id', 'regular_price', 'sale_price', 'sale_starts_at', 'sale_ends_at']),
             ])
-            ->when($q !== '', fn ($query) => $query->whereIn('id', ProductVariant::query()->select('product_id')
-                ->where('search_text', 'like', '%'.$q.'%')))
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w->whereIn('id', \App\Support\ProductSearch::apply(ProductVariant::query()->select('product_id'), $q)))) // names, descriptions, words that mean the same
             ->when($list->filter('category'), fn ($query, $id) => $query->where('category_id', $id))
             ->when($list->filter('status'), fn ($query, $s) => $query->where('status', $s))
             ->when($list->filter('availability'), fn ($query, $a) => $query->whereIn('id', ProductVariant::query()->select('product_id')->where('availability_status', $a)))
@@ -109,8 +108,9 @@ class ProductController extends Controller
             ->join('products as p', 'p.id', '=', 'v.product_id')
             ->leftJoin('variant_prices as vp', fn ($j) => $j->on('vp.variant_id', '=', 'v.id')->where('vp.price_list_id', $onlineId))
             ->whereNull('v.deleted_at')->whereNull('p.deleted_at')->where('v.is_active', true)->where('p.status', '!=', 'archived')
-            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w->where('v.search_text', 'like', '%'.$q.'%')->orWhere('v.barcode', $q)))
-            ->orderByRaw('CASE WHEN v.sku = ? OR v.barcode = ? THEN 0 WHEN v.search_text LIKE ? THEN 1 ELSE 2 END', [$q, $q, $q.'%'])
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => \App\Support\ProductSearch::apply($w, $q, 'v.search_text', 'v.product_id')->orWhere('v.barcode', $q)))
+            // What was typed, in the name, first; a match found only through a word that means the same, or in the description, after.
+            ->orderByRaw('CASE WHEN v.sku = ? OR v.barcode = ? THEN 0 WHEN v.search_text LIKE ? THEN 1 WHEN v.search_text LIKE ? THEN 2 ELSE 3 END', [$q, $q, $q.'%', '%'.$q.'%'])
             ->orderBy('p.name')
             ->limit(20)
             ->get(['v.id', 'v.sku', 'v.name as variant', 'v.unit', 'v.weight_g', 'v.availability_status', 'p.name as product', 'vp.regular_price', 'vp.sale_price', 'vp.sale_starts_at', 'vp.sale_ends_at']);

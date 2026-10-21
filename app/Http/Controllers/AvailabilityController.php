@@ -30,7 +30,7 @@ class AvailabilityController extends Controller
             ->with(['product:id,name', 'markedBy:id,name'])
             ->when($status === 'review', fn ($w) => $w->where('availability_status', '!=', 'in_stock')->where('oos_review_at', '<=', now()))
             ->when($status !== 'review', fn ($w) => $w->where('availability_status', $status))
-            ->when($q !== '', fn ($w) => $w->where('search_text', 'like', '%'.$q.'%'))
+            ->when($q !== '', fn ($w) => \App\Support\ProductSearch::apply($w, $q))
             ->tap(fn ($w) => $list->applySort($w))
             ->paginate($list->perPage)
             ->withQueryString();

@@ -35,14 +35,22 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(\App\Services\Work\DeskRules::class);
         $this->app->scoped(\App\Services\Packaging\PackagingPause::class);
 
-        // Website receiver: fake everywhere except production with STORE_DRIVER=woocommerce.
-        $this->app->singleton(StoreDriver::class, fn ($app) => $app->environment(['testing', 'staging', 'local']) || config('store.driver') !== 'woocommerce'
-            ? new FakeStoreDriver
-            : new WooCommerceDriver(array_merge(config('store.woocommerce'), array_filter([
-                'url' => \App\Models\WebsiteAccount::current()?->url,
-                'key' => \App\Models\WebsiteAccount::current()?->consumer_key,
-                'secret' => \App\Models\WebsiteAccount::current()?->consumer_secret,
-            ]))));
+        // Website receiver: fake everywhere except production with STORE_DRIVER=woocommerce. A staging server connected
+        // to a test website (STORE_ORDER_STATUS_LIVE=true) sends order statuses for real and keeps catalog pushes fake.
+        $this->app->singleton(StoreDriver::class, function ($app) {
+            $woo = function () {
+                $account = \App\Models\WebsiteAccount::current(); // read only when the real website is used
+
+                return new WooCommerceDriver(array_merge(config('store.woocommerce'), array_filter([
+                    'url' => $account?->url, 'key' => $account?->consumer_key, 'secret' => $account?->consumer_secret,
+                ])));
+            };
+            if ($app->environment('staging') && config('store.order_status_live')) {
+                return new \App\Services\Catalog\Store\SplitStoreDriver(new FakeStoreDriver, $woo());
+            }
+
+            return $app->environment(['testing', 'staging', 'local']) || config('store.driver') !== 'woocommerce' ? new FakeStoreDriver : $woo();
+        });
         $this->app->bind(CourierDriver::class, fn ($app) => $app->make(CourierManager::class)->driver());
     }
 

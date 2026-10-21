@@ -90,14 +90,16 @@ class VerificationTest extends TestCase
 
         // The website refused: the reason stays on the order, the desk offers Send to website, and it goes once the website takes it.
         $mock = \Mockery::mock(\App\Services\Catalog\Store\StoreDriver::class);
+        $mock->shouldReceive('name')->andReturn('woocommerce');
         $mock->shouldReceive('setOrderStatus')->once()->andThrow(new \RuntimeException('HTTP 500'));
         $mock->shouldReceive('setOrderStatus')->once();
         $this->app->instance(\App\Services\Catalog\Store\StoreDriver::class, $mock);
         $order->forceFill(['external_status' => 'processing'])->save();
         $this->assertFalse(app(\App\Services\Orders\WebsiteStatusPush::class)->push($order));
         $this->assertSame('HTTP 500', $order->fresh()->website_push_error);
-        $this->actingAs($this->owner())->get(route('desk.index', ['order' => $order->id]))->assertSee('Website status:')->assertSee("\$dispatch('call-then-confirm')", false)->assertSee('Woo Record Verified')->assertSee('Not set: HTTP 500');
-        $this->post(route('orders.website-status', $order))->assertSessionHas('success');
+        $this->actingAs($this->owner())->get(route('desk.index', ['order' => $order->id]))->assertSee('Website status:')->assertSee("\$dispatch('call-then-confirm')", false)->assertSee('Woo Record Verified')->assertSee('Not set:')->assertSee('HTTP 500');
+        $this->get(route('orders.show', $order))->assertSee('Woo Record Verified');
+        $this->postJson(route('orders.website-status', $order))->assertOk()->assertJson(['ok' => true, 'status' => 'Record Verified']);
         $this->get(route('desk.index', ['order' => $order->id]))->assertSee('Record Verified')->assertDontSee('Woo Record Verified');
         $this->assertNull($order->fresh()->website_push_error);
         // Never moves a finished website order back.

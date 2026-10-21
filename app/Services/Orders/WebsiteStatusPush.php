@@ -49,7 +49,9 @@ class WebsiteStatusPush
             return false;
         }
         $order->forceFill(['external_status' => self::STATUS, 'website_pushed_at' => now(), 'website_push_error' => null])->save();
-        app(OrderService::class)->note($order, 'system', __('Website order set to Record verified.'), $by);
+        app(OrderService::class)->note($order, 'system', $this->store->name() === 'fake'
+            ? __('Test server: Record verified not sent to the website (no live connection).')
+            : __('Website order set to Record verified.'), $by);
 
         return true;
     }

@@ -319,20 +319,7 @@
                                         </button>
                                     @endif
                                 </div>
-                                @if ($order->channel === 'web' && $order->external_ref)
-                                    {{-- The website order's own status, and a button to set it to Record verified there
-                                         (done by itself on record verified; this is for when it did not go or to do it now). --}}
-                                    @php $push = app(\App\Services\Orders\WebsiteStatusPush::class); @endphp
-                                    <form method="POST" action="{{ route('orders.website-status', $order) }}" @class(['mt-2 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs',
-                                        'bg-amber-50 text-amber-900' => $order->website_push_error, 'bg-gray-50 text-gray-700' => ! $order->website_push_error])>
-                                        @csrf
-                                        <span>{{ __('Website status:') }} <b>{{ \Illuminate\Support\Str::headline((string) ($order->external_status ?: __('not known'))) }}</b>@if ($order->external_status === \App\Services\Orders\WebsiteStatusPush::STATUS && $order->website_pushed_at) <span class="text-green-700">✓ {{ __('set :t', ['t' => $order->website_pushed_at->format('d M, g:i A')]) }}</span>@endif</span>
-                                        @if ($order->website_push_error)<span>· {{ __('Not set: :e', ['e' => \Illuminate\Support\Str::limit($order->website_push_error, 90)]) }}</span>@endif
-                                        @if ($push->canSend($order))
-                                            <button class="lockable rounded-lg border border-gray-300 bg-white px-2.5 py-1 font-semibold text-gray-800 hover:border-primary hover:text-primary">{{ __('Woo Record Verified') }}</button>
-                                        @endif
-                                    </form>
-                                @endif
+                                <x-website-status :order="$order" />
                                 <h2 class="mt-1 text-2xl font-semibold text-gray-900">{{ $order->ship_name }}</h2>
                                 <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
                             </div>

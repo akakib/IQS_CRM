@@ -17,6 +17,7 @@
             <x-order-status :order="$order" :statuses="$statuses" />
             <span class="text-xs text-gray-500">{{ \App\Models\Order::channelLabel($order->channel) }} · {{ $order->created_at->format('d M Y, g:i A') }}</span>
             @if ($order->holdReason)<x-badge color="amber">{{ $order->holdReason->label_en }}{{ $order->hold_expected_date ? ' · '.$order->hold_expected_date->format('d M') : '' }}</x-badge>@endif
+            <x-website-status :order="$order" class="!mt-0 w-full sm:w-auto" />
         </div>
         <div class="flex items-center gap-2">
             @if ($canEdit)

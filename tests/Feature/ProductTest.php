@@ -241,7 +241,7 @@ class ProductTest extends TestCase
         $this->actingAs($this->owner());
         Product::factory()->withVariant(500, ['sku' => 'KALMI'])->create(['name' => 'কালমি খেজুর (Black Maryam)']);
         Product::factory()->withVariant(900, ['sku' => 'SAUDI'])->create(['name' => 'Saudi Premium', 'description' => '<p>Soft Saudi <b>dates</b> from Madinah.</p>']);
-        Product::factory()->withVariant(300, ['sku' => 'HONEY'])->create(['name' => 'Sundarban Honey']);
+        Product::factory()->withVariant(300, ['sku' => 'HONEY'])->create(['name' => 'Sundarban Honey', 'description' => 'Pure honey. Check the expiry dateline and updates on the jar.']);
 
         $names = fn (string $q) => collect($this->getJson(route('products.search', ['q' => $q]))->assertOk()->json())->pluck('label')->all();
         $this->assertEqualsCanonicalizing(['কালমি খেজুর (Black Maryam)', 'Saudi Premium'], $names('খেজুর')); // the name in Bangla, the description in English

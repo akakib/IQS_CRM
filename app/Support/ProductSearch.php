@@ -51,12 +51,17 @@ final class ProductSearch
         });
     }
 
-    /** Product ids whose short or long description holds one of the terms. */
+    /**
+     * Product ids whose short or long description has a word starting with one of the terms ("dates" finds
+     * "dates" and "Dates," but not "updates"); a description is long, so a part of a word would match too much.
+     */
     public static function inDescription(array $terms): \Illuminate\Database\Query\Builder
     {
         return DB::table('products')->select('id')->where(function ($w) use ($terms) {
-            foreach ($terms as $t) {
-                $w->orWhere('short_description', 'like', '%'.$t.'%')->orWhere('description', 'like', '%'.$t.'%');
+            foreach (array_filter($terms, fn ($t) => mb_strlen($t) >= 2) as $t) {
+                foreach (['short_description', 'description'] as $col) {
+                    $w->orWhere($col, 'like', $t.'%')->orWhere($col, 'like', '% '.$t.'%')->orWhere($col, 'like', '%>'.$t.'%')->orWhere($col, 'like', '%('.$t.'%');
+                }
             }
         });
     }

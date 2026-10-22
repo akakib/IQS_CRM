@@ -585,7 +585,15 @@
                                 <div class="mt-3"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Follow-up date')" full-width /></div>
                             @endif
                             @if ($mode === 'hold')
-                                <textarea name="note" required minlength="3" maxlength="500" rows="2" placeholder="{{ __('Why, in a few words (whoever opens it next reads this)') }}" class="{{ $input }} mt-3"></textarea>
+                                <div x-data="{ need: @js($holdNeedsNote ?? []) }">
+                                    <div class="mt-3 flex flex-wrap gap-1.5">
+                                        @foreach (\App\Services\Orders\DeskService::holdQuickNotes() as $line)
+                                            <button type="button" @click="$refs.holdNote.value = @js($line); $refs.holdNote.focus()" class="rounded-full border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:border-primary hover:text-primary">{{ $line }}</button>
+                                        @endforeach
+                                    </div>
+                                    <textarea name="note" x-ref="holdNote" :required="need.includes(reason)" minlength="3" maxlength="500" rows="2"
+                                        :placeholder="need.includes(reason) ? @js(__('What the customer said (needed for this reason)')) : @js(__('Note (optional)'))" class="{{ $input }} mt-2"></textarea>
+                                </div>
                             @else
                                 <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="{{ $input }} mt-3">
                             @endif

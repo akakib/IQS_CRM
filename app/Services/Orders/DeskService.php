@@ -1050,6 +1050,21 @@ class DeskService
         ]);
     }
 
+    /** Hold reasons that need a written note: the customer's own story (wait, a date, the advance). */
+    public const HOLD_NOTE_REASONS = ['customer_wait', 'scheduled', 'advance_wait'];
+
+    /** @return list<int> */
+    public function holdNoteReasonIds(): array
+    {
+        return DB::table('status_reasons')->where('reason_type', 'hold')->whereIn('system_key', self::HOLD_NOTE_REASONS)->pluck('id')->map(fn ($id) => (int) $id)->all();
+    }
+
+    /** @return list<string> */
+    public static function holdQuickNotes(): array
+    {
+        return collect(preg_split('/\R/u', (string) settings('hold.quick_notes')))->map(fn ($l) => trim($l))->filter()->values()->all();
+    }
+
     public function managerIds(): array
     {
         return DB::table('user_roles as ur')->join('roles as r', 'r.id', '=', 'ur.role_id')->join('users as u', 'u.id', '=', 'ur.user_id')

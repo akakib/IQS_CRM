@@ -400,8 +400,10 @@ class DeskTest extends TestCase
         // No date: refused. With a date: held, the date kept.
         $this->act($orders[0], 'hold', ['note' => 'Customer travelling', 'reason_id' => $reason])->assertSessionHasErrors('hold_expected_date');
         $this->assertSame('record_verified', $this->key($orders[0]));
-        // No written reason: refused (whoever opens it next must know why).
-        $this->act($orders[0], 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDays(2)->toDateString()])->assertSessionHasErrors('note');
+        // The customer's own story (asked to wait) needs words; a stock hold does not.
+        $wait = DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'customer_wait')->value('id');
+        $this->act($orders[0], 'hold', ['reason_id' => $wait, 'hold_expected_date' => today()->addDays(2)->toDateString()])->assertSessionHasErrors('note');
+        $this->get('/desk?tab=call&order='.$orders[0]->id)->assertSee('Salary pele nibe');
         $this->act($orders[0], 'hold', ['note' => 'Customer travelling', 'reason_id' => $reason, 'hold_expected_date' => today()->addDays(2)->toDateString()])->assertSessionHasNoErrors();
         $this->assertSame(today()->addDays(2)->toDateString(), $orders[0]->fresh()->hold_expected_date->toDateString());
         $this->assertSame('Customer travelling', $orders[0]->fresh()->hold_note);

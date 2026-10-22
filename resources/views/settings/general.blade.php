@@ -57,7 +57,7 @@
                                 <input type="checkbox" name="{{ $name }}" value="1" @checked(old($name, $f['value'])) class="rounded border-gray-300 text-primary">
                                 {{ $f['label'] }}
                             </label>
-                        @elseif ($key === 'search.words')
+                        @elseif (in_array($key, ['search.words', 'hold.quick_notes'], true))
                             <div class="mb-4 md:col-span-2">
                                 <label for="{{ $name }}" class="mb-1.5 block text-sm font-medium text-gray-700">{{ $f['label'] }}</label>
                                 <textarea id="{{ $name }}" name="{{ $name }}" rows="12" class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none">{{ old($name, $f['value']) }}</textarea>

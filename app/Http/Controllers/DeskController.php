@@ -125,7 +125,7 @@ class DeskController extends Controller
         // Packer-only hold reasons (item not found on the shelf) are not offered to moderators.
         $reasons = DB::table('status_reasons')->whereIn('reason_type', ['hold', 'cancel'])->where('is_active', true)
             ->where(fn ($q) => $q->whereNull('system_key')->orWhereNotIn('system_key', ['item_not_found', 'item_damaged']))
-            ->orderBy('sort_order')->get(['id', 'reason_type', 'label_en'])->groupBy('reason_type');
+            ->orderBy('sort_order')->get(['id', 'reason_type', 'label_en', 'system_key'])->groupBy('reason_type');
 
         $rules = app(\App\Services\Work\DeskRules::class)->for($user->id);
 
@@ -157,6 +157,8 @@ class DeskController extends Controller
                 'holder' => $order->moderator_id ? DB::table('users')->where('id', $order->moderator_id)->first(['id', 'name', 'photo_path']) : null,
             ] : null,
             'reasons' => ['hold' => ($reasons['hold'] ?? collect())->pluck('label_en', 'id')->all(), 'cancel' => ($reasons['cancel'] ?? collect())->pluck('label_en', 'id')->all()],
+            // Hold reasons that are the customer's own story need a written note (same list as the server check).
+            'holdNeedsNote' => ($reasons['hold'] ?? collect())->whereIn('system_key', \App\Services\Orders\DeskService::HOLD_NOTE_REASONS)->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
             'returns' => array_values(array_filter(array_map('intval', explode(',', (string) settings('desk.no_response_returns'))))),
         ]);
     }
@@ -296,7 +298,8 @@ class DeskController extends Controller
         $data = $request->validate([
             'action' => ['required', Rule::in(['verify', 'confirm', 'no_response', 'hold', 'cancel', 'resume', 'send', 'back_to_packaging', 'back_to_send'])],
             'reason_id' => ['nullable', 'integer'],
-            'note' => ['nullable', 'required_if:action,hold', 'string', 'min:3', 'max:500'], // a hold says why, for whoever opens it next
+            // A hold whose reason is the customer's own story (wait, a date, the advance) says it in words, for whoever opens it next.
+            'note' => [Rule::requiredIf(fn () => $request->input('action') === 'hold' && in_array((int) $request->input('reason_id'), $this->desk->holdNoteReasonIds(), true)), 'nullable', 'string', 'min:3', 'max:500'],
             'hold_expected_date' => ['nullable', 'date', 'after_or_equal:today'],
             'lock_version' => ['required', 'integer'],
             'tab' => ['nullable', Rule::in(self::TABS)],

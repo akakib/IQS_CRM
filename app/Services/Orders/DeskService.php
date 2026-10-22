@@ -542,13 +542,27 @@ class DeskService
             }
         }
 
+        // Given out on arrival but nobody was free: now everyone hears of it (once), so whoever finishes first takes it.
+        if ($onArrival) {
+            foreach ($due as $o) {
+                if (DB::table('orders')->where('id', $o->id)->whereNull('moderator_id')->exists()) {
+                    $this->announceNewOrder($o->id, $o->order_no);
+                }
+            }
+        }
+
         // Managers are told when orders wait and nobody is free, at most once every 30 minutes (this runs every minute).
         // Counted from the auto-assign minutes, so an order given out on arrival a minute later does not alarm anyone.
         $left = $this->waitingQuery()->where('channel', 'web')->where('queue_since', '<=', now()->subMinutes((int) settings('desk.auto_assign_minutes')))->count()
             + $this->waitingAdvanceQuery()->where('queue_since', '<=', now()->subMinutes(60))->count();
-        if ($left > 0 && Cache::add('desk:unassigned-alert', 1, now()->addMinutes(30))) {
+        // One notice that keeps its place and shows the latest count (grouped), gone once nothing waits.
+        $type = DB::table('notification_types')->where('system_key', 'orders_unassigned')->value('id');
+        if ($left === 0 && $type) {
+            DB::table('app_notifications')->where('type_id', $type)->whereNull('read_at')->delete();
+            Cache::forget('desk:unassigned-alert');
+        } elseif ($left > 0 && Cache::add('desk:unassigned-alert', 1, now()->addMinutes(30))) {
             $this->notifications->send('orders_unassigned', trans_choice('{1} 1 order is waiting and nobody is free to take it|[2,*] :n orders are waiting and nobody is free to take them', $left, ['n' => $left]), null, [
-                'link' => route('orders.activity'), 'user_ids' => $this->managerIds(),
+                'link' => route('orders.activity'), 'user_ids' => $this->managerIds(), 'group_key' => 'orders_unassigned',
             ]);
         }
 
@@ -1020,6 +1034,20 @@ class DeskService
         }
 
         return $moved;
+    }
+
+    /**
+     * "New order" to the free people, once per order: its number only (no amount, no customer). One notice per order,
+     * so it is gone for everyone as soon as someone has the order (assign() settles it).
+     */
+    public function announceNewOrder(int $orderId, string $orderNo): void
+    {
+        if (! Cache::add('desk:new-order-notice:'.$orderId, 1, now()->addDay())) {
+            return;
+        }
+        $this->notifications->send('new_order', __('New order :no', ['no' => $orderNo]), __('Waiting to be taken'), [
+            'link' => route('desk.notice', $orderId), 'subject' => ['order', $orderId], 'except_user_ids' => $this->notFreeForNewOrders(),
+        ]);
     }
 
     public function managerIds(): array

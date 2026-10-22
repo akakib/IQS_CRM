@@ -129,10 +129,11 @@ class OrderService
 
             app(\App\Services\Tracking\TrackingService::class)->handle($order, 'order_created');
 
-            if (! $order->moderator_id) {
-                $this->notifications->send('new_order', __('New order :no · ৳:t', ['no' => $order->order_no, 't' => number_format((float) $order->grand_total)]),
-                    $order->ship_name, ['link' => route('desk.notice', $order), 'subject' => ['order', $order->id], 'group_key' => 'new_order',
-                        'except_user_ids' => app(DeskService::class)->notFreeForNewOrders()]);
+            // A website order given out on arrival goes to one free person, who alone is told ("given to you"); everyone
+            // hears of it only when nobody was free (DeskService::autoAssign). Other orders: the free people are told now.
+            $givenOut = $order->channel === 'web' && settings('desk.assign_on_arrival');
+            if (! $order->moderator_id && ! $givenOut) {
+                app(DeskService::class)->announceNewOrder($order->id, $order->order_no);
             }
 
             return $order->refresh();

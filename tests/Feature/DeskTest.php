@@ -1153,4 +1153,29 @@ class DeskTest extends TestCase
         app(\App\Services\Orders\DeskService::class)->assign($a->id, $this->mahim->id, 'auto');
         $this->assertSame(0, DB::table('app_notifications')->where('subject_id', $a->id)->where('title', 'New order '.$a->order_no)->count()); // gone: one order, one notice
     }
+
+    public function test_a_website_order_given_out_on_arrival_tells_only_its_person_and_everyone_only_when_nobody_is_free(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['desk.assign_on_arrival' => true, 'desk.active_limit' => 1]);
+        DB::table('users')->whereIn('id', [$this->mahim->id, $this->rima->id])->update(['last_seen_at' => now()]);
+        $newOrder = DB::table('notification_types')->where('system_key', 'new_order')->value('id');
+
+        // Someone is free: the order goes to one person, only they are told, nobody gets "New order".
+        $a = $this->web();
+        $this->desk()->autoAssign();
+        $this->assertNotNull($who = $a->fresh()->moderator_id);
+        $this->assertSame(0, DB::table('app_notifications')->where('type_id', $newOrder)->count());
+        $this->assertSame([$who], DB::table('app_notifications')->where('subject_id', $a->id)->pluck('user_id')->all());
+
+        // Both busy now (one order each): the next one waits, everyone free would hear of it; nobody is, so nobody is told.
+        $b = $this->web();
+        $this->desk()->autoAssign();
+        $c = $this->web();
+        $this->desk()->autoAssign();
+        $this->assertNull($c->fresh()->moderator_id);
+        $this->assertSame(0, DB::table('app_notifications')->where('type_id', $newOrder)->where('title', 'like', '%৳%')->count()); // never the amount
+        $this->desk()->autoAssign();
+        $this->assertSame(DB::table('app_notifications')->where('type_id', $newOrder)->where('subject_id', $c->id)->count(),
+            DB::table('app_notifications')->where('type_id', $newOrder)->where('subject_id', $c->id)->distinct()->count('user_id')); // once each
+    }
 }

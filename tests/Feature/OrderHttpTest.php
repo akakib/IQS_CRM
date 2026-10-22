@@ -105,9 +105,10 @@ class OrderHttpTest extends TestCase
             'target' => 'role', 'role_id' => DB::table('user_roles')->where('user_id', $this->agent->id)->value('role_id'),
             'channel_in_app' => true, 'channel_telegram' => false, 'channel_sms' => false, 'is_active' => true,
         ]);
+        app(\App\Services\SettingsService::class)->set(['desk.assign_on_arrival' => false]); // orders are taken by hand here: everyone free is told
         $order = $this->webOrder();
 
-        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->agent->id, 'subject_type' => 'order', 'subject_id' => $order->id]);
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->agent->id, 'subject_type' => 'order', 'subject_id' => $order->id, 'title' => 'New order '.$order->order_no]);
 
         $this->actingAs($this->agent)->get('/orders?tab=take')->assertOk()->assertSee($order->order_no);
         $this->get("/orders/{$order->id}")->assertOk()->assertDontSee('Assign to me');

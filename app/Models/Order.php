@@ -33,6 +33,20 @@ class Order extends Model
         return array_diff_key(self::CHANNELS, ['web' => true]);
     }
 
+    /** "Woo #25288" for a website order (its number on the website), else the channel's name. */
+    public static function sourceLabel(object $order): string
+    {
+        return $order->channel === 'web' && filled($order->external_ref ?? null) ? 'Woo #'.$order->external_ref : self::channelLabel($order->channel);
+    }
+
+    /** The website order in the website's admin, for a website order. */
+    public static function websiteAdminUrl(object $order): ?string
+    {
+        $base = $order->channel === 'web' && filled($order->external_ref ?? null) ? rtrim((string) \App\Models\WebsiteAccount::current()?->url, '/') : '';
+
+        return $base !== '' ? $base.'/wp-admin/admin.php?page=wc-orders&action=edit&id='.rawurlencode((string) $order->external_ref) : null;
+    }
+
     public static function channelLabel(?string $key): string
     {
         return __(self::CHANNELS[$key] ?? ucfirst((string) $key));

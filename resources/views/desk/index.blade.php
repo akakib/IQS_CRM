@@ -230,7 +230,7 @@
                             'border-l-primary bg-primary-soft/60' => $current, 'border-l-transparent' => ! $current])>
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $row->ship_name }}</span>
-                            <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }}@if ($row->channel !== 'web') · {{ \App\Models\Order::channelLabel($row->channel) }}@endif</span>
+                            <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }} · {{ \App\Models\Order::sourceLabel($row) }}</span>
                         </span>
                         <span class="shrink-0 text-right">
                             @if ($row->action_due_at)
@@ -290,7 +290,7 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                                     <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-primary hover:underline">{{ $order->order_no }}</a>
-                                    <span>{{ \App\Models\Order::channelLabel($order->channel) }}</span>
+                                    @if ($woo = \App\Models\Order::websiteAdminUrl($order))<a href="{{ $woo }}" target="_blank" rel="noopener" class="hover:text-primary hover:underline">{{ \App\Models\Order::sourceLabel($order) }}</a>@else<span>{{ \App\Models\Order::sourceLabel($order) }}</span>@endif
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
                                     <x-courier-word :status="$detail['parcel']->courier_status ?? null" :courier="$detail['parcel']->courier ?? null" />

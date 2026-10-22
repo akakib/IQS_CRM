@@ -84,7 +84,7 @@ class DeskController extends Controller
             ->where('moderator_id', $user->id)->whereRaw($where[$tab][0], $where[$tab][1])
             ->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('orders.id')
             ->forPage($page, self::PER_PAGE)
-            ->get(['orders.id', 'order_no', 'ship_name', 'ship_thana', 'ship_district', 'grand_total', 'channel', 'status_id', 'orders.created_at', 'assigned_at',
+            ->get(['orders.id', 'order_no', 'external_ref', 'ship_name', 'ship_thana', 'ship_district', 'grand_total', 'channel', 'status_id', 'orders.created_at', 'assigned_at',
                 'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packer_id', 'packed_at',
                 'pk.name as packer_name', 'pk.photo_path as packer_photo']);
         $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ['tab' => $tab]]);

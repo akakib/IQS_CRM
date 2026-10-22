@@ -52,7 +52,7 @@
             @foreach ($orders as $o)
                 @php $open = $o->moderator_id === auth()->id() ? route('desk.notice', $o) : route('orders.show', $o); @endphp
                 <tr class="cursor-pointer" onclick="location.href='{{ $open }}'">
-                    <td><a href="{{ $open }}" onclick="event.stopPropagation()" class="font-mono font-medium text-gray-800 hover:text-primary hover:underline">{{ $o->order_no }}</a> <span class="text-xs text-gray-400">{{ \App\Models\Order::channelLabel($o->channel) }}</span></td>
+                    <td><a href="{{ $open }}" onclick="event.stopPropagation()" class="font-mono font-medium text-gray-800 hover:text-primary hover:underline">{{ $o->order_no }}</a> <span class="text-xs text-gray-400">{{ \App\Models\Order::sourceLabel($o) }}</span></td>
                     <td><p class="text-gray-800">{{ $o->ship_name }}</p><p class="font-mono text-xs text-gray-500">{{ Mask::value($o->ship_phone, 'customer_contact') }}</p></td>
                     <td><x-order-status :order="$o" :statuses="$statuses" /> <x-courier-word :status="$o->courier_status" :courier="$o->courier" />
                         @if (isset($o->cancelled_at))<p class="mt-0.5 text-xs text-gray-500">{{ collect([$o->cancel_reason ? __($o->cancel_reason) : null, $o->cancelled_by ? __('by :n', ['n' => $o->cancelled_by]) : null, \Illuminate\Support\Carbon::parse($o->cancelled_at)->format('d M, g:i A')])->filter()->join(' · ') }}</p>@endif</td>
@@ -66,7 +66,7 @@
         <x-list.cards>
             @foreach ($orders as $o)
                 <a href="{{ $o->moderator_id === auth()->id() ? route('desk.notice', $o) : route('orders.show', $o) }}" class="block">
-                    <x-record-card :title="$o->order_no.' · '.$o->ship_name" :subtitle="Mask::value($o->ship_phone, 'customer_contact')">
+                    <x-record-card :title="$o->order_no.' · '.\App\Models\Order::sourceLabel($o).' · '.$o->ship_name" :subtitle="Mask::value($o->ship_phone, 'customer_contact')">
                         <x-slot:badge><x-order-status :order="$o" :statuses="$statuses" /> <x-courier-word :status="$o->courier_status" :courier="$o->courier" /></x-slot:badge>
                         @if (isset($o->cancelled_at))<p class="mt-0.5 text-xs text-gray-500">{{ collect([$o->cancel_reason ? __($o->cancel_reason) : null, $o->cancelled_by ? __('by :n', ['n' => $o->cancelled_by]) : null, \Illuminate\Support\Carbon::parse($o->cancelled_at)->format('d M, g:i A')])->filter()->join(' · ') }}</p>@endif
                         <x-slot:footer>{{ $o->created_at->format('d M, g:i A') }} · {{ $o->moderator?->name ?? __('Not taken') }}</x-slot:footer>

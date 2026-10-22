@@ -115,7 +115,7 @@ class OrderActivityController extends Controller
             // Oldest first: what has waited longest is what needs a look.
             ->orderByRaw('COALESCE(o.queue_since, o.assigned_at, o.created_at)')->orderBy('o.id')
             ->forPage($page, self::PER_COLUMN)
-            ->get(['o.id', 'o.order_no', 'o.ship_name', 'o.ship_phone', 'o.grand_total', 'o.channel', 'o.status_id', 'o.created_at', 'o.queue_since',
+            ->get(['o.id', 'o.order_no', 'o.external_ref', 'o.ship_name', 'o.ship_phone', 'o.grand_total', 'o.channel', 'o.status_id', 'o.created_at', 'o.queue_since',
                 'o.assigned_at', 'o.action_due_at', 'o.next_call_at', 'o.no_response_count', 'o.booking_state', 'o.booking_error',
                 'o.hold_expected_date', 'o.packed_at', 'o.packaging_started_at', 'o.edited_after_pack', 'o.packed_version', 'o.current_version',
                 'o.moderator_id', 'm.name as moderator', 'm.photo_path as moderator_photo', 'm.current_break_id as moderator_on_break',

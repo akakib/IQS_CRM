@@ -43,13 +43,14 @@ class OrderSearchController extends Controller
                     'name' => $nameMatch($w),
                     // All: the order number, then whatever the text looks like.
                     default => $w->where('order_no', $orderNo)
+                        ->when(preg_match('/^#?\d{3,10}$/', $q), fn ($w) => $w->orWhere(fn ($x) => $x->where('channel', 'web')->where('external_ref', ltrim($q, '#')))) // the website's order number
                         ->when($phone, $phoneMatch)
                         ->when(strlen($digits) >= 6, $cnMatch)
                         ->orWhereIn('orders.id', DB::table('shipments')->select('order_id')->where('tracking_code', $q))
                         ->when(! $phone && strlen($digits) < 6, $nameMatch),
                 })
                 ->orderByDesc('orders.id')->limit(25)
-                ->get(['orders.id', 'order_no', 'status_id', 'moderator_id', 'customer_id', 'ship_name', 'ship_phone', 'ship_thana', 'ship_district', 'grand_total', 'cod_amount', 'active_shipment_id', 'created_at', 'channel']);
+                ->get(['orders.id', 'order_no', 'external_ref', 'status_id', 'moderator_id', 'customer_id', 'ship_name', 'ship_phone', 'ship_thana', 'ship_district', 'grand_total', 'cod_amount', 'active_shipment_id', 'created_at', 'channel']);
         }
 
         // Parcels imported from a courier file (history only), found by their CN.

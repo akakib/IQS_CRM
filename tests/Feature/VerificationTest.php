@@ -75,6 +75,22 @@ class VerificationTest extends TestCase
         $this->assertSame((float) $order->delivery_charge, (float) $order->advance_required);
     }
 
+    public function test_an_order_confirmed_without_record_verified_is_set_on_the_website_and_shows_its_website_number(): void
+    {
+        \App\Services\Catalog\Store\FakeStoreDriver::$sent = [];
+        $order = $this->order('01712345679', 1, ['external_ref' => '25288']); // held for the advance, never Record verified
+        $this->assertSame('hold', $this->key($order));
+        $owner = $this->owner();
+        app(\App\Services\Orders\OrderStateMachine::class)->transition($order, 'confirmed', $owner, 'user', null, 'Advance waived');
+        $this->app->terminate();
+        (fn () => $this->terminatingCallbacks = [])->call($this->app);
+        $this->assertContains(['order' => '25288', 'status' => 'record-verified'], \App\Services\Catalog\Store\FakeStoreDriver::$sent);
+
+        $this->actingAs($owner)->get(route('orders.show', $order))->assertSee('Woo #25288');
+        $this->get(route('orders.search', ['q' => '25288']))->assertSee($order->order_no);
+        $this->get(route('orders.index'))->assertSee('Woo #25288');
+    }
+
     public function test_a_record_verified_website_order_is_set_to_record_verified_on_the_website(): void
     {
         \App\Services\Catalog\Store\FakeStoreDriver::$sent = [];

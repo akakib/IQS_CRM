@@ -49,7 +49,7 @@ class OrderController extends Controller
 
         // Large, fast-growing list: simple pagination, indexed filters; the count above the list stops at COUNT_CAP.
         $query = Order::query()->visibleTo($user)
-            ->select(['id', 'order_no', 'channel', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'grand_total', 'cod_amount',
+            ->select(['id', 'order_no', 'external_ref', 'channel', 'status_id', 'moderator_id', 'ship_name', 'ship_phone', 'grand_total', 'cod_amount',
                 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packed_version', 'current_version', 'edited_after_pack', 'created_at'])
             ->addSelect(['courier' => DB::table('shipments')->select('courier')->whereColumn('shipments.id', 'orders.active_shipment_id')->limit(1),
                 'courier_status' => DB::table('shipments')->select('courier_status')->whereColumn('shipments.id', 'orders.active_shipment_id')->limit(1)])

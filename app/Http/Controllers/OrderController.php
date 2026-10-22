@@ -504,6 +504,10 @@ class OrderController extends Controller
 
     private function authorizeWork(Order $order, User $user): void
     {
+        // One order at a time: an order waiting its turn in someone's hand is worked after the one before it.
+        if ($order->moderator_id === $user->id && ($first = app(\App\Services\Orders\DeskService::class)->lockedBehind($order))) {
+            abort(409, __('One order at a time: finish :no first.', ['no' => $first]));
+        }
         abort_unless(Order::visibleTo($user)->whereKey($order->id)->exists(), 403);
         // An order nobody has is taken with Take next (oldest first), never picked by hand: nobody chooses the good
         // customers and leaves the hard ones. Managers (who give orders out) may still act on it.

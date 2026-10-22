@@ -1184,4 +1184,23 @@ class DeskTest extends TestCase
         $this->assertSame(DB::table('app_notifications')->where('type_id', $newOrder)->where('subject_id', $c->id)->count(),
             DB::table('app_notifications')->where('type_id', $newOrder)->where('subject_id', $c->id)->distinct()->count('user_id')); // once each
     }
+
+    public function test_with_two_orders_in_hand_only_the_first_opens_the_second_waits_its_turn(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 2, 'desk.timer_enabled' => false]); // countdown off: the queue keeps one at a time
+        $a = $this->web();
+        $b = $this->web();
+        $this->actingAs($this->mahim)->post('/desk/next');
+        $this->assertSame([$this->mahim->id, $this->mahim->id], [$a->fresh()->moderator_id, $b->fresh()->moderator_id]);
+
+        // The second is shown but locked behind the first, and cannot be worked on by any door.
+        $this->get('/desk?tab=verify&order='.$b->id)->assertOk()->assertSee('Opens after '.$a->order_no);
+        $this->act($b->fresh(), 'cancel', ['reason_id' => DB::table('status_reasons')->where('reason_type', 'cancel')->value('id')])->assertSessionHasErrors('order');
+        $this->get('/orders/'.$b->id.'/edit')->assertStatus(409);
+
+        // The first is done: the second opens.
+        $this->act($a->fresh(), 'cancel', ['reason_id' => DB::table('status_reasons')->where('reason_type', 'cancel')->value('id')])->assertSessionHasNoErrors();
+        $this->get('/desk?tab=verify')->assertOk()->assertDontSee('Opens after');
+        $this->act($b->fresh(), 'verify')->assertSessionHasNoErrors();
+    }
 }

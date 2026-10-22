@@ -225,6 +225,17 @@
                 <p class="border-b border-gray-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $tabLabels[$tab] }} · {{ __('oldest first') }}</p>
                 @forelse ($list as $row)
                     @php $current = $order && $order->id === $row->id; @endphp
+                    @if (isset($locked) && $locked->has($row->id))
+                        {{-- One at a time: waits until the order before it is done, then opens by itself. --}}
+                        <div class="flex items-center justify-between gap-2 border-b border-l-4 border-b-gray-100 border-l-transparent px-4 py-3 opacity-60 last:border-b-0">
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm font-medium text-gray-800">{{ $row->ship_name }}</span>
+                                <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }}</span>
+                            </span>
+                            <span class="shrink-0 text-right text-xs text-gray-500">{{ __('Opens after :no', ['no' => $working->order_no]) }}</span>
+                        </div>
+                        @continue
+                    @endif
                     <a href="{{ $url(['tab' => $tab, 'page' => $list->currentPage() > 1 ? $list->currentPage() : null, 'order' => $row->id]) }}" data-row data-current="{{ $current ? 1 : 0 }}"
                         @class(['flex items-center justify-between gap-2 border-b border-l-4 border-b-gray-100 px-4 py-3 last:border-b-0 hover:bg-gray-50',
                             'border-l-primary bg-primary-soft/60' => $current, 'border-l-transparent' => ! $current])>

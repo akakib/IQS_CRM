@@ -111,6 +111,36 @@ class DeskService
         return $this->activeCount($userId) + $uncalled;
     }
 
+    /**
+     * One order at a time: of the orders in someone's hand (the batch: new and record verified website orders, and
+     * advance holds not called yet), the one to work now (the one with the running timer, else the oldest given) and
+     * the rest, which stay locked until it is done. One query; the rest of the page already knows the timer.
+     *
+     * @return array{0: ?object, 1: \Illuminate\Support\Collection} [working order (id, order_no), locked orders keyed by id]
+     */
+    public function workQueue(int $userId, ?int $timedId = null): array
+    {
+        $rows = DB::table('orders as o')->where('o.moderator_id', $userId)
+            ->where(fn ($w) => $w->where(fn ($a) => $a->where('o.channel', 'web')->whereIn('o.status_id', OrderStatus::idsFor(self::ACTIVE)))
+                ->orWhere(fn ($h) => $h->where('o.status_id', OrderStatus::idFor('hold'))->where('o.hold_reason_id', $this->advanceReasonId())->whereNull('o.advance_waived_at')
+                    ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_notes as n')->whereColumn('n.order_id', 'o.id')->where('n.note_type', 'call'))))
+            ->orderBy('o.assigned_at')->orderBy('o.id')->get(['o.id', 'o.order_no']);
+        $working = ($timedId ? $rows->firstWhere('id', $timedId) : null) ?? $rows->first();
+
+        return [$working, $rows->reject(fn ($r) => $working && $r->id === $working->id)->keyBy('id')];
+    }
+
+    /** The order this one waits behind, when it is locked for its person (null: free to work on). */
+    public function lockedBehind(Order $order): ?string
+    {
+        if (! $order->moderator_id || settings('desk.timer_enabled')) {
+            return null; // with the countdown on, the running timer keeps one order at a time
+        }
+        [$working, $locked] = $this->workQueue((int) $order->moderator_id);
+
+        return $locked->has($order->id) ? $working?->order_no : null;
+    }
+
     /** Website orders this person still has to act on (the limit counts these). */
     public function activeCount(int $userId): int
     {

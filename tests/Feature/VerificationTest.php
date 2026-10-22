@@ -176,6 +176,7 @@ class VerificationTest extends TestCase
         // 3. Asked without advance: the admin allows, it goes to Call.
         $b = $this->order('01812345679');
         $b->forceFill(['moderator_id' => $mod->id])->save();
+        $a->forceFill(['moderator_id' => null])->save(); // one order at a time: the first is out of the way
         $this->post("/orders/{$b->id}/advance-waiver", ['why' => 'Old shop customer'])->assertSessionHas('success');
         $this->assertNotNull($b->fresh()->advance_waiver_requested_at);
         $this->post("/orders/{$b->id}/advance-waiver/decide", ['decision' => 'allow'])->assertForbidden();

@@ -89,9 +89,16 @@ class DeskController extends Controller
                 'pk.name as packer_name', 'pk.photo_path as packer_photo']);
         $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ['tab' => $tab]]);
 
-        // The open order: the one asked for (if it is mine), else the first in the list.
+        // One at a time: with more than one order in hand, only the one to work now opens; the rest wait their turn.
+        // (With the countdown on, the running timer already keeps one order at a time.)
+        [$working, $locked] = ! settings('desk.timer_enabled') && $counts['verify'] + $counts['call'] >= 2 ? $this->desk->workQueue($user->id) : [null, collect()];
+
+        // The open order: the one asked for (if it is mine and not waiting its turn), else the first in the list.
         // (An order just taken back is not reopened, even if the address still names it.)
         $openId = ($lost ? 0 : (int) $request->query('order')) ?: ($toTimed ? $timed->id : ($rows->first()->id ?? 0));
+        if ($locked->has($openId)) {
+            $openId = $working->id;
+        }
         $order = $openId ? Order::with(['customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en', 'packer:id,name,photo_path', 'moderator:id,name,photo_path'])->find($openId) : null;
         $notYours = null;
         if ($order && $order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all') {
@@ -134,6 +141,7 @@ class DeskController extends Controller
             'counts' => $counts,
             'list' => $list,
             'order' => $order,
+            'locked' => $locked, 'working' => $working,
             'detail' => $order ? $this->detail($order) : null,
             // The timer runs on one order at a time. If the open order is not that one, point to it.
             'timed' => $timed && (! $order || $order->id !== $timed->id) ? $timed : null,
@@ -295,6 +303,9 @@ class DeskController extends Controller
         $user = $request->user();
         abort_if($order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
 
+        if ($order->moderator_id === $user->id && ($first = $this->desk->lockedBehind($order))) {
+            throw ValidationException::withMessages(['order' => __('One order at a time: finish :no first.', ['no' => $first])]);
+        }
         $data = $request->validate([
             'action' => ['required', Rule::in(['verify', 'confirm', 'no_response', 'hold', 'cancel', 'resume', 'send', 'back_to_packaging', 'back_to_send'])],
             'reason_id' => ['nullable', 'integer'],

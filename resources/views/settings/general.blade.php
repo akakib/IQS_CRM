@@ -7,7 +7,7 @@
 @endphp
 
 <x-layouts.app :heading="__('Settings')">
-    <form method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" class="max-w-3xl space-y-6" x-data="tabs(@js($firstTab))">
+    <form method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" class="max-w-6xl space-y-6" x-data="tabs(@js($firstTab))">
         @csrf
         <input type="hidden" name="settings_page" value="1">
         @method('PUT')

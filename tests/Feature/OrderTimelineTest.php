@@ -115,13 +115,17 @@ class OrderTimelineTest extends TestCase
         $this->travel(40)->minutes();
         app(OrderStateMachine::class)->transition($worked->fresh(), 'record_verified', $this->mahim); // touched at 10:40
         $this->travel(21)->minutes();
-        $this->assertSame(1, app(DeskService::class)->returnIdle());
+        // Busy on one of his orders 21 minutes ago (one at a time: the other waits its turn): nothing is taken back.
+        $this->assertSame(0, app(DeskService::class)->returnIdle());
+        $this->assertSame($this->mahim->id, $left->fresh()->moderator_id);
 
-        $this->assertNull($left->fresh()->moderator_id); // 61 minutes with nothing done: back to New
+        // Then an hour with nothing done on anything: both go back to New.
+        $this->travel(40)->minutes();
+        $this->assertSame(2, app(DeskService::class)->returnIdle());
+        $this->assertNull($left->fresh()->moderator_id);
         $this->assertDatabaseHas('order_assignments', ['order_id' => $left->id, 'user_id' => $this->mahim->id, 'ended_reason' => 'idle']);
-        $this->assertSame($this->mahim->id, $worked->fresh()->moderator_id);
         // Counted where the old timeouts were: Control room shows it as given back.
-        $this->assertSame(1, DB::table('order_assignments')->whereIn('ended_reason', ['timeout', 'idle'])->count());
+        $this->assertSame(2, DB::table('order_assignments')->whereIn('ended_reason', ['timeout', 'idle'])->count());
 
         // A new turn is measured from its own start: Rima's time does not include Mahim's hour.
         $this->assertSame($left->id, app(DeskService::class)->takeNext($this->rima)->id);

@@ -1198,6 +1198,14 @@ class DeskTest extends TestCase
         $this->act($b->fresh(), 'cancel', ['reason_id' => DB::table('status_reasons')->where('reason_type', 'cancel')->value('id')])->assertSessionHasErrors('order');
         $this->get('/orders/'.$b->id.'/edit')->assertStatus(409);
 
+        // Busy on the first for longer than the idle limit: the locked second is not taken back from them.
+        app(\App\Services\SettingsService::class)->set(['desk.idle_return_minutes' => 20]);
+        $this->travel(15)->minutes();
+        app(OrderStateMachine::class)->transition($a->fresh(), 'record_verified', $this->mahim);
+        $this->travel(10)->minutes();
+        $this->desk()->returnIdle();
+        $this->assertSame($this->mahim->id, $b->fresh()->moderator_id);
+
         // The first is done: the second opens.
         $this->act($a->fresh(), 'cancel', ['reason_id' => DB::table('status_reasons')->where('reason_type', 'cancel')->value('id')])->assertSessionHasNoErrors();
         $this->get('/desk?tab=verify')->assertOk()->assertDontSee('Opens after');

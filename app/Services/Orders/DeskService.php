@@ -449,6 +449,9 @@ class DeskService
             ->whereIn('o.status_id', OrderStatus::idsFor(self::ACTIVE))->where('o.assigned_at', '<=', $cutoff)
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_events as e')->whereColumn('e.order_id', 'o.id')->where('e.created_at', '>', $cutoff))
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('customer_calls as c')->whereColumn('c.order_id', 'o.id')->whereColumn('c.user_id', 'o.moderator_id')->where('c.started_at', '>', $cutoff))
+            // Busy on another of their orders (one at a time: the next ones wait locked): nothing of theirs is taken back.
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_events as e2')->whereColumn('e2.user_id', 'o.moderator_id')->where('e2.created_at', '>', $cutoff))
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('customer_calls as c2')->whereColumn('c2.user_id', 'o.moderator_id')->where('c2.started_at', '>', $cutoff))
             ->orderBy('o.id')->limit(100)->pluck('o.id');
         foreach ($ids as $id) {
             $this->release((int) $id, 'idle');

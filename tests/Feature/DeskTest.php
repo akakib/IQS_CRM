@@ -313,6 +313,26 @@ class DeskTest extends TestCase
         $this->assertSame(0, DB::table('point_ledger')->where('user_id', $this->rima->id)->where('trigger_key', 'order_delivered')->count());
     }
 
+    public function test_an_order_waiting_for_its_advance_goes_to_a_colleague_when_its_person_is_off_work_not_on_a_break(): void
+    {
+        $o = $this->web();
+        $this->desk()->assign($o->id, $this->mahim->id, 'claimed');
+        $advance = (int) $this->desk()->advanceReasonId();
+        DB::table('orders')->where('id', $o->id)->update(['status_id' => OrderStatus::idFor('hold'), 'hold_reason_id' => $advance, 'advance_required' => 100]);
+        DB::table('users')->where('id', $this->rima->id)->update(['last_seen_at' => now()]);
+        DB::table('users')->where('id', $this->mahim->id)->update(['last_seen_at' => now()->subHour()]);
+
+        // On a break: it waits for them.
+        $break = DB::table('staff_breaks')->insertGetId(['user_id' => $this->mahim->id, 'started_at' => now(), 'counts_as_break' => true]);
+        DB::table('users')->where('id', $this->mahim->id)->update(['current_break_id' => $break]);
+        $this->assertSame(0, $this->desk()->coverAway());
+
+        // Off work: Rima holds it now; it stays Mahim's order.
+        DB::table('users')->where('id', $this->mahim->id)->update(['current_break_id' => null]);
+        $this->assertSame(1, $this->desk()->coverAway());
+        $this->assertSame([$this->rima->id, $this->mahim->id], [$o->fresh()->moderator_id, $o->fresh()->covered_for_id]);
+    }
+
     public function test_no_response_returns_after_each_delay_then_cancels(): void
     {
         $a = $this->web();

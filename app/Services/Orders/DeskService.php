@@ -988,7 +988,11 @@ class DeskService
         $due = DB::table('orders')->whereNotNull('moderator_id')->whereNotIn('moderator_id', $free ?: [0])
             ->where(fn ($q) => $q->where(fn ($n) => $n->where('status_id', OrderStatus::idFor('no_answer'))->where('next_call_at', '<=', now()))
                 ->orWhere(fn ($h) => $h->where('status_id', OrderStatus::idFor('hold'))->whereNotNull('hold_expected_date')->where('hold_expected_date', '<=', today())
-                    ->where(fn ($r) => $r->whereNull('hold_reason_id')->orWhere('hold_reason_id', '!=', (int) $this->advanceReasonId()))))
+                    ->where(fn ($r) => $r->whereNull('hold_reason_id')->orWhere('hold_reason_id', '!=', (int) $this->advanceReasonId())))
+                // Waiting for the advance while its person is off work (not just on a break): the customer may call or
+                // send it at any time, so someone at work holds it.
+                ->orWhere(fn ($a) => $a->where('status_id', OrderStatus::idFor('hold'))->where('hold_reason_id', (int) $this->advanceReasonId())
+                    ->whereNull('advance_waived_at')->whereIn('moderator_id', DB::table('users')->select('id')->whereNull('current_break_id'))))
             ->orderBy('id')->limit(50)->get(['id', 'order_no', 'moderator_id', 'covered_for_id']);
         $moved = 0;
         foreach ($due as $o) {

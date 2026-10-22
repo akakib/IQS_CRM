@@ -129,15 +129,15 @@ class AdvanceHoldTest extends TestCase
         $this->next()->assertRedirect("/desk?tab=call&order={$held->id}");
         $this->assertNull($another->fresh()->moderator_id);
         // Called ("will pay by a date"): parked, the hand is free, the next one comes.
-        $this->post("/orders/{$held->id}/advance-date", ['date' => today()->addDay()->toDateString()]);
+        $this->post("/orders/{$held->id}/advance-date", ['date' => today()->addDay()->toDateString(), 'note' => 'Will send after salary']);
         $this->next()->assertRedirect("/desk?tab=call&order={$another->id}");
 
         // 4. The parked cap: at most 5 advance holds per person, each called before the next.
-        $this->post("/orders/{$another->id}/advance-date", ['date' => today()->addDay()->toDateString()]);
+        $this->post("/orders/{$another->id}/advance-date", ['date' => today()->addDay()->toDateString(), 'note' => 'Will send after salary']);
         for ($i = 0; $i < 3; $i++) {
             $o = $this->web(9);
             $this->next()->assertSessionHasNoErrors();
-            $this->post("/orders/{$o->id}/advance-date", ['date' => today()->addDay()->toDateString()]);
+            $this->post("/orders/{$o->id}/advance-date", ['date' => today()->addDay()->toDateString(), 'note' => 'Will send after salary']);
         }
         $sixth = $this->web(9);
         $this->next()->assertSessionHasErrors('order');
@@ -214,7 +214,7 @@ class AdvanceHoldTest extends TestCase
     {
         $held = $this->web(9);
         $this->actingAs($this->mod)->post('/desk/next');
-        $this->post("/orders/{$held->id}/advance-date", ['date' => today()->addDays(2)->toDateString()])->assertSessionHas('success');
+        $this->post("/orders/{$held->id}/advance-date", ['date' => today()->addDays(2)->toDateString(), 'note' => 'Will send after salary'])->assertSessionHas('success');
         $this->assertDatabaseHas('order_notes', ['order_id' => $held->id, 'note_type' => 'call']);
 
         // Not yet: no notice. On the day: one notice, and only one however often it runs.

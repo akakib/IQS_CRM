@@ -398,14 +398,18 @@ class DeskTest extends TestCase
         $this->actingAs($this->mahim);
 
         // No date: refused. With a date: held, the date kept.
-        $this->act($orders[0], 'hold', ['reason_id' => $reason])->assertSessionHasErrors('hold_expected_date');
+        $this->act($orders[0], 'hold', ['note' => 'Customer travelling', 'reason_id' => $reason])->assertSessionHasErrors('hold_expected_date');
         $this->assertSame('record_verified', $this->key($orders[0]));
-        $this->act($orders[0], 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDays(2)->toDateString()])->assertSessionHasNoErrors();
+        // No written reason: refused (whoever opens it next must know why).
+        $this->act($orders[0], 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDays(2)->toDateString()])->assertSessionHasErrors('note');
+        $this->act($orders[0], 'hold', ['note' => 'Customer travelling', 'reason_id' => $reason, 'hold_expected_date' => today()->addDays(2)->toDateString()])->assertSessionHasNoErrors();
         $this->assertSame(today()->addDays(2)->toDateString(), $orders[0]->fresh()->hold_expected_date->toDateString());
-        $this->act($orders[1], 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()]);
+        $this->assertSame('Customer travelling', $orders[0]->fresh()->hold_note);
+        $this->get(route('orders.show', $orders[0]))->assertSee('Customer travelling');
+        $this->act($orders[1], 'hold', ['note' => 'Customer travelling', 'reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()]);
 
         // The limit (2): the third is refused, so Hold cannot empty the hands for the next batch.
-        $this->act($orders[2], 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])
+        $this->act($orders[2], 'hold', ['note' => 'Customer travelling', 'reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])
             ->assertSessionHasErrors(['hold_limit' => 'You already hold 2 orders on hold. Settle one of them first (call, confirm or cancel), or ask your manager for more.']);
         $this->assertSame('record_verified', $this->key($orders[2]));
 
@@ -432,7 +436,7 @@ class DeskTest extends TestCase
             app(\App\Services\Orders\OrderStateMachine::class)->transition($fourth->fresh(), 'record_verified', $this->mahim);
         }
         $this->actingAs($this->mahim);
-        $this->act($fourth->fresh(), 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])->assertSessionHasErrors('hold_limit');
+        $this->act($fourth->fresh(), 'hold', ['note' => 'Customer travelling', 'reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])->assertSessionHasErrors('hold_limit');
         $this->get(route('desk.index', ['order' => $fourth->id]))->assertSee('Ask your manager');
         $this->post(route('hold-limits.ask'), ['reason' => 'Eid week, many customers ask to wait'])->assertSessionHas('success');
         $this->post(route('hold-limits.ask'), ['reason' => 'again'])->assertSessionHas('error');
@@ -450,7 +454,7 @@ class DeskTest extends TestCase
         app()->forgetInstance(\App\Services\Work\DeskRules::class);
         app()->forgetInstance(\App\Services\Orders\DeskService::class);
         $this->actingAs($this->mahim);
-        $this->act($fourth->fresh(), 'hold', ['reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])->assertSessionHasNoErrors();
+        $this->act($fourth->fresh(), 'hold', ['note' => 'Customer travelling', 'reason_id' => $reason, 'hold_expected_date' => today()->addDay()->toDateString()])->assertSessionHasNoErrors();
         $this->assertSame('hold', $this->key($fourth));
     }
 
@@ -817,7 +821,7 @@ class DeskTest extends TestCase
 
         // Finishing a frees b: opening it starts its clock.
         $this->act($a, 'verify')->assertSessionHas('success');
-        $this->act($a->fresh(), 'hold', ['reason_id' => DB::table('status_reasons')->where('reason_type', 'hold')->value('id')]);
+        $this->act($a->fresh(), 'hold', ['note' => 'Customer travelling', 'reason_id' => DB::table('status_reasons')->where('reason_type', 'hold')->value('id')]);
         $this->get('/desk?tab=verify&order='.$b->id)->assertOk();
         $this->assertNotNull($b->fresh()->action_due_at);
     }

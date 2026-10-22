@@ -334,6 +334,7 @@
                                 @if ($key === 'hold')
                                     <p><b>{{ $order->holdReason->label_en ?? __('On hold') }}</b>@if ($order->hold_expected_date) · {{ __('until :d', ['d' => $order->hold_expected_date->format('d M')]) }}@endif
                                         @if ($detail['heldBy']) · {{ __('held by :n', ['n' => $detail['heldBy']]) }}@endif</p>
+                                    @if ($order->hold_note)<p class="text-gray-800">“{{ $order->hold_note }}”</p>@endif
                                 @elseif ($key === 'no_answer' && $order->next_call_at && $order->next_call_at->isFuture())
                                     <p>{{ __('Comes back to your Call tab at :t.', ['t' => $order->next_call_at->isToday() ? $order->next_call_at->format('g:i A') : $order->next_call_at->format('d M, g:i A')]) }}</p>
                                 @elseif (isset($guide[$key]))
@@ -583,7 +584,11 @@
                             @if ($mode === 'hold')
                                 <div class="mt-3"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Follow-up date')" full-width /></div>
                             @endif
-                            <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="{{ $input }} mt-3">
+                            @if ($mode === 'hold')
+                                <textarea name="note" required minlength="3" maxlength="500" rows="2" placeholder="{{ __('Why, in a few words (whoever opens it next reads this)') }}" class="{{ $input }} mt-3"></textarea>
+                            @else
+                                <input name="note" maxlength="500" placeholder="{{ __('Note (optional)') }}" class="{{ $input }} mt-3">
+                            @endif
                             <div class="mt-4 flex gap-2">
                                 <button type="button" @click="reasonMode = null" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">{{ __('Back') }}</button>
                                 <button type="submit" :disabled="!reason" class="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 {{ $mode === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary-dark' }}">{{ $mode === 'cancel' ? __('Cancel the order') : __('Put on hold') }}</button>

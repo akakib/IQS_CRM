@@ -412,10 +412,10 @@ class OrderService
     }
 
     /** "Will send the advance by": the call happened, the date is noted, the hold stays. */
-    public function advanceWillPayBy(Order $order, User $by, string $date): void
+    public function advanceWillPayBy(Order $order, User $by, string $date, ?string $why = null): void
     {
-        $order->forceFill(['hold_expected_date' => $date, 'hold_date_notified_at' => null])->save();
-        $this->note($order, 'call', __('Called: will send the advance by :d', ['d' => \Illuminate\Support\Carbon::parse($date)->format('d M')]), $by, ['outcome' => 'will_pay']);
+        $order->forceFill(['hold_expected_date' => $date, 'hold_date_notified_at' => null] + ($why ? ['hold_note' => $why, 'hold_note_by' => $by->id, 'hold_note_at' => now()] : []))->save();
+        $this->note($order, 'call', __('Called: will send the advance by :d', ['d' => \Illuminate\Support\Carbon::parse($date)->format('d M')]).($why ? ' · '.$why : ''), $by, ['outcome' => 'will_pay']);
     }
 
     /** The order number of another open order of the same customer from the last 7 days, if any (same rule as the desk's duplicate check). */

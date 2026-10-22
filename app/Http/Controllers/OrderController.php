@@ -329,8 +329,8 @@ class OrderController extends Controller
     public function advanceWillPayBy(Order $order, Request $request): RedirectResponse
     {
         $this->authorizeWork($order, $request->user());
-        $data = $request->validate(['date' => ['required', 'date', 'after_or_equal:today']]);
-        $this->orders->advanceWillPayBy($order, $request->user(), $data['date']);
+        $data = $request->validate(['date' => ['required', 'date', 'after_or_equal:today'], 'note' => ['required', 'string', 'min:3', 'max:500']]);
+        $this->orders->advanceWillPayBy($order, $request->user(), $data['date'], $data['note']);
 
         return back()->with('success', __('Noted. You are reminded on :d.', ['d' => \Illuminate\Support\Carbon::parse($data['date'])->format('d M')]));
     }

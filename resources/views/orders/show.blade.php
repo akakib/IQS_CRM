@@ -19,6 +19,7 @@
                 @if ($woo = \App\Models\Order::websiteAdminUrl($order))<a href="{{ $woo }}" target="_blank" rel="noopener" class="font-medium text-primary hover:underline">{{ \App\Models\Order::sourceLabel($order) }}</a>@else{{ \App\Models\Order::sourceLabel($order) }}@endif
                 · {{ $order->created_at->format('d M Y, g:i A') }}</span>
             @if ($order->holdReason)<x-badge color="amber">{{ $order->holdReason->label_en }}{{ $order->hold_expected_date ? ' · '.$order->hold_expected_date->format('d M') : '' }}</x-badge>@endif
+            @if ($order->hold_note && \App\Models\OrderStatus::map()[$order->status_id]['key'] === 'hold')<span class="w-full text-sm text-amber-900">“{{ $order->hold_note }}”</span>@endif
             <x-website-status :order="$order" class="!mt-0 w-full sm:w-auto" />
         </div>
         <div class="flex items-center gap-2">

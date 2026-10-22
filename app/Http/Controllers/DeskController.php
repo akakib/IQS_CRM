@@ -296,7 +296,7 @@ class DeskController extends Controller
         $data = $request->validate([
             'action' => ['required', Rule::in(['verify', 'confirm', 'no_response', 'hold', 'cancel', 'resume', 'send', 'back_to_packaging', 'back_to_send'])],
             'reason_id' => ['nullable', 'integer'],
-            'note' => ['nullable', 'string', 'max:500'],
+            'note' => ['nullable', 'required_if:action,hold', 'string', 'min:3', 'max:500'], // a hold says why, for whoever opens it next
             'hold_expected_date' => ['nullable', 'date', 'after_or_equal:today'],
             'lock_version' => ['required', 'integer'],
             'tab' => ['nullable', Rule::in(self::TABS)],
@@ -348,7 +348,7 @@ class DeskController extends Controller
             case 'hold':
                 $this->desk->checkHold($user, $order, $data['hold_expected_date'] ?? null);
                 $this->machine->transition($order, 'hold', $user, 'user', $reason, $note);
-                $order->forceFill(['hold_expected_date' => $data['hold_expected_date']])->save();
+                $order->forceFill(['hold_expected_date' => $data['hold_expected_date'], 'hold_note' => $note, 'hold_note_by' => $user->id, 'hold_note_at' => now()])->save();
                 $message = __(':no is on hold.', ['no' => $order->order_no]);
                 break;
             case 'cancel':

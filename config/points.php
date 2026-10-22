@@ -10,10 +10,10 @@ return [
     'triggers' => [
         'order_claimed' => ['Took an order (Assign to me)', 'Intake', ['minutes_waiting']],
         'order_confirmed' => ['Order confirmed', 'Confirmation', ['minutes_since_claim', 'risky', 'by_rule']],
-        'order_delivered' => ['Order delivered', 'Delivery', ['channel', 'saved', 'repeat_customer', 'own_entry', 'days_since_last_order', 'risky']],
+        'order_delivered' => ['Order delivered', 'Delivery', ['channel', 'saved', 'repeat_customer', 'own_entry', 'days_since_last_order', 'risky', 'advance_taken']],
         'order_partial' => ['Partial delivery', 'Delivery', ['channel', 'blame', 'risky']],
         'order_returned' => ['Order returned', 'Delivery', ['channel', 'blame', 'risky']],
-        'order_cancelled' => ['Order cancelled', 'Confirmation', ['channel', 'blame', 'shipped', 'risky', 'advance_asked']],
+        'order_cancelled' => ['Order cancelled', 'Confirmation', ['channel', 'blame', 'shipped', 'risky', 'advance_asked', 'advance_taken']],
         'timer_extended' => ['Took extra time on the action timer', 'Quality', ['extensions_today']],
         'timer_beaten' => ['Finished an order within the time limit', 'Quality', []],
         'timer_missed' => ['Went over the time limit on an order (it stays with them)', 'Quality', ['releases_today']],
@@ -44,6 +44,7 @@ return [
         'by_rule' => 'Confirmed automatically by a rule (true/false)',
         'blame' => 'Whose fault (none, sales, packaging, courier, customer…)',
         'advance_asked' => 'Advance was asked before cancelling (true/false)',
+        'advance_taken' => 'An advance was taken from the customer (true/false)',
         'after_pack' => 'Changed after packaging (true/false)',
     ],
 ];

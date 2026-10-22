@@ -424,4 +424,19 @@ class AdvanceHoldTest extends TestCase
         $this->actingAs($this->admin)->post("/payments/refunds/{$b->id}/credit", ['amount' => 50])->assertSessionHas('success');
         $this->assertSame('0.00', $b->fresh()->refund_due);
     }
+
+    public function test_an_advance_taken_earns_more_when_delivered_and_costs_less_when_cancelled(): void
+    {
+        $points = function (string $ending) {
+            $o = $this->web(9);
+            $this->actingAs($this->mod)->post('/desk/next');
+            $this->post("/orders/{$o->id}/payments", ['called' => 1, 'advance' => ['method_id' => $this->bkash(), 'amount' => (float) $o->advance_required, 'transaction_id' => 'ADV'.$ending.$o->id]]);
+            DB::table('point_ledger')->delete();
+            app(\App\Services\Orders\OrderStateMachine::class)->transition($o->fresh(), $ending, $ending === 'cancelled' ? $this->admin : null, $ending === 'cancelled' ? 'user' : 'webhook',
+                $ending === 'cancelled' ? DB::table('status_reasons')->where('reason_type', 'cancel')->value('id') : null);
+
+            return (float) DB::table('point_ledger')->where('user_id', $this->mod->id)->sum('points');
+        };
+        $this->assertSame(-0.5, $points('cancelled')); // not the full -1
+    }
 }

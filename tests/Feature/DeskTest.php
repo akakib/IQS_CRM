@@ -229,13 +229,16 @@ class DeskTest extends TestCase
         $this->get('/desk')->assertOk()->assertSee('Time limit passed on '.$a->order_no);
         $this->assertSame($this->mahim->id, $a->fresh()->moderator_id);
 
-        // An hour later with nothing done: back to New for anyone, without a second penalty.
+        // An hour later with nothing done: back to New for anyone, without a second penalty; the managers are told who left it.
+        $boss = $this->manager();
+        DB::table('roles')->where('id', $boss->roles()->value('roles.id'))->update(['system_key' => 'manager']);
         $this->travel(61)->minutes();
         Artisan::call('desk:tick');
         $this->assertNull($a->fresh()->moderator_id);
         $this->assertNull($a->fresh()->timer_overran_at);
         $this->assertDatabaseHas('order_work_logs', ['order_id' => $a->id, 'outcome' => 'idle', 'overran' => true]);
         $this->assertSame($a->id, $this->desk()->takeNext($this->rima)->id);
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $boss->id, 'title' => 'Mahim left '.$a->order_no.' untouched for 60 minutes']);
     }
 
     public function test_extra_time_once_per_order_with_a_daily_limit_and_a_small_cost(): void

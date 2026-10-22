@@ -27,6 +27,7 @@ class NotificationSeeder extends Seeder
         'return_problem' => [['role', 'manager', true, true]],
         'orders_unassigned' => [['role', 'manager', true, true]],
         'hold_limit_request' => [['role', 'manager', true, false]],
+        'order_left_idle' => [['role', 'manager', true, true]],
     ];
 
     /** The rules a type gets when it has none yet (an installed system keeps the admin's matrix for the rest). */

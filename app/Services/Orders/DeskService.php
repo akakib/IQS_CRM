@@ -311,6 +311,11 @@ class DeskService
             'left' => __(':n no longer works here: waiting in New again.', ['n' => $name]),
             default => __(':n went on a break: waiting in New again.', ['n' => $name]),
         }, null, ['released_from' => $userId, 'reason' => $reason]);
+        if ($reason === 'idle') {
+            // Accountability: the managers see who left which order untouched (also counted as Given back on KPI).
+            $this->notifications->send('order_left_idle', __(':n left :no untouched for :m minutes', ['n' => $name, 'no' => $order->order_no, 'm' => settings('desk.idle_return_minutes')]),
+                __('Taken back and waiting in New again.'), ['link' => route('orders.show', $orderId), 'subject' => ['order', $orderId], 'user_ids' => $this->managerIds()]);
+        }
     }
 
     /** How many times this person took extra time today. */

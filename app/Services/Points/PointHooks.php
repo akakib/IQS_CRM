@@ -64,11 +64,11 @@ class PointHooks
             'order_claimed' => ['minutes_waiting' => $this->minutesWaiting($order)],
             'order_confirmed' => ['minutes_since_claim' => $this->minutesSinceClaim($order), 'risky' => $this->risky($order), 'by_rule' => $actor === null && $this->confirmedByRule($order)],
             'order_packed' => ['minutes_since_release' => $this->minutesSinceRelease($order)],
-            'order_delivered' => ['channel' => $order->channel, 'saved' => (bool) $order->had_setback, 'risky' => $this->risky($order)] + $this->followUp($order),
+            'order_delivered' => ['channel' => $order->channel, 'saved' => (bool) $order->had_setback, 'risky' => $this->risky($order), 'advance_taken' => $this->advanceTaken($order)] + $this->followUp($order),
             'order_partial' => ['channel' => $order->channel, 'risky' => $this->risky($order), 'blame' => $this->lastReasonBlame($order)],
             'order_returned' => ['channel' => $order->channel, 'risky' => $this->risky($order), 'blame' => $this->lastReasonBlame($order)],
             'order_cancelled' => ['channel' => $order->channel, 'shipped' => (bool) $order->active_shipment_id, 'risky' => $this->risky($order),
-                'blame' => $this->lastReasonBlame($order), 'advance_asked' => $this->advanceAsked($order)],
+                'blame' => $this->lastReasonBlame($order), 'advance_asked' => $this->advanceAsked($order), 'advance_taken' => $this->advanceTaken($order)],
             default => [],
         };
     }
@@ -218,6 +218,13 @@ class PointHooks
         $reasonId = DB::table('order_events')->where('order_id', $order->id)->orderByDesc('id')->value('reason_id');
 
         return ($reasonId ? DB::table('status_reasons')->where('id', $reasonId)->value('blame_stage') : null) ?? 'none';
+    }
+
+    /** The customer paid an advance on this order (recorded, not rejected). */
+    private function advanceTaken(Order $order): bool
+    {
+        return DB::table('order_payments')->where('order_id', $order->id)->whereIn('payment_type', ['advance', 'adjustment'])
+            ->whereIn('status', ['verified', 'pending_verification'])->where('amount', '>', 0)->exists();
     }
 
     private function advanceAsked(Order $order): bool

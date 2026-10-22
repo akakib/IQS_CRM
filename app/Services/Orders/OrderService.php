@@ -335,7 +335,9 @@ class OrderService
     public function requestAdvanceWaiver(Order $order, User $by, string $why): void
     {
         $order->forceFill(['advance_waiver_requested_at' => now(), 'advance_waiver_requested_by' => $by->id, 'advance_waiver_note' => $why])->save();
-        $this->note($order, 'system', __('Asked an admin to process it without advance: :w', ['w' => $why]), $by);
+        // Asked after talking to the customer: it is a call, so the order waits for the admin parked and the hand is
+        // free for the next order (it stays theirs; the admin's answer comes back to them).
+        $this->note($order, 'call', __('Called: customer asks to go without advance. Asked an admin: :w', ['w' => $why]), $by, ['outcome' => 'waiver_asked']);
         app(\App\Services\NotificationService::class)->send('payment_to_check', __('Without advance? :no', ['no' => $order->order_no]),
             __(':n asks: :w (advance needed ৳:a)', ['n' => $by->name, 'w' => $why, 'a' => number_format((float) $order->advance_required)]), [
                 'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',

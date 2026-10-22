@@ -179,6 +179,8 @@ class VerificationTest extends TestCase
         $a->forceFill(['moderator_id' => null])->save(); // one order at a time: the first is out of the way
         $this->post("/orders/{$b->id}/advance-waiver", ['why' => 'Old shop customer'])->assertSessionHas('success');
         $this->assertNotNull($b->fresh()->advance_waiver_requested_at);
+        $this->assertSame(0, app(\App\Services\Orders\DeskService::class)->inHand($mod->id)); // waiting for the admin: the hand is free for the next order
+        $this->assertSame($mod->id, $b->fresh()->moderator_id); // still theirs
         $this->post("/orders/{$b->id}/advance-waiver/decide", ['decision' => 'allow'])->assertForbidden();
         $this->actingAs($admin)->get("/orders/{$b->id}")->assertSee('Old shop customer')->assertSee('Process without advance');
         $this->post("/orders/{$b->id}/advance-waiver/decide", ['decision' => 'allow'])->assertSessionHas('success');

@@ -17,7 +17,7 @@ phone numbers), and (3) missing hardening layers (2FA, security headers).
 |---|---|---|---|
 | S1 | HIGH | `APP_DEBUG=true` on staging, which holds real website orders. Any error shows a full debug page (queries with phones and addresses, request data). Debugbar is installed (dev packages deployed) and turns on with debug. | `APP_DEBUG=false` on every internet-facing host; deploy production with `composer install --no-dev`. |
 | S2 | MEDIUM | Document root is `public_html` (the whole app), protected only by a rewrite in `public_html/.htaccess`. Today `.env`, `.git`, logs and backups answer 403, but one broken `.htaccess` would expose source, `.env` and SQL backups. | Point the domain's document root at `public_html/public` in hPanel (or move the app above `public_html`). |
-| S3 | MEDIUM | `.env.bak-debug`, `.env.bak-debugbar`, `.env.bak-fake` (old secrets) and `CLAUDE.md` sit in the app root. Not reachable by URL today (see S2). | Delete the `.env.bak-*` files; keep `CLAUDE.md` out of the deploy. |
+| S3 | MEDIUM | `.env.bak-debug`, `.env.bak-debugbar`, `.env.bak-fake` (old secrets) and the project guide file sit in the app root. Not reachable by URL today (see S2). | Delete the `.env.bak-*` files; keep the project guide out of the deploy. |
 | S4 | MEDIUM | `storage/backups/*.sql` are mode 644, uncompressed, ~2.2 GB in total, on the same server as the app. | `chmod 600`, gzip, keep N copies, and copy off-server (Google Drive is already connected). |
 | S5 | LOW | No HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy; `X-Powered-By: PHP/8.3` is sent. Cookies are fine (Secure, HttpOnly, SameSite=Lax, 2 h). | One middleware adding the headers; `expose_php=Off`. |
 

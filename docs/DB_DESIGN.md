@@ -5,7 +5,7 @@
 ```text
 IQS — Database Design (Order, Verification,
 Payments, Tracking Events)
-Save as docs/DB_DESIGN.md in the project. CLAUDE.md should say:
+Save as docs/DB_DESIGN.md in the project. The project guide says:
 "Follow docs/DB_DESIGN.md for all order-related tables."
 Single business. Timezone Asia/Dhaka. Money DECIMAL(12,2).
 Quantities DECIMAL(12,3) (loose goods are sold by gram).

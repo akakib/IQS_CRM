@@ -181,6 +181,8 @@ class VerificationTest extends TestCase
         $this->assertNotNull($b->fresh()->advance_waiver_requested_at);
         $this->assertSame(0, app(\App\Services\Orders\DeskService::class)->inHand($mod->id)); // waiting for the admin: the hand is free for the next order
         $this->assertSame($mod->id, $b->fresh()->moderator_id); // still theirs
+        $this->actingAs($mod)->get('/desk?tab=hold')->assertSee($b->order_no)->assertSee('Waiting for admin'); // in On hold until the admin answers
+        $this->get('/desk?tab=call')->assertDontSee($b->order_no);
         $this->post("/orders/{$b->id}/advance-waiver/decide", ['decision' => 'allow'])->assertForbidden();
         $this->actingAs($admin)->get("/orders/{$b->id}")->assertSee('Old shop customer')->assertSee('Process without advance');
         $this->post("/orders/{$b->id}/advance-waiver/decide", ['decision' => 'allow'])->assertSessionHas('success');

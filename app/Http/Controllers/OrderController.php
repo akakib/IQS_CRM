@@ -309,6 +309,13 @@ class OrderController extends Controller
     /** Money the customer sent after the order was placed (bKash and so on). */
     public function storePayment(Order $order, Request $request): RedirectResponse
     {
+        // Nobody had it (an advance hold waits in the shared queue) and this person called the customer: they take it
+        // first, so the order, its confirm and its points are theirs and it shows under their name everywhere.
+        $desk = app(\App\Services\Orders\DeskService::class);
+        if ($request->boolean('called') && ! $order->moderator_id && $request->user()->can('orders.take')
+            && $desk->whereWaiting(Order::whereKey($order->id))->exists() && $desk->assign($order->id, $request->user()->id, 'claimed', $request->user()->id)) {
+            $order->refresh();
+        }
         $this->authorizeWork($order, $request->user());
         $data = $request->validate([
             'advance.method_id' => ['required', 'integer'],

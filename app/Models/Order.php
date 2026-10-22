@@ -136,8 +136,9 @@ class Order extends Model
     {
         return match ($user->permissionScope('orders.view')) {
             'all' => $query,
+            // Their own, and whatever waits for anyone to take (the Desk's one definition: new, record verified, no answer, advance holds).
             'own', 'team' => $query->where(fn ($q) => $q->where('orders.moderator_id', $user->id)
-                ->orWhere(fn ($q) => $q->whereNull('orders.moderator_id')->whereIn('orders.status_id', OrderStatus::idsFor(['new', 'record_verified'])))),
+                ->orWhere(fn ($q) => app(\App\Services\Orders\DeskService::class)->whereWaiting($q))),
             default => $query->whereRaw('1 = 0'),
         };
     }

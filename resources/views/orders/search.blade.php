@@ -107,7 +107,10 @@
                         $s = $statuses[$o->status_id] ?? null;
                         $cn = $cns[$o->id] ?? null;
                     @endphp
-                    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white" x-data="{ copied: null, copy(t, k) { navigator.clipboard?.writeText(t); this.copied = k; setTimeout(() => this.copied = null, 1200) } }">
+                    {{-- The whole card opens the order, like its number; the phone and CN boxes (Call, Copy), links and selected text do not. --}}
+                    <div @class(['overflow-hidden rounded-2xl border border-gray-200 bg-white', 'cursor-pointer hover:border-primary' => $canOpen])
+                        x-data="{ copied: null, copy(t, k) { navigator.clipboard?.writeText(t); this.copied = k; setTimeout(() => this.copied = null, 1200) } }"
+                        @if ($canOpen) @click="if (! $event.target.closest('a, button, [data-keep]') && ! String(window.getSelection())) $refs.open.click()" @endif>
                         <div class="flex">
                             <div class="w-1.5 shrink-0" style="background: {{ $s['color'] ?? '#9ca3af' }}"></div>
                             <div class="min-w-0 flex-1 p-4">
@@ -115,7 +118,7 @@
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2">
                                             @if ($canOpen)
-                                                <a href="{{ route('orders.show', $o) }}" class="font-mono text-lg font-semibold text-gray-900 hover:text-primary">{{ $o->order_no }}</a>
+                                                <a href="{{ route('orders.show', $o) }}" x-ref="open" class="font-mono text-lg font-semibold text-gray-900 hover:text-primary">{{ $o->order_no }}</a>
                                             @else
                                                 <span class="font-mono text-lg font-semibold text-gray-900">{{ $o->order_no }}</span>
                                             @endif
@@ -130,7 +133,7 @@
                                 </div>
 
                                 <div class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                                    <div class="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                                    <div data-keep class="flex cursor-auto items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
                                         <span class="text-xs text-gray-500">{{ __('Phone') }}</span>
                                         <span class="font-mono text-gray-900">{{ Mask::value($o->ship_phone, 'customer_contact') }}</span>
                                         @if ($seePhone)
@@ -140,7 +143,7 @@
                                             </span>
                                         @endif
                                     </div>
-                                    <div class="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                                    <div data-keep class="flex cursor-auto items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
                                         <span class="text-xs text-gray-500">CN</span>
                                         <span class="font-mono text-gray-900">{{ $cn ?? '-' }}</span>
                                         @if ($cn)

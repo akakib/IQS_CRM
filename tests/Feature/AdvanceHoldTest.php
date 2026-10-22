@@ -162,15 +162,17 @@ class AdvanceHoldTest extends TestCase
         $this->assertSame((float) $held->fresh()->cod_amount, (float) DB::table('shipments')->where('order_id', $held->id)->value('cod_amount'));
     }
 
-    public function test_calling_in_the_advance_of_an_order_nobody_had_makes_it_the_callers(): void
+    public function test_an_order_nobody_has_cannot_be_picked_by_hand_only_taken_with_take_next(): void
     {
         $held = $this->web(9);
         $this->assertNull($held->fresh()->moderator_id); // waiting in the shared queue
         $this->actingAs($this->mod)->post("/orders/{$held->id}/payments", ['called' => 1, 'advance' => ['method_id' => $this->bkash(), 'amount' => (float) $held->advance_required, 'transaction_id' => 'NOBODY1']])
+            ->assertForbidden();
+        $this->post('/desk/next');
+        $this->assertSame($this->mod->id, $held->fresh()->moderator_id);
+        $this->post("/orders/{$held->id}/payments", ['called' => 1, 'advance' => ['method_id' => $this->bkash(), 'amount' => (float) $held->advance_required, 'transaction_id' => 'NOBODY1']])
             ->assertSessionHas('success');
-        $fresh = $held->fresh();
-        $this->assertSame([$this->mod->id, $this->mod->id], [$fresh->moderator_id, $fresh->confirmed_by]); // theirs on Order activity, KPI and points
-        $this->assertSame('ready_for_packaging', $this->key($held));
+        $this->assertSame($this->mod->id, $held->fresh()->confirmed_by);
     }
 
     public function test_paid_during_the_call_is_not_booked_by_itself_when_the_customer_has_another_open_order(): void

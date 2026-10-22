@@ -309,13 +309,6 @@ class OrderController extends Controller
     /** Money the customer sent after the order was placed (bKash and so on). */
     public function storePayment(Order $order, Request $request): RedirectResponse
     {
-        // Nobody had it (an advance hold waits in the shared queue) and this person called the customer: they take it
-        // first, so the order, its confirm and its points are theirs and it shows under their name everywhere.
-        $desk = app(\App\Services\Orders\DeskService::class);
-        if ($request->boolean('called') && ! $order->moderator_id && $request->user()->can('orders.take')
-            && $desk->whereWaiting(Order::whereKey($order->id))->exists() && $desk->assign($order->id, $request->user()->id, 'claimed', $request->user()->id)) {
-            $order->refresh();
-        }
         $this->authorizeWork($order, $request->user());
         $data = $request->validate([
             'advance.method_id' => ['required', 'integer'],
@@ -512,6 +505,9 @@ class OrderController extends Controller
     private function authorizeWork(Order $order, User $user): void
     {
         abort_unless(Order::visibleTo($user)->whereKey($order->id)->exists(), 403);
+        // An order nobody has is taken with Take next (oldest first), never picked by hand: nobody chooses the good
+        // customers and leaves the hard ones. Managers (who give orders out) may still act on it.
+        abort_if(! $order->moderator_id && ! OrderStatus::map()[$order->status_id]['final'] && ! $user->can('orders.reassign'), 403, __('Nobody has this order yet. Press Take next on the Desk: orders are taken oldest first.'));
         abort_if($order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
     }
 

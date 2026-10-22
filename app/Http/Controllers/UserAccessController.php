@@ -18,8 +18,30 @@ class UserAccessController extends Controller
 {
     public function __construct(private PermissionService $permissions, private ActivityLogger $logger) {}
 
-    public function edit(User $user): View
+    /** Roles only the Owner gives or takes: Owner and Manager. */
+    private const OWNER_ONLY_ROLES = [Role::OWNER, 'manager'];
+
+    /**
+     * Someone who is not the Owner (a manager with staff.roles) gives and takes the other roles only, never their own,
+     * and never an Owner's or a manager's. Making or changing roles and custom access stay with the Owner.
+     */
+    private function limitedTo(Request $request, User $user, ?Role $role = null): void
     {
+        $actor = $request->user();
+        if ($actor->isOwner()) {
+            return;
+        }
+        abort_if($user->is($actor), 403, __('Your own roles are changed by the Owner.'));
+        abort_if($user->isOwner() || $user->roles()->whereIn('system_key', self::OWNER_ONLY_ROLES)->exists(), 403, __('Only the Owner changes an Owner\'s or a manager\'s roles.'));
+        if ($role && in_array($role->system_key, self::OWNER_ONLY_ROLES, true)) {
+            abort(403, __('Only the Owner gives or takes the :r role.', ['r' => $role->name]));
+        }
+    }
+
+    public function edit(Request $request, User $user): View
+    {
+        $this->limitedTo($request, $user);
+        $full = $request->user()->isOwner();
         $assignments = DB::table('user_roles as ur')
             ->join('roles as r', 'r.id', '=', 'ur.role_id')
             ->leftJoin('users as by', 'by.id', '=', 'ur.assigned_by')
@@ -41,7 +63,8 @@ class UserAccessController extends Controller
             'user' => $user,
             'assignments' => $assignments,
             'overrides' => $overrides,
-            'roleOptions' => Role::orderBy('name')->pluck('name', 'id')->all(),
+            'roleOptions' => Role::orderBy('name')->when(! $full, fn ($q) => $q->where(fn ($w) => $w->whereNull('system_key')->orWhereNotIn('system_key', self::OWNER_ONLY_ROLES)))->pluck('name', 'id')->all(),
+            'full' => $full,
             'permissionOptions' => Catalog::options(),
             'modules' => Catalog::modules(),
             'map' => $map,
@@ -58,6 +81,7 @@ class UserAccessController extends Controller
             'reason' => [Rule::requiredIf(fn () => $request->filled('expires_at')), 'nullable', 'string', 'max:255'],
         ], ['reason.required' => __('Give a reason for temporary access.')]);
 
+        $this->limitedTo($request, $user, Role::find($data['role_id']));
         $row = [
             'user_id' => $user->id,
             'role_id' => (int) $data['role_id'],
@@ -79,6 +103,7 @@ class UserAccessController extends Controller
             ->where('ur.id', $assignment)->where('ur.user_id', $user->id)
             ->first(['ur.id', 'r.system_key', 'r.name', 'ur.role_id', 'ur.starts_at', 'ur.expires_at', 'ur.reason']);
         abort_unless($row, 404);
+        $this->limitedTo($request, $user, Role::find($row->role_id));
 
         // Never leave the system without an Owner.
         if ($row->system_key === Role::OWNER && $this->activeOwnerCount() <= 1) {

@@ -7,9 +7,9 @@
     @can('staff.edit')
         <a href="{{ route('users.edit', $user) }}" class="text-sm font-medium text-primary hover:underline">{{ __('Edit') }}</a>
     @endcan
-    @can('access.manage')
-        <a href="{{ route('users.access', $user) }}" class="text-sm font-medium text-primary hover:underline">{{ __('Access') }}</a>
-    @endcan
+    @if (auth()->user()->isOwner() || (auth()->user()->can('staff.roles') && ! $user->is(auth()->user()) && ! $user->isOwner()))
+        <a href="{{ route('users.access', $user) }}" class="text-sm font-medium text-primary hover:underline">{{ auth()->user()->isOwner() ? __('Access') : __('Roles') }}</a>
+    @endif
     @if (! $user->is(auth()->user()) && auth()->user()->can('staff.delete'))
         <form id="{{ $formId }}" method="POST" action="{{ route('users.status', $user) }}">
             @csrf

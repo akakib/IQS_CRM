@@ -404,6 +404,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/activity', [ActivityLogController::class, 'index'])->middleware('can:activity.view')->name('activity.index');
 
     Route::get('/roles', [RoleController::class, 'index'])->middleware('can:roles.view')->name('roles.index');
+    // Roles of a person: the Owner, or someone allowed to give staff their roles (limits in UserAccessController).
+    Route::middleware('can:staff.roles')->group(function () {
+        Route::get('/users/{user}/access', [UserAccessController::class, 'edit'])->name('users.access');
+        Route::post('/users/{user}/access/roles', [UserAccessController::class, 'storeRole'])->name('users.access.roles.store');
+        Route::delete('/users/{user}/access/roles/{assignment}', [UserAccessController::class, 'destroyRole'])->name('users.access.roles.destroy');
+    });
     Route::middleware('can:access.manage')->group(function () {
         Route::get('/health', HealthController::class)->name('health');
         Route::get('/settings/integrations', [IntegrationController::class, 'index'])->name('settings.integrations');
@@ -427,10 +433,7 @@ Route::middleware('auth')->group(function () {
 
         Route::resource('roles', RoleController::class)->except(['index', 'show']);
 
-        Route::get('/users/{user}/access', [UserAccessController::class, 'edit'])->name('users.access');
         Route::post('/roles/{role}/people', [RoleController::class, 'people'])->name('roles.people');
-        Route::post('/users/{user}/access/roles', [UserAccessController::class, 'storeRole'])->name('users.access.roles.store');
-        Route::delete('/users/{user}/access/roles/{assignment}', [UserAccessController::class, 'destroyRole'])->name('users.access.roles.destroy');
         Route::post('/users/{user}/access/overrides', [UserAccessController::class, 'storeOverride'])->name('users.access.overrides.store');
         Route::delete('/users/{user}/access/overrides/{override}', [UserAccessController::class, 'destroyOverride'])->name('users.access.overrides.destroy');
     });

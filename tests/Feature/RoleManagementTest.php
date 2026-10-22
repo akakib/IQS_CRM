@@ -132,4 +132,36 @@ class RoleManagementTest extends TestCase
         $this->delete("/users/{$this->owner->id}/access/roles/{$assignment}")->assertSessionHas('error');
         $this->assertTrue($this->owner->fresh()->isOwner());
     }
+
+    public function test_a_manager_gives_staff_their_roles_but_not_owner_or_manager_and_never_edits_roles(): void
+    {
+        $managerRole = Role::firstOrCreate(['system_key' => 'manager'], ['name' => 'Manager']);
+        DB::table('role_permissions')->insert(DB::table('permissions')->whereIn('key', ['staff.view', 'staff.edit', 'staff.roles', 'roles.view'])->pluck('id')
+            ->map(fn ($id) => ['role_id' => $managerRole->id, 'permission_id' => $id, 'data_scope' => 'all'])->all());
+        $moderatorRole = Role::firstOrCreate(['system_key' => 'moderator'], ['name' => 'Moderator']);
+        $boss = User::factory()->create();
+        $boss->roles()->attach($managerRole->id);
+        $staff = User::factory()->create();
+        $otherManager = User::factory()->create();
+        $otherManager->roles()->attach($managerRole->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->actingAs($boss);
+
+        $this->get("/users/{$staff->id}/access")->assertOk()->assertSee('Moderator')->assertDontSee('Custom access for');
+        $this->post("/users/{$staff->id}/access/roles", ['role_id' => $moderatorRole->id])->assertSessionHas('success');
+        $this->assertTrue($staff->fresh()->roles->contains($moderatorRole));
+        $assignment = DB::table('user_roles')->where('user_id', $staff->id)->value('id');
+        $this->delete("/users/{$staff->id}/access/roles/{$assignment}")->assertSessionHas('success');
+
+        // Not Owner or Manager, not their own roles, not another manager's or the Owner's, not custom access, not the roles themselves.
+        $this->post("/users/{$staff->id}/access/roles", ['role_id' => $managerRole->id])->assertForbidden();
+        $this->post("/users/{$staff->id}/access/roles", ['role_id' => Role::firstWhere('system_key', Role::OWNER)->id])->assertForbidden();
+        $this->post("/users/{$boss->id}/access/roles", ['role_id' => $moderatorRole->id])->assertForbidden();
+        $this->post("/users/{$otherManager->id}/access/roles", ['role_id' => $moderatorRole->id])->assertForbidden();
+        $this->get("/users/{$this->owner->id}/access")->assertForbidden();
+        $this->post("/users/{$staff->id}/access/overrides", ['permission' => 'staff.delete', 'effect' => 'allow', 'reason' => 'x'])->assertForbidden();
+        $this->get('/roles/create')->assertForbidden();
+        $this->post('/roles', ['name' => 'Sneaky', 'grants' => ['staff.delete']])->assertForbidden();
+        $this->put("/roles/{$moderatorRole->id}", ['name' => 'Moderator', 'grants' => ['staff.delete']])->assertForbidden();
+    }
 }

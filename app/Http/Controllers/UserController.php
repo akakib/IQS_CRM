@@ -61,7 +61,7 @@ class UserController extends Controller
         $this->saveChatChannels($request, $user);
         $this->saveSalary($request, $user);
 
-        return ($request->user()->can('access.manage') ? redirect()->route('users.access', $user) : redirect()->route('users.edit', $user))
+        return ($request->user()->can('staff.roles') ? redirect()->route('users.access', $user) : redirect()->route('users.edit', $user))
             ->with('success', __('Staff ":name" added. Now give a role so they can work.', ['name' => $user->name]));
     }
 

@@ -8,7 +8,7 @@
 
 return [
     'modules' => [
-        'staff' => ['view', 'create', 'edit', 'delete'],
+        'staff' => ['view', 'create', 'edit', 'delete', 'roles'],
         'locations' => ['view', 'create', 'edit', 'delete'],
         'products' => ['view', 'create', 'edit', 'delete', 'availability'],
         'customers' => ['view', 'create', 'edit', 'import'],
@@ -35,6 +35,7 @@ return [
     'action_labels' => [
         'payments.verify' => 'Check advance payments (TrxID and amount)',
         'staff.delete' => 'Deactivate',
+        'staff.roles' => 'Give staff their roles (not Owner or Manager)',
         'customers.import' => 'Import order history (CSV/Excel)',
         'calls.work' => 'Make calls from the lists given to them',
         'calls.manage' => 'Make call lists and give them to staff',

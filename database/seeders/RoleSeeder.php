@@ -18,7 +18,7 @@ class RoleSeeder extends Seeder
     private const ROLES = [
         'owner' => ['Owner', 'Full access to everything, including new modules.', [], []],
         'manager' => ['Manager', 'Operations lead.', [
-            'staff.view', 'staff.create', 'staff.edit', 'locations.view', 'locations.create', 'locations.edit', 'roles.view',
+            'staff.view', 'staff.create', 'staff.edit', 'staff.roles', 'locations.view', 'locations.create', 'locations.edit', 'roles.view',
             'products.view', 'products.create', 'products.edit', 'products.availability', 'customers.view', 'customers.create', 'customers.edit',
             'orders.view', 'orders.create', 'orders.edit', 'orders.approve', 'orders.reassign', 'orders.export',
         ], ['salary']],

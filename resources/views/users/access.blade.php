@@ -67,6 +67,7 @@
             </form>
         </section>
 
+        @if ($full)
         {{-- Personal allow / deny --}}
         <section class="rounded-xl border border-gray-200 bg-white p-5">
             <h2 class="text-sm font-semibold text-gray-800">{{ __('Custom access for :name', ['name' => $user->name]) }}</h2>
@@ -119,6 +120,7 @@
                 <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Save custom access') }}</button>
             </form>
         </section>
+        @endif
     </div>
 
     {{-- What they can do right now, after roles + custom access --}}

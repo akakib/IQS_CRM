@@ -126,6 +126,7 @@
                     <span class="text-sm font-semibold tabular-nums text-gray-600" x-text="ticked.length + ' / ' + list.items.length"></span>
                 </div>
                 <p x-show="!list.repack" class="bg-primary-soft px-4 py-2 text-sm font-medium text-primary" x-text="last?.message"></p>
+                <p x-show="list.note" class="bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900">{{ __('Customer note') }}: <span x-text="list.note"></span></p>
                 <p x-show="list.repack" class="bg-red-50 px-4 py-2 text-sm font-medium text-red-700">{{ __('Edited after packaging. Change the box:') }} <span x-text="list.diff"></span></p>
                 <div class="divide-y divide-gray-100">
                     <template x-for="i in list.items" :key="i.id">
@@ -235,6 +236,7 @@
                     <template x-if="previews[{{ $o->id }}]?.error"><p class="text-sm text-red-600">{{ __('Could not load. Tap again.') }}</p></template>
                     <template x-if="previews[{{ $o->id }}]?.items">
                         <div>
+                            <p x-show="previews[{{ $o->id }}].note" class="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">{{ __('Customer note') }}: <span x-text="previews[{{ $o->id }}].note"></span></p>
                             <p x-show="previews[{{ $o->id }}].repack" class="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{{ __('Edited after packaging. Change the box:') }} <span x-text="previews[{{ $o->id }}].diff"></span></p>
                             <div class="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
                                 <template x-for="i in previews[{{ $o->id }}].items" :key="i.id">

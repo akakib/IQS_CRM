@@ -30,6 +30,7 @@
         .box { width: 9mm; height: 9mm; border: 2px solid #000; margin: auto; }
         .changed td { background: #fff3cd; }
         .warn { font-size: 13px; font-weight: bold; margin-bottom: 1mm; }
+        .note { font-size: 13px; font-style: italic; border: 1px dashed #000; padding: 1mm 2mm; margin-bottom: 1mm; }
         .num { width: 7mm; color: #555; font-size: 12px; }
     </style>
 </head>
@@ -51,6 +52,7 @@
                     </td>
                     <td class="items">
                         @if ($r->changed)<div class="warn">{{ __('CHANGED: use the new label :l', ['l' => $r->current ?? '-']) }}</div>@endif
+                        @if ($n = \App\Support\Phone::hideIn($r->order->customer_note))<div class="note">{{ __('Note') }}: {{ $n }}</div>@endif
                         @foreach ($r->order->items as $i)
                             @php($size = \App\Support\Units::itemSize($i))
                             <div><b>{{ $i->name_snapshot }}</b>@if ($size) <span class="size">{{ $size }}</span>@endif <span class="qty">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</span></div>

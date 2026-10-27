@@ -677,4 +677,15 @@ class PackagingTest extends TestCase
         $this->assertSame(0, $points($a));
         $this->assertSame(1, $points($b));
     }
+
+    public function test_the_customer_note_reaches_the_packer_without_any_phone_number(): void
+    {
+        $order = $this->booked('01712345651', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $order->forceFill(['customer_note' => 'Gift wrap please, call 01812345678 before delivery'])->save();
+        $this->actingAs($this->packer)->getJson('/packaging/orders/'.$order->id)->assertOk()
+            ->assertJsonFragment(['note' => 'Gift wrap please, call [phone] before delivery']);
+        $this->get(route('packaging.labels'));
+        $run = DB::table('shipment_labels')->where('order_id', $order->id)->value('print_run');
+        $this->get(route('packaging.sheet', ['run' => $run]))->assertSee('Gift wrap please')->assertDontSee('01812345678');
+    }
 }

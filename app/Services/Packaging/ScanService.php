@@ -103,6 +103,7 @@ class ScanService
             'order_no' => $order->order_no,
             'repack' => $repack,
             'diff' => $repack ? $this->diff($order) : null,
+            'note' => \App\Support\Phone::hideIn($order->customer_note), // e.g. "gift wrap", "two separate packets"
             'moderator' => $order->moderator_id ? DB::table('users')->where('id', $order->moderator_id)->value('name') : null,
             'items' => DB::table('order_items as i')->join('product_variants as v', 'v.id', '=', 'i.variant_id')
                 ->where('i.order_id', $order->id)->orderBy('v.shelf_code')->orderBy('i.id')

@@ -48,6 +48,16 @@ final class Phone
         return $prefix === null ? $w : $w->orWhere("{$alias}.ship_phone", 'like', $prefix.'%')->orWhere("{$alias}.ship_alt_phone", 'like', $prefix.'%');
     }
 
+    /** Text with every phone number in it hidden ("call 01712345678 first" -> "call [phone] first"), for people who must not see contacts. */
+    public static function hideIn(?string $text): ?string
+    {
+        if ($text === null || trim($text) === '') {
+            return null;
+        }
+
+        return preg_replace('/(?:\+?88)?[0০][1১][\d০-৯](?:[\s-]?[\d০-৯]){8}/u', '[phone]', $text);
+    }
+
     public static function isValid(?string $input): bool
     {
         return self::normalize($input) !== null;

@@ -207,9 +207,7 @@ class OrderController extends Controller
     public function transition(Order $order, Request $request): RedirectResponse
     {
         $user = $request->user();
-        abort_unless(Order::visibleTo($user)->whereKey($order->id)->exists(), 403);
-        // Working an order you do not own is not allowed (except for those who see all orders).
-        abort_if($order->moderator_id !== $user->id && $user->permissionScope('orders.view') !== 'all', 403);
+        $this->authorizeWork($order, $user); // visible, taken (Take next), one at a time
 
         $data = $request->validate([
             'to' => ['required', 'string'],
@@ -225,6 +223,11 @@ class OrderController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages(['status' => __('Log the call first (Order management, or add a Call note below).')]);
         }
 
+        if ($data['to'] === 'confirmed' && $this->orders->hasUncheckedAdvance($order) && OrderStatus::map()[$order->status_id]['key'] !== 'hold') {
+            $this->orders->parkForPaymentCheck($order, $user, $data['note'] ?? null);
+
+            return back()->with('success', __(':no waits in On hold for the payment check, then goes to booking by itself.', ['no' => $order->order_no]));
+        }
         if ($data['to'] === 'hold') {
             app(\App\Services\Orders\DeskService::class)->checkHold($user, $order, $data['hold_expected_date'] ?? null);
         }

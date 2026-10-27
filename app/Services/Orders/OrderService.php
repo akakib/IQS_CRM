@@ -320,6 +320,11 @@ class OrderService
             $this->note($order, 'payment', ($approve ? __('Payment ৳:a verified. COD is now ৳:c.', ['a' => $payment->amount, 'c' => $order->cod_amount]) : __('Payment ৳:a rejected (TrxID or amount did not match). COD is now ৳:c.', ['a' => $payment->amount, 'c' => $order->cod_amount])), $by);
             if (! $approve) {
                 $this->backOnAdvanceHold($order, $by);
+            } elseif ($order->moderator_id && $order->moderator_id !== $by->id) {
+                app(\App\Services\NotificationService::class)->send('payment_to_check', __('Payment checked: :no', ['no' => $order->order_no]),
+                    __('৳:a, TrxID :t matched.', ['a' => $payment->amount, 't' => $payment->transaction_id ?? '-']), [
+                        'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$order->moderator_id],
+                    ]);
             }
             if (! $approve && $order->moderator_id) {
                 app(\App\Services\NotificationService::class)->send('payment_to_check', __('Payment rejected: :no', ['no' => $order->order_no]),
@@ -329,6 +334,19 @@ class OrderService
             }
             $this->afterPayment($order, $oldCod, $by);
         });
+    }
+
+    /**
+     * The customer confirmed but their advance is still to be checked (bigger than the trust limit): the order waits
+     * in On hold as a called advance hold, the moderator's hand is free, and once the payment is checked it goes on to
+     * booking by itself (afterPayment); a rejection brings it back to them.
+     */
+    public function parkForPaymentCheck(Order $order, User $by, ?string $note = null): void
+    {
+        $this->note($order, 'call', trim(__('Called: customer confirmed. Waiting for the payment check to go on.').($note ? ' · '.$note : '')), $by, ['outcome' => 'confirmed']);
+        $reason = (int) DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id');
+        app(OrderStateMachine::class)->transition($order, 'hold', $by, 'user', $reason, __('Waiting for the payment check'));
+        $order->forceFill(['hold_note' => __('Customer confirmed. Waiting for the payment check.'), 'hold_note_by' => $by->id, 'hold_note_at' => now()])->save();
     }
 
     /** A moderator asks an admin to let an advance-hold order go without the advance. */

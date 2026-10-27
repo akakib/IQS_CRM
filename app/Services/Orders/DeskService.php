@@ -1083,6 +1083,27 @@ class DeskService
         ]);
     }
 
+    /** An advance that holds its order (bigger than the trust limit) and is still unchecked after 30 minutes: managers are reminded once. */
+    public function remindPaymentChecks(): int
+    {
+        $due = DB::table('order_payments as p')->join('orders as o', 'o.id', '=', 'p.order_id')->where('p.payment_type', 'advance')
+            ->where('p.status', 'pending_verification')->where('p.counts_now', false)->where('p.created_at', '<=', now()->subMinutes(30))
+            ->orderBy('p.id')->limit(50)->get(['p.id', 'p.amount', 'o.id as order_id', 'o.order_no']);
+        $sent = 0;
+        foreach ($due as $p) {
+            if (! Cache::add('pay-check-reminder:'.$p->id, 1, now()->addDays(3))) {
+                continue;
+            }
+            $this->notifications->send('payment_to_check', __('Still to check: :no', ['no' => $p->order_no]),
+                __('An advance of ৳:a has waited 30 minutes; the order goes on once it is checked.', ['a' => number_format((float) $p->amount)]), [
+                    'link' => route('payments.index'), 'subject' => ['order', $p->order_id], 'user_ids' => $this->managerIds(), 'priority' => 'urgent',
+                ]);
+            $sent++;
+        }
+
+        return $sent;
+    }
+
     /** Hold reasons that need a written note: the customer's own story (wait, a date, the advance). */
     public const HOLD_NOTE_REASONS = ['customer_wait', 'scheduled', 'advance_wait'];
 

@@ -732,22 +732,24 @@ class DeskTest extends TestCase
         $manager->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'payments.verify'], [], 'Accounts')->id);
         app(\App\Services\PermissionService::class)->bump();
 
-        // A big advance (over ৳500) stops Confirm until it is checked.
+        // A big advance (over ৳500): Confirm parks the order in On hold until it is checked; the hand is free.
         $a = $this->web();
         $machine->transition($a, 'record_verified', null, 'rule');
         $this->desk()->assign($a->id, $this->mahim->id, 'claimed');
         $this->actingAs($this->mahim)->post("/orders/{$a->id}/payments", ['advance' => ['method_id' => $bkash, 'amount' => 550, 'transaction_id' => 'BIG1']])->assertSessionHas('success');
-        $this->act($a, 'confirm')->assertSessionHasErrors('status');
-        $this->assertSame('record_verified', $this->key($a));
+        $this->act($a, 'confirm')->assertSessionHasNoErrors();
+        $this->assertSame('hold', $this->key($a));
+        $this->assertSame(0, $this->desk()->inHand($this->mahim->id));
+        $this->get('/desk?tab=hold')->assertSee($a->order_no)->assertSee('Waiting for payment check');
+        $this->get('/dashboard')->assertSee('My orders waiting for a check or admin');
 
-        // Held for the advance: the check releases it and it is booked with the lower COD.
-        $hold = (int) DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id');
-        $machine->transition($a->fresh(), 'hold', $this->mahim, 'user', $hold);
+        // The check releases it and it is booked with the lower COD; its person is told.
         $this->get('/payments')->assertForbidden(); // moderators do not check money
         $this->actingAs($manager)->get('/payments')->assertOk()->assertSee('BIG1')->assertSee($a->order_no);
         $pay = DB::table('order_payments')->where('transaction_id', 'BIG1')->value('id');
         $this->post('/payments/decide', ['ids' => [$pay], 'decision' => 'approve'])->assertSessionHas('success');
         $this->assertSame('ready_for_packaging', $this->key($a)); // the call was logged already: straight to booking, no second call
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->mahim->id, 'title' => 'Payment checked: '.$a->order_no]);
         $this->assertSame((float) $a->fresh()->cod_amount, (float) DB::table('shipments')->where('order_id', $a->id)->value('cod_amount'));
 
         // A small advance after booking lowers the COD at once: update it at the courier, new label.

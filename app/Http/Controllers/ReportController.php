@@ -39,12 +39,22 @@ class ReportController extends Controller
                 ? [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null]
                 : [__('My delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->where('assigned_to', $user->id)->count(), route('issues.index', ['show' => 'mine']), null];
         }
+        if (! $shop && $user->can('orders.take')) {
+            // Their own orders parked for someone else: an advance to check, or an admin's yes (Waiting to be taken counts others' orders).
+            $parked = DB::table('orders')->where('moderator_id', $user->id)->where('status_id', OrderStatus::idFor('hold'))
+                ->where(fn ($w) => $w->whereNotNull('advance_waiver_requested_at')->orWhereExists(fn ($e) => $e->selectRaw('1')->from('order_payments as pc')
+                    ->whereColumn('pc.order_id', 'orders.id')->where('pc.payment_type', 'advance')->where('pc.status', 'pending_verification')->where('pc.counts_now', false)))->count();
+            $tiles[] = [__('My orders waiting for a check or admin'), $parked, route('desk.index', ['tab' => 'hold']), null];
+        }
         if ($user->can('packaging.view')) {
             // The packer's day: what is left to pack, what waits for the rider, returns to take in, items not found.
+            $queue = app(\App\Services\Packaging\PackingQueue::class)->counts($user);
             if (! $shop) {
                 // The same number as "All" on the packaging page (repacks and new labels included, paused orders out).
-                $tiles[] = [__('To pack'), app(\App\Services\Packaging\PackingQueue::class)->counts($user)['all'], route('packaging.index'), null];
+                $tiles[] = [__('To pack'), $queue['all'], route('packaging.index'), null];
             }
+            // Edited after packing: red until it is packed again (handover refuses it meanwhile).
+            $tiles[] = [__('Repack needed'), $queue['red'], route('packaging.index', ['show' => 'red']), $queue['red'] ? 'down' : null];
             $tiles[] = [__('Packed today'), $todayCount('packed'), route('packaging.index'), null];
             if (! $shop) {
                 $tiles[] = [__('I packed today'), $todayCount('packed', $user->id), route('packaging.index'), null];

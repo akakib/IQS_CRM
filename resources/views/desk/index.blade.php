@@ -250,6 +250,8 @@
                                 <span class="text-xs text-amber-700">{{ Carbon::parse($row->next_call_at)->isToday() ? Carbon::parse($row->next_call_at)->format('g:i A') : Carbon::parse($row->next_call_at)->format('d M, g A') }}</span>
                             @elseif ($tab === 'hold' && $row->advance_waiver_requested_at)
                                 <x-badge color="amber">{{ __('Waiting for admin') }}</x-badge>
+                            @elseif ($tab === 'hold' && $row->waiting_check)
+                                <x-badge color="amber">{{ __('Waiting for payment check') }}</x-badge>
                             @elseif ($tab === 'packaging')
                                 <span class="flex flex-col items-end gap-1">
                                     <x-badge :color="$statuses[$row->status_id]['color']">{{ $row->booking_state === 'failed' ? __('Booking failed') : ($row->booking_state === 'queued' ? __('Booking…') : __($statuses[$row->status_id]['name'])) }}</x-badge>

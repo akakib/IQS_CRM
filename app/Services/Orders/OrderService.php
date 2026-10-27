@@ -129,12 +129,7 @@ class OrderService
 
             app(\App\Services\Tracking\TrackingService::class)->handle($order, 'order_created');
 
-            // A website order given out on arrival goes to one free person, who alone is told ("given to you"); everyone
-            // hears of it only when nobody was free (DeskService::autoAssign). Other orders: the free people are told now.
-            $givenOut = $order->channel === 'web' && settings('desk.assign_on_arrival');
-            if (! $order->moderator_id && ! $givenOut) {
-                app(DeskService::class)->announceNewOrder($order->id, $order->order_no);
-            }
+            // No "New order" to everyone: an order is told to one person only, the one it is given to (DeskService::autoAssign).
 
             return $order->refresh();
         });
@@ -323,13 +318,13 @@ class OrderService
             } elseif ($order->moderator_id && $order->moderator_id !== $by->id) {
                 app(\App\Services\NotificationService::class)->send('payment_to_check', __('Payment checked: :no', ['no' => $order->order_no]),
                     __('৳:a, TrxID :t matched.', ['a' => $payment->amount, 't' => $payment->transaction_id ?? '-']), [
-                        'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$order->moderator_id],
+                        'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$order->moderator_id], 'only' => true,
                     ]);
             }
             if (! $approve && $order->moderator_id) {
                 app(\App\Services\NotificationService::class)->send('payment_to_check', __('Payment rejected: :no', ['no' => $order->order_no]),
                     __('৳:a, TrxID :t did not match. Talk to the customer.', ['a' => $payment->amount, 't' => $payment->transaction_id ?? '-']), [
-                        'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$order->moderator_id],
+                        'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$order->moderator_id], 'only' => true,
                     ]);
             }
             $this->afterPayment($order, $oldCod, $by);
@@ -397,7 +392,7 @@ class OrderService
         if ($asker && $asker !== $by->id) {
             app(\App\Services\NotificationService::class)->send('payment_to_check', ($allow ? __('Allowed without advance: :no', ['no' => $order->order_no]) : __('Advance still needed: :no', ['no' => $order->order_no])),
                 $allow ? ($to === 'confirmed' ? __(':n allowed it. It goes on to booking.', ['n' => $by->name]) : __(':n allowed it. It is in your Call tab.', ['n' => $by->name])) : __(':n refused. Ask the customer for the delivery charge.', ['n' => $by->name]), [
-                    'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$asker],
+                    'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$asker], 'only' => true,
                 ]);
         }
     }

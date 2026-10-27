@@ -98,17 +98,17 @@ class OrderHttpTest extends TestCase
         $this->getJson('/customers/lookup?phone='.urlencode('+880 1812-345673'))->assertJson(['found' => true, 'name' => 'Rahim'])->assertJsonPath('addresses.0.line', fn ($l) => str_contains($l, 'House 9'));
     }
 
-    public function test_new_website_order_notifies_moderators_and_is_given_by_take_next(): void
+    public function test_new_website_order_tells_nobody_even_with_a_role_rule_and_is_given_by_take_next(): void
     {
         DB::table('notification_rules')->insert([
             'type_id' => DB::table('notification_types')->where('system_key', 'new_order')->value('id'),
             'target' => 'role', 'role_id' => DB::table('user_roles')->where('user_id', $this->agent->id)->value('role_id'),
             'channel_in_app' => true, 'channel_telegram' => false, 'channel_sms' => false, 'is_active' => true,
         ]);
-        app(\App\Services\SettingsService::class)->set(['desk.assign_on_arrival' => false]); // orders are taken by hand here: everyone free is told
+        app(\App\Services\SettingsService::class)->set(['desk.assign_on_arrival' => false]); // orders are taken by hand here
         $order = $this->webOrder();
 
-        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->agent->id, 'subject_type' => 'order', 'subject_id' => $order->id, 'title' => 'New order '.$order->order_no]);
+        $this->assertSame(0, DB::table('app_notifications')->where('subject_id', $order->id)->count()); // no "New order" to everyone
 
         $this->actingAs($this->agent)->get('/orders?tab=take')->assertOk()->assertSee($order->order_no);
         $this->get("/orders/{$order->id}")->assertOk()->assertDontSee('Assign to me');

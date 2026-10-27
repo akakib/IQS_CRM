@@ -111,7 +111,7 @@ class DeliveryIssueService
             $this->orders->note($order, 'rider', __('Delivery issue moved to :n (:p is away).', ['n' => $name, 'p' => $person?->name ?? '-']), null, ['delivery_issue_id' => $r->id]);
             $this->notifications->send('delivery_issue', __(':no: delivery issue given to you', ['no' => $order->order_no]), null, [
                 'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'group_key' => 'delivery_issue:'.$order->id,
-                'user_ids' => $next ? [$next] : app(DeskService::class)->managerIds(),
+                'user_ids' => $next ? [$next] : app(DeskService::class)->managerIds(), 'only' => true,
             ]);
             $moved++;
         }

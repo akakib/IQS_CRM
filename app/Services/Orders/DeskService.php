@@ -544,7 +544,7 @@ class DeskService
             if ($this->assign($o->id, $userId, 'auto')) {
                 $assigned++;
                 $this->notifications->send('order_assigned', __('Order :no was given to you', ['no' => $o->order_no]), null, [
-                    'link' => route('desk.index', ['order' => $o->id]), 'subject' => ['order', $o->id], 'user_ids' => [$userId],
+                    'link' => route('desk.index', ['order' => $o->id]), 'subject' => ['order', $o->id], 'user_ids' => [$userId], 'only' => true,
                 ]);
                 if (++$load[$userId] >= $limitOf[$userId]) {
                     unset($load[$userId]);
@@ -569,18 +569,9 @@ class DeskService
             if ($this->assign($orderId, $userId, 'auto')) {
                 unset($room[$userId]); // their hand is full now (the call has not happened yet)
                 $this->notifications->send('order_assigned', __('Order :no was given to you (ask for the advance)', ['no' => $orderNo]), null, [
-                    'link' => route('desk.index', ['tab' => 'call', 'order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId],
+                    'link' => route('desk.index', ['tab' => 'call', 'order' => $orderId]), 'subject' => ['order', $orderId], 'user_ids' => [$userId], 'only' => true,
                 ]);
 
-            }
-        }
-
-        // Given out on arrival but nobody was free: now everyone hears of it (once), so whoever finishes first takes it.
-        if ($onArrival) {
-            foreach ($due as $o) {
-                if (DB::table('orders')->where('id', $o->id)->whereNull('moderator_id')->exists()) {
-                    $this->announceNewOrder($o->id, $o->order_no);
-                }
             }
         }
 
@@ -869,7 +860,7 @@ class DeskService
             if ($touched && $packerId) {
                 $this->notifications->send('courier_cancel_needed', __('Stop: :no was taken back', ['no' => $fresh->order_no]),
                     __('Do not pack or send it. Open the box, put the items back on the shelf, then press Unpacked on the Packaging page.'), [
-                        'link' => route('packaging.index'), 'subject' => ['order', $fresh->id], 'priority' => 'urgent', 'user_ids' => [$packerId],
+                        'link' => route('packaging.index'), 'subject' => ['order', $fresh->id], 'priority' => 'urgent', 'user_ids' => [$packerId], 'only' => true,
                     ]);
             }
         });
@@ -1061,26 +1052,12 @@ class DeskService
             $this->systemNote($o->id, __(':a is away: :b calls it now. Still :c\'s order.', ['a' => $names[$o->moderator_id] ?? '-', 'b' => $names[$helper] ?? '-', 'c' => $names[$owner] ?? '-']), null, ['covered_for' => $owner]);
             $this->notifications->send('order_assigned', __(':no to call: :n is away', ['no' => $o->order_no, 'n' => $names[$o->moderator_id] ?? '-']),
                 __('It stays :n\'s order. Confirm it to earn the help points.', ['n' => $names[$owner] ?? '-']), [
-                    'link' => route('desk.index', ['order' => $o->id]), 'subject' => ['order', $o->id], 'user_ids' => [$helper],
+                    'link' => route('desk.index', ['order' => $o->id]), 'subject' => ['order', $o->id], 'user_ids' => [$helper], 'only' => true,
                 ]);
             $moved++;
         }
 
         return $moved;
-    }
-
-    /**
-     * "New order" to the free people, once per order: its number only (no amount, no customer). One notice per order,
-     * so it is gone for everyone as soon as someone has the order (assign() settles it).
-     */
-    public function announceNewOrder(int $orderId, string $orderNo): void
-    {
-        if (! Cache::add('desk:new-order-notice:'.$orderId, 1, now()->addDay())) {
-            return;
-        }
-        $this->notifications->send('new_order', __('New order :no', ['no' => $orderNo]), __('Waiting to be taken'), [
-            'link' => route('desk.notice', $orderId), 'subject' => ['order', $orderId], 'except_user_ids' => $this->notFreeForNewOrders(),
-        ]);
     }
 
     /** An advance that holds its order (bigger than the trust limit) and is still unchecked after 30 minutes: managers are reminded once. */

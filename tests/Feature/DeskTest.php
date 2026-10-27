@@ -1181,10 +1181,8 @@ class DeskTest extends TestCase
         $c = $this->web();
         $this->desk()->autoAssign();
         $this->assertNull($c->fresh()->moderator_id);
-        $this->assertSame(0, DB::table('app_notifications')->where('type_id', $newOrder)->where('title', 'like', '%৳%')->count()); // never the amount
         $this->desk()->autoAssign();
-        $this->assertSame(DB::table('app_notifications')->where('type_id', $newOrder)->where('subject_id', $c->id)->count(),
-            DB::table('app_notifications')->where('type_id', $newOrder)->where('subject_id', $c->id)->distinct()->count('user_id')); // once each
+        $this->assertSame(0, DB::table('app_notifications')->where('type_id', $newOrder)->count()); // nobody free: it waits, nobody is told
     }
 
     public function test_with_two_orders_in_hand_only_the_first_opens_the_second_waits_its_turn(): void
@@ -1212,5 +1210,27 @@ class DeskTest extends TestCase
         $this->act($a->fresh(), 'cancel', ['reason_id' => DB::table('status_reasons')->where('reason_type', 'cancel')->value('id')])->assertSessionHasNoErrors();
         $this->get('/desk?tab=verify')->assertOk()->assertDontSee('Opens after');
         $this->act($b->fresh(), 'verify')->assertSessionHasNoErrors();
+    }
+
+    public function test_an_order_notice_reaches_one_person_only_even_when_a_role_rule_covers_everyone(): void
+    {
+        // The worst case: the admin set "Order given to you" and "New order" for the whole moderator role.
+        foreach (['order_assigned', 'new_order'] as $key) {
+            DB::table('notification_rules')->insert(['type_id' => DB::table('notification_types')->where('system_key', $key)->value('id'), 'target' => 'role',
+                'role_id' => DB::table('user_roles')->where('user_id', $this->rima->id)->value('role_id'), 'channel_in_app' => true, 'channel_telegram' => true,
+                'channel_sms' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        app(\App\Services\SettingsService::class)->set(['desk.assign_on_arrival' => true, 'desk.active_limit' => 1]);
+        DB::table('users')->whereIn('id', [$this->mahim->id, $this->rima->id])->update(['last_seen_at' => now()]);
+
+        $orders = [$this->web(), $this->web(), $this->web()]; // two people free, three orders: the third waits
+        $this->desk()->autoAssign();
+        foreach ($orders as $o) {
+            $people = DB::table('app_notifications')->where('subject_type', 'order')->where('subject_id', $o->id)->pluck('user_id')->unique();
+            $this->assertLessThanOrEqual(1, $people->count(), $o->order_no.' reached '.$people->count().' people');
+            $this->assertSame($o->fresh()->moderator_id ? [$o->fresh()->moderator_id] : [], $people->values()->all());
+        }
+        $this->assertNull($orders[2]->fresh()->moderator_id);
+        $this->assertSame(2, DB::table('app_notifications')->where('subject_type', 'order')->count()); // two orders given, two notices, nothing else
     }
 }

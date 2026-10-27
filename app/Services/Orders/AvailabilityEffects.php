@@ -42,7 +42,7 @@ class AvailabilityEffects
                 $this->orders->note($order, 'courier', __('Booked parcel is on hold: cancel or keep the Steadfast booking.'), null);
             }
             $this->notifications->send('order_held_for_stock', __(':no on hold: offer a substitute or wait', ['no' => $order->order_no]), null, [
-                'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => array_filter([$order->moderator_id]),
+                'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => array_filter([$order->moderator_id]), 'only' => true,
             ]);
         }
     }

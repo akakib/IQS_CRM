@@ -19,7 +19,7 @@ class NotificationService
 {
     /**
      * @param  array{link?: string, subject?: array{0: string, 1: int}, group_key?: string, priority?: string,
-     *               order_moderator_id?: int|null, user_ids?: list<int>, except_user_ids?: list<int>}  $opts
+     *               order_moderator_id?: int|null, user_ids?: list<int>, except_user_ids?: list<int>, only?: bool}  $opts
      * @return int number of people notified
      */
     public function send(string $typeKey, string $title, ?string $body = null, array $opts = []): int
@@ -144,6 +144,10 @@ class NotificationService
         // Explicit recipients from the caller always get the in-app copy.
         foreach ($opts['user_ids'] ?? [] as $id) {
             $out[(int) $id]['in_app'] = true;
+        }
+        // A personal notice ("given to you"): those people alone, whatever the rules say.
+        if (! empty($opts['only'])) {
+            $out = array_intersect_key($out, array_flip(array_map('intval', $opts['user_ids'] ?? [])));
         }
 
         return $out;

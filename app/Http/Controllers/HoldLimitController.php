@@ -64,7 +64,7 @@ class HoldLimitController extends Controller
             }
         });
         $this->notifications->send('hold_limit_request', $approve ? __('More holds: you can now hold :n orders', ['n' => (int) $data['new_limit']]) : __('More holds: your manager said no'),
-            null, ['link' => route('desk.index'), 'user_ids' => [$person->id]]);
+            null, ['link' => route('desk.index'), 'user_ids' => [$person->id], 'only' => true]);
 
         return back()->with('success', $approve ? __(':n can now hold :l orders.', ['n' => $person->name, 'l' => (int) $data['new_limit']]) : __('Request turned down.'));
     }

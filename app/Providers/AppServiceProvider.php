@@ -112,7 +112,7 @@ class AppServiceProvider extends ServiceProvider
                 app(\App\Services\NotificationService::class)->send('order_held_in_shop', __(':no on hold: set the parcel aside, do not send', ['no' => $order->order_no]),
                     trim(($label ? __('Label :l', ['l' => $label]).'. ' : '').($reason ? __($reason) : '')), [
                         'link' => route('packaging.index', ['show' => 'hold']), 'subject' => ['order', $order->id], 'priority' => 'urgent',
-                    ]);
+                    ] + ($order->packer_id ? ['user_ids' => [(int) $order->packer_id], 'only' => true] : []));
             }
         });
         // A website order record-verified here is set to Record verified on the website too (after the response); one

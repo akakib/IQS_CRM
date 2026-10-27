@@ -103,6 +103,18 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        // An order already in the packers' list put on hold (by the desk or a manager): the packers set the parcel aside.
+        \App\Services\Orders\OrderStateMachine::listen(function ($order, $from, $to, $user = null) {
+            // (Held by its own packer, who knows: no notice.)
+            if ($from['key'] === 'ready_for_packaging' && $to['key'] === 'hold' && ! ($user && (int) $order->packer_id === (int) $user->id)) {
+                $reason = $order->hold_reason_id ? \Illuminate\Support\Facades\DB::table('status_reasons')->where('id', $order->hold_reason_id)->value('label_en') : null;
+                $label = \Illuminate\Support\Facades\DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')->value('barcode');
+                app(\App\Services\NotificationService::class)->send('order_held_in_shop', __(':no on hold: set the parcel aside, do not send', ['no' => $order->order_no]),
+                    trim(($label ? __('Label :l', ['l' => $label]).'. ' : '').($reason ? __($reason) : '')), [
+                        'link' => route('packaging.index', ['show' => 'hold']), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+                    ]);
+            }
+        });
         // A website order record-verified here is set to Record verified on the website too (after the response); one
         // confirmed without passing Record verified (held for an advance, then confirmed) is set then. Only once: after
         // it is set, applies() is false.

@@ -47,7 +47,14 @@ class PackagingController extends Controller
         $pause = app(\App\Services\Packaging\PackagingPause::class);
         $controls = $pause->canControl($user);
 
-        $filter = in_array($request->query('show'), ['red', 'waiting', 'mine'], true) ? $request->query('show') : 'all';
+        $filter = in_array($request->query('show'), ['red', 'waiting', 'mine', 'hold'], true) ? $request->query('show') : 'all';
+        // Reached the packers, then put on hold: the parcel is set aside (its label stays with it) until it goes on.
+        $heldQuery = DB::table('orders as o')->where('o.status_id', OrderStatus::idFor('hold'))->whereNotNull('o.packaging_sent_at')->whereNotNull('o.active_shipment_id');
+        $counts['hold'] = (clone $heldQuery)->count();
+        $held = $filter !== 'hold' ? collect() : (clone $heldQuery)->leftJoin('status_reasons as r', 'r.id', '=', 'o.hold_reason_id')->leftJoin('users as m', 'm.id', '=', 'o.moderator_id')
+            ->orderByDesc('o.updated_at')->limit(100)
+            ->get(['o.id', 'o.order_no', 'o.ship_district', 'o.hold_note', 'o.hold_expected_date', 'o.updated_at', 'r.label_en as reason', 'm.name as moderator',
+                DB::raw('(SELECT barcode FROM shipment_labels l WHERE l.order_id = o.id AND l.voided_at IS NULL ORDER BY l.id DESC LIMIT 1) as label')]);
         $queue = DB::table('orders as o')
             ->leftJoin('users as m', 'm.id', '=', 'o.moderator_id')->leftJoin('users as p', 'p.id', '=', 'o.packer_id')
             ->whereRaw($inQueue)
@@ -72,6 +79,7 @@ class PackagingController extends Controller
             'counts' => $counts,
             'filter' => $filter,
             'queue' => $queue,
+            'heldInShop' => $held,
             'myDay' => [
                 'packed' => $mine->count(),
                 'avg' => $mine->count() ? (int) round($mine->avg(fn ($o) => $o->packaging_started_at ? max(0, strtotime($o->packed_at) - strtotime($o->packaging_started_at)) : 0) / 60) : null,

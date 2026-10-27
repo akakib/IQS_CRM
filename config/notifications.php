@@ -29,6 +29,7 @@ return [
         'scan_stopped' => ['A parcel was stopped at handover', 'urgent'],
         'return_problem' => ['Returned parcel: item damaged or missing, or not back in time', 'urgent'],
         'order_held_by_packer' => ['Packer put an order on hold', 'urgent'],
+        'order_held_in_shop' => ['An order already with the packers was put on hold', 'urgent'],
         'break_not_closed' => ['Someone went on break and did not come back', 'normal'],
         'order_left_idle' => ['An order was left untouched and taken back', 'normal'],
         'points_review' => ['Points: flag or dispute to review', 'normal'],

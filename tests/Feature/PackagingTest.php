@@ -700,4 +700,18 @@ class PackagingTest extends TestCase
             ->assertSeeInOrder([$a->order_no, 'Dates', 'Nuts', $b->order_no, 'Dates'])
             ->assertSeeInOrder(['Total', '2', 'Packed', '1', 'Still to pack', '1']);
     }
+
+    public function test_an_order_held_after_reaching_the_packers_tells_them_and_shows_in_on_hold(): void
+    {
+        $order = $this->booked('01712345671', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $reason = DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'customer_wait')->value('id');
+        app(OrderStateMachine::class)->transition($order->fresh(), 'hold', $this->desk, 'user', $reason, 'Customer travelling');
+        $order->forceFill(['hold_note' => 'Back on Sunday'])->save();
+
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->packer->id, 'title' => $order->order_no.' on hold: set the parcel aside, do not send']);
+        $this->actingAs($this->packer)->get('/packaging')->assertSee('On hold');
+        $this->get('/packaging?show=hold')->assertOk()->assertSee($order->order_no)->assertSee($this->label($order))->assertSee('Customer asked to wait')
+            ->assertSee('Back on Sunday')->assertSee('Do not send it');
+        $this->get('/packaging')->assertDontSee('Set the parcel aside');
+    }
 }

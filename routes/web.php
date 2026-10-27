@@ -186,6 +186,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/payments', [OrderController::class, 'storePayment'])->middleware('can:orders.edit')->name('orders.payments.store');
     Route::post('/orders/{order}/advance-date', [OrderController::class, 'advanceWillPayBy'])->middleware('can:orders.edit')->name('orders.advance-date');
     Route::post('/orders/{order}/advance-waiver', [OrderController::class, 'askWaiver'])->middleware('can:orders.edit')->name('orders.advance-waiver');
+    Route::post('/orders/{order}/advance-waiver/self', [OrderController::class, 'selfWaiver'])->middleware('can:orders.edit')->name('orders.advance-waiver.self');
     Route::post('/orders/{order}/advance-waiver/decide', [OrderController::class, 'decideWaiver'])->middleware('can:orders.approve')->name('orders.advance-waiver.decide');
     Route::get('/order-search', [\App\Http\Controllers\OrderSearchController::class, 'index'])->name('orders.search'); // every staff member
 

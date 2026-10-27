@@ -10,6 +10,8 @@
         && $order->advance_required && ! $order->advance_waived_at
         && (int) $order->hold_reason_id === (int) app(\App\Services\Orders\DeskService::class)->advanceReasonId();
     $isAdmin = auth()->user()?->can('orders.approve');
+    $selfLimit = (int) settings('advance.self_waive_up_to');
+    $canSelfWaive = ! $isAdmin && $selfLimit > 0 && (float) $order->cod_amount <= $selfLimit;
     $remaining = max(0, (float) $order->advance_required - (float) $order->advance_verified);
     $methods = $advanceHold ? \Illuminate\Support\Facades\DB::table('payment_methods')->where('is_active', true)->orderBy('id')->pluck('name', 'id')->all() : [];
     $input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none';
@@ -38,6 +40,8 @@
                     <form method="POST" action="{{ route('orders.advance-waiver.decide', $order) }}">@csrf<input type="hidden" name="decision" value="refuse">
                         <button class="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">{{ __('Refuse, advance needed') }}</button></form>
                 @endif
+            @elseif ($canSelfWaive)
+                <button type="button" @click="panel = panel === 'self' ? null : 'self'" class="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">{{ __('Process without advance') }}</button>
             @elseif (! $order->advance_waiver_requested_at)
                 <button type="button" @click="panel = panel === 'ask' ? null : 'ask'" class="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">{{ __('Ask admin: process without advance') }}</button>
             @endif
@@ -71,6 +75,15 @@
             @error('date')<p class="w-full text-xs text-red-600">{{ $message }}</p>@enderror
         </form>
 
+        @if ($canSelfWaive)
+            <form x-show="panel === 'self'" x-cloak method="POST" action="{{ route('orders.advance-waiver.self', $order) }}" class="mt-2 space-y-2">
+                @csrf
+                <p class="text-xs">{{ __('Small order (COD up to ৳:l): you may let it go without the advance. Your reason is kept on the order.', ['l' => number_format($selfLimit)]) }}</p>
+                <textarea name="why" required minlength="5" maxlength="300" rows="2" class="{{ $input }}" placeholder="{{ __('Why without advance? e.g. old customer of the shop, known person') }}"></textarea>
+                @error('why')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
+                <x-button size="sm">{{ __('Go without advance') }}</x-button>
+            </form>
+        @endif
         @unless ($isAdmin)
             <form x-show="panel === 'ask'" x-cloak method="POST" action="{{ route('orders.advance-waiver', $order) }}" class="mt-2 space-y-2">
                 @csrf

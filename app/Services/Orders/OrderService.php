@@ -349,6 +349,18 @@ class OrderService
         $order->forceFill(['hold_note' => __('Customer confirmed. Waiting for the payment check.'), 'hold_note_by' => $by->id, 'hold_note_at' => now()])->save();
     }
 
+    /** A small order (COD up to Settings > Payments) let go without the advance on the moderator's own word, on record. */
+    public function selfWaiveAdvance(Order $order, User $by, string $why): void
+    {
+        $limit = (int) settings('advance.self_waive_up_to');
+        if ($limit <= 0 || (float) $order->cod_amount > $limit) {
+            throw ValidationException::withMessages(['why' => __('Orders over ৳:l need an admin: use Ask admin.', ['l' => number_format($limit)])]);
+        }
+        $this->note($order, 'call', __('Called: went without advance on own decision (COD up to ৳:l): :w', ['l' => number_format($limit), 'w' => $why]), $by, ['outcome' => 'self_waived']);
+        $order->forceFill(['advance_waiver_note' => $why])->save();
+        $this->decideAdvanceWaiver($order, $by, true);
+    }
+
     /** A moderator asks an admin to let an advance-hold order go without the advance. */
     public function requestAdvanceWaiver(Order $order, User $by, string $why): void
     {

@@ -124,7 +124,9 @@ export default function voiceAlerts({ url, name, voice = true, interval = 30000 
             }
             if (d.notifications) window.dispatchEvent(new CustomEvent('iqs-bell', { detail: d.notifications }));
             // Order management listens: the waiting count and Take next follow without a reload.
-            window.dispatchEvent(new CustomEvent('iqs-pulse', { detail: { waiting: d.waiting, advance_waiting: d.advance_waiting || 0, can_take: d.can_take } }));
+            // mine: the orders in their hand and calls now due, so the list can follow when one is given, taken back or due.
+            const mine = [...(d.mine || []), ...(d.returned || [])].map((o) => o.id).sort((a, b) => a - b).join(',');
+            window.dispatchEvent(new CustomEvent('iqs-pulse', { detail: { waiting: d.waiting, advance_waiting: d.advance_waiting || 0, can_take: d.can_take, mine } }));
             const open = window.iqsOpenOrder || null; // the order on screen (Order management sets it)
             const prev = this.load();
             // On an order (one of theirs open on screen, or their timer running): new orders are kept quiet

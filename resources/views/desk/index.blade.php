@@ -31,8 +31,26 @@
 @endphp
 
 <x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="__('Order management')">
-<div x-data="{
+<div @iqs-pulse.window="follow($event.detail.mine)" x-data="{
         reasonMode: null, reason: null,
+        // Live list: when the orders in their hand change (one given, taken back, a call due), the tabs and the list
+        // update by themselves. Nothing open: the page reloads. An order open (maybe mid-typing): only the list and
+        // tabs are swapped, the open order stays as it is.
+        mineSeen: null,
+        async follow(mine) {
+            if (this.mineSeen === null || mine === this.mineSeen) { this.mineSeen = mine; return }
+            this.mineSeen = mine;
+            const open = window.iqsOpenOrder || null;
+            if (! open || ! mine.split(',').includes(String(open))) { location.reload(); return }
+            try {
+                const html = await (await fetch(location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })).text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                for (const id of ['desk-tabs', 'desk-list']) {
+                    const fresh = doc.getElementById(id), here = document.getElementById(id);
+                    if (fresh && here) here.innerHTML = fresh.innerHTML;
+                }
+            } catch (e) {}
+        },
         openReason(mode) { this.reasonMode = mode; this.reason = null },
         // A call saved as Wrong number: Cancel opens with Wrong number picked (only where Cancel is offered).
         wrongNumber(id) { if (document.querySelector('[data-key=x]')) { this.openReason('cancel'); this.reason = id } },
@@ -136,7 +154,7 @@
     @endif
 
     <div @class(['hidden lg:block' => $showDetailOnPhone])>
-        <x-tabs :tabs="collect($tabLabels)->reject(fn ($label, $t) => $t === 'send' && ! $counts['send'] && $tab !== 'send')->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
+        <x-tabs id="desk-tabs" :tabs="collect($tabLabels)->reject(fn ($label, $t) => $t === 'send' && ! $counts['send'] && $tab !== 'send')->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
     </div>
     @endunless
 
@@ -221,7 +239,7 @@
         {{-- My orders in this stage --}}
         @unless ($embed)
         <aside @class(['lg:block', 'hidden' => $showDetailOnPhone])>
-            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div id="desk-list" class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                 <p class="border-b border-gray-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $tabLabels[$tab] }} · {{ __('oldest first') }}</p>
                 @forelse ($list as $row)
                     @php $current = $order && $order->id === $row->id; @endphp

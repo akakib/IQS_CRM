@@ -348,6 +348,16 @@ class OrderController extends Controller
         return back()->with('success', __('Asked. You get a notice when an admin decides.'));
     }
 
+    /** A small order: the moderator lets it go without the advance themselves, with a reason. */
+    public function selfWaiver(Order $order, Request $request): RedirectResponse
+    {
+        $this->authorizeWork($order, $request->user());
+        $data = $request->validate(['why' => ['required', 'string', 'min:5', 'max:300']]);
+        $this->orders->selfWaiveAdvance($order, $request->user(), $data['why']);
+
+        return back()->with('success', __(':no goes on without advance.', ['no' => $order->order_no]));
+    }
+
     public function decideWaiver(Order $order, Request $request): RedirectResponse
     {
         $data = $request->validate(['decision' => ['required', 'in:allow,refuse']]);

@@ -150,6 +150,7 @@ class VerificationTest extends TestCase
     public function test_advance_hold_needs_the_delivery_charge_or_an_admins_yes(): void
     {
         (new \Database\Seeders\RoleSeeder)->run();
+        app(\App\Services\SettingsService::class)->set(['advance.self_waive_up_to' => 0]); // every order asks an admin here
         $mod = \App\Models\User::factory()->create();
         $admin = \App\Models\User::factory()->create();
         $mod->roles()->attach(\App\Models\Role::firstWhere('system_key', 'moderator')->id);
@@ -292,5 +293,28 @@ class VerificationTest extends TestCase
         $this->post('/settings/verification/test', ['order_no' => $order->order_no])
             ->assertSessionHas('verification_test', fn ($t) => $t['rule'] === 'Big web orders need advance' && $t['outcome'] === 'hold_for_advance');
         $this->assertSame('record_verified', $this->key($order->fresh())); // a test changes nothing
+    }
+
+    public function test_a_moderator_lets_a_small_order_go_without_advance_and_a_bigger_one_needs_an_admin(): void
+    {
+        (new \Database\Seeders\RoleSeeder)->run();
+        $mod = \App\Models\User::factory()->create();
+        $mod->roles()->attach(DB::table('roles')->where('system_key', 'moderator')->value('id'));
+        app(\App\Services\PermissionService::class)->bump();
+        app(\App\Services\SettingsService::class)->set(['advance.self_waive_up_to' => 1000]);
+
+        $small = $this->order('01712345679'); // held for the advance
+        $small->forceFill(['moderator_id' => $mod->id, 'cod_amount' => 800])->save();
+        $this->actingAs($mod)->get("/orders/{$small->id}")->assertSee('Go without advance');
+        $this->post("/orders/{$small->id}/advance-waiver/self", ['why' => 'Known customer, pays on delivery'])->assertSessionHas('success');
+        $this->assertNotNull($small->fresh()->advance_waived_at);
+        $this->assertNotSame('hold', $this->key($small->fresh()));
+        $this->assertDatabaseHas('order_notes', ['order_id' => $small->id, 'user_id' => $mod->id, 'note_type' => 'call']);
+
+        $big = $this->order('01712345669');
+        $big->forceFill(['moderator_id' => $mod->id, 'cod_amount' => 5000])->save();
+        $small->forceFill(['moderator_id' => null])->save(); // one order at a time
+        $this->post("/orders/{$big->id}/advance-waiver/self", ['why' => 'Known customer, pays on delivery'])->assertSessionHasErrors('why');
+        $this->assertSame('hold', $this->key($big->fresh()));
     }
 }

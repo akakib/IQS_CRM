@@ -58,6 +58,7 @@
             <b class="text-gray-800">{{ $onDuty->isEmpty() ? __('not set (everyone with packaging access)') : $onDuty->map(fn ($name, $id) => $name.(($helpersToday[$id] ?? null) ? ' + '.$helpersToday[$id] : ''))->join(', ') }}</b></span>
         <span class="flex items-center gap-3">
             @if ($newLabels)<a href="{{ route('packaging.labels') }}" target="_blank" class="font-medium text-primary hover:underline">{{ __('Print new labels (:n)', ['n' => $newLabels]) }}</a>@endif
+            <a href="{{ route('packaging.sheet', ['today' => 1]) }}" target="_blank" class="font-medium text-primary hover:underline">{{ __('Today\'s sheet') }}</a>
             <a href="{{ route('handover.index') }}" class="font-medium text-primary hover:underline">{{ __('Handover') }}</a>
             @if ($openIssues)<a href="{{ route('packaging.issues') }}" class="font-medium text-red-600 hover:underline">{{ __('Missing items (:n)', ['n' => $openIssues]) }}</a>@endif
         </span>

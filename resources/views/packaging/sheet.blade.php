@@ -32,14 +32,25 @@
         .warn { font-size: 13px; font-weight: bold; margin-bottom: 1mm; }
         .note { font-size: 13px; font-style: italic; border: 1px dashed #000; padding: 1mm 2mm; margin-bottom: 1mm; }
         .num { width: 7mm; color: #555; font-size: 12px; }
+        .totals { display: flex; flex-wrap: wrap; gap: 6mm; padding: 0 4mm 3mm; font-size: 14px; }
+        .totals b { font-size: 18px; }
+        .done { font-size: 12px; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
     <div class="toolbar"><button onclick="window.print()">{{ __('Print the packing sheet') }}</button></div>
     <div class="head">
-        <h1>{{ __('Packing sheet') }}</h1>
+        <h1>{{ $summary ? __('Today\'s packing sheet') : __('Packing sheet') }}</h1>
         <span>{{ now()->format('d M Y, g:i A') }} · {{ trans_choice(':n order|:n orders', $rows->count(), ['n' => $rows->count()]) }}</span>
     </div>
+    @if ($summary)
+        <div class="totals">
+            <span>{{ __('Total') }} <b>{{ $summary['total'] }}</b></span>
+            <span>{{ __('Packed') }} <b>{{ $summary['packed'] }}</b></span>
+            <span>{{ __('Still to pack') }} <b>{{ $summary['to_pack'] }}</b></span>
+            <span>{{ __('Waiting for the rider') }} <b>{{ $summary['rider'] }}</b></span>
+        </div>
+    @endif
     <table>
         <thead><tr><th class="num">#</th><th>{{ __('Label') }}</th><th>{{ __('Items') }}</th><th style="text-align:right">COD</th><th style="text-align:center">{{ __('Packed') }}</th><th style="text-align:center">{{ __('Label on') }}</th></tr></thead>
         <tbody>
@@ -52,14 +63,14 @@
                     </td>
                     <td class="items">
                         @if ($r->changed)<div class="warn">{{ __('CHANGED: use the new label :l', ['l' => $r->current ?? '-']) }}</div>@endif
-                        @if ($n = \App\Support\Phone::hideIn($r->order->customer_note))<div class="note">{{ __('Note') }}: {{ $n }}</div>@endif
+                        @if ($note = \App\Support\Phone::hideIn($r->order->customer_note))<div class="note">{{ __('Note') }}: {{ $note }}</div>@endif
                         @foreach ($r->order->items as $i)
                             @php($size = \App\Support\Units::itemSize($i))
                             <div><b>{{ $i->name_snapshot }}</b>@if ($size) <span class="size">{{ $size }}</span>@endif <span class="qty">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</span></div>
                         @endforeach
                     </td>
                     <td style="text-align:right;white-space:nowrap">৳{{ number_format((float) $r->order->cod_amount) }}</td>
-                    <td><div class="box"></div></td>
+                    <td>@if ($r->order->packed_at)<div class="done">{{ __('Packed') }}</div>@else<div class="box"></div>@endif</td>
                     <td><div class="box"></div></td>
                 </tr>
             @endforeach

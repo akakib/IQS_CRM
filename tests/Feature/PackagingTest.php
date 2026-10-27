@@ -688,4 +688,16 @@ class PackagingTest extends TestCase
         $run = DB::table('shipment_labels')->where('order_id', $order->id)->value('print_run');
         $this->get(route('packaging.sheet', ['run' => $run]))->assertSee('Gift wrap please')->assertDontSee('01812345678');
     }
+
+    public function test_todays_sheet_lists_every_order_of_the_day_with_its_items_and_totals(): void
+    {
+        $a = $this->booked('01712345661', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        $b = $this->booked('01712345662', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $this->actingAs($this->packer);
+        $this->packIt($a);
+        $this->get('/packaging')->assertSee("Today's sheet");
+        $this->get(route('packaging.sheet', ['today' => 1]))->assertOk()->assertSee("Today's packing sheet")
+            ->assertSeeInOrder([$a->order_no, 'Dates', 'Nuts', $b->order_no, 'Dates'])
+            ->assertSeeInOrder(['Total', '2', 'Packed', '1', 'Still to pack', '1']);
+    }
 }

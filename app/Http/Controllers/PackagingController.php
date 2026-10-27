@@ -211,7 +211,21 @@ class PackagingController extends Controller
         $run = preg_match('/^\d{10,20}$/', (string) $request->query('run')) ? $request->query('run') : null;
         $pause = app(PackagingPause::class);
         $hide = $pause->canControl($request->user()) ? '' : $pause->visibleSql('o');
-        if ($run) {
+        $summary = null;
+        if ($request->boolean('today')) {
+            // Today's sheet: everything that reached packaging today, plus what still waits from before, oldest first,
+            // with today's totals on top. Each order with its items; the ones already packed say so.
+            $inShop = OrderStatus::groupIds('packaging');
+            $printed = DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')->whereNull('l.voided_at')
+                ->where(fn ($w) => $w->where('o.packaging_sent_at', '>=', today())->orWhere('o.status_id', OrderStatus::idFor('ready_for_packaging')))
+                ->whereNotIn('o.status_id', OrderStatus::idsFor(['cancelled']))->when($hide !== '', fn ($q) => $q->whereRaw($hide))
+                ->orderBy('o.packaging_sent_at')->orderBy('o.id')->limit(500)->get(['l.order_id', 'l.barcode', 'l.voided_at']);
+            $today = DB::table('orders as o')->whereIn('o.id', $printed->pluck('order_id'))->selectRaw(
+                'COUNT(*) as total, SUM(CASE WHEN o.packed_at IS NOT NULL THEN 1 ELSE 0 END) as packed, SUM(CASE WHEN o.status_id = ? THEN 1 ELSE 0 END) as to_pack,
+                 SUM(CASE WHEN o.status_id IN ('.implode(',', array_map('intval', array_slice($inShop, 1))).') THEN 1 ELSE 0 END) as rider',
+                [OrderStatus::idFor('ready_for_packaging')])->first();
+            $summary = array_map('intval', (array) $today);
+        } elseif ($run) {
             $printed = DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')->where('l.print_run', $run)
                 ->when($hide !== '', fn ($q) => $q->whereRaw($hide))->orderBy('l.printed_at')->orderBy('l.id')->get(['l.order_id', 'l.barcode', 'l.voided_at']);
         } else {
@@ -225,7 +239,7 @@ class PackagingController extends Controller
             'label' => $l->barcode, 'order' => $orders[$l->order_id], 'changed' => $l->voided_at !== null, 'current' => $current[$l->order_id] ?? null,
         ])->values();
 
-        return view('packaging.sheet', ['rows' => $rows]);
+        return view('packaging.sheet', ['rows' => $rows, 'summary' => $summary]);
     }
 
     // ── Batches (older flow, kept for bulk pick lists; not in the menu) ──

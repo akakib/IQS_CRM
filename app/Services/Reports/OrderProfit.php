@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\DB;
  */
 class OrderProfit
 {
-    public const GROUPS = ['day', 'channel', 'moderator', 'product', 'category'];
+    public const GROUPS = ['day', 'channel', 'source', 'moderator', 'product', 'category'];
 
     /** One row per settled order (a subquery to group on). */
     public function orders(string $from, string $to, ?string $channel = null): Builder
@@ -59,7 +59,7 @@ class OrderProfit
             ->leftJoin('ad_cost_days as ad', fn ($j) => $j->on(DB::raw('DATE(o.created_at)'), '=', 'ad.day'))
             ->whereIn('o.status_id', $settled)
             ->when($channel, fn ($q) => $q->where('o.channel', $channel))
-            ->selectRaw("o.id, o.order_no, o.channel, COALESCE(o.confirmed_by, o.moderator_id) as moderator_id, f.final_at,
+            ->selectRaw("o.id, o.order_no, o.channel, o.ad_source, COALESCE(o.confirmed_by, o.moderator_id) as moderator_id, f.final_at,
                 CASE WHEN $isDelivered THEN 1 ELSE 0 END as delivered,
                 (CASE WHEN $isDelivered THEN $collected + o.advance_verified ELSE o.advance_verified END) - $refunds as revenue,
                 COALESCE(o.return_charge, 0) + $lostItems as returns,
@@ -118,7 +118,7 @@ class OrderProfit
                 ->orderByDesc('revenue')->paginate($perPage)->withQueryString();
         }
 
-        $key = match ($group) { 'channel' => 'x.channel', 'moderator' => 'x.moderator_id', default => 'DATE(x.final_at)' };
+        $key = match ($group) { 'channel' => 'x.channel', 'source' => 'x.ad_source', 'moderator' => 'x.moderator_id', default => 'DATE(x.final_at)' };
 
         return DB::query()->fromSub($this->orders($from, $to, $channel), 'x')
             ->groupByRaw($key)

@@ -23,13 +23,13 @@
             if (@js((bool) request('fresh'))) forgetDraft();
             else if (@js(! $errors->any() && ! request('phone'))) restoreDraft();
             if (phone && !@js(old('phone'))) lookup();
-            $watch(() => JSON.stringify([channel, chatChannel, phone, name, addressId, zoneId, items, orderDiscount, payMethod, payAmount]), () => saveDraft());
+            $watch(() => JSON.stringify([channel, chatChannel, adSource, phone, name, addressId, zoneId, items, orderDiscount, payMethod, payAmount]), () => saveDraft());
         })"
         @input.debounce.400ms="saveDraft()" @select-change="$nextTick(() => saveDraft())" @submit="markSent()"
         x-data="{
             draftKey: 'iqs-order-draft:' + @js((string) ($chatChannel?->id ?? 'plain')),
             draftAt: null,
-            plainFields: ['address_line', 'district', 'thana', 'advance[transaction_id]', 'advance[sender_number]', 'customer_note'],
+            plainFields: ['address_line', 'district', 'thana', 'advance[transaction_id]', 'advance[sender_number]', 'customer_note', 'ad_code'],
             field(n) { return this.$refs.form.querySelector(`[name='${n}']`) },
             saveDraft() {
                 const plain = {};
@@ -38,7 +38,7 @@
                 try {
                     if (empty) { localStorage.removeItem(this.draftKey); this.draftAt = null; return }
                     localStorage.setItem(this.draftKey, JSON.stringify({ at: Date.now(), data: {
-                        channel: this.channel, chatChannel: this.chatChannel, byChat: this.byChat, phone: this.phone, name: this.name,
+                        channel: this.channel, chatChannel: this.chatChannel, byChat: this.byChat, adSource: this.adSource, sourceAuto: this.sourceAuto, phone: this.phone, name: this.name,
                         addressId: this.addressId, zoneId: this.zoneId, items: this.items, orderDiscount: this.orderDiscount,
                         payMethod: this.payMethod, payAmount: this.payAmount, plain } }));
                 } catch (e) {}
@@ -48,7 +48,7 @@
                 try { saved = JSON.parse(localStorage.getItem(this.draftKey) || 'null') } catch (e) {}
                 if (!saved || saved.sent || Date.now() - saved.at > 86400000) { this.forgetDraft(); return }
                 const d = saved.data;
-                ['channel', 'chatChannel', 'byChat', 'phone', 'name', 'addressId', 'zoneId', 'items', 'orderDiscount', 'payMethod', 'payAmount'].forEach(k => { if (d[k] !== undefined) this[k] = d[k] });
+                ['channel', 'chatChannel', 'byChat', 'adSource', 'sourceAuto', 'phone', 'name', 'addressId', 'zoneId', 'items', 'orderDiscount', 'payMethod', 'payAmount'].forEach(k => { if (d[k] !== undefined) this[k] = d[k] });
                 this.$nextTick(() => {
                     Object.entries(d.plain || {}).forEach(([n, v]) => {
                         const el = this.field(n);
@@ -67,6 +67,8 @@
             channel: @js(old('channel', $chatChannel?->orderChannel() ?? (array_key_exists((string) request('channel'), \App\Models\Order::manualChannels()) ? request('channel') : ''))),
             chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
             byChat: @js((bool) $chatChannel),
+            {{-- Ad or organic: picked by hand; a customer with earlier orders starts on Repeat customer (still changeable). --}}
+            adSource: @js((string) old('ad_source', '')), sourceAuto: false,
             chatPlatforms: @js($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all()),
             {{-- A platform picked by hand: a chat of another platform is dropped; the only chat of this platform is picked. --}}
             pickPlatform(key) {
@@ -102,6 +104,8 @@
                     const r = await fetch(@js(route('customers.lookup')) + '?phone=' + phone, { headers: { Accept: 'application/json' } });
                     const d = await r.json();
                     this.customer = d.found ? d : null;
+                    if ((!this.adSource || this.sourceAuto) && d.found && d.orders > 0) { this.adSource = 'repeat'; this.sourceAuto = true; }
+                    else if (this.sourceAuto && !(d.found && d.orders > 0)) { this.adSource = ''; this.sourceAuto = false; }
                     {{-- The saved name and address fill in (still editable); another number replaces what was filled, never what was typed. --}}
                     if (d.found) {
                         if (!this.name || this.nameAuto) { this.name = d.name; this.nameAuto = true; }
@@ -158,6 +162,7 @@
         @if (request('call_item'))<input type="hidden" name="call_item" value="{{ (int) request('call_item') }}">@endif
         <input type="hidden" name="channel" :value="channel">
         <input type="hidden" name="chat_channel_id" :value="chatChannel">
+        <input type="hidden" name="ad_source" :value="adSource">
 
         <div class="grid gap-6 xl:grid-cols-3">
             <div class="space-y-6 xl:col-span-2">
@@ -172,6 +177,19 @@
                     <p x-show="!channel" class="-mt-2 mb-4 text-sm font-medium text-amber-700">{{ __('Pick where the order came from.') }}</p>
                     @error('channel')<p class="-mt-2 mb-4 text-sm text-red-600">{{ $message }}</p>@enderror
                     {{-- Which number or page the customer wrote to: counted per channel in reports. --}}
+                    <p class="mb-1 text-sm font-medium text-gray-700">{{ __('Source') }}</p>
+                    <div class="mb-4 flex flex-wrap gap-2">
+                        @foreach (\App\Models\Order::SOURCES as $key => $label)
+                            <button type="button" @click="adSource = @js($key); sourceAuto = false" class="rounded-full border px-3 py-1.5 text-sm"
+                                :class="adSource === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ __($label) }}</button>
+                        @endforeach
+                    </div>
+                    <p x-show="!adSource" class="-mt-2 mb-4 text-sm font-medium text-amber-700">{{ __('Pick how the customer found us.') }}</p>
+                    @error('ad_source')<p class="-mt-2 mb-4 text-sm text-red-600">{{ $message }}</p>@enderror
+                    {{-- Which ad: the code in the ad's ready message (e.g. AD12), when the customer's first message has one. --}}
+                    <label x-show="adSource.endsWith('_ad')" x-cloak class="mb-4 block text-sm font-medium text-gray-700">{{ __('Ad code (optional)') }}
+                        <input name="ad_code" value="{{ old('ad_code') }}" maxlength="100" placeholder="AD12" class="{{ $input }} mt-1 sm:w-72">
+                    </label>
                     @if ($chatChannels->isNotEmpty())
                         <div class="mb-4">
                             <p class="mb-1 text-sm font-medium text-gray-700">{{ __('From which chat') }}</p>
@@ -317,7 +335,7 @@
                 <p x-show="draftAt" x-cloak class="text-center text-xs text-gray-500">{{ __('Draft kept from') }} <span x-text="draftAt"></span>. {{ __('It stays until the order is created or cleared.') }}</p>
                 <div class="flex gap-2">
                     <x-button type="button" variant="secondary" class="shrink-0" @click="$dispatch('open-confirm', { id: 'order-draft-clear-confirm', form: 'order-draft-clear' })">{{ __('Clear') }}</x-button>
-                    <x-button class="w-full" ::disabled="!items.length || !channel">{{ __('Create order') }}</x-button>
+                    <x-button class="w-full" ::disabled="!items.length || !channel || !adSource">{{ __('Create order') }}</x-button>
                 </div>
             </div>
         </div>

@@ -120,6 +120,8 @@ class OrderController extends Controller
     {
         $data = $request->validate([
             'channel' => ['required', Rule::in(array_keys(Order::manualChannels()))],
+            'ad_source' => ['required', Rule::in(array_keys(Order::SOURCES))],
+            'ad_code' => ['nullable', 'string', 'max:100'],
             'phone' => ['required', 'string', 'max:20'],
             'alt_phone' => ['nullable', 'string', 'max:20'],
             'name' => ['required', 'string', 'max:150'],

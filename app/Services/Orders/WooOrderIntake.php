@@ -133,9 +133,11 @@ class WooOrderIntake
                 'source' => $meta['_wc_order_attribution_utm_source'] ?? null,
                 'medium' => $meta['_wc_order_attribution_utm_medium'] ?? null,
                 'campaign' => $meta['_wc_order_attribution_utm_campaign'] ?? null,
+                'content' => $meta['_wc_order_attribution_utm_content'] ?? null,
                 'source_type' => $meta['_wc_order_attribution_source_type'] ?? null,
             ]) ?: null,
             'source_campaign' => $meta['_wc_order_attribution_utm_campaign'] ?? null,
+            'ad_code' => $meta['_wc_order_attribution_utm_content'] ?? null, // the ad's name, when the ad's link carries utm_content
         ], null, 'webhook');
 
         $this->orders->note($order, 'system', __('Imported from website order #:n (:m).', ['n' => $p['number'] ?? $p['id'], 'm' => $p['payment_method_title'] ?? $p['payment_method'] ?? 'COD']), null);

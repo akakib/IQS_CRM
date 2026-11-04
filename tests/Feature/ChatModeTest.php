@@ -93,7 +93,7 @@ class ChatModeTest extends TestCase
         $this->get('/orders/create?channel=phone&embed=1')->assertSee("iqs-order-draft:", false)->assertSee('id="order-draft-clear"', false)->assertSee('name="fresh" value="1"', false)->assertSee('name="channel" value="phone"', false);
         $this->get('/orders/create?chat_channel='.$wa->id.'&embed=1')->assertOk()->assertSee('From which chat')->assertSee('name="embed"', false)->assertDontSee('Communication channels');
         $this->post('/orders', [
-            'channel' => 'whatsapp', 'chat_channel_id' => $wa->id, 'phone' => '01812345678', 'name' => 'Rahim', 'address_line' => 'House 9',
+            'channel' => 'whatsapp', 'ad_source' => 'wa_ad', 'ad_code' => 'AD12', 'chat_channel_id' => $wa->id, 'phone' => '01812345678', 'name' => 'Rahim', 'address_line' => 'House 9',
             'zone_id' => DB::table('delivery_zones')->where('system_key', 'inside_dhaka')->value('id'),
             'items' => [['variant_id' => $this->variant->id, 'qty' => 1]], 'embed' => 1,
         ])->assertOk()->assertSee('iqsOrderCreated')->assertSessionHas('success');
@@ -110,7 +110,7 @@ class ChatModeTest extends TestCase
         $this->assertSame('other', (new ChatChannel(['type' => 'something_new']))->orderChannel());
         $this->assertSame('TikTok', Order::channelLabel('tiktok'));
         $this->get('/orders/create?chat_channel='.$wa->id)->assertSee('TikTok')->assertSee('Facebook comments');
-        $this->post('/orders', ['channel' => 'messenger', 'chat_channel_id' => $comments->id, 'phone' => '01812345679', 'name' => 'X', 'address_line' => 'Y',
+        $this->post('/orders', ['channel' => 'messenger', 'ad_source' => 'organic', 'chat_channel_id' => $comments->id, 'phone' => '01812345679', 'name' => 'X', 'address_line' => 'Y',
             'items' => [['variant_id' => $this->variant->id, 'qty' => 1]]])->assertSessionHasErrors('chat_channel_id');
         $this->getJson('/chat')->assertJsonPath('channels.0.orders', 1);
 

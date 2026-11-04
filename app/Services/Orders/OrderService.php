@@ -94,6 +94,10 @@ class OrderService
                 'fbp' => $data['fbp'] ?? null,
                 'fbc' => $data['fbc'] ?? null,
                 'source_campaign' => $data['source_campaign'] ?? null,
+                // Picked by hand on the order form; a website order's comes from its attribution.
+                'ad_source' => $data['ad_source'] ?? ($data['channel'] === 'web'
+                    ? Order::sourceFromUtm($data['utm'] ?? null, DB::table('orders')->where('customer_id', $customer->id)->exists()) : null),
+                'ad_code' => isset($data['ad_code']) && trim((string) $data['ad_code']) !== '' ? mb_substr(trim((string) $data['ad_code']), 0, 100) : null,
                 'is_duplicate_flag' => $duplicate,
                 'duplicate_of_no' => $twin?->order_no,
                 'duplicate_items' => $match['items'] ?? null,

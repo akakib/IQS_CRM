@@ -340,7 +340,7 @@ class CallListTest extends TestCase
         $this->actingAs($this->rakin)->get(route('calls.work', $list))->assertSee('Take an order');
         $item = $this->item($this->rakin, $list);
 
-        $done = $this->post(route('orders.store'), ['channel' => 'phone', 'phone' => $item->phone, 'name' => $item->name, 'address_line' => 'Road 1', 'embed' => 1, 'call_item' => $item->id,
+        $done = $this->post(route('orders.store'), ['channel' => 'phone', 'ad_source' => 'organic', 'phone' => $item->phone, 'name' => $item->name, 'address_line' => 'Road 1', 'embed' => 1, 'call_item' => $item->id,
             'items' => [['variant_id' => ProductVariant::first()->id, 'qty' => 1]]]);
         $done->assertOk()->assertSee('stay', false);
         $orderId = (int) DB::table('orders')->max('id');

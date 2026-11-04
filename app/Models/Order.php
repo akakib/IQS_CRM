@@ -47,6 +47,38 @@ class Order extends Model
         return $base !== '' ? $base.'/wp-admin/admin.php?page=wc-orders&action=edit&id='.rawurlencode((string) $order->external_ref) : null;
     }
 
+    /** Where the customer found us: an ad (which one in ad_code) or not. Picked on every order made by hand. */
+    public const SOURCES = [
+        'fb_ad' => 'Facebook Ad', 'ig_ad' => 'Instagram Ad', 'wa_ad' => 'WhatsApp Ad', 'organic' => 'Organic', 'repeat' => 'Repeat customer', 'other' => 'Other',
+    ];
+
+    public static function adSourceLabel(?string $key): string
+    {
+        return $key === null ? __('Not set') : __(self::SOURCES[$key] ?? ucfirst($key));
+    }
+
+    /**
+     * A website order's source from its WooCommerce attribution: a paid Meta link is that ad; any other paid link is Other;
+     * no paid link is a repeat customer (an earlier order) or Organic.
+     *
+     * @param  array<string, string>|null  $utm
+     */
+    public static function sourceFromUtm(?array $utm, bool $hasEarlierOrder): string
+    {
+        $source = strtolower((string) ($utm['source'] ?? ''));
+        $paid = in_array(strtolower((string) ($utm['medium'] ?? '')), ['paid', 'cpc', 'ppc', 'paid_social', 'paidsocial', 'ad', 'ads'], true);
+        if ($paid) {
+            return match (true) {
+                (bool) preg_match('/instagram|^ig$/', $source) => 'ig_ad',
+                (bool) preg_match('/whatsapp|^wa$/', $source) => 'wa_ad',
+                (bool) preg_match('/facebook|^fb$|meta/', $source) => 'fb_ad',
+                default => 'other',
+            };
+        }
+
+        return $hasEarlierOrder ? 'repeat' : 'organic';
+    }
+
     public static function channelLabel(?string $key): string
     {
         return __(self::CHANNELS[$key] ?? ucfirst((string) $key));

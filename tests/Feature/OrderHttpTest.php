@@ -54,7 +54,7 @@ class OrderHttpTest extends TestCase
         $this->actingAs($this->agent)->get('/orders/create')->assertOk()->assertSee('New order');
 
         $this->post('/orders', [
-            'channel' => 'whatsapp', 'phone' => '01812345678', 'name' => 'Rahim', 'address_line' => 'House 9',
+            'channel' => 'whatsapp', 'ad_source' => 'organic', 'phone' => '01812345678', 'name' => 'Rahim', 'address_line' => 'House 9',
             'zone_id' => DB::table('delivery_zones')->where('system_key', 'outside_dhaka')->value('id'),
             'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
         ])->assertRedirect();
@@ -68,7 +68,7 @@ class OrderHttpTest extends TestCase
         $this->assertTrue(DB::table('order_notes')->where('order_id', $order->id)->where('body', 'like', '%Confirmed in the chat or call it was taken in%')->exists());
 
         // From somewhere that is none of the listed channels: Other. No channel at all is refused.
-        $line = ['phone' => '01812345670', 'name' => 'Karim', 'address_line' => 'House 2', 'items' => [['variant_id' => $this->variant->id, 'qty' => 1]]];
+        $line = ['ad_source' => 'organic', 'phone' => '01812345670', 'name' => 'Karim', 'address_line' => 'House 2', 'items' => [['variant_id' => $this->variant->id, 'qty' => 1]]];
         $this->post('/orders', $line)->assertSessionHasErrors('channel');
         $this->post('/orders', $line + ['channel' => 'other'])->assertRedirect();
         $this->assertSame('other', Order::latest('id')->first()->channel);
@@ -90,7 +90,7 @@ class OrderHttpTest extends TestCase
         // An order typed with Bangla digits is saved with the normal number, and the next lookup finds that customer.
         $this->get('/orders/create')->assertSee('Steadfast:');
         $this->post('/orders', [
-            'channel' => 'whatsapp', 'phone' => '০১৮১২৩৪৫৬৭৩', 'name' => 'Rahim', 'address_line' => 'House 9',
+            'channel' => 'whatsapp', 'ad_source' => 'organic', 'phone' => '০১৮১২৩৪৫৬৭৩', 'name' => 'Rahim', 'address_line' => 'House 9',
             'zone_id' => DB::table('delivery_zones')->where('system_key', 'inside_dhaka')->value('id'),
             'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
         ])->assertRedirect();
@@ -179,5 +179,26 @@ class OrderHttpTest extends TestCase
         // How many match, under the filters; the page range only when there is more than one page.
         $this->get('/orders?tab=all')->assertSeeInOrder(['2</span>', 'orders'], false)->assertDontSee('showing 1');
         $this->assertSame(2, $this->get('/orders?tab=all')->viewData('total'));
+    }
+
+    public function test_an_order_made_by_hand_needs_its_source_and_keeps_the_ad_code(): void
+    {
+        $line = ['channel' => 'whatsapp', 'phone' => '01812345674', 'name' => 'Karim', 'address_line' => 'House 2', 'items' => [['variant_id' => $this->variant->id, 'qty' => 1]]];
+        $this->actingAs($this->agent)->get('/orders/create')->assertOk()->assertSee('Source')->assertSee('WhatsApp Ad')->assertSee('Repeat customer');
+        $this->post('/orders', $line)->assertSessionHasErrors('ad_source');
+        $this->post('/orders', $line + ['ad_source' => 'tv'])->assertSessionHasErrors('ad_source');
+        $this->post('/orders', $line + ['ad_source' => 'wa_ad', 'ad_code' => ' AD12 '])->assertRedirect();
+        $order = Order::latest('id')->first();
+        $this->assertSame(['wa_ad', 'AD12'], [$order->ad_source, $order->ad_code]);
+    }
+
+    public function test_a_website_order_gets_its_source_from_the_attribution(): void
+    {
+        $this->assertSame('fb_ad', Order::sourceFromUtm(['source' => 'facebook', 'medium' => 'paid', 'source_type' => 'utm'], false));
+        $this->assertSame('ig_ad', Order::sourceFromUtm(['source' => 'ig', 'medium' => 'paid'], true));
+        $this->assertSame('other', Order::sourceFromUtm(['source' => 'google', 'medium' => 'cpc'], false));
+        $this->assertSame('organic', Order::sourceFromUtm(['source' => 'facebook.com', 'medium' => 'referral', 'source_type' => 'referral'], false));
+        $this->assertSame('organic', Order::sourceFromUtm(null, false));
+        $this->assertSame('repeat', Order::sourceFromUtm(['source' => 'google', 'medium' => 'organic'], true));
     }
 }

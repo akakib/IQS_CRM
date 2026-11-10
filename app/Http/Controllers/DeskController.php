@@ -420,7 +420,7 @@ class DeskController extends Controller
         // Same customer, another order still open or placed in the last 7 days.
         // (Open ones get a warning on Confirm: the courier is booked right away.)
         $duplicates = DB::table('orders')->where('customer_id', $order->customer_id)->where('id', '!=', $order->id)
-            ->where('created_at', '>=', now()->subDays(7))->orderByDesc('id')->limit(5)->get(['id', 'order_no', 'status_id', 'grand_total', 'created_at']);
+            ->where('created_at', '>=', now()->subHours(max(7 * 24, (int) settings('orders.duplicate_window_hours'))))->orderByDesc('id')->limit(5)->get(['id', 'order_no', 'status_id', 'grand_total', 'created_at']);
         if ($duplicates->isNotEmpty()) {
             $match = app(\App\Services\Orders\DuplicateCheck::class)->compare(
                 $items->whereNotNull('variant_id')->groupBy('variant_id')->map(fn ($r) => $r->sum('qty'))->all(),
@@ -456,7 +456,9 @@ class DeskController extends Controller
             'heldFrom' => $heldFrom ?? null,
             // Ending this hold goes to Confirmed (Send to packaging) or to Call (Resume): the one rule in OrderService.
             'resumeTo' => $key === 'hold' ? $this->orders->resumeTarget($order) : null,
-            'openDuplicates' => $duplicates->filter(fn ($d) => ! (OrderStatus::map()[$d->status_id]['final'] ?? false) && OrderStatus::map()[$d->status_id]['key'] !== 'cancelled')->values(),
+            // The one duplicate rule (OrderService::openDuplicateOf), read from the list already loaded: open, inside the Settings window.
+            'openDuplicates' => $duplicates->filter(fn ($d) => ! (OrderStatus::map()[$d->status_id]['final'] ?? false) && OrderStatus::map()[$d->status_id]['key'] !== 'cancelled'
+                && $d->created_at >= now()->subHours((int) settings('orders.duplicate_window_hours'))->toDateTimeString())->take(1)->values(),
             'parcel' => $parcel = $order->active_shipment_id ? DB::table('shipments')->where('id', $order->active_shipment_id)->first(['consignment_id', 'courier', 'courier_status']) : null,
             'consignment' => $parcel?->consignment_id,
         ];

@@ -104,8 +104,8 @@
                     const r = await fetch(@js(route('customers.lookup')) + '?phone=' + phone, { headers: { Accept: 'application/json' } });
                     const d = await r.json();
                     this.customer = d.found ? d : null;
-                    if ((!this.adSource || this.sourceAuto) && d.found && d.orders > 0) { this.adSource = 'repeat'; this.sourceAuto = true; }
-                    else if (this.sourceAuto && !(d.found && d.orders > 0)) { this.adSource = ''; this.sourceAuto = false; }
+                    if ((!this.adSource || this.sourceAuto) && d.found && d.delivered > 0) { this.adSource = 'repeat'; this.sourceAuto = true; }
+                    else if (this.sourceAuto && !(d.found && d.delivered > 0)) { this.adSource = ''; this.sourceAuto = false; }
                     {{-- The saved name and address fill in (still editable); another number replaces what was filled, never what was typed. --}}
                     if (d.found) {
                         if (!this.name || this.nameAuto) { this.name = d.name; this.nameAuto = true; }

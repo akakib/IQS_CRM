@@ -101,12 +101,7 @@ class ImportedOrders
     /** The customer who has this number, following merges. */
     private function owner(string $phone): ?int
     {
-        $id = DB::table('customer_phones')->where('phone', $phone)->value('customer_id') ?? DB::table('customers')->where('primary_phone', $phone)->value('id');
-        for ($hop = 0; $id && $hop < 10 && ($m = DB::table('customers')->where('id', $id)->value('merged_into_id')); $hop++) {
-            $id = $m;
-        }
-
-        return $id ? (int) $id : null;
+        return app(CustomerService::class)->findByPhone($phone)?->id;
     }
 
     /** Customers this import made who have nothing left in IQS go, as on Undo. */

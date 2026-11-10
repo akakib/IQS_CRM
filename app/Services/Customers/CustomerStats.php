@@ -16,6 +16,24 @@ use Illuminate\Support\Facades\DB;
 class CustomerStats
 {
     /** @param  iterable<int|null>  $customerIds */
+    /**
+     * Repeat customer (marketing, sales report, points, the order form): had a delivered order before,
+     * with IQS or in an imported file. Not the same as verification's "new customer", which trusts only IQS.
+     */
+    public static function isRepeat(?\App\Models\Customer $customer): bool
+    {
+        return (int) $customer?->delivered_count > 0;
+    }
+
+    /** The same rule for an order row aliased $o: a delivered order before this one. */
+    public static function repeatBeforeSql(string $o = 'o'): string
+    {
+        $ids = self::list(OrderStatus::groupIds('delivered'));
+
+        return "(EXISTS (SELECT 1 FROM orders rp WHERE rp.customer_id = {$o}.customer_id AND rp.id < {$o}.id AND rp.status_id IN ({$ids}))"
+            ." OR EXISTS (SELECT 1 FROM customer_past_orders rpp WHERE rpp.customer_id = {$o}.customer_id AND rpp.status = 'delivered' AND rpp.ordered_at < {$o}.created_at))";
+    }
+
     public static function refresh(iterable $customerIds): void
     {
         $ids = collect($customerIds)->filter()->map(fn ($id) => (int) $id)->unique()->values();

@@ -96,7 +96,10 @@ Use these; never write a second version.
 | Website order set to Record verified on the website | `Orders/WebsiteStatusPush` (status slug `record-verified`, after the response on record_verified; `website_push_error` + Send to website on the desk, `orders.website-status`). The website then fires its own Meta Purchase, so untick Website in Settings > Tracking to avoid counting it twice |
 | Customer counts (orders, delivered, returned) | `Customers/CustomerStats::refresh()` (section 4) |
 | A customer's whole story (sales, timeline, channels) | `Customers/CustomerJourney::build()` |
-| Find the customer a search is about | `Customers/CustomerFinder::find()` |
+| Find the customer a search is about | `Customers/CustomerFinder::find()` (its phone part is `findByPhone`; an order's typed number only for showing) |
+| Find a customer by phone (order create, lookup, imports) | `Customers/CustomerService::findByPhone()`: numbers, then a primary number, a merged customer leads to the one kept |
+| Repeat customer (Source, order form, Sales report returning, points) | `CustomerStats::isRepeat()` / `repeatBeforeSql()`: a delivered order before, with IQS or in an imported file. Verification's "new customer" stays separate (trust) |
+| Another open order of the same customer (duplicate) | `OrderService::openDuplicateOf()`: open (not final, not cancelled) and inside Settings > Orders duplicate window; create, booking and the desk all use it |
 | Normalize or find phone numbers | `App\Support\Phone::normalize()` / `Phone::extract()` |
 | Call recording or screenshot: check, keep, open | `Calls/CallProof` (`check`, `take`, `find`, `response`) |
 | Move call files to Google Drive | `calls:proofs-to-drive` command (after each saved call, Move now, and the scheduler) |

@@ -34,7 +34,7 @@ return [
         'minutes_since_release' => 'Minutes from batch release to packed',
         'channel' => 'Order channel (web, messenger, whatsapp, phone)',
         'saved' => 'Saved order: had No response or Hold, then delivered (true/false)',
-        'repeat_customer' => 'Repeat customer: had a delivered order before this one (true/false)',
+        'repeat_customer' => 'Repeat customer: had a delivered order before this one, with IQS or in an imported file (true/false)',
         'own_entry' => 'The moderator entered the order (chat or phone, not from the website) (true/false)',
         'days_since_last_order' => 'Days since the customer\'s previous order',
         'shipped' => 'Already handed to the courier (true/false)',

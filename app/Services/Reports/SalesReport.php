@@ -224,9 +224,7 @@ class SalesReport
     /** An earlier order of the same customer was delivered (fully or partly). */
     private function returningSql(): string
     {
-        $ids = implode(',', array_map('intval', OrderStatus::groupIds('delivered') ?: [0]));
-
-        return "EXISTS (SELECT 1 FROM orders o2 WHERE o2.customer_id = o.customer_id AND o2.id < o.id AND o2.status_id IN ($ids))";
+        return \App\Services\Customers\CustomerStats::repeatBeforeSql('o');
     }
 
     /** The order lines of the orders at this step, with their item. */

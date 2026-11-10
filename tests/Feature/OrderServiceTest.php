@@ -270,4 +270,54 @@ class OrderServiceTest extends TestCase
         DB::table('order_payments')->insert(['order_id' => $third->id, 'payment_type' => 'advance', 'method_id' => DB::table('payment_methods')->value('id'), 'amount' => 100, 'status' => 'pending_verification', 'transaction_id' => 'MRG1', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         $this->assertStringContainsString('has a payment', (string) $merger->refusal($third->fresh(), $first->fresh()));
     }
+
+    public function test_one_phone_lookup_finds_a_primary_number_and_follows_a_merge(): void
+    {
+        $svc = app(\App\Services\Customers\CustomerService::class);
+        $keep = \App\Models\Customer::create(['name' => 'Kept', 'primary_phone' => '01711111111']);
+        $dup = \App\Models\Customer::create(['name' => 'Old', 'primary_phone' => '01722222222']); // no customer_phones row
+        $this->assertSame($dup->id, $svc->findByPhone('01722222222')->id);
+
+        $dup->update(['merged_into_id' => $keep->id]);
+        $dup->delete();
+        $this->assertSame($keep->id, $svc->findByPhone('+880 1722-222222')->id);
+        // A new order with that number goes to the kept customer, never a new duplicate.
+        $this->assertSame($keep->id, $this->make(['phone' => '01722222222'])->customer_id);
+    }
+
+    public function test_repeat_customer_means_a_delivered_order_before_with_iqs_or_in_a_file(): void
+    {
+        $web = fn (string $phone) => app(OrderService::class)->create([
+            'channel' => 'web', 'phone' => $phone, 'name' => 'Web', 'address_line' => 'Road 1', 'zone_id' => $this->zone('inside_dhaka'),
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 1]],
+        ], null, 'webhook');
+
+        // Only a cancelled order before: still not repeat.
+        $first = $web('01733333333');
+        DB::table('orders')->where('id', $first->id)->update(['status_id' => OrderStatus::idFor('cancelled')]);
+        \App\Services\Customers\CustomerStats::refresh([$first->customer_id]);
+        $this->assertSame('organic', $web('01733333333')->ad_source);
+
+        // A delivery from an imported file counts.
+        DB::table('customer_past_orders')->insert(['customer_id' => $first->customer_id, 'source' => 'old', 'external_no' => 'F1', 'ordered_at' => now()->subYear(), 'status' => 'delivered', 'created_at' => now(), 'updated_at' => now()]);
+        \App\Services\Customers\CustomerStats::refresh([$first->customer_id]);
+        $third = $web('01733333333');
+        $this->assertSame('repeat', $third->ad_source);
+        // Reports and points read the same rule.
+        $this->assertTrue(DB::table('orders as o')->where('o.id', $third->id)->whereRaw(\App\Services\Customers\CustomerStats::repeatBeforeSql('o'))->exists());
+    }
+
+    public function test_the_duplicate_window_from_settings_is_the_one_rule_everywhere(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['orders.duplicate_window_hours' => 24]);
+        $old = $this->make();
+        DB::table('orders')->where('id', $old->id)->update(['created_at' => now()->subDays(3)]);
+        $new = $this->make();
+        $this->assertFalse((bool) $new->is_duplicate_flag);
+        $this->assertNull(app(OrderService::class)->openDuplicate($new)); // booking does not stop on it either
+
+        $twin = $this->make();
+        $this->assertTrue((bool) $twin->is_duplicate_flag);
+        $this->assertSame($new->order_no, app(OrderService::class)->openDuplicate($twin));
+    }
 }

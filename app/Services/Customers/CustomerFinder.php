@@ -26,8 +26,8 @@ class CustomerFinder
         }
         $phone = in_array($by, ['all', 'phone'], true) ? Phone::normalize($q) : null;
         if ($phone) {
-            $id = DB::table('customer_phones')->where('phone', $phone)->value('customer_id')
-                ?? Customer::where('primary_phone', $phone)->value('id')
+            // The customer of the number (CustomerService::findByPhone); only for showing, also a number typed on an order.
+            $id = app(CustomerService::class)->findByPhone($phone)?->id
                 ?? Order::where('ship_phone', $phone)->orWhere('ship_alt_phone', $phone)->latest('id')->value('customer_id');
 
             return $this->one($id);

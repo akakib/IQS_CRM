@@ -19,7 +19,12 @@ class CustomerService
         if (! $phone) {
             return null;
         }
-        $id = DB::table('customer_phones')->where('phone', $phone)->value('customer_id');
+        // The one lookup: the customer's numbers, then a primary number, and a merged customer leads to the one kept.
+        $id = DB::table('customer_phones')->where('phone', $phone)->value('customer_id')
+            ?? DB::table('customers')->where('primary_phone', $phone)->orderByRaw('merged_into_id IS NULL DESC')->orderBy('id')->value('id');
+        for ($hop = 0; $id && $hop < 10 && ($m = DB::table('customers')->where('id', $id)->value('merged_into_id')); $hop++) {
+            $id = $m;
+        }
 
         return $id ? Customer::find($id) : null;
     }

@@ -183,12 +183,11 @@ class PointHooks
      */
     private function followUp(Order $order): array
     {
-        $delivered = OrderStatus::groupIds('delivered');
         $previous = DB::table('orders')->where('customer_id', $order->customer_id)->where('id', '<', $order->id)->orderByDesc('id')
             ->get(['status_id', 'created_at']);
 
         return [
-            'repeat_customer' => $previous->contains(fn ($o) => in_array($o->status_id, $delivered, true)),
+            'repeat_customer' => DB::table('orders as o')->where('o.id', $order->id)->whereRaw(\App\Services\Customers\CustomerStats::repeatBeforeSql('o'))->exists(),
             'own_entry' => $order->channel !== 'web' && $order->moderator_id && (int) $order->created_by === (int) $order->moderator_id,
             'days_since_last_order' => $previous->isNotEmpty() ? round($order->created_at->diffInHours($previous->first()->created_at, true) / 24, 1) : null,
         ];

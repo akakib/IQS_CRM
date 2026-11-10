@@ -64,9 +64,7 @@ class OrderService
 
             $isChat = $data['channel'] !== 'web';
             // The customer's latest open order in the window: which one, and are items and address the same?
-            $twin = DB::table('orders')->where('customer_id', $customer->id)
-                ->whereNotIn('status_id', OrderStatus::idsFor(['cancelled', 'delivered', 'returned', 'partial_delivered']))
-                ->where('created_at', '>=', now()->subHours((int) settings('orders.duplicate_window_hours')))->orderByDesc('id')->first(['id', 'order_no']);
+            $twin = $this->openDuplicateOf($customer->id);
             $duplicate = (bool) $twin;
             $match = $twin ? app(DuplicateCheck::class)->compare(
                 collect($items)->filter(fn ($i) => $i['variant_id'] ?? null)->groupBy('variant_id')->map(fn ($r) => $r->sum('qty'))->all(),
@@ -96,7 +94,7 @@ class OrderService
                 'source_campaign' => $data['source_campaign'] ?? null,
                 // Picked by hand on the order form; a website order's comes from its attribution.
                 'ad_source' => $data['ad_source'] ?? ($data['channel'] === 'web'
-                    ? Order::sourceFromUtm($data['utm'] ?? null, DB::table('orders')->where('customer_id', $customer->id)->exists()) : null),
+                    ? Order::sourceFromUtm($data['utm'] ?? null, \App\Services\Customers\CustomerStats::isRepeat($customer)) : null),
                 'ad_code' => isset($data['ad_code']) && trim((string) $data['ad_code']) !== '' ? mb_substr(trim((string) $data['ad_code']), 0, 100) : null,
                 'is_duplicate_flag' => $duplicate,
                 'duplicate_of_no' => $twin?->order_no,
@@ -449,13 +447,23 @@ class OrderService
         $this->note($order, 'call', __('Called: will send the advance by :d', ['d' => \Illuminate\Support\Carbon::parse($date)->format('d M')]).($why ? ' · '.$why : ''), $by, ['outcome' => 'will_pay']);
     }
 
-    /** The order number of another open order of the same customer from the last 7 days, if any (same rule as the desk's duplicate check). */
-    public function openDuplicate(Order $order): ?string
+    /**
+     * The one duplicate rule (order create, booking, the desk): the customer's latest other order that is still
+     * open (not final, not cancelled) and was placed within Settings > Orders "duplicate within (hours)".
+     */
+    public function openDuplicateOf(int $customerId, ?int $exceptOrderId = null): ?object
     {
         $open = array_keys(array_filter(OrderStatus::map(), fn ($s) => ! $s['final'] && $s['key'] !== 'cancelled'));
 
-        return DB::table('orders')->where('customer_id', $order->customer_id)->where('id', '!=', $order->id)
-            ->where('created_at', '>=', now()->subDays(7))->whereIn('status_id', $open)->orderByDesc('id')->value('order_no');
+        return DB::table('orders')->where('customer_id', $customerId)->when($exceptOrderId, fn ($q, $id) => $q->where('id', '!=', $id))
+            ->where('created_at', '>=', now()->subHours((int) settings('orders.duplicate_window_hours')))
+            ->whereIn('status_id', $open)->orderByDesc('id')->first(['id', 'order_no', 'created_at']);
+    }
+
+    /** The order number of another open order of the same customer (openDuplicateOf), if any. */
+    public function openDuplicate(Order $order): ?string
+    {
+        return $this->openDuplicateOf((int) $order->customer_id, $order->id)?->order_no;
     }
 
     /** Is an advance on this order still waiting for its check without lowering the COD yet? */

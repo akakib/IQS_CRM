@@ -82,11 +82,13 @@ class VerificationEngine
         $order->forceFill(['verification_rule_id' => $decision['rule']?->id])->save();
 
         $ruleName = $decision['rule']->name ?? __('no rule matched');
+        // Say plainly which check did not answer, so nobody reads it as a new customer.
+        $failed = ($f = $decision['inputs']['provider_failures'] ?? []) ? ' '.implode('. ', $f).'.' : '';
         $status = OrderStatus::map()[$order->status_id];
         // Past New the checks only inform: say so, so "record verified" on a confirmed order is not read as a step back.
-        $this->orders->note($order, 'verification', $status['key'] === 'new'
+        $this->orders->note($order, 'verification', ($status['key'] === 'new'
             ? __('Checks: :o (:r).', ['o' => str_replace('_', ' ', $decision['outcome']), 'r' => $ruleName])
-            : __('Checks: :r (order already :s, status unchanged).', ['r' => $ruleName, 's' => $status['name']]), $by, [
+            : __('Checks: :r (order already :s, status unchanged).', ['r' => $ruleName, 's' => $status['name']])).$failed, $by, [
                 'rule_id' => $decision['rule']?->id,
             ]);
 
@@ -145,6 +147,8 @@ class VerificationEngine
         }
         $rates = collect($byProvider)->pluck('success_rate')->filter(fn ($r) => $r !== null);
         $anyHistory = collect($byProvider)->sum('total_parcels') > 0;
+        $failures = $customer ? $this->fraud->failures() : [];
+        $ownHistory = (int) $customer?->iqs_delivered_count > 0 || (int) $customer?->iqs_returned_count > 0;
 
         $advance = (float) DB::table('order_payments')->where('order_id', $order->id)->whereIn('payment_type', ['advance', 'adjustment'])
             ->whereIn('status', ['verified', 'pending_verification'])->sum('amount');
@@ -155,7 +159,9 @@ class VerificationEngine
             'any_provider_success_rate' => $rates->max(),
             'all_providers_success_rate' => $rates->min(),
             // Only what IQS saw itself decides on its own; imported files are separate conditions an admin may add.
-            'is_new_customer' => ! $anyHistory && (int) $customer?->iqs_delivered_count === 0 && (int) $customer?->iqs_returned_count === 0,
+            // Known history anywhere = not new. A provider that did not answer = unknown (null never passes a rule), never "new".
+            'is_new_customer' => $anyHistory || $ownHistory ? false : ($failures ? null : true),
+            'provider_failures' => $failures,
             // Delivered out of delivered + returned with IQS; no finished order yet = no data (never passes).
             'own_success_rate' => ($d = (int) $customer?->iqs_delivered_count) + ($r = (int) $customer?->iqs_returned_count) > 0 ? round($d * 100 / ($d + $r), 2) : null,
             'own_delivered_count' => (int) $customer?->iqs_delivered_count,

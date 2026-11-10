@@ -18,9 +18,19 @@ use Illuminate\Support\Facades\Log;
  */
 class FraudCheckService
 {
+    /** @var array<string, string> provider key => "Steadfast check failed (HTTP 429)" from the last check() */
+    private array $failures = [];
+
+    /** Providers that did not answer in the last check() (no saved result either): their history is unknown. */
+    public function failures(): array
+    {
+        return $this->failures;
+    }
+
     public function check(Customer $customer, bool $force = false): Collection
     {
         $results = collect();
+        $this->failures = [];
 
         foreach (FraudCheckProvider::where('is_active', true)->orderBy('sort_order')->get() as $provider) {
             $cached = $force ? null : CustomerFraudCheck::where('customer_id', $customer->id)->where('provider_id', $provider->id)
@@ -50,8 +60,16 @@ class FraudCheckService
                     'checked_at' => now(),
                 ]));
             } catch (\Throwable $e) {
-                // One vendor being down must not block an order; it just has no result.
+                // One vendor being down must not block an order; it has no result, and nothing is saved so the next check asks again.
                 Log::warning("Fraud check {$provider->system_key} failed: {$e->getMessage()}");
+                $why = match (true) {
+                    (bool) preg_match('/HTTP \d{3}/', $e->getMessage(), $m) => $m[0],
+                    str_contains($e->getMessage(), 'empty answer') => 'empty answer',
+                    $e instanceof \Illuminate\Http\Client\ConnectionException => 'no answer',
+                    str_contains($e->getMessage(), 'keys are missing') => 'keys missing',
+                    default => 'error',
+                };
+                $this->failures[$provider->system_key] = "{$provider->name} check failed ({$why})";
             }
         }
 

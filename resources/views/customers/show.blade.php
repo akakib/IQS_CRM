@@ -30,6 +30,8 @@
                 @endcan
                 @can('customers.edit')
                     @if ($canSeeContact)<x-button size="sm" variant="secondary" :href="route('customers.edit', array_filter(['customer' => $customer, 'embed' => $embed ?: null]))">{{ __('Edit') }}</x-button>@endif
+                @endcan
+                @can('orders.approve')
                     <x-button size="sm" type="button" variant="secondary" @click="$dispatch('open-modal', 'merge')">{{ __('Merge duplicate') }}</x-button>
                 @endcan
             </div>

@@ -59,6 +59,11 @@ class CodPayoutTest extends TestCase
         $this->get(route('cod.index'))->assertSee('৳1,000'); // one parcel still unpaid: 1060 less 60
         $this->get(route('cod.index', ['tab' => 'statements']))->assertSee('PAY-1');
 
+        // The same file again without a reference: refused, nothing counted twice.
+        $this->post(route('cod.upload'), ['file' => UploadedFile::fake()->createWithContent('pay-again.csv', $csv), 'paid_on' => today()->toDateString()])
+            ->assertSessionHasErrors('file');
+        $this->assertSame(1, DB::table('courier_payouts')->count());
+
         $this->post(route('cod.upload'), ['file' => UploadedFile::fake()->createWithContent('bad.csv', "Name,Amount\nA,1\n"), 'paid_on' => today()->toDateString()])
             ->assertSessionHasErrors('file');
     }

@@ -110,6 +110,8 @@ Use these; never write a second version.
 | Stock changes | `Catalog/StockService` (a line in `stock_movements` for every change) |
 | Product writes | `Catalog/ProductService` |
 | Activity log | `ActivityLogger::log()` (`activity_log` table) |
+| Advance that the COD takes off | `orders.advance_verified`, set by `Orders/OrderCalculator::applyPayments()` (verified + trusted pending); the edit page reads it, never its own sum |
+| Block / unblock a customer (risk level), merge two customers | Managers only (`orders.approve`); `customers.edit` alone keeps the risk as it is |
 
 ---
 
@@ -126,6 +128,13 @@ Each customer row keeps two kinds of counts, both written only by `CustomerStats
 an imported order edit or delete, and an Undo. Imported counts are also offered to the verification rules as
 separate conditions ("Delivered / Returned orders in imported files") that an admin may choose to add.
 **Why:** rows typed into a file must never make a customer look trusted.
+
+**"New customer" in the verification rules** (`is_new_customer`): `false` when any provider or IQS itself has history;
+`true` only when every active provider answered with 0 parcels and IQS has none; `null` (unknown, never passes a
+rule, so the order waits in manual review) when a provider failed and nothing else proves history.
+`FraudCheckService::failures()` names the failed provider ("Steadfast check failed (HTTP 429)"); it goes in the
+verification note and on the order page, and a failure is never saved as a check, so the next run asks again.
+A Steadfast 200 with no score in it counts as a failure.
 
 ---
 
@@ -259,6 +268,13 @@ has confirmed with the customer is never booked before a call).
 **Communication stops by itself** after 15 minutes with no chat tap, call or order action (`ChatService::IDLE_MINUTES`),
 counted to the last action + 5 minutes. It is checked when the person's page opens and before a tap, so it
 works without cron; the cron (`desk:tick`) checks everyone too.
+
+**`desk:tick` runs each step on its own** (`DeskTick::step`): a step that throws is logged as
+"desk:tick step X failed" and the other steps (bookings, breaks, chat, digest) still run that minute.
+
+**Customer merge** moves phones, addresses, fraud checks, orders, imported history and store credit
+(`customer_credits` rows + `credit_balance`). **COD payout statements** are refused when the same file
+(`courier_payouts.file_hash`) or the same reference was uploaded before.
 
 ---
 

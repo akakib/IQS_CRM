@@ -317,4 +317,74 @@ class VerificationTest extends TestCase
         $this->post("/orders/{$big->id}/advance-waiver/self", ['why' => 'Known customer, pays on delivery'])->assertSessionHasErrors('why');
         $this->assertSame('hold', $this->key($big->fresh()));
     }
+
+    private function failingSteadfast(string $message): void
+    {
+        $this->app->bind(\App\Services\Customers\Drivers\SteadfastFraudDriver::class, fn () => new class($message) implements \App\Services\Customers\FraudCheckDriver
+        {
+            public function __construct(private string $message) {}
+
+            public function check(Customer $customer, string $phone, ?array $credentials): \App\Services\Courier\Data\FraudCheckResult
+            {
+                throw new \RuntimeException($this->message);
+            }
+        });
+    }
+
+    public function test_a_failed_provider_makes_new_customer_unknown_not_new_and_saves_nothing(): void
+    {
+        $this->failingSteadfast('Steadfast score failed: HTTP 429');
+        $order = $this->order('01712345679'); // would be "new to Steadfast" if it had answered
+
+        $run = DB::table('verification_runs')->where('order_id', $order->id)->first();
+        $inputs = json_decode($run->inputs_snapshot, true);
+        $this->assertNull($inputs['is_new_customer']);
+        $this->assertSame('Steadfast check failed (HTTP 429)', $inputs['provider_failures']['steadfast']);
+        $this->assertSame('new', $this->key($order)); // manual review: a person looks at it
+        $this->assertSame(['manual_review', 'Everything else'], [$run->outcome, DB::table('verification_rules')->where('id', $run->matched_rule_id)->value('name')]); // not "New to Steadfast"
+        $this->assertStringContainsString('Steadfast check failed (HTTP 429)', (string) DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'verification')->value('body'));
+        $steadfast = DB::table('fraud_check_providers')->where('system_key', 'steadfast')->value('id');
+        $this->assertSame(0, DB::table('customer_fraud_checks')->where('provider_id', $steadfast)->count()); // asked again next time
+    }
+
+    public function test_every_provider_answering_with_no_parcels_is_a_new_customer(): void
+    {
+        $order = $this->order('01712345679'); // fake Steadfast: 0 parcels
+        $inputs = json_decode(DB::table('verification_runs')->where('order_id', $order->id)->value('inputs_snapshot'), true);
+        $this->assertTrue($inputs['is_new_customer']);
+        $this->assertSame([], $inputs['provider_failures']);
+    }
+
+    public function test_history_means_not_new_even_when_a_provider_fails(): void
+    {
+        $inputs = fn (Order $o) => json_decode(DB::table('verification_runs')->where('order_id', $o->id)->value('inputs_snapshot'), true);
+        $this->assertFalse($inputs($this->order('01712345678'))['is_new_customer']); // Steadfast: 13 parcels
+
+        // IQS delivered to this customer itself: not new, even with Steadfast down.
+        $customer = Customer::create(['name' => 'Known', 'primary_phone' => '01912345679']);
+        DB::table('customer_phones')->insert(['customer_id' => $customer->id, 'phone' => '01912345679', 'is_primary' => true]);
+        $earlier = $this->order('01912345679');
+        DB::table('orders')->where('id', $earlier->id)->update(['status_id' => OrderStatus::idFor('delivered')]);
+        \App\Services\Customers\CustomerStats::refresh([$customer->id]);
+        $this->failingSteadfast('Steadfast score failed: HTTP 503');
+        $this->assertFalse($inputs($this->order('01912345679'))['is_new_customer']);
+    }
+
+    public function test_an_empty_steadfast_answer_is_a_failure_not_a_new_customer(): void
+    {
+        \Illuminate\Support\Facades\Http::fake(['*fraud_check/score/*' => \Illuminate\Support\Facades\Http::response([])]);
+        $this->expectExceptionMessage('Steadfast score failed: empty answer');
+        (new \App\Services\Courier\SteadfastDriver(['api_key' => 'k', 'secret_key' => 's', 'base_url' => 'https://portal.packzy.com/api/v1']))->fraudCheck('01712345678');
+    }
+
+    public function test_the_edit_page_takes_off_the_same_advance_as_the_saved_cod(): void
+    {
+        $order = $this->order('01712345678');
+        // A small advance that counts before its check (trusted): the saved COD already takes it off.
+        DB::table('order_payments')->insert(['order_id' => $order->id, 'payment_type' => 'advance', 'method_id' => DB::table('payment_methods')->value('id'), 'amount' => 200, 'status' => 'pending_verification', 'counts_now' => true, 'transaction_id' => 'TRUST1', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        app(\App\Services\Orders\OrderCalculator::class)->applyPayments($order = $order->fresh());
+        $this->assertSame(200.0, (float) $order->fresh()->advance_verified);
+
+        $this->actingAs($this->owner())->get("/orders/{$order->id}/edit")->assertOk()->assertSee('−৳200.00', false);
+    }
 }

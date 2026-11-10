@@ -382,7 +382,7 @@ class OrderController extends Controller
             'reasons' => StatusReason::options('amendment'),
             'policy' => OrderStatus::map()[$order->status_id]['edit_policy'],
             'orderDiscount' => app(\App\Services\Orders\OrderEditor::class)->orderDiscount($order),
-            'paid' => (float) DB::table('order_payments')->where('order_id', $order->id)->where('status', 'verified')->whereIn('payment_type', ['advance', 'adjustment'])->sum('amount'),
+            'paid' => (float) $order->advance_verified, // what the saved COD already takes off (OrderCalculator::applyPayments)
             'discountLimit' => (float) settings('orders.discount_limit'),
         ]);
     }

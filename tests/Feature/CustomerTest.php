@@ -126,4 +126,38 @@ class CustomerTest extends TestCase
         $this->assertSame(2, DB::table('customer_fraud_checks')->where('customer_id', $c->id)->where('provider_id', DB::table('fraud_check_providers')->where('system_key', 'steadfast')->value('id'))->count());
         $this->get("/customers/{$c->id}")->assertOk()->assertSee('37.5%');
     }
+
+    public function test_only_a_manager_changes_risk_or_merges(): void
+    {
+        $blocked = $this->create('Fraud', '01712345670');
+        $blocked->update(['risk_level' => 'blocked', 'blocked_reason' => 'Fake orders']);
+        $other = $this->create('Other', '01812345670');
+
+        $mod = User::factory()->create();
+        $mod->roles()->attach($this->role(['customers.view', 'customers.edit'])->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->actingAs($mod);
+
+        $this->get("/customers/{$blocked->id}/edit")->assertOk()->assertSee('a manager can change it')->assertDontSee('name="risk_level"', false);
+        $this->put("/customers/{$blocked->id}", ['name' => 'Fraud', 'primary_phone' => '01712345670', 'risk_level' => 'normal'])->assertSessionHasNoErrors();
+        $this->assertSame(['blocked', 'Fake orders'], [$blocked->fresh()->risk_level, $blocked->fresh()->blocked_reason]);
+
+        $this->get("/customers/{$blocked->id}")->assertDontSee('Merge duplicate');
+        $this->post("/customers/{$blocked->id}/merge", ['duplicate_phone' => '01812345670'])->assertForbidden();
+        $this->assertNotSoftDeleted($other);
+    }
+
+    public function test_merge_moves_store_credit(): void
+    {
+        $keep = $this->create('Karim', '01712345671');
+        $dup = $this->create('Karim 2', '01812345671');
+        DB::table('customers')->where('id', $dup->id)->update(['credit_balance' => 150]);
+        DB::table('customer_credits')->insert(['customer_id' => $dup->id, 'amount' => 150, 'balance_after' => 150, 'note' => 'kept', 'created_at' => now()]);
+
+        $this->post("/customers/{$keep->id}/merge", ['duplicate_phone' => '01812345671'])->assertSessionHas('success');
+
+        $this->assertSame(150.0, (float) $keep->fresh()->credit_balance);
+        $this->assertSame(0.0, (float) DB::table('customers')->where('id', $dup->id)->value('credit_balance'));
+        $this->assertSame(1, DB::table('customer_credits')->where('customer_id', $keep->id)->count());
+    }
 }

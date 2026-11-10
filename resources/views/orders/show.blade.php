@@ -197,7 +197,10 @@
                             <div class="flex justify-between"><dt class="text-gray-500">{{ ucfirst($p['key']) }}</dt><dd>@if ($p['key'] === 'steadfast')<x-steadfast-line :provider="$p" />@else{{ $p['success_rate'] === null ? __('no history') : $p['success_rate'].'%' }} · {{ $p['total_parcels'] }} {{ __('parcels') }}@endif</dd></div>
                             <x-steadfast-detail :detail="$p['detail'] ?? null" class="mb-1 justify-end" />
                         @endforeach
-                        <div class="flex justify-between"><dt class="text-gray-500">{{ __('New customer') }}</dt><dd>{{ ($in['is_new_customer'] ?? false) ? __('yes') : __('no') }}</dd></div>
+                        <div class="flex justify-between"><dt class="text-gray-500">{{ __('New customer') }}</dt><dd>{{ ! array_key_exists('is_new_customer', $in ?? []) || $in['is_new_customer'] === false ? __('no') : ($in['is_new_customer'] === null ? __('unknown (check failed)') : __('yes')) }}</dd></div>
+                        @foreach (($in['provider_failures'] ?? []) as $failed)
+                            <p class="text-right text-xs text-amber-700">{{ $failed }}</p>
+                        @endforeach
                         <div class="flex justify-between"><dt class="text-gray-500">{{ __('Advance') }}</dt><dd>{{ $in['advance_paid_percent'] ?? 0 }}%</dd></div>
                     </dl>
                 @else

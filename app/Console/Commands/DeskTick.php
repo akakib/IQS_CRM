@@ -24,24 +24,39 @@ class DeskTick extends Command
 
     public function handle(DeskService $desk, BreakService $breaks, TelegramService $telegram): int
     {
-        $released = $desk->sweepExpired();
-        $desk->armUntouchedAll();
-        $assigned = $desk->autoAssign();
-        $desk->coverAway(); // a call-back or hold date due while its person is away: a free colleague calls
-        $desk->followUpHolds();
-        $desk->remindPaymentChecks();
+        // Each step on its own: one bad order in one step must not stop the others (bookings, breaks...) every minute.
+        $released = $this->step('sweepExpired', fn () => $desk->sweepExpired(), 0);
+        $this->step('armUntouched', fn () => $desk->armUntouchedAll());
+        $assigned = $this->step('autoAssign', fn () => $desk->autoAssign(), 0);
+        $this->step('coverAway', fn () => $desk->coverAway()); // a call-back or hold date due while its person is away: a free colleague calls
+        $this->step('followUpHolds', fn () => $desk->followUpHolds());
+        $this->step('remindPaymentChecks', fn () => $desk->remindPaymentChecks());
         if (Cache::add('woo:sweep', 1, now()->addMinutes(9))) {
-            app(\App\Services\Orders\WooOrderSweep::class)->run(); // website orders a webhook did not bring
+            $this->step('wooSweep', fn () => app(\App\Services\Orders\WooOrderSweep::class)->run()); // website orders a webhook did not bring
         }
-        $desk->recoverStale(); // a booking that stopped half way: ask the courier before trying again
-        $desk->runBookings();
-        $closed = $breaks->autoClose();
-        app(\App\Services\Work\ChatService::class)->closeStale(); // Communication left on by someone who left
-        $this->digest($telegram);
+        $this->step('recoverStale', fn () => $desk->recoverStale()); // a booking that stopped half way: ask the courier before trying again
+        $this->step('runBookings', fn () => $desk->runBookings());
+        $closed = $this->step('breaksAutoClose', fn () => $breaks->autoClose(), 0);
+        $this->step('chatCloseStale', fn () => app(\App\Services\Work\ChatService::class)->closeStale()); // Communication left on by someone who left
+        $this->step('digest', fn () => $this->digest($telegram));
 
         $this->line("released {$released}, auto-assigned {$assigned}, breaks closed {$closed}");
 
         return self::SUCCESS;
+    }
+
+    /** Runs one step; a failure is written to the log (with the step name) and the tick goes on. */
+    private function step(string $name, callable $run, mixed $fallback = null): mixed
+    {
+        try {
+            return $run();
+        } catch (\Throwable $e) {
+            report($e);
+            \Illuminate\Support\Facades\Log::error("desk:tick step {$name} failed: {$e->getMessage()}");
+            $this->error("{$name} failed");
+
+            return $fallback;
+        }
     }
 
     /** One message per interval: how many orders reached packaging, plus exceptions. No customer details. */

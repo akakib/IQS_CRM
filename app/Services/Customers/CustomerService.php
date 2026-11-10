@@ -52,7 +52,9 @@ class CustomerService
                 'whatsapp_number' => Phone::normalize($data['whatsapp_number'] ?? null),
                 'messenger_psid' => ($data['messenger_psid'] ?? null) ?: null,
                 'risk_level' => $data['risk_level'] ?? $customer->risk_level ?? 'normal',
-                'blocked_reason' => ($data['risk_level'] ?? 'normal') === 'normal' ? null : (($data['blocked_reason'] ?? null) ?: null),
+                // Not sent (the person may not change risk): the reason stays as it was.
+                'blocked_reason' => ! array_key_exists('risk_level', $data) ? $customer->blocked_reason
+                    : ($data['risk_level'] === 'normal' ? null : (($data['blocked_reason'] ?? null) ?: null)),
                 'note' => ($data['note'] ?? null) ?: null,
                 'marketing_consent' => (bool) ($data['marketing_consent'] ?? false),
             ]);
@@ -119,6 +121,13 @@ class CustomerService
             DB::table('customer_fraud_checks')->where('customer_id', $duplicate->id)->update(['customer_id' => $keep->id]);
             if (\Illuminate\Support\Facades\Schema::hasTable('orders')) {
                 DB::table('orders')->where('customer_id', $duplicate->id)->update(['customer_id' => $keep->id]);
+            }
+            // Store credit (and its history) goes with the person.
+            DB::table('customer_credits')->where('customer_id', $duplicate->id)->update(['customer_id' => $keep->id]);
+            $credit = (float) DB::table('customers')->where('id', $duplicate->id)->lockForUpdate()->value('credit_balance');
+            if ($credit != 0) {
+                DB::table('customers')->where('id', $keep->id)->update(['credit_balance' => DB::raw('credit_balance + '.round($credit, 2))]);
+                DB::table('customers')->where('id', $duplicate->id)->update(['credit_balance' => 0]);
             }
             // Imported order history goes with the person too.
             DB::table('customer_past_orders')->where('customer_id', $duplicate->id)->update(['customer_id' => $keep->id]);

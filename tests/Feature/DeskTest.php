@@ -1233,4 +1233,23 @@ class DeskTest extends TestCase
         $this->assertNull($orders[2]->fresh()->moderator_id);
         $this->assertSame(2, DB::table('app_notifications')->where('subject_type', 'order')->count()); // two orders given, two notices, nothing else
     }
+
+    public function test_a_hold_with_no_reason_still_shows_on_the_desk(): void
+    {
+        $o = $this->web();
+        DB::table('orders')->where('id', $o->id)->update(['status_id' => OrderStatus::idFor('hold'), 'hold_reason_id' => null, 'moderator_id' => $this->mahim->id]);
+
+        $this->actingAs($this->mahim)->get('/desk?tab=hold')->assertOk()->assertSee($o->order_no);
+    }
+
+    public function test_one_failing_step_does_not_stop_the_rest_of_the_tick(): void
+    {
+        $this->partialMock(DeskService::class, function ($m) {
+            $m->shouldReceive('sweepExpired')->andThrow(new \RuntimeException('bad order'));
+            $m->shouldReceive('autoAssign')->andThrow(new \RuntimeException('bad order'));
+            $m->shouldReceive('runBookings')->once();
+        });
+
+        $this->assertSame(0, Artisan::call('desk:tick'));
+    }
 }

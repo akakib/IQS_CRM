@@ -39,9 +39,14 @@ class PayoutImporter
         if ($reference && DB::table('courier_payouts')->where('reference', $reference)->exists()) {
             throw ValidationException::withMessages(['file' => __('A statement with this reference was uploaded already.')]);
         }
+        // The same file again (no reference typed) would count every parcel twice.
+        $hash = sha1_file($path);
+        if (DB::table('courier_payouts')->where('file_hash', $hash)->exists()) {
+            throw ValidationException::withMessages(['file' => __('This statement file was uploaded already.')]);
+        }
 
-        return DB::transaction(function () use ($rows, $fileName, $paidOn, $reference, $by) {
-            $payoutId = DB::table('courier_payouts')->insertGetId(['paid_on' => $paidOn, 'reference' => $reference, 'file_name' => mb_substr($fileName, 0, 190),
+        return DB::transaction(function () use ($rows, $fileName, $paidOn, $reference, $by, $hash) {
+            $payoutId = DB::table('courier_payouts')->insertGetId(['paid_on' => $paidOn, 'reference' => $reference, 'file_name' => mb_substr($fileName, 0, 190), 'file_hash' => $hash,
                 'uploaded_by' => $by->id, 'created_at' => now(), 'updated_at' => now()]);
             $out = ['matched' => 0, 'mismatched' => 0, 'unknown' => 0, 'unknown_ids' => []];
             $totals = ['collected' => 0.0, 'charge' => 0.0];

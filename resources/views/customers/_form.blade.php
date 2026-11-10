@@ -32,12 +32,19 @@
             <x-form.input name="messenger_psid" :label="__('Messenger ID')" :value="$customer->messenger_psid" maxlength="64" />
         </div>
 
+        @can('orders.approve')
         <div class="mb-4" x-data="{ risk: @js(old('risk_level', $customer->risk_level ?? 'normal')) }" @select-change="if (['normal','watch','blocked'].includes($event.detail)) risk = $event.detail">
             <p class="mb-2 text-sm font-medium text-gray-700">{{ __('Risk level') }}</p>
             <x-simple-select name="risk_level" :options="['normal' => __('Normal'), 'watch' => __('Watch'), 'blocked' => __('Blocked')]" :value="old('risk_level', $customer->risk_level ?? 'normal')" full-width class="w-full" />
             <input x-show="risk !== 'normal'" name="blocked_reason" value="{{ old('blocked_reason', $customer->blocked_reason) }}" maxlength="255" placeholder="{{ __('Reason') }}" class="{{ $input }} mt-2">
             @error('blocked_reason')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
         </div>
+        @else
+        <div class="mb-4">
+            <p class="mb-1 text-sm font-medium text-gray-700">{{ __('Risk level') }}</p>
+            <p class="text-sm text-gray-600">{{ \App\Support\Labels::risk($customer->risk_level ?? 'normal') }}@if ($customer->blocked_reason) · {{ $customer->blocked_reason }}@endif <span class="text-gray-400">({{ __('a manager can change it') }})</span></p>
+        </div>
+        @endcan
 
         <div class="mb-4">
             <label for="note" class="mb-2 block text-sm font-medium text-gray-700">{{ __('Note') }}</label>

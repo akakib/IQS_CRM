@@ -102,6 +102,10 @@ class SteadfastDriver implements CourierDriver
             throw new RuntimeException('Steadfast score failed: HTTP '.$response->status());
         }
         $d = $response->json() ?? [];
+        // A 200 with no score in it is a failure, not "a customer with no parcels".
+        if (! is_array($d) || (! isset($d['delivery_ratio']) && ! isset($d['volume_range']) && ! isset($d['delivered_count']))) {
+            throw new RuntimeException('Steadfast score failed: empty answer');
+        }
         // Parcels = volume_range ("25+", "3-5": the lower number). total_reports is NOT parcels: it is
         // reports by other merchants (a 97% / 25+ customer comes back with total_reports 0).
         $total = preg_match('/\d+/', (string) ($d['volume_range'] ?? ''), $m) ? (int) $m[0] : 0;

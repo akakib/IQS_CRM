@@ -180,6 +180,12 @@ class CustomerController extends Controller
     private function validated(Request $request): array
     {
         $request->merge(['marketing_consent' => $request->boolean('marketing_consent')]);
+        // Blocking or unblocking a customer is a manager's call: anyone else's risk fields are ignored.
+        $canRisk = $request->user()->can('orders.approve');
+        if (! $canRisk) {
+            $request->request->remove('risk_level');
+            $request->request->remove('blocked_reason');
+        }
 
         return $request->validate([
             'name' => ['required', 'string', 'max:150'],
@@ -188,7 +194,7 @@ class CustomerController extends Controller
             'extra_phones.*' => ['nullable', fn ($a, $v, $fail) => $v === null || $v === '' || Phone::isValid($v) ?: $fail(__('Phone must be a Bangladesh mobile number like 01XXXXXXXXX.'))],
             'whatsapp_number' => ['nullable', fn ($a, $v, $fail) => Phone::isValid($v) ?: $fail(__('Phone must be a Bangladesh mobile number like 01XXXXXXXXX.'))],
             'messenger_psid' => ['nullable', 'string', 'max:64'],
-            'risk_level' => ['required', Rule::in(['normal', 'watch', 'blocked'])],
+            'risk_level' => [$canRisk ? 'required' : 'prohibited', Rule::in(['normal', 'watch', 'blocked'])],
             'blocked_reason' => ['nullable', 'required_if:risk_level,blocked', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:500'],
             'marketing_consent' => ['boolean'],

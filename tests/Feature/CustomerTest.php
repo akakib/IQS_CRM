@@ -160,4 +160,26 @@ class CustomerTest extends TestCase
         $this->assertSame(0.0, (float) DB::table('customers')->where('id', $dup->id)->value('credit_balance'));
         $this->assertSame(1, DB::table('customer_credits')->where('customer_id', $keep->id)->count());
     }
+
+    public function test_a_moderator_lists_only_own_customers_and_a_full_number_finds_anyone(): void
+    {
+        (new \Database\Seeders\RoleSeeder)->run();
+        (new \Database\Seeders\OrderConfigSeeder)->run();
+        \App\Models\OrderStatus::forget();
+        $mine = $this->create('Mine Customer', '01712340001');
+        $other = $this->create('Other Customer', '01712340002');
+        $mod = User::factory()->create();
+        $mod->roles()->attach(DB::table('roles')->where('system_key', 'moderator')->value('id'));
+        app(\App\Services\PermissionService::class)->bump();
+        DB::table('customers')->where('id', $mine->id)->update(['created_by' => $mod->id]);
+        $this->actingAs($mod);
+
+        $this->get('/customers')->assertSee('Mine Customer')->assertDontSee('Other Customer');
+        $this->get('/customers?q=Other')->assertDontSee('Other Customer');
+        $this->get("/customers/{$other->id}")->assertForbidden();
+
+        // The full number: found, and the page opens (to take the order or the call).
+        $this->get('/customers?q=01712340002')->assertSee('Other Customer');
+        $this->get("/customers/{$other->id}")->assertOk();
+    }
 }

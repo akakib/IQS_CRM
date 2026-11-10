@@ -32,16 +32,16 @@ class SalesReport
     }
 
     /**
-     * Orders at one step in the dates, each once; for one person: packed by the packer, confirmed by whoever confirmed
-     * it, delivered by the order's moderator. The dashboard tiles and the Telegram summaries read this, so they
-     * always agree with this report.
+     * Orders at one step in the dates, each once; for one person: packed by the packer, confirmed and delivered by
+     * whoever confirmed it (the moderator when nobody did), the same credit as KPI and Scorecard. The dashboard
+     * tiles and the Telegram summaries read this, so they always agree with this report.
      */
     public function count(string $stage, string $from, string $to, ?int $userId = null): int
     {
-        $col = ['packed' => 'packer_id', 'delivered' => 'moderator_id'][$stage] ?? 'confirmed_by';
+        $col = ['packed' => 'packer_id', 'delivered' => 'COALESCE(confirmed_by, moderator_id)'][$stage] ?? 'confirmed_by';
 
         return DB::query()->fromSub($this->stage($stage, $from, $to), 's')
-            ->when($userId, fn ($q) => $q->whereIn('s.order_id', DB::table('orders')->select('id')->where($col, $userId)))->count();
+            ->when($userId, fn ($q) => $q->whereIn('s.order_id', DB::table('orders')->select('id')->whereRaw("{$col} = ?", [$userId])))->count();
     }
 
     /**

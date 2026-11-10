@@ -62,7 +62,7 @@ class OrderSearchController extends Controller
 
         return view('orders.search', [
             // The customers the search is about, on top (only for those who may see customers).
-            'customers' => $q !== '' && ! $tooShort && $user->can('customers.view') ? app(\App\Services\Customers\CustomerFinder::class)->find($q, $by) : collect(),
+            'customers' => $q !== '' && ! $tooShort && $user->can('customers.view') ? $this->allowedCustomers(app(\App\Services\Customers\CustomerFinder::class)->find($q, $by), $q, $user) : collect(),
             'q' => $q,
             'by' => $by,
             'past' => $past,
@@ -73,5 +73,21 @@ class OrderSearchController extends Controller
             // The order page opens only where the person may see the order.
             'openable' => $ids->isEmpty() || ! $user->can('orders.view') ? collect() : Order::visibleTo($user)->whereIn('id', $ids)->pluck('id')->flip(),
         ]);
+    }
+
+    /** Own-scope people: a full number shows (and opens) its customer; anything else only their own customers. */
+    private function allowedCustomers(\Illuminate\Support\Collection $found, string $q, \App\Models\User $user): \Illuminate\Support\Collection
+    {
+        if ($found->isEmpty() || $user->permissionScope('customers.view') === 'all') {
+            return $found;
+        }
+        if (\App\Support\Phone::normalize($q)) {
+            $found->each(fn ($c) => CustomerController::unlock((int) $c->id));
+
+            return $found;
+        }
+        $mine = \App\Models\Customer::visibleTo($user)->whereIn('customers.id', $found->pluck('id'))->pluck('customers.id')->all();
+
+        return $found->filter(fn ($c) => in_array($c->id, $mine))->values();
     }
 }

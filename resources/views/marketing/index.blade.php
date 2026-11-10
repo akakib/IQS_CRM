@@ -50,7 +50,7 @@
             <x-slot:head>
                 <th>{{ __('Day') }}</th><th class="text-right">{{ __('Spend') }}</th><th class="text-right">{{ __('Taka cost') }}</th>
                 <th class="text-right">{{ __('Messages') }}</th><th class="text-right">{{ __('Orders (web / chat / other)') }}</th>
-                <th class="text-right">{{ __('Delivered revenue') }}</th><th class="text-right">{{ __('Meta / confirmed / delivered ROAS') }}</th>
+                <th class="text-right">{{ __('Delivered revenue (orders placed that day)') }}</th><th class="text-right">{{ __('Meta / confirmed / delivered ROAS') }}</th>
                 <th class="text-right">{{ __('MER') }}</th><th class="text-right">{{ __('Per order') }}</th>
             </x-slot:head>
             @foreach ($report['days'] as $d)

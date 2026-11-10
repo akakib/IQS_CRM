@@ -37,8 +37,18 @@ class SteadfastWebhookController extends Controller
 
         $body = $request->getContent();
         $key = sha1($body);
-        if (DB::table('courier_events')->where('idempotency_key', $key)->exists()) {
+        $seen = DB::table('courier_events')->where('idempotency_key', $key)->first(['id', 'processed_at']);
+        if ($seen && $seen->processed_at) {
             return response()->json(['status' => 'duplicate']);
+        }
+        if ($seen) {
+            // Sent again before the first copy was applied: apply that one now instead of refusing it.
+            $update = $courier->driver()->parseWebhook($payload);
+            if ($update) {
+                app()->terminating(fn () => app(CourierUpdateProcessor::class)->applyEvent($update, $seen->id));
+            }
+
+            return response()->json(['status' => 'received']);
         }
 
         $eventId = DB::table('courier_events')->insertGetId([
@@ -52,7 +62,7 @@ class SteadfastWebhookController extends Controller
 
         $update = $courier->driver()->parseWebhook($payload);
         if ($update) {
-            app()->terminating(fn () => app(CourierUpdateProcessor::class)->apply($update, $eventId));
+            app()->terminating(fn () => app(CourierUpdateProcessor::class)->applyEvent($update, $eventId));
         } else {
             DB::table('courier_events')->where('id', $eventId)->update(['processed_at' => now(), 'error' => 'Unrecognised payload']);
         }

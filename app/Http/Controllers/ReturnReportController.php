@@ -29,11 +29,19 @@ class ReturnReportController extends Controller
         // Each returned order once, on the day it came back, with its reason.
         $events = DB::table('order_events')->whereIn('to_status_id', OrderStatus::idsFor(ReturnService::STATES))->whereBetween('created_at', $range)
             ->orderBy('id')->get(['order_id', 'reason_id', 'to_status_id'])->keyBy('order_id');
-        $ids = $events->keys()->all();
-        $orders = DB::table('orders as o')->leftJoin('users as u', 'u.id', '=', 'o.moderator_id')->whereIn('o.id', $ids)
+        // Owner's rule: nothing kept = a full return; something kept = a partial delivery: a delivered parcel whose
+        // returned pieces count as returned items. The rate counts parcels like KPI (partial = delivered).
+        $partialStatus = OrderStatus::idFor('partial_delivered');
+        $partialIds = $events->filter(fn ($e) => (int) $e->to_status_id === (int) $partialStatus)->keys()->all();
+        $allIds = $events->keys()->all();
+        $ids = array_values(array_diff($allIds, $partialIds));
+        $orders = DB::table('orders as o')->leftJoin('users as u', 'u.id', '=', 'o.moderator_id')->whereIn('o.id', $allIds)
             ->get(['o.id', 'o.order_no', 'o.ship_district', 'o.return_charge', 'o.return_received_at', 'u.name as person', 'o.moderator_id'])->keyBy('id');
-        $delivered = DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')->where('e.to_status_id', OrderStatus::idFor('delivered'))
-            ->whereBetween('e.created_at', $range)->get(['o.moderator_id', 'o.ship_district']);
+        $partials = $orders->only($partialIds);
+        $orders = $orders->only($ids);
+        // Delivered parcels in the dates (a partial delivery is one), each order once.
+        $delivered = DB::table('order_events as e')->join('orders as o', 'o.id', '=', 'e.order_id')->whereIn('e.to_status_id', OrderStatus::idsFor(['delivered', 'partial_delivered']))
+            ->whereBetween('e.created_at', $range)->get(['o.id', 'o.moderator_id', 'o.ship_district'])->unique('id');
 
         // Damaged or missing, by product, at what it cost us.
         $bad = DB::table('return_items as r')->join('order_items as i', 'i.id', '=', 'r.order_item_id')->join('orders as o', 'o.id', '=', 'r.order_id')
@@ -50,8 +58,14 @@ class ReturnReportController extends Controller
         $reasons = DB::table('status_reasons')->where('reason_type', 'return')->pluck('label_en', 'id');
         $byReason = $events->groupBy('reason_id')->map(fn ($g, $id) => ['label' => __($reasons[$id] ?? 'Not set'), 'n' => $g->count()])->sortByDesc('n')->values();
 
+        // Full returns: every item; partial deliveries: only the pieces that came back (counted at the shop).
         $byProduct = DB::table('order_items')->whereIn('order_id', $ids)->groupBy('name_snapshot')
-            ->selectRaw('name_snapshot as name, COUNT(DISTINCT order_id) as parcels, SUM(qty) as qty')->orderByDesc('parcels')->limit(50)->get();
+            ->selectRaw('name_snapshot as name, COUNT(DISTINCT order_id) as parcels, SUM(qty) as qty')->get()
+            ->concat(DB::table('return_items as r')->join('order_items as i', 'i.id', '=', 'r.order_item_id')->whereIn('r.order_id', $partialIds)
+                ->where('r.condition', '!=', 'kept')->groupBy('i.name_snapshot')
+                ->selectRaw('i.name_snapshot as name, COUNT(DISTINCT r.order_id) as parcels, SUM(r.qty) as qty')->get())
+            ->groupBy('name')->map(fn ($g, $name) => (object) ['name' => $name, 'parcels' => (int) $g->sum('parcels'), 'qty' => (float) $g->sum('qty')])
+            ->sortByDesc('parcels')->take(50)->values();
 
         $rate = fn (int $ret, int $del) => $ret + $del ? round($ret * 100 / ($ret + $del)) : null;
         // Per person: the same numbers as KPI and Scorecard (credited to who confirmed; a partial delivery counts as delivered).
@@ -64,14 +78,15 @@ class ReturnReportController extends Controller
             'delivered' => (int) ($delByArea[$d] ?? 0), 'rate' => $rate($g->count(), (int) ($delByArea[$d] ?? 0))])->sortByDesc('returned')->values();
 
         $returned = count($ids);
-        $charges = (float) $orders->sum('return_charge');
+        $charges = (float) $orders->sum('return_charge') + (float) $partials->sum('return_charge');
         $damagedCost = (float) $bad->where('condition', 'damaged')->sum($cost);
         $missingCost = (float) $bad->where('condition', 'missing')->sum($cost);
 
         return view('reports.returns', [
             'from' => $from, 'to' => $to,
             'total' => ['returned' => $returned, 'rate' => $rate($returned, $delivered->count()), 'charges' => $charges, 'damaged' => $damagedCost, 'missing' => $missingCost,
-                'loss' => $charges + $damagedCost + $missingCost, 'notBack' => $orders->whereNull('return_received_at')->count()],
+                'loss' => $charges + $damagedCost + $missingCost, 'notBack' => $orders->concat($partials)->whereNull('return_received_at')->count(),
+                'partial' => count($partialIds)],
             'damagedItems' => $damagedItems, 'byReason' => $byReason, 'byProduct' => $byProduct, 'byPerson' => $byPerson, 'byArea' => $byArea,
         ]);
     }

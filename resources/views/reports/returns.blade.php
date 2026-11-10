@@ -17,17 +17,18 @@
             <x-date-input name="to" :value="$to->toDateString()" :max="today()->toDateString()" :clearable="false" @date-change="$nextTick(() => $refs.range.requestSubmit())" />
         </form>
     </div>
-    <p class="mb-4 text-xs text-gray-500">{{ __('Parcels the courier sent back in these dates. Rate = returned out of returned and delivered. Loss = the courier charge for each return (Settings, Returns) plus damaged and missing items at cost.') }}</p>
+    <p class="mb-4 text-xs text-gray-500">{{ __('Parcels the courier sent back in these dates. Returned = the customer kept nothing. A partial delivery counts as delivered; only its returned pieces count, under By product. Rate = returned out of returned and delivered, the same as KPI. Loss = the courier charge for each return (Settings, Returns) plus damaged and missing items at cost.') }}</p>
 
-    <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
         <x-stat-tile :label="__('Returned')" :value="number_format($total['returned'])" />
         <x-stat-tile :label="__('Return rate')" :value="$pct($total['rate'])" />
+        <x-stat-tile :label="__('Partly returned')" :value="number_format($total['partial'])" />
         <x-stat-tile :label="__('Loss')" :value="$money($total['loss'])" />
         <x-stat-tile :label="__('Not back at the shop')" :value="number_format($total['notBack'])" />
     </div>
     <p class="mb-6 text-sm text-gray-600">{{ __('Loss: courier charges :c · damaged :d · missing :m', ['c' => $money($total['charges']), 'd' => $money($total['damaged']), 'm' => $money($total['missing'])]) }}</p>
 
-    @if (! $total['returned'] && $damagedItems->isEmpty())
+    @if (! $total['returned'] && ! $total['partial'] && $damagedItems->isEmpty())
         <x-empty-state :message="__('No returns in these dates.')" />
     @else
         {{-- One list at a time. --}}

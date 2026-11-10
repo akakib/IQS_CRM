@@ -99,6 +99,9 @@ Use these; never write a second version.
 | Find the customer a search is about | `Customers/CustomerFinder::find()` (its phone part is `findByPhone`; an order's typed number only for showing) |
 | Find a customer by phone (order create, lookup, imports) | `Customers/CustomerService::findByPhone()`: numbers, then a primary number, a merged customer leads to the one kept |
 | Repeat customer (Source, order form, Sales report returning, points) | `CustomerStats::isRepeat()` / `repeatBeforeSql()`: a delivered order before, with IQS or in an imported file. Verification's "new customer" stays separate (trust) |
+| Who may list and open a customer | `Customer::visibleTo()` / `Customer::canOpen()` (customers.view scope). Moderators are "Own only": customers of orders they may see or confirmed, ones they created, their call-list rows; a full number typed (list, search, order form) opens that one customer for the session |
+| Credit for a delivery (dashboard, Telegram, KPI, Scorecard, Return report) | Whoever confirmed it, else the moderator (`COALESCE(confirmed_by, moderator_id)`) |
+| Return counts | Returned = the customer kept nothing. A partial delivery is a delivered parcel; only its returned pieces count (Return report By product, tile "Partly returned"). Rate = returned / (returned + delivered), same as KPI |
 | Another open order of the same customer (duplicate) | `OrderService::openDuplicateOf()`: open (not final, not cancelled) and inside Settings > Orders duplicate window; create, booking and the desk all use it |
 | Normalize or find phone numbers | `App\Support\Phone::normalize()` / `Phone::extract()` |
 | Call recording or screenshot: check, keep, open | `Calls/CallProof` (`check`, `take`, `find`, `response`) |
@@ -278,6 +281,12 @@ works without cron; the cron (`desk:tick`) checks everyone too.
 **Customer merge** moves phones, addresses, fraud checks, orders, imported history and store credit
 (`customer_credits` rows + `credit_balance`). **COD payout statements** are refused when the same file
 (`courier_payouts.file_hash`) or the same reference was uploaded before.
+
+**Courier messages are never lost:** a Steadfast message is saved first, then applied after the response
+(`CourierUpdateProcessor::applyEvent`, errors kept on the event). `desk:tick` retries open ones older than
+2 minutes (`retryPending`, up to 5 tries, then closed with "Gave up after 5 tries"); the same message sent again
+while its first copy is still open is applied, not refused. Ad events left "queued" for 10 minutes are sent by
+`TrackingSender::retryStuck` (same tick).
 
 ---
 

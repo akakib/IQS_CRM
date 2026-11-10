@@ -51,7 +51,8 @@ class CourierUpdateProcessor
                 ->where('o.order_no', preg_replace('/-\d+$/', '', $u->invoice))->where('s.is_active', true)->select('s.*')->first();
         }
         if (! $shipment) {
-            $this->mark($eventId, 'No shipment for this consignment / invoice.');
+            // Maybe the booking is still being saved: left open, so the retry tries again (up to MAX_ATTEMPTS).
+            $this->fail($eventId, 'No shipment for this consignment / invoice.');
 
             return 'unknown_shipment';
         }
@@ -210,6 +211,58 @@ class CourierUpdateProcessor
                 'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
                 'user_ids' => array_values(array_unique(array_filter([$order->moderator_id, ...app(\App\Services\Orders\DeskService::class)->managerIds()]))),
             ]);
+    }
+
+    public const MAX_ATTEMPTS = 5;
+
+    /** Apply a saved message; anything that goes wrong is kept on the event (still open) instead of being lost. */
+    public function applyEvent(CourierUpdate $u, int $eventId): string
+    {
+        try {
+            return $this->apply($u, $eventId);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->fail($eventId, mb_substr($e->getMessage(), 0, 400));
+
+            return 'error';
+        }
+    }
+
+    /**
+     * Messages that were saved but never applied (the process stopped, an error, the parcel not saved yet):
+     * tried again, oldest first, up to MAX_ATTEMPTS each; then closed with the last error so it shows.
+     */
+    public function retryPending(int $limit = 50): int
+    {
+        $driver = app(CourierManager::class)->driver();
+        $done = 0;
+        $events = DB::table('courier_events')->whereNull('processed_at')->where('created_at', '<=', now()->subMinutes(2))
+            ->where('attempts', '<', self::MAX_ATTEMPTS)->orderBy('id')->limit($limit)->get(['id', 'payload', 'attempts', 'error']);
+        foreach ($events as $event) {
+            DB::table('courier_events')->where('id', $event->id)->increment('attempts');
+            $update = $driver->parseWebhook(json_decode((string) $event->payload, true) ?: []);
+            if (! $update) {
+                $this->mark($event->id, 'Unrecognised payload');
+
+                continue;
+            }
+            $this->applyEvent($update, $event->id);
+            $done++;
+        }
+        // Tried enough: closed with its last error, so the courier page can show it.
+        foreach (DB::table('courier_events')->whereNull('processed_at')->where('attempts', '>=', self::MAX_ATTEMPTS)->limit(100)->get(['id', 'error']) as $e) {
+            DB::table('courier_events')->where('id', $e->id)->update(['processed_at' => now(), 'error' => mb_substr('Gave up after '.self::MAX_ATTEMPTS.' tries: '.$e->error, 0, 500)]);
+        }
+
+        return $done;
+    }
+
+    /** Not applied: the error is kept and the message stays open for the retry. */
+    private function fail(?int $eventId, string $error): void
+    {
+        if ($eventId) {
+            DB::table('courier_events')->where('id', $eventId)->update(['error' => $error]);
+        }
     }
 
     private function mark(?int $eventId, ?string $error): void

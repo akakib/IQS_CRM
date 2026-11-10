@@ -38,6 +38,8 @@ class DeskTick extends Command
         $this->step('runBookings', fn () => $desk->runBookings());
         $closed = $this->step('breaksAutoClose', fn () => $breaks->autoClose(), 0);
         $this->step('chatCloseStale', fn () => app(\App\Services\Work\ChatService::class)->closeStale()); // Communication left on by someone who left
+        $this->step('courierRetry', fn () => app(\App\Services\Courier\CourierUpdateProcessor::class)->retryPending()); // courier messages not applied yet
+        $this->step('trackingRetry', fn () => app(\App\Services\Tracking\TrackingSender::class)->retryStuck()); // ad events left queued
         $this->step('digest', fn () => $this->digest($telegram));
 
         $this->line("released {$released}, auto-assigned {$assigned}, breaks closed {$closed}");

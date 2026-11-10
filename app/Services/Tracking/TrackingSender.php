@@ -12,6 +12,19 @@ use Illuminate\Support\Facades\Http;
  */
 class TrackingSender
 {
+    /** Events left "queued" (the process stopped before sending): sent now. Nothing else sends them again. */
+    public function retryStuck(int $limit = 50): int
+    {
+        $ids = DB::table('tracking_event_logs')->where('status', 'queued')->where('created_at', '<=', now()->subMinutes(10))
+            ->where('created_at', '>=', now()->subDays(6)) // Meta refuses events older than 7 days
+            ->orderBy('id')->limit($limit)->pluck('id');
+        foreach ($ids as $id) {
+            $this->send($id);
+        }
+
+        return $ids->count();
+    }
+
     public function send(int $logId): void
     {
         $log = DB::table('tracking_event_logs')->where('id', $logId)->where('status', 'queued')->first();

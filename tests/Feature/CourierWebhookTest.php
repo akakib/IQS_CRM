@@ -201,4 +201,89 @@ class CourierWebhookTest extends TestCase
         $this->hook(['notification_type' => 'delivery_status', 'consignment_id' => (int) $this->cn, 'status' => 'pending', 'cod_amount' => $cod + 900])->assertOk();
         $this->assertNotNull($this->order->fresh()->courier_mismatch_at);
     }
+
+    private function delivered(): array
+    {
+        return ['notification_type' => 'delivery_status', 'consignment_id' => (int) $this->cn, 'invoice' => $this->order->order_no,
+            'status' => 'delivered', 'cod_amount' => 1000, 'delivery_charge' => 60, 'tracking_message' => 'Delivered'];
+    }
+
+    private function savedButNotApplied(array $payload): int
+    {
+        return DB::table('courier_events')->insertGetId(['courier' => 'steadfast', 'consignment_id' => (string) ($payload['consignment_id'] ?? ''),
+            'notification_type' => $payload['notification_type'], 'payload' => json_encode($payload), 'idempotency_key' => sha1(json_encode($payload)),
+            'created_at' => now()->subMinutes(5)]);
+    }
+
+    public function test_a_message_saved_but_never_applied_is_tried_again(): void
+    {
+        $id = $this->savedButNotApplied($this->delivered()); // the process stopped after saving it
+
+        $this->assertSame(1, app(\App\Services\Courier\CourierUpdateProcessor::class)->retryPending());
+        $this->assertSame('delivered', $this->key());
+        $this->assertNotNull(DB::table('courier_events')->where('id', $id)->value('processed_at'));
+    }
+
+    public function test_the_same_message_sent_again_is_applied_when_the_first_copy_was_not(): void
+    {
+        $this->savedButNotApplied($this->delivered());
+
+        $this->hook($this->delivered())->assertOk()->assertJson(['status' => 'received']);
+        $this->assertSame('delivered', $this->key());
+        $this->hook($this->delivered())->assertJson(['status' => 'duplicate']); // applied now: a third copy is refused
+        $this->assertSame(1, DB::table('courier_events')->count());
+    }
+
+    public function test_a_message_for_an_unknown_parcel_is_tried_five_times_then_closed(): void
+    {
+        $id = $this->savedButNotApplied(['notification_type' => 'delivery_status', 'consignment_id' => 999999, 'status' => 'delivered']);
+        $retry = app(\App\Services\Courier\CourierUpdateProcessor::class);
+
+        $retry->retryPending();
+        $row = DB::table('courier_events')->find($id);
+        $this->assertNull($row->processed_at);
+        $this->assertSame('No shipment for this consignment / invoice.', $row->error);
+
+        foreach (range(1, 4) as $n) {
+            $retry->retryPending();
+        }
+        $row = DB::table('courier_events')->find($id);
+        $this->assertSame(5, (int) $row->attempts);
+        $this->assertNotNull($row->processed_at);
+        $this->assertStringStartsWith('Gave up after 5 tries', $row->error);
+    }
+
+    public function test_an_ad_event_left_queued_is_sent_by_the_retry(): void
+    {
+        $log = DB::table('tracking_event_logs')->insertGetId(['order_id' => $this->order->id, 'platform' => 'meta_capi', 'event_name' => 'Purchase',
+            'event_id' => 'e1', 'event_time' => now(), 'value' => 100, 'status' => 'queued', 'created_at' => now()->subMinutes(15)]);
+
+        $this->assertSame(1, app(\App\Services\Tracking\TrackingSender::class)->retryStuck());
+        $this->assertSame('sent', DB::table('tracking_event_logs')->where('id', $log)->value('status')); // fake send off production
+    }
+
+    public function test_delivery_credit_goes_to_whoever_confirmed_on_every_report(): void
+    {
+        $confirmer = (int) $this->order->confirmed_by;
+        $other = \App\Models\User::factory()->create();
+        DB::table('orders')->where('id', $this->order->id)->update(['moderator_id' => $other->id]); // given to someone else later
+        $this->hook($this->delivered());
+
+        $sales = app(\App\Services\Reports\SalesReport::class);
+        $day = today()->toDateString();
+        $this->assertSame(1, $sales->count('delivered', $day, $day, $confirmer));
+        $this->assertSame(0, $sales->count('delivered', $day, $day, $other->id));
+    }
+
+    public function test_a_partial_delivery_counts_as_delivered_and_its_returned_pieces_as_returned(): void
+    {
+        DB::table('orders')->where('id', $this->order->id)->update(['status_id' => OrderStatus::idFor('partial_delivered')]);
+        DB::table('order_events')->insert(['order_id' => $this->order->id, 'to_status_id' => OrderStatus::idFor('partial_delivered'), 'source' => 'webhook', 'created_at' => now()]);
+        $item = DB::table('order_items')->where('order_id', $this->order->id)->first();
+        DB::table('return_items')->insert(['order_id' => $this->order->id, 'order_item_id' => $item->id, 'variant_id' => $item->variant_id, 'qty' => 1, 'condition' => 'good', 'created_at' => now()]);
+
+        $this->actingAs($this->owner())->get('/returns-report')->assertOk()
+            ->assertSeeInOrder(['Returned', '0', 'Return rate', '0%', 'Partly returned', '1'])
+            ->assertSee($item->name_snapshot);
+    }
 }

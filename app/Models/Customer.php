@@ -44,6 +44,31 @@ class Customer extends Model
     }
 
     /** No delivered or returned parcel in what IQS itself saw (imported files do not count). */
+    /**
+     * Customers a person may list and open (customers.view scope). Own: customers of the orders they may see
+     * (Order::visibleTo), orders they confirmed, customers they created, and their call-list rows. A full number
+     * typed in a search opens any customer for that session (CustomerController::unlock).
+     */
+    public function scopeVisibleTo(\Illuminate\Database\Eloquent\Builder $query, User $user): \Illuminate\Database\Eloquent\Builder
+    {
+        return match ($user->permissionScope('customers.view')) {
+            'all' => $query,
+            'own', 'team' => $query->where(fn ($q) => $q->whereIn('customers.id', Order::visibleTo($user)->select('orders.customer_id'))
+                ->orWhereIn('customers.id', \Illuminate\Support\Facades\DB::table('orders')->select('customer_id')->where('confirmed_by', $user->id))
+                ->orWhere('customers.created_by', $user->id)
+                ->orWhereIn('customers.id', \Illuminate\Support\Facades\DB::table('call_list_items')->select('customer_id')->where('user_id', $user->id)->whereNotNull('customer_id'))),
+            default => $query->whereRaw('1 = 0'),
+        };
+    }
+
+    /** May this person open this customer's page? */
+    public static function canOpen(User $user, int $id): bool
+    {
+        return $user->permissionScope('customers.view') === 'all'
+            || in_array($id, session('customers.unlocked', []), true)
+            || self::visibleTo($user)->whereKey($id)->exists();
+    }
+
     public function isNew(): bool
     {
         return (int) $this->iqs_delivered_count === 0 && (int) $this->iqs_returned_count === 0;

@@ -24,9 +24,15 @@ class CustomerController extends Controller
     {
         $list = ListState::from($request, ['created_at', 'name', 'orders_count'], ['risk' => ['normal', 'watch', 'blocked']], 'desc');
         $digits = (string) Phone::searchPrefix($list->search);
+        // A full number finds that one customer even outside the person's own (to take an order or a call).
+        $exact = $list->search !== '' ? $this->customers->findByPhone($list->search) : null;
+        if ($exact) {
+            self::unlock($exact->id);
+        }
 
         // A number search hits the unique phone index; a name search is a prefix match.
         $customers = Customer::query()
+            ->when(! $exact, fn ($q) => $q->visibleTo($request->user()))
             ->select(['id', 'name', 'primary_phone', 'risk_level', 'orders_count', 'delivered_count', 'returned_count', 'created_at'])
             ->when($list->search !== '' && strlen($digits) >= 4, fn ($q) => $q->whereIn('id', DB::table('customer_phones')->select('customer_id')
                 ->where('phone', 'like', $digits.'%')))
@@ -57,8 +63,15 @@ class CustomerController extends Controller
      * (orders, imported orders and calls in time order), Orders and Calls. Opened from the search, a call
      * list, an order or the customer list; came from a search, "Back to results" returns to it.
      */
+    /** Opened by its full number this session: the person may open this customer's page. */
+    public static function unlock(int $id): void
+    {
+        session(['customers.unlocked' => array_values(array_unique([...array_slice(session('customers.unlocked', []), -199), $id]))]);
+    }
+
     public function show(Customer $customer, Request $request): View
     {
+        abort_unless(Customer::canOpen($request->user(), $customer->id), 403);
         $customer->load(['phones', 'addresses.zone:id,name']);
         $checks = $customer->fraudChecks()->with('provider:id,name,system_key')->latest('checked_at')->limit(20)->get();
         // Came from the search: remembered for this customer, so it stays after a reload or an action here.
@@ -121,6 +134,7 @@ class CustomerController extends Controller
         if (! $customer) {
             return response()->json(['found' => false, 'valid' => Phone::isValid($request->query('phone'))]);
         }
+        self::unlock($customer->id); // the full number was typed
         $customer->load('addresses');
 
         return response()->json([

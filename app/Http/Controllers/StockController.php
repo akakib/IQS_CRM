@@ -25,7 +25,7 @@ class StockController extends Controller
 
         $variants = ProductVariant::query()
             ->select(['id', 'product_id', 'sku', 'name', 'shelf_code', 'availability_status', 'stock_qty', 'stock_counted_at'])
-            ->with('product:id,name')
+            ->with('product:id,name,image_url')
             ->when($show === 'not_counted', fn ($w) => $w->whereNull('stock_qty'))
             ->when($show === 'low', fn ($w) => $w->where('stock_qty', '>', 0)->where('stock_qty', '<=', 5))
             ->when($show === 'zero', fn ($w) => $w->where('stock_qty', '<=', 0))

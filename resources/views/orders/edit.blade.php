@@ -56,7 +56,7 @@
                 if (!p || !p.sellable) return;
                 const e = this.items.find(i => i.variant_id === p.value);
                 if (e) e.qty = Number(e.qty) + 1;
-                else this.items.push({ variant_id: p.value, label: p.label, sub: String(p.sub || '').split(' · ')[0], price: p.price || 0, unit: p.unit, weight_g: p.weight_g, qty: ({ g: 500, ml: 250 })[p.unit] || 1, line_discount: 0 });
+                else this.items.push({ variant_id: p.value, label: p.label, image: p.image || null, sub: String(p.sub || '').split(' · ')[0], price: p.price || 0, unit: p.unit, weight_g: p.weight_g, qty: ({ g: 500, ml: 250 })[p.unit] || 1, line_discount: 0 });
                 this.q = ''; this.results = []; this.searched = false;
             },
             money(n) { return '৳' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); },
@@ -78,7 +78,7 @@
                         <div x-show="results.length" x-cloak class="absolute z-30 mt-1 w-full rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
                             <template x-for="(p, i) in results" :key="p.value">
                                 <button type="button" @click="add(p)" :disabled="!p.sellable" class="block w-full px-3 py-1.5 text-left text-sm disabled:opacity-50" :class="i === active ? 'bg-green-50' : ''">
-                                    <span x-text="p.label"></span><span class="block text-xs text-gray-400" x-text="p.sub"></span>
+                                    <span class="flex items-center gap-2"><img x-show="p.image" :src="p.image" alt="" loading="lazy" class="h-9 w-9 shrink-0 rounded-md border border-gray-200 bg-gray-50 object-cover"><span class="min-w-0"><span x-text="p.label"></span><span class="block text-xs text-gray-400" x-text="p.sub"></span></span></span>
                                 </button>
                             </template>
                         </div>
@@ -88,7 +88,7 @@
                         <template x-for="(it, i) in items" :key="it.variant_id">
                             <div class="grid grid-cols-12 items-end gap-2 rounded-lg border border-gray-100 p-2 text-sm">
                                 <input type="hidden" :name="`items[${i}][variant_id]`" :value="it.variant_id">
-                                <div class="col-span-12 self-center md:col-span-5"><p class="font-medium text-gray-800" x-text="it.label"></p><p class="text-xs text-gray-400" x-text="it.sub + ' · ' + money(it.price)"></p></div>
+                                <div class="col-span-12 flex items-center gap-2 self-center md:col-span-5"><img x-show="it.image" :src="it.image" alt="" loading="lazy" class="h-9 w-9 shrink-0 rounded-md border border-gray-200 bg-gray-50 object-cover"><div class="min-w-0"><p class="font-medium text-gray-800" x-text="it.label"></p><p class="text-xs text-gray-400" x-text="it.sub + ' · ' + money(it.price)"></p></div></div>
                                 <label class="col-span-4 text-xs text-gray-500 md:col-span-2"><span x-text="({ g: @js(__('Grams')), kg: @js(__('KG')), ml: @js(__('ML')), l: @js(__('Litres')), packet: @js(__('Packets')), box: @js(__('Boxes')) })[it.unit] || @js(__('Qty'))"></span>
                                     <input type="number" step="any" min="0.001" :name="`items[${i}][qty]`" x-model.number="it.qty" @input="recharge()" class="{{ $input }} mt-0.5 px-2 py-1"></label>
                                 <label class="col-span-4 text-xs text-gray-500 md:col-span-2">{{ __('Discount') }}

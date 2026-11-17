@@ -400,8 +400,12 @@ class OrderController extends Controller
     private function editLines(Order $order, ?array $typed): \Illuminate\Support\Collection
     {
         $sold = $order->items->keyBy('variant_id');
+        // Pictures of every line in one query (sold lines and lines typed since).
+        $images = DB::table('product_variants as v')->join('products as p', 'p.id', '=', 'v.product_id')
+            ->whereIn('v.id', $sold->keys()->merge(collect($typed ?? [])->pluck('variant_id'))->map(fn ($id) => (int) $id)->filter()->unique()->all())
+            ->pluck('p.image_url', 'v.id');
         $line = fn ($i) => [
-            'variant_id' => $i->variant_id, 'label' => $i->name_snapshot, 'sub' => $i->sku_snapshot, 'price' => (float) $i->unit_price,
+            'variant_id' => $i->variant_id, 'label' => $i->name_snapshot, 'image' => $images[$i->variant_id] ?? null, 'sub' => $i->sku_snapshot, 'price' => (float) $i->unit_price,
             'unit' => $i->unit, 'weight_g' => (int) ($i->variant?->weight_g ?? 0), 'qty' => (float) $i->qty, 'line_discount' => (float) $i->line_discount,
         ];
         if (! is_array($typed) || $typed === []) {
@@ -416,13 +420,13 @@ class OrderController extends Controller
             ->get(['v.id', 'v.sku', 'v.name as variant', 'v.unit', 'v.weight_g', 'p.name as product', 'vp.regular_price', 'vp.sale_price', 'vp.sale_starts_at', 'vp.sale_ends_at'])
             ->keyBy('id');
 
-        return collect($typed)->map(function ($t) use ($sold, $variants, $line) {
+        return collect($typed)->map(function ($t) use ($sold, $variants, $line, $images) {
             $id = (int) ($t['variant_id'] ?? 0);
             if (isset($sold[$id])) {
                 $row = $line($sold[$id]);
             } elseif ($v = $variants[$id] ?? null) {
                 $row = [
-                    'variant_id' => $id, 'label' => $v->product.' · '.$v->variant, 'sub' => $v->sku,
+                    'variant_id' => $id, 'label' => $v->product.' · '.$v->variant, 'image' => $images[$id] ?? null, 'sub' => $v->sku,
                     'price' => $v->regular_price === null ? 0.0 : (float) (new \App\Models\VariantPrice((array) $v))->effective(),
                     'unit' => $v->unit, 'weight_g' => (int) $v->weight_g, 'qty' => 1.0, 'line_discount' => 0.0,
                 ];

@@ -61,10 +61,13 @@
                                 this.qty = j.qty; this.counted = j.counted; this.status = j.status;
                             } catch (e) { this.err = @js(__('No connection. Try again.')) } finally { this.busy = false }
                         } }">
+                    <div class="flex min-w-0 flex-1 items-center gap-3">
+                    @if ($v->product?->image_url)<img src="{{ $v->product->image_url }}" alt="" loading="lazy" class="h-9 w-9 shrink-0 rounded-md border border-gray-200 bg-gray-50 object-cover">@endif
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-medium text-gray-900">{{ $label }}</p>
                         <p class="text-xs text-gray-500">{{ $v->sku ?: '-' }}@if ($v->shelf_code) · {{ __('Shelf') }} {{ $v->shelf_code }}@endif
                             · <span :class="{ 'text-green-700': status === 'in_stock', 'text-amber-700': status === 'backorder', 'text-red-600': status === 'out_of_stock' }" x-text="({{ \Illuminate\Support\Js::from(array_map('__', \App\Models\ProductVariant::AVAILABILITY)) }})[status]"></span></p>
+                    </div>
                     </div>
                     <div class="flex items-center gap-3">
                         <div class="text-right">

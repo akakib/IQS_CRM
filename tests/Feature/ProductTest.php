@@ -128,11 +128,12 @@ class ProductTest extends TestCase
         foreach (range(1, 25) as $i) {
             Product::factory()->withVariant(100 + $i, ['sku' => "ALM-{$i}"])->create(['name' => "Almond pack {$i}"]);
         }
-        Product::factory()->withVariant(50, ['sku' => 'X1', 'availability_status' => 'out_of_stock'])->create(['name' => 'Cashew']);
+        Product::factory()->withVariant(50, ['sku' => 'X1', 'availability_status' => 'out_of_stock'])->create(['name' => 'Cashew', 'image_url' => 'https://shop.test/cashew.jpg']);
 
         $this->getJson('/products/search?q=almond')->assertOk()->assertJsonCount(20);
         $this->getJson('/products/search?q=alm-7')->assertJsonPath('0.sub', fn ($s) => str_starts_with($s, 'ALM-7'));
-        $this->getJson('/products/search?q=cashew')->assertJsonPath('0.sellable', false)->assertJsonPath('0.sub', fn ($s) => str_contains($s, 'OUT OF STOCK'));
+        $this->getJson('/products/search?q=cashew')->assertJsonPath('0.sellable', false)->assertJsonPath('0.sub', fn ($s) => str_contains($s, 'OUT OF STOCK'))
+            ->assertJsonPath('0.image', 'https://shop.test/cashew.jpg'); // the picture for the order pickers
     }
 
     public function test_index_lists_filters_and_stays_in_query_budget(): void

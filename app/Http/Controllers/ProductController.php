@@ -113,11 +113,12 @@ class ProductController extends Controller
             ->orderByRaw('CASE WHEN v.sku = ? OR v.barcode = ? THEN 0 WHEN v.search_text LIKE ? THEN 1 WHEN v.search_text LIKE ? THEN 2 ELSE 3 END', [$q, $q, $q.'%', '%'.$q.'%'])
             ->orderBy('p.name')
             ->limit(20)
-            ->get(['v.id', 'v.sku', 'v.name as variant', 'v.unit', 'v.weight_g', 'v.availability_status', 'p.name as product', 'vp.regular_price', 'vp.sale_price', 'vp.sale_starts_at', 'vp.sale_ends_at']);
+            ->get(['v.id', 'v.sku', 'v.name as variant', 'v.unit', 'v.weight_g', 'v.availability_status', 'p.name as product', 'p.image_url', 'vp.regular_price', 'vp.sale_price', 'vp.sale_starts_at', 'vp.sale_ends_at']);
 
         return response()->json($rows->map(fn ($r) => [
             'value' => $r->id,
             'label' => $r->product.($r->variant !== 'Default' ? ' · '.$r->variant : ''),
+            'image' => $r->image_url ?: null,
             'sub' => collect([
                 $r->sku,
                 $r->sale_price !== null ? '৳'.number_format((float) $r->sale_price, 2) : ($r->regular_price !== null ? '৳'.number_format((float) $r->regular_price, 2) : null),

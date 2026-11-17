@@ -263,6 +263,22 @@ class WooWebhookTest extends TestCase
         $this->assertSame(0, DB::table('order_payments')->where('order_id', Order::firstWhere('external_ref', '5003')->id)->count());
     }
 
+    public function test_main_site_statuses_come_in_and_orders_before_the_start_date_stay_on_the_website(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['website.orders_from' => '2026-11-17 18:58']);
+        $this->send($this->payload(['status' => 'record-verified', 'date_created' => '2026-11-17T19:14:10']))->assertOk();
+        $this->assertNotNull(Order::firstWhere('external_ref', '5001'));
+
+        $this->send($this->payload(['id' => 5002, 'number' => '5002', 'billing' => ['phone' => '+8801712345671'], 'status' => 'call-verified', 'date_created' => '2026-11-17T19:20:00']))->assertOk();
+        $called = Order::firstWhere('external_ref', '5002');
+        $this->assertNotNull($called);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $called->id, 'note_type' => 'system']);
+
+        $this->send($this->payload(['id' => 5003, 'number' => '5003', 'billing' => ['phone' => '+8801712345672'], 'status' => 'call-verified', 'date_created' => '2026-11-17T18:15:37']))->assertOk();
+        $this->assertNull(Order::firstWhere('external_ref', '5003')); // placed before IQS took website orders
+        $this->assertDatabaseHas('integration_inbox', ['status' => 'ignored', 'error' => 'placed before 2026-11-17 18:58']);
+    }
+
     public function test_signed_order_webhook_creates_an_unowned_web_order(): void
     {
         $this->send($this->payload())->assertOk()->assertJson(['status' => 'received']);

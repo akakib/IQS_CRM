@@ -51,10 +51,20 @@ class WooOrderIntake
 
                     return null;
                 }
+                // Orders placed before IQS took over stay on the website (they were handled there).
+                $from = (string) settings('website.orders_from');
+                if ($from !== '' && ! empty($p['date_created']) && \Illuminate\Support\Carbon::parse($p['date_created'])->lt(\Illuminate\Support\Carbon::parse($from))) {
+                    $this->finish($inboxId, 'ignored', "placed before {$from}");
+
+                    return null;
+                }
 
                 $order = DB::transaction(fn () => $this->create($p));
                 $this->finish($inboxId, 'processed', null, $order->id);
                 app(VerificationEngine::class)->run($order);
+                if ($status === 'call-verified') {
+                    $this->calledOnWebsite($order->fresh());
+                }
                 // Given to a free person right away (Settings), after the website has its answer.
                 if (settings('desk.assign_on_arrival')) {
                     app()->terminating(fn () => app(DeskService::class)->autoAssign());
@@ -81,8 +91,28 @@ class WooOrderIntake
         });
     }
 
-    /** Website statuses that mean "this is an order" (the rest: pending, failed, cancelled, checkout-draft, trash). */
-    private const PLACED = ['processing', 'on-hold', 'completed'];
+    /**
+     * Website statuses that mean "this is an order" (the rest: pending, failed, cancelled, checkout-draft, trash).
+     * The IQS main site gives a new checkout order "record-verified" (its order guard) and staff there mark
+     * "call-verified" after calling: both are real orders.
+     */
+    private const PLACED = ['processing', 'on-hold', 'completed', 'record-verified', 'call-verified'];
+
+    /** Already called and verified on the website: confirmed here too when the checks passed, else a note for the desk. */
+    private function calledOnWebsite(Order $order): void
+    {
+        $note = __('Called and verified on the website before it reached IQS.');
+        if (OrderStatus::map()[$order->status_id]['key'] !== 'record_verified') {
+            $this->orders->note($order, 'system', $note.' '.__('Not confirmed here: it waits for the checks above.'), null);
+
+            return;
+        }
+        try {
+            $this->machine->transition($order, 'confirmed', null, 'webhook', null, $note);
+        } catch (Throwable $e) {
+            $this->orders->note($order, 'system', $note.' '.__('Could not confirm it here: :m', ['m' => $e->getMessage()]), null);
+        }
+    }
 
     private function failed(int $inboxId, array $p, Throwable $e): void
     {

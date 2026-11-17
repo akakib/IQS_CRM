@@ -12,7 +12,7 @@
     <template x-teleport="body">
         <div x-show="src" x-cloak class="fixed inset-0 z-[130] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">
             <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-[92vh] sm:rounded-2xl">
-                <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-6">
+                <div class="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
                     <h3 class="text-base font-semibold text-gray-900" x-text="title || @js(__('New order'))"></h3>
                     <div class="flex shrink-0 items-center gap-2">
                         <a x-show="page" :href="page" target="_blank" rel="noopener" class="inline-flex min-h-8 items-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Open in new tab') }}</a>

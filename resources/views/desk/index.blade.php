@@ -658,7 +658,7 @@
             @message.window="if ($event.origin === location.origin && $event.data?.iqsOrderEdited) location.href = @js(route('desk.index', $embed ? ['embed' => 1, 'order' => $order->id] : ['tab' => $tab, 'order' => $order->id]))"
             class="fixed inset-0 z-[120] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">
             <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-[92vh] sm:rounded-2xl">
-                <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-6">
+                <div class="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
                     <h3 class="text-base font-semibold text-gray-900">{{ __('Edit :no', ['no' => $order->order_no]) }}</h3>
                     <button type="button" @click="open = false; src = ''" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Close') }}</button>
                 </div>

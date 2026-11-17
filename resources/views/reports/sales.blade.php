@@ -245,7 +245,7 @@
     <div x-show="pop" x-cloak class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4" role="dialog" aria-modal="true">
         <div class="absolute inset-0 bg-black/40" @click="pop = false"></div>
         <div class="relative flex max-h-[88dvh] w-full max-w-2xl flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl" :class="order ? 'h-[88dvh]' : ''">
-            <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
+            <div class="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 bg-white px-5 py-3">
                 <div class="flex min-w-0 items-center gap-2">
                     <button type="button" x-show="order" @click="order = null" class="text-sm font-medium text-primary">‹ {{ __('List') }}</button>
                     <h3 class="truncate text-sm font-semibold text-gray-900" x-text="order ? order.no : title"></h3>

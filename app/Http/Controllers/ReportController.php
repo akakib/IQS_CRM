@@ -30,7 +30,14 @@ class ReportController extends Controller
             $tiles[] = $shop
                 ? [__('Orders today'), DB::table('orders')->where('created_at', '>=', $today)->count(), route('orders.index'), null]
                 : [__('My orders today'), DB::table('orders')->where('created_at', '>=', $today)->where('moderator_id', $user->id)->count(), route('orders.index', ['tab' => 'mine']), null];
-            $tiles[] = [__('Waiting to be taken'), app(\App\Services\Orders\DeskService::class)->whereWaiting(DB::table('orders'))->count(), route('desk.index'), null];
+            $tiles[] = [__('Waiting to be taken (nobody has it)'), app(\App\Services\Orders\DeskService::class)->whereWaiting(DB::table('orders'))->count(), route('desk.index'), null];
+            if (! $shop && $user->can('orders.take')) {
+                // Their own orders parked for someone else: an advance to check, or an admin's yes (not in the line above: they are theirs).
+                $parked = DB::table('orders')->where('moderator_id', $user->id)->where('status_id', OrderStatus::idFor('hold'))
+                    ->where(fn ($w) => $w->whereNotNull('advance_waiver_requested_at')->orWhereExists(fn ($e) => $e->selectRaw('1')->from('order_payments as pc')
+                        ->whereColumn('pc.order_id', 'orders.id')->where('pc.payment_type', 'advance')->where('pc.status', 'pending_verification')->where('pc.counts_now', false)))->count();
+                $tiles[] = [__('My orders waiting for a check or admin'), $parked, route('desk.index', ['tab' => 'hold']), null];
+            }
             $tiles[] = $shop
                 ? [__('Confirmed today'), $todayCount('confirmed'), null, null]
                 : [__('I confirmed today'), $todayCount('confirmed', $user->id), null, null];
@@ -38,13 +45,6 @@ class ReportController extends Controller
             $tiles[] = $user->can('orders.approve')
                 ? [__('Open delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->count(), route('issues.index'), null]
                 : [__('My delivery issues'), DB::table('delivery_issues')->whereNull('resolved_at')->where('assigned_to', $user->id)->count(), route('issues.index', ['show' => 'mine']), null];
-        }
-        if (! $shop && $user->can('orders.take')) {
-            // Their own orders parked for someone else: an advance to check, or an admin's yes (Waiting to be taken counts others' orders).
-            $parked = DB::table('orders')->where('moderator_id', $user->id)->where('status_id', OrderStatus::idFor('hold'))
-                ->where(fn ($w) => $w->whereNotNull('advance_waiver_requested_at')->orWhereExists(fn ($e) => $e->selectRaw('1')->from('order_payments as pc')
-                    ->whereColumn('pc.order_id', 'orders.id')->where('pc.payment_type', 'advance')->where('pc.status', 'pending_verification')->where('pc.counts_now', false)))->count();
-            $tiles[] = [__('My orders waiting for a check or admin'), $parked, route('desk.index', ['tab' => 'hold']), null];
         }
         if ($user->can('packaging.view')) {
             // The packer's day: what is left to pack, what waits for the rider, returns to take in, items not found.

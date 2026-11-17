@@ -484,9 +484,14 @@
                             }" x-init="const s = localStorage.getItem('iqs_desk_history'); if (s !== null) $el.open = s === '1'">
                             <summary @click="localStorage.setItem('iqs_desk_history', $el.parentElement.open ? '0' : '1')" class="cursor-pointer px-4 py-2.5 text-sm font-medium text-gray-700">{{ __('History') }} <span class="text-gray-400">(<span x-text="count">{{ $detail['notes']->count() }}</span>)</span></summary>
                             <div class="space-y-3 border-t border-gray-100 px-4 py-3">
-                                <form method="POST" action="{{ route('orders.notes', $order) }}" class="flex gap-2" @submit.prevent="addNote($el)">
+                                <form method="POST" action="{{ route('orders.notes', $order) }}" class="flex flex-wrap gap-2" x-data="{ type: 'manual' }" @submit.prevent="addNote($el)">
                                     @csrf
-                                    <input type="hidden" name="type" value="manual">
+                                    <input type="hidden" name="type" :value="type">
+                                    <div class="flex shrink-0 gap-1">
+                                        @foreach (['manual' => __('Note'), 'packing' => __('For packer')] as $noteKey => $noteLabel)
+                                            <button type="button" @click="type = @js($noteKey)" class="rounded-lg border px-2.5 py-1.5 text-xs" :class="type === @js($noteKey) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $noteLabel }}</button>
+                                        @endforeach
+                                    </div>
                                     <input name="body" required maxlength="2000" placeholder="{{ __('Add a note') }}" class="{{ $input }}">
                                     <x-button size="sm" variant="secondary">{{ __('Add') }}</x-button>
                                 </form>

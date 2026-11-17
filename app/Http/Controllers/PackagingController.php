@@ -123,6 +123,14 @@ class PackagingController extends Controller
         return back()->with('success', __(':no: items are back on the shelf.', ['no' => $order->order_no]));
     }
 
+    /** What the packing list holds now, for the page to notice a change (one query for the counts, one for boxes to open). */
+    public function pulse(Request $request): JsonResponse
+    {
+        $counts = app(\App\Services\Packaging\PackingQueue::class)->counts($request->user());
+
+        return response()->json(['sig' => implode('-', [$counts['all'], $counts['red'], $counts['waiting'], $counts['mine'], DB::table('orders')->whereNotNull('unpack_needed_at')->count()])]);
+    }
+
     /** Today's on-duty packers (replaces the list). */
     public function shift(Request $request, ActivityLogger $logger): RedirectResponse
     {

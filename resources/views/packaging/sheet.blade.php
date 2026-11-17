@@ -64,6 +64,7 @@
                     <td class="items">
                         @if ($r->changed)<div class="warn">{{ __('CHANGED: use the new label :l', ['l' => $r->current ?? '-']) }}</div>@endif
                         @if ($note = \App\Support\Phone::hideIn($r->order->customer_note))<div class="note">{{ __('Note') }}: {{ $note }}</div>@endif
+                        @if ($pnote = \App\Support\Phone::hideIn($r->order->packer_note))<div class="note" style="white-space: pre-line">{{ __('For packer') }}: {{ $pnote }}</div>@endif
                         @foreach ($r->order->items as $i)
                             @php($size = \App\Support\Units::itemSize($i))
                             <div><b>{{ $i->name_snapshot }}</b>@if ($size) <span class="size">{{ $size }}</span>@endif <span class="qty">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</span></div>

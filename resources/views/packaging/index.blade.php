@@ -6,10 +6,21 @@
 @endphp
 
 <x-layouts.app :heading="__('Packaging')">
-<div class="mx-auto max-w-3xl"
+<div class="mx-auto max-w-3xl" x-init="follow(); setInterval(() => follow(), 30000)"
     x-data="{
         last: null, list: null, ticked: [], busy: false, holding: false, holdReason: null,
         open: null, previews: {}, picked: [],
+        // Live list: every 30 seconds the page asks what the list holds; when it changed, it reloads,
+        // but never while a packer is busy (a checklist or a card open, a row ticked, typing).
+        sig: null,
+        async follow() {
+            if (document.hidden) return;
+            let d;
+            try { d = await (await fetch(@js(route('packaging.pulse')), { headers: { Accept: 'application/json' } })).json() } catch (e) { return }
+            if (this.sig === null) { this.sig = d.sig; return }
+            const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement.value;
+            if (d.sig !== this.sig && !this.list && !this.open && !this.picked.length && !this.busy && !this.holding && !typing) location.reload();
+        },
         printPicked(ids) { window.open(@js(route('packaging.labels')) + '?orders=' + ids.join(','), '_blank'); setTimeout(() => location.reload(), 1500) },
         async peek(id) {
             if (this.open === id) { this.open = null; return }
@@ -100,6 +111,13 @@
         </details>
     @endif
 
+    @if ($counts['red'] > 0)
+        <a href="{{ route('packaging.index', ['show' => 'red']) }}" class="mb-4 flex items-center justify-between gap-3 rounded-xl border-2 border-red-600 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+            <span>{{ trans_choice(':n order was edited after packing. Repack it before it goes.|:n orders were edited after packing. Repack them before they go.', $counts['red'], ['n' => $counts['red']]) }}</span>
+            <span class="shrink-0 underline">{{ __('Show') }}</span>
+        </a>
+    @endif
+
     @unless ($working)
         <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{{ __('You are not on duty for packaging today. Ask the admin to add you.') }}</div>
     @endunless
@@ -128,6 +146,7 @@
                 </div>
                 <p x-show="!list.repack" class="bg-primary-soft px-4 py-2 text-sm font-medium text-primary" x-text="last?.message"></p>
                 <p x-show="list.note" class="bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900">{{ __('Customer note') }}: <span x-text="list.note"></span></p>
+                <p x-show="list.packer_note" class="whitespace-pre-line bg-orange-50 px-4 py-2 text-sm font-medium text-orange-900">{{ __('For packer') }}: <span x-text="list.packer_note"></span></p>
                 <p x-show="list.repack" class="bg-red-50 px-4 py-2 text-sm font-medium text-red-700">{{ __('Edited after packaging. Change the box:') }} <span x-text="list.diff"></span></p>
                 <div class="divide-y divide-gray-100">
                     <template x-for="i in list.items" :key="i.id">
@@ -258,6 +277,7 @@
                     <template x-if="previews[{{ $o->id }}]?.items">
                         <div>
                             <p x-show="previews[{{ $o->id }}].note" class="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">{{ __('Customer note') }}: <span x-text="previews[{{ $o->id }}].note"></span></p>
+                            <p x-show="previews[{{ $o->id }}].packer_note" class="mb-2 whitespace-pre-line rounded-lg bg-orange-50 px-3 py-2 text-sm font-medium text-orange-900">{{ __('For packer') }}: <span x-text="previews[{{ $o->id }}].packer_note"></span></p>
                             <p x-show="previews[{{ $o->id }}].repack" class="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{{ __('Edited after packaging. Change the box:') }} <span x-text="previews[{{ $o->id }}].diff"></span></p>
                             <div class="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
                                 <template x-for="i in previews[{{ $o->id }}].items" :key="i.id">

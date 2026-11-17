@@ -247,6 +247,14 @@ print_run; the A4 sheet lists those orders in sticker order (label ID, items, CO
 scan of a label marks it applied. Edits while packing need no manager (edit_policy free for ready_for_packaging, packed,
 ready_for_pickup); OrderEditor sends an urgent order_needs_repack telling the packer: repack / replace the label /
 print the new label, with the old and new label IDs. Scanning an old label names the new one.
+Until the box is repacked (`packed_version < current_version`, the Repack tab), a red banner on top of /packaging
+says how many orders were edited after packing. **For packer notes**: the order's note box (order page and Order
+management) has Note / Chat / For packer; a For packer note goes to the history (note_type `packing`) and is gathered
+on `orders.packer_note`, shown (phone numbers hidden) on the packing preview, the scan checklist and the A4 sheet.
+Other notes never reach the packers. **Live list**: /packaging asks `packaging.pulse` every 30 s (the PackingQueue
+counts plus boxes to open) and reloads when that changed, never while a checklist or card is open, rows are ticked or
+someone is typing. Dashboard: "Waiting to be taken (nobody has it)" is the shared queue; a moderator's own parked
+orders (advance to check, admin's yes) are the tile right after it.
 Printing from the packaging list: Print on a row (one order, again if needed), tick rows + Print selected (several,
 one print_run so the A4 sheet matches), or Print new labels (every label not printed yet). Every print, including
 Courier booking's shipping.labels, goes through `Packaging/LabelPrinter` (current label first, one print_run).

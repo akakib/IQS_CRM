@@ -162,7 +162,7 @@
                     <input type="hidden" name="type" :value="type">
                     <div class="flex shrink-0 gap-1">
                         {{-- No Call here: calls are logged from the call panel (outcome, how happy, proof), so they count. --}}
-                        @foreach (['manual' => __('Note'), 'chat' => __('Chat')] as $key => $label)
+                        @foreach (['manual' => __('Note'), 'chat' => __('Chat'), 'packing' => __('For packer')] as $key => $label)
                             <button type="button" @click="type = @js($key)" class="rounded-lg border px-2.5 py-2 text-xs" :class="type === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ $label }}</button>
                         @endforeach
                     </div>

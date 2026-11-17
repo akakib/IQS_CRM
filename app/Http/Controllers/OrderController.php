@@ -281,8 +281,12 @@ class OrderController extends Controller
     public function note(Order $order, Request $request): RedirectResponse|JsonResponse
     {
         abort_unless(Order::visibleTo($request->user())->whereKey($order->id)->exists(), 403);
-        $data = $request->validate(['type' => ['required', Rule::in(['manual', 'chat'])], 'body' => ['required', 'string', 'max:2000']]);
+        $data = $request->validate(['type' => ['required', Rule::in(['manual', 'chat', 'packing'])], 'body' => ['required', 'string', 'max:2000']]);
         $this->orders->note($order, $data['type'], $data['body'], $request->user());
+        if ($data['type'] === 'packing') {
+            // Gathered on the order so the packing list, scan screen and A4 sheet read it with the order (no extra query).
+            $order->forceFill(['packer_note' => trim(($order->packer_note ? $order->packer_note."\n" : '').$data['body'])])->save();
+        }
 
         // Added from a page that stays open (Order management): send back the entry so it can slide into the history.
         if ($request->expectsJson()) {

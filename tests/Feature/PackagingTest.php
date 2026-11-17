@@ -222,6 +222,8 @@ class PackagingTest extends TestCase
         app(OrderEditor::class)->request($order->fresh(), ['items' => [['variant_id' => $this->dates->id, 'qty' => 3]]],
             DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'customer_request')->value('id'), $this->desk, $order->fresh()->lock_version);
         $this->assertSame('repack', $order->fresh()->packMark());
+        // The red banner stays on top of the packaging page until the box is repacked.
+        $this->get('/packaging')->assertSee('1 order was edited after packing. Repack it before it goes.');
 
         $old = $order->order_no.'-1';
         // The edit itself issued the new label (unprinted), so the packer can print it without asking anyone.
@@ -233,6 +235,25 @@ class PackagingTest extends TestCase
         $this->assertSame('repack', $order->fresh()->packMark()); // still red until the items are ticked again
         $this->packIt($order, $order->order_no.'-2');
         $this->assertSame('edited', $order->fresh()->packMark());
+    }
+
+    public function test_a_note_for_the_packer_reaches_the_packing_list_and_sheet_and_the_list_follows_changes(): void
+    {
+        $order = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 2]]);
+        $this->actingAs($this->desk)->post("/orders/{$order->id}/notes", ['type' => 'manual', 'body' => 'Customer was rude'])->assertSessionHas('success');
+        $this->post("/orders/{$order->id}/notes", ['type' => 'packing', 'body' => 'Two separate packets'])->assertSessionHas('success');
+        $this->assertSame('Two separate packets', $order->fresh()->packer_note);
+        $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'packing']);
+
+        $this->actingAs($this->packer);
+        $this->getJson("/packaging/orders/{$order->id}")->assertJsonPath('packer_note', 'Two separate packets');
+        $this->postJson('/packaging/scan', ['code' => $this->label($order)])->assertJsonPath('checklist.packer_note', 'Two separate packets');
+        $this->get('/packaging/sheet')->assertSee('For packer: Two separate packets')->assertDontSee('Customer was rude');
+
+        // The page's pulse changes when the list does.
+        $before = $this->getJson('/packaging/pulse')->assertOk()->json('sig');
+        $this->packIt($order);
+        $this->assertNotSame($before, $this->getJson('/packaging/pulse')->json('sig'));
     }
 
     public function test_a_cod_change_after_booking_blocks_handover_until_someone_confirms_it_was_updated_by_hand(): void

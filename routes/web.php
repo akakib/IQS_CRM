@@ -241,6 +241,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/packaging/scan', fn () => redirect('/packaging'))->name('packaging.scan');
         Route::get('/packaging/labels', [PackagingController::class, 'labels'])->name('packaging.labels');
         Route::get('/packaging/sheet', [PackagingController::class, 'sheet'])->name('packaging.sheet');
+        Route::get('/packaging/pulse', [PackagingController::class, 'pulse'])->name('packaging.pulse');
         Route::get('/packaging/orders/{order}', [PackagingController::class, 'preview'])->name('packaging.preview');
         Route::get('/packaging/batches/{batch}', [PackagingController::class, 'batch'])->whereNumber('batch')->name('packaging.batch');
         Route::post('/packaging/report', [PackagingController::class, 'report'])->name('packaging.report');

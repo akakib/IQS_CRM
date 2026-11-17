@@ -12,10 +12,19 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family={{ $family }}&display=swap">
 @endif
+{{-- Installable on phones (Android: Install app, iPhone: Add to Home Screen). sw.js keeps no data, only the No internet page. --}}
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="{{ $brand }}">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="T5 CRM">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
     :root { --brand: {{ $brand }};@if ($family) --app-font: '{{ $font }}';@elseif ($font === 'System default') --app-font: system-ui;@endif }
 </style>
 <script>
     try { if (localStorage.getItem('iqs_theme') === 'dark') document.documentElement.classList.add('dark') } catch (e) {}
     try { if (localStorage.getItem('iqs_sidebar_mini') === '1') document.documentElement.classList.add('sidebar-mini') } catch (e) {}
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 </script>

@@ -106,6 +106,7 @@ Use these; never write a second version.
 | Normalize or find phone numbers | `App\Support\Phone::normalize()` / `Phone::extract()` |
 | Call recording or screenshot: check, keep, open | `Calls/CallProof` (`check`, `take`, `find`, `response`) |
 | Move call files to Google Drive | `calls:proofs-to-drive` command (after each saved call, Move now, and the scheduler) |
+| Phone app (install) | `public/manifest.webmanifest` (T5 CRM, standalone, start /dashboard), `public/icons/*` (IQS logo), `public/sw.js` (keeps nothing; only `offline.html` when a page cannot load); tags in `components/theme-head` |
 | Google Drive access | `Drive/GoogleDriveService` (scope `drive.file`: only files IQS made) |
 | Database backup | `backup:database` nightly 03:00 (scheduled with `-d disable_functions=`), keeps 14 on the server; when Drive is connected a copy goes to "DB Backup" and the newest 30 (`backup.drive_keep`) stay there. A failed Drive copy never fails the backup: System health shows it. Drive root is "IQS CRM by T5" on production, "IQS CRM by T5 (staging)" elsewhere (one Google app for both; a later folder goes inside the stored root) |
 | Raise a notification | `NotificationService` |

@@ -5,11 +5,12 @@
          <x-slot:footer>meta</x-slot:footer>
          <x-slot:actions>Edit</x-slot:actions>
      </x-record-card> --}}
-@props(['title', 'subtitle' => null, 'badge' => null, 'footer' => null, 'actions' => null])
+@props(['title', 'subtitle' => null, 'image' => null, 'badge' => null, 'footer' => null, 'actions' => null])
 
 <div {{ $attributes->merge(['class' => 'rounded-xl border border-gray-200 bg-white p-4']) }}>
     <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0">
+        @if ($image)<img src="{{ $image }}" alt="" loading="lazy" class="h-12 w-12 shrink-0 rounded-md border border-gray-200 object-cover">@endif
+        <div class="min-w-0 {{ $image ? 'flex-1' : '' }}">
             <p class="font-medium text-gray-800">{{ $title }}</p>
             @if ($subtitle)<p class="truncate text-sm text-gray-500">{{ $subtitle }}</p>@endif
             {{ $slot }}

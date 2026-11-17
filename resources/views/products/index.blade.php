@@ -83,7 +83,7 @@
 
         <x-list.cards>
             @foreach ($products as $product)
-                <x-record-card :title="$product->name" :subtitle="($product->category?->name ?? '-').' · '.$priceRange($product)">
+                <x-record-card :title="$product->name" :image="$product->image_url" :subtitle="($product->category?->name ?? '-').' · '.$priceRange($product)">
                     <x-slot:badge>
                         @forelse ($stockSummary($product) as $status => $n)
                             <x-badge :color="$availabilityColor[$status]">{{ $n }} {{ __(\App\Models\ProductVariant::AVAILABILITY[$status]) }}</x-badge>

@@ -2,7 +2,8 @@
     $ok = 'bg-green-50 text-green-800';
     $warn = 'bg-amber-50 text-amber-800';
     $bad = 'bg-red-50 text-red-700';
-    $backupState = ! $backup ? $bad : ($backup['at']->lt(now()->subHours(26)) ? $warn : $ok);
+    $backupState = ! $backup ? $bad : ($backup['at']->lt(now()->subHours(26)) || ($driveCopy && ! $driveCopy['ok']) ? $warn : $ok);
+    $copied = $offServer ? __('copied to :disk', ['disk' => $offServer]) : ($driveCopy && $driveCopy['ok'] ? __('server + Drive') : __('server only'));
     $schedulerState = ! $scheduler ? $bad : ($scheduler->lt(now()->subMinutes(5)) ? $warn : $ok);
     $queueState = $queue['failed'] > 0 || ($queue['oldest'] && $queue['oldest']->lt(now()->subMinutes(10))) ? $warn : $ok;
 @endphp
@@ -14,8 +15,11 @@
             <p class="mt-2 text-lg font-semibold text-gray-800">{{ $backup ? $backup['at']->diffForHumans() : __('Never') }}</p>
             <p class="text-xs text-gray-500">{{ $backup ? $backup['at']->format('d M Y, g:i A').' · '.number_format($backup['size'] / 1024, 1).' KB' : '' }}</p>
             <span class="mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium {{ $backupState }}">
-                {{ trans_choice(':count file kept|:count files kept', $backupCount, ['count' => $backupCount]) }} · {{ $offServer ? __('copied to :disk', ['disk' => $offServer]) : __('server only') }}
+                {{ trans_choice(':count file kept|:count files kept', $backupCount, ['count' => $backupCount]) }} · {{ $copied }}
             </span>
+            @if ($driveCopy && ! $driveCopy['ok'])
+                <p class="mt-2 text-xs text-amber-700">{{ __('Drive copy failed: :m', ['m' => $driveCopy['message']]) }}</p>
+            @endif
             @if ($backupError)
                 <p class="mt-2 text-xs text-red-600">{{ __('Last attempt failed: :m', ['m' => $backupError['message']]) }}</p>
             @endif

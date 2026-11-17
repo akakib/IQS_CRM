@@ -73,11 +73,11 @@ class GoogleDriveTest extends TestCase
         $drive = $drive->fresh();
         $this->assertTrue($drive->isConnected());
         $this->assertSame('files@example.com', $drive->account_email);
-        $this->assertSame(['root' => 'folder1', 'records' => 'folder2', 'screenshots' => 'folder3', 'riders' => 'folder4'], $drive->folders);
+        $this->assertSame(['root' => 'folder1', 'records' => 'folder2', 'screenshots' => 'folder3', 'riders' => 'folder4', 'backups' => 'folder5'], $drive->folders);
 
         $this->post('/settings/google-drive/test')->assertSessionHas('success');
         $this->assertTrue($drive->fresh()->test_ok);
-        $this->assertSame(4, $made); // folders are made once, not on every upload
+        $this->assertSame(5, $made); // folders are made once, not on every upload
         $this->get('/settings/google-drive')->assertSee('Last test passed')->assertSee('files@example.com')->assertDontSee('top-secret-value');
 
         $this->post('/settings/google-drive/disconnect')->assertSessionHas('success');
@@ -125,7 +125,7 @@ class GoogleDriveTest extends TestCase
         Http::assertNothingSent();
         $this->assertNull(\DB::table('customer_calls')->where('id', $rec)->value('proof_drive_id'));
 
-        GoogleDrive::current()->update(['client_id' => self::ID, 'client_secret' => 's', 'refresh_token' => 'rt', 'folders' => ['root' => 'R', 'records' => 'REC', 'screenshots' => 'SS', 'riders' => 'RID']]);
+        GoogleDrive::current()->update(['client_id' => self::ID, 'client_secret' => 's', 'refresh_token' => 'rt', 'folders' => ['root' => 'R', 'records' => 'REC', 'screenshots' => 'SS', 'riders' => 'RID', 'backups' => 'BK']]);
         $down = true;
 
         // Drive fails: the files stay on the server and are tried again later.

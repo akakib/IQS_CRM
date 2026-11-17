@@ -27,6 +27,7 @@ class HealthController extends Controller
             'backupCount' => $backups->count(),
             'backupError' => Cache::get('backup:last_error'),
             'offServer' => config('backup.copy_to_disk'),
+            'driveCopy' => Cache::get('backup:drive'),
             'queue' => [
                 'pending' => DB::table('jobs')->count(),
                 'oldest' => ($t = DB::table('jobs')->min('created_at')) ? Carbon::createFromTimestamp($t) : null,

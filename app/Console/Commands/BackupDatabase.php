@@ -67,8 +67,34 @@ class BackupDatabase extends Command
         $this->prune($dir);
         Cache::forget('backup:last_error');
         $this->info('Backup written: '.basename($gz).' ('.number_format(filesize($gz) / 1024, 1).' KB)');
+        $this->toDrive($gz);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * A copy in the business Google Drive (Settings > Google Drive), folder "DB Backup": the newest
+     * config('backup.drive_keep') stay there. A failed copy never fails the backup; System health shows it.
+     */
+    private function toDrive(string $gz): void
+    {
+        $drive = \App\Models\GoogleDrive::current();
+        if (! $drive->isConnected() || ! $drive->hasKeys()) {
+            Cache::forget('backup:drive');
+
+            return;
+        }
+        try {
+            $service = app(\App\Services\Drive\GoogleDriveService::class);
+            $service->upload($drive, 'backups', basename($gz), 'application/gzip', (string) file_get_contents($gz));
+            $service->keepNewest($drive, 'backups', (int) config('backup.drive_keep', 30));
+            Cache::forever('backup:drive', ['at' => now()->toIso8601String(), 'ok' => true]);
+            $this->info('Copied to Google Drive (DB Backup).');
+        } catch (\Throwable $e) {
+            Cache::forever('backup:drive', ['at' => now()->toIso8601String(), 'ok' => false, 'message' => $e->getMessage()]);
+            \Illuminate\Support\Facades\Log::warning('Backup copy to Google Drive failed: '.$e->getMessage());
+            $this->warn('Google Drive copy failed: '.$e->getMessage());
+        }
     }
 
     /** Stream in 1 MB chunks so a large dump never sits in memory. */

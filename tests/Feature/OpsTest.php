@@ -78,6 +78,55 @@ class OpsTest extends TestCase
         $this->assertFalse($files->contains('iqs-20260101-030000.sql.gz'));
     }
 
+    public function test_backup_is_copied_to_drive_and_only_the_newest_thirty_stay_there(): void
+    {
+        $this->fakeDump();
+        \App\Models\GoogleDrive::current()->update(['client_id' => 'id.apps.googleusercontent.com', 'client_secret' => 's', 'refresh_token' => 'rt',
+            'folders' => ['root' => 'r', 'records' => 'a', 'screenshots' => 'b', 'riders' => 'c', 'backups' => 'bk']]);
+        $uploaded = null;
+        $deleted = [];
+        $refuse = false;
+        \Illuminate\Support\Facades\Http::fake(function ($request) use (&$uploaded, &$deleted, &$refuse) {
+            $u = $request->url();
+            if ($refuse && str_starts_with($u, 'https://www.googleapis.com/upload/')) {
+                return \Illuminate\Support\Facades\Http::response(['error' => ['message' => 'quota']], 403);
+            }
+            if (str_starts_with($u, 'https://oauth2.googleapis.com/token')) {
+                return \Illuminate\Support\Facades\Http::response(['access_token' => 'at', 'expires_in' => 3600]);
+            }
+            if (str_starts_with($u, 'https://www.googleapis.com/upload/')) {
+                preg_match('~"name":"([^"]+)".*"parents":\["([^"]+)"\]~', $request->body(), $m);
+                $uploaded = [$m[1] ?? null, $m[2] ?? null];
+
+                return \Illuminate\Support\Facades\Http::response(['id' => 'new', 'name' => $m[1] ?? '']);
+            }
+            if ($request->method() === 'GET' && str_contains(urldecode($u), "'bk' in parents")) {
+                return \Illuminate\Support\Facades\Http::response(['files' => array_map(fn ($i) => ['id' => 'f'.$i], range(1, 32))]);
+            }
+            if ($request->method() === 'DELETE') {
+                $deleted[] = basename(parse_url($u, PHP_URL_PATH));
+
+                return \Illuminate\Support\Facades\Http::response(null, 204);
+            }
+
+            return \Illuminate\Support\Facades\Http::response(['error' => ['message' => 'unexpected '.$u]], 500);
+        });
+
+        $this->artisan('backup:database')->assertSuccessful();
+
+        $this->assertStringStartsWith('iqs-', $uploaded[0]);
+        $this->assertSame('bk', $uploaded[1]); // the DB Backup folder
+        $this->assertSame(['f31', 'f32'], $deleted); // newest thirty kept
+        $this->assertTrue(cache('backup:drive')['ok']);
+        $this->actingAs($this->owner())->get('/health')->assertSee('server + Drive');
+
+        // Drive refuses: the backup itself still succeeds, health says the copy failed.
+        $refuse = true;
+        $this->artisan('backup:database')->assertSuccessful();
+        $this->assertFalse(cache('backup:drive')['ok']);
+        $this->get('/health')->assertSee('Drive copy failed');
+    }
+
     public function test_failed_dump_is_reported(): void
     {
         Process::fake(fn () => Process::result(errorOutput: 'Access denied', exitCode: 2));

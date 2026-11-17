@@ -18,7 +18,7 @@ class GoogleDriveService
 {
     public const SCOPE = 'openid email https://www.googleapis.com/auth/drive.file';
 
-    public const FOLDERS = ['root' => 'IQS CRM by T5', 'records' => 'Call Record', 'screenshots' => 'Call SS', 'riders' => 'Rider Calls'];
+    public const FOLDERS = ['root' => 'IQS CRM by T5', 'records' => 'Call Record', 'screenshots' => 'Call SS', 'riders' => 'Rider Calls', 'backups' => 'DB Backup'];
 
     private const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
@@ -75,7 +75,7 @@ class GoogleDriveService
             if ($this->download($drive, $file['id']) !== $body) {
                 throw new RuntimeException(__('The test file went up but came back different.'));
             }
-            $message = __('Drive works: a test file was put in ":f" and read back.', ['f' => self::FOLDERS['root']]);
+            $message = __('Drive works: a test file was put in ":f" and read back.', ['f' => self::rootName()]);
             $drive->update(['tested_at' => now(), 'test_ok' => true, 'test_message' => $message]);
 
             return $message;
@@ -101,6 +101,22 @@ class GoogleDriveService
         return ['id' => (string) $r->json('id'), 'name' => (string) $r->json('name')];
     }
 
+    /** Keep the newest $keep files of one of our folders, delete the older ones. Returns how many were deleted. */
+    public function keepNewest(GoogleDrive $drive, string $folder, int $keep): int
+    {
+        $parent = $this->folders($drive)[$folder] ?? throw new RuntimeException('Unknown folder.');
+        $r = $this->api($drive)->get('https://www.googleapis.com/drive/v3/files', [
+            'q' => "'{$parent}' in parents and trashed=false", 'orderBy' => 'createdTime desc', 'fields' => 'files(id)', 'pageSize' => 200,
+        ]);
+        $this->fail($r, 'Drive could not be read');
+        $old = array_slice(array_column($r->json('files') ?? [], 'id'), $keep);
+        foreach ($old as $id) {
+            $this->fail($this->api($drive)->delete('https://www.googleapis.com/drive/v3/files/'.rawurlencode($id)), 'Drive did not delete an old file');
+        }
+
+        return count($old);
+    }
+
     public function download(GoogleDrive $drive, string $fileId): string
     {
         $r = $this->api($drive)->get('https://www.googleapis.com/drive/v3/files/'.rawurlencode($fileId), ['alt' => 'media']);
@@ -116,14 +132,22 @@ class GoogleDriveService
         if (count(array_filter($have)) === count(self::FOLDERS)) {
             return $have;
         }
-        $root = $this->folder($drive, self::FOLDERS['root'], null);
-        $have = ['root' => $root];
+        // A folder added later (e.g. DB Backup) goes inside the root we already have; the root is looked up by
+        // name only on a first connect. Staging and production share one Google app, so names must differ.
+        $root = ($have['root'] ?? null) ?: $this->folder($drive, self::rootName(), null);
+        $have = ['root' => $root] + $have;
         foreach (array_diff_key(self::FOLDERS, ['root' => 1]) as $key => $name) {
-            $have[$key] = $this->folder($drive, $name, $root);
+            $have[$key] = ($have[$key] ?? null) ?: $this->folder($drive, $name, $root);
         }
         $drive->update(['folders' => $have]);
 
         return $have;
+    }
+
+    /** "IQS CRM by T5" on production; any other server gets its own name so the two never share a folder. */
+    public static function rootName(): string
+    {
+        return app()->environment('production') ? self::FOLDERS['root'] : self::FOLDERS['root'].' (staging)';
     }
 
     private function folder(GoogleDrive $drive, string $name, ?string $parent): string

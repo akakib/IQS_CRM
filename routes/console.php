@@ -16,7 +16,10 @@ Schedule::call(fn () => Cache::forever('schedule:last_run', now()->toIso8601Stri
 Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3')
     ->everyMinute()->withoutOverlapping(5);
 
-Schedule::command('backup:database')->dailyAt('03:00');
+// Run with proc_open allowed: the production account disables it, and a scheduled child process
+// does not inherit the cron's -d flag, so mysqldump could not start (same flag as the cron line).
+Schedule::exec(escapeshellarg(PHP_BINARY).' -d disable_functions= '.escapeshellarg(base_path('artisan')).' backup:database')
+    ->dailyAt('03:00')->name('backup:database');
 Schedule::command('data:trim-raw-payloads')->dailyAt('03:40');
 
 // Shop team end-of-day report on Telegram.

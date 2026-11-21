@@ -20,6 +20,7 @@ return [
     'appearance.font' => ['string', 'Figtree', 'Font', 'Appearance', ['required', 'string', 'max:40']],
     'store.logo' => ['string', '', 'Logo', 'Store', ['nullable', 'image', 'max:1024']],
 
+    'courier.name_prefix' => ['string', 'T_CRM', 'Written before the customer name on every parcel booked from here (e.g. T_CRM Rahim). Empty: the name only', 'Orders', ['nullable', 'string', 'max:20']],
     'orders.pickup_cutoffs' => ['json', ['15:00'], 'Courier pickup cut-off times', 'Orders', ['array', 'min:1', 'max:6']],
     'orders.packaging_cost' => ['decimal', 0, 'Packaging cost per order (৳)', 'Orders', ['required', 'numeric', 'min:0', 'max:100000']],
     'returns.alert_days' => ['int', 7, 'A returned parcel not back at the shop after this many days shows red (days)', 'Returns', ['required', 'integer', 'min:1', 'max:60']],

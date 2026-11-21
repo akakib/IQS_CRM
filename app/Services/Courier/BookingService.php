@@ -29,6 +29,8 @@ class BookingService
         $confirmed = OrderStatus::idFor('confirmed');
         $orders = Order::whereIn('id', $orderIds)->where('status_id', $confirmed)->get()->keyBy('order_no');
         $hotline = (string) settings('store.hotline');
+        // While the CRM is being tried out, parcels carry a mark before the name (Settings > Courier; empty: none).
+        $prefix = trim((string) settings('courier.name_prefix'));
         $result = ['booked' => [], 'failed' => [], 'kind' => []];
 
         // The courier takes each invoice once: after a deleted parcel the order is booked as IQ10007-2.
@@ -36,7 +38,7 @@ class BookingService
         $byInvoice = $invoices->flip();
         $requests = $orders->map(fn (Order $o) => new BookingRequest(
             invoice: $invoices[$o->order_no],
-            recipientName: $o->ship_name,
+            recipientName: $prefix !== '' ? $prefix.' '.$o->ship_name : $o->ship_name,
             recipientPhone: $o->ship_phone,
             recipientAddress: collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', '),
             codAmount: (float) $o->cod_amount,

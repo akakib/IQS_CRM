@@ -193,8 +193,8 @@ class HotlineTest extends TestCase
         $this->actingAs($this->agent)->get('/dashboard')->assertOk()
             ->assertSeeInOrder(['My orders today', '1'])->assertSeeInOrder(['I confirmed today', '1'])->assertSeeInOrder(['My delivery issues', '1'])
             ->assertDontSee('Open delivery issues')->assertSee('Waiting to be taken');
-        // The owner: the whole shop.
-        $this->actingAs($owner)->get('/dashboard')->assertSee('Orders today')->assertSee('Confirmed today')->assertSeeInOrder(['Open delivery issues', '2'])->assertDontSee('My orders today');
+        // The owner: the whole shop, live counts under Needs action now (today's counts are in the dated cards instead).
+        $this->actingAs($owner)->get('/dashboard')->assertSeeInOrder(['Needs action now', 'Open delivery issues', '2'])->assertDontSee('Confirmed today')->assertDontSee('My orders today');
     }
 
     public function test_the_dashboard_money_is_for_owner_and_manager_and_keeps_the_dates_until_clear(): void
@@ -204,7 +204,7 @@ class HotlineTest extends TestCase
 
         $owner = $this->owner();
         $this->actingAs($owner)->get('/dashboard')->assertOk()
-            ->assertSee('Profit after ads')->assertSee('With Steadfast, not paid yet')->assertSee('Orders by hour')->assertDontSee('?clear=1', false);
+            ->assertSeeInOrder(['Needs action now', 'How the business is doing', 'Profit after ads', 'Products and stock', 'Steadfast owes us'])->assertSee('Orders by hour');
         $this->assertSame(1, array_sum($this->get('/dashboard')->viewData('money')['hours'])); // the order made in setUp, today
 
         // Dates picked stay until Clear.
@@ -212,7 +212,6 @@ class HotlineTest extends TestCase
         $money = $this->get('/dashboard')->viewData('money');
         $this->assertSame(['2026-01-01', '2026-01-31'], [$money['from'], $money['to']]);
         $this->assertCount(31, $money['days']);
-        $this->get('/dashboard?from=2026-01-01')->assertSee('?clear=1', false);
         $this->get('/dashboard?clear=1')->assertDontSee('2026-01-31');
         $this->assertSame(today()->toDateString(), $this->get('/dashboard')->viewData('money')['from']);
     }

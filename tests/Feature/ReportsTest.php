@@ -174,7 +174,7 @@ class ReportsTest extends TestCase
             $this->actingAs($owner)->get(route('analysis.index', ['group' => $g]))->assertOk()->assertSee('Profit before ads');
         }
         $this->get(route('kpi.index'))->assertOk()->assertSee('Mahim');
-        $this->get(route('dashboard'))->assertOk()->assertSee('Orders today');
+        $this->get(route('dashboard'))->assertOk()->assertSee('Orders arrived');
 
         $viewer = User::factory()->create();
         $viewer->roles()->attach($this->role(['analysis.view'], ['profit'], 'Viewer')->id);

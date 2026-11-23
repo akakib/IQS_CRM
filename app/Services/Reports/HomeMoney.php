@@ -33,6 +33,29 @@ class HomeMoney
             'paidOut' => (float) DB::table('courier_payouts')->whereBetween('paid_on', [$from, $to])->sum(DB::raw('total_collected - total_charge')),
             'advance' => (float) DB::table('order_payments')->where('payment_type', 'advance')->where('status', 'verified')->whereBetween('verified_at', $range)->sum('amount'),
             ...$this->arrivals($from, $to, $range),
+            ...$this->products($from, $to),
+        ];
+    }
+
+    /**
+     * Products and stock: the items in orders confirmed in the dates (most money first), and what is out of stock
+     * now (newest first). Ten each, with a photo. Three queries.
+     */
+    private function products(string $from, string $to): array
+    {
+        $selling = DB::table('order_items as i')->joinSub($this->sales->stage('confirmed', $from, $to), 's', 's.order_id', '=', 'i.order_id')
+            ->join('product_variants as v', 'v.id', '=', 'i.variant_id')->join('products as p', 'p.id', '=', 'v.product_id')
+            ->groupBy('i.variant_id', 'p.name', 'v.name', 'p.image_url')
+            ->selectRaw('p.name, v.name as variant, p.image_url, COUNT(DISTINCT i.order_id) as orders, SUM(i.line_total) as money')
+            ->orderByDesc('money')->limit(10)->get();
+
+        $out = DB::table('product_variants as v')->join('products as p', 'p.id', '=', 'v.product_id')
+            ->where('v.availability_status', 'out_of_stock')->where('p.status', 'active');
+
+        return [
+            'selling' => $selling,
+            'outCount' => (clone $out)->count(),
+            'out' => $out->orderByDesc('v.oos_marked_at')->orderByDesc('v.id')->limit(10)->get(['p.name', 'v.name as variant', 'p.image_url', 'v.oos_marked_at']),
         ];
     }
 

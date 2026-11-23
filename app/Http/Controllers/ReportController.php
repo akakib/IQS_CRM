@@ -25,12 +25,18 @@ class ReportController extends Controller
         $sales = app(\App\Services\Reports\SalesReport::class);
         $todayCount = fn (string $stage, ?int $userId = null) => $sales->count($stage, $today, $today, $userId);
         $tiles = [];
+        // Owner and Manager: the dated home (sales, profit, money). Their tiles become the live "Needs action now" list,
+        // so a tile counting today (the fifth item true) moves into the dated part instead.
+        $boss = $user->can('analysis.view') && $user->canSeeField('profit');
 
         if ($user->can('orders.view')) {
             $tiles[] = $shop
-                ? [__('Orders today'), DB::table('orders')->where('created_at', '>=', $today)->count(), route('orders.index'), null]
+                ? [__('Orders today'), DB::table('orders')->where('created_at', '>=', $today)->count(), route('orders.index'), null, true]
                 : [__('My orders today'), DB::table('orders')->where('created_at', '>=', $today)->where('moderator_id', $user->id)->count(), route('orders.index', ['tab' => 'mine']), null];
             $tiles[] = [__('Waiting to be taken (nobody has it)'), app(\App\Services\Orders\DeskService::class)->whereWaiting(DB::table('orders'))->count(), route('desk.index'), null];
+            if ($boss) {
+                $tiles[] = [__('On hold'), DB::table('orders')->where('status_id', OrderStatus::idFor('hold'))->count(), route('desk.index', ['tab' => 'hold']), null];
+            }
             if (! $shop && $user->can('orders.take')) {
                 // Their own orders parked for someone else: an advance to check, or an admin's yes (not in the line above: they are theirs).
                 $parked = DB::table('orders')->where('moderator_id', $user->id)->where('status_id', OrderStatus::idFor('hold'))
@@ -39,7 +45,7 @@ class ReportController extends Controller
                 $tiles[] = [__('My orders waiting for a check or admin'), $parked, route('desk.index', ['tab' => 'hold']), null];
             }
             $tiles[] = $shop
-                ? [__('Confirmed today'), $todayCount('confirmed'), null, null]
+                ? [__('Confirmed today'), $todayCount('confirmed'), null, null, true]
                 : [__('I confirmed today'), $todayCount('confirmed', $user->id), null, null];
             // The same issues as the list it opens: all of them for those who see all, else their own.
             $tiles[] = $user->can('orders.approve')
@@ -49,15 +55,17 @@ class ReportController extends Controller
         if ($user->can('packaging.view')) {
             // The packer's day: what is left to pack, what waits for the rider, returns to take in, items not found.
             $queue = app(\App\Services\Packaging\PackingQueue::class)->counts($user);
-            if (! $shop) {
+            if (! $shop || $boss) {
                 // The same number as "All" on the packaging page (repacks and new labels included, paused orders out).
                 $tiles[] = [__('To pack'), $queue['all'], route('packaging.index'), null];
             }
             // Edited after packing: red until it is packed again (handover refuses it meanwhile).
             $tiles[] = [__('Repack needed'), $queue['red'], route('packaging.index', ['show' => 'red']), $queue['red'] ? 'down' : null];
-            $tiles[] = [__('Packed today'), $todayCount('packed'), route('packaging.index'), null];
+            $tiles[] = [__('Packed today'), $todayCount('packed'), route('packaging.index'), null, true];
             if (! $shop) {
                 $tiles[] = [__('I packed today'), $todayCount('packed', $user->id), route('packaging.index'), null];
+            }
+            if (! $shop || $boss) {
                 $tiles[] = [__('Waiting for the rider'), DB::table('orders')->whereIn('status_id', OrderStatus::idsFor(['packed', 'ready_for_pickup']))->count(), route('handover.index'), null];
                 $tiles[] = [__('Returns to receive'), DB::table('orders')->whereIn('status_id', OrderStatus::idsFor(\App\Services\Packaging\ReturnService::STATES))->whereNull('return_received_at')->count(), route('returns.index'), null]; // as the Returns page counts it
                 $notFound = DB::table('stock_issue_reports')->where('status', 'open')->count();
@@ -66,7 +74,7 @@ class ReportController extends Controller
         }
         if ($user->can('orders.view')) {
             $tiles[] = $shop
-                ? [__('Delivered today'), $todayCount('delivered'), null, null]
+                ? [__('Delivered today'), $todayCount('delivered'), null, null, true]
                 : [__('My orders delivered today'), $todayCount('delivered', $user->id), null, null];
         }
         if ($user->can('points.manage')) {
@@ -94,7 +102,7 @@ class ReportController extends Controller
         // Money and when orders come in: Owner and Manager (whoever may open Analysis and see profit).
         // The dates stay as last picked until Clear; the first time it is today.
         $money = null;
-        if ($user->can('analysis.view') && $user->canSeeField('profit')) {
+        if ($boss) {
             if ($request->boolean('clear')) {
                 $request->session()->forget('dashboard.range');
             } elseif ($request->hasAny(['from', 'to'])) {
@@ -102,7 +110,8 @@ class ReportController extends Controller
             }
             [$from, $to] = $request->session()->get('dashboard.range', [$today, $today]);
             $money = app(\App\Services\Reports\HomeMoney::class)->build($from, $to) + ['from' => $from, 'to' => $to,
-                'picked' => $request->session()->has('dashboard.range'), 'seeCost' => $user->canSeeField('cost_price')];
+                'picked' => $request->session()->has('dashboard.range'), 'seeCost' => $user->canSeeField('cost_price'),
+                'greeting' => now()->hour < 12 ? __('Good morning') : (now()->hour < 17 ? __('Good afternoon') : __('Good evening'))];
         }
 
         return view('dashboard', ['tiles' => $tiles, 'myPoints' => $myPoints, 'outOfStock' => $outOfStock, 'money' => $money, 'myWorking' => DB::table('orders')->where('moderator_id', $user->id)

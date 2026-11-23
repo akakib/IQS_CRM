@@ -94,9 +94,9 @@ class WooOrderIntake
     /**
      * Website statuses that mean "this is an order" (the rest: pending, failed, cancelled, checkout-draft, trash).
      * The IQS main site gives a new checkout order "record-verified" (its order guard) and staff there mark
-     * "call-verified" after calling: both are real orders.
+     * "call-verified" after calling, and "paid-by-bkash" once the customer paid by bKash: all are real orders.
      */
-    private const PLACED = ['processing', 'on-hold', 'completed', 'record-verified', 'call-verified'];
+    private const PLACED = ['processing', 'on-hold', 'completed', 'record-verified', 'call-verified', 'paid-by-bkash'];
 
     /** Already called and verified on the website: confirmed here too when the checks passed, else a note for the desk. */
     private function calledOnWebsite(Order $order): void
@@ -109,6 +109,11 @@ class WooOrderIntake
         }
         try {
             $this->machine->transition($order, 'confirmed', null, 'webhook', null, $note);
+            // While the website still books its own called orders, the courier is not booked again from here.
+            if (! settings('courier.book_website_called')) {
+                DB::table('orders')->where('id', $order->id)->where('booking_state', 'queued')->update(['booking_state' => 'none']);
+                $this->orders->note($order, 'system', __('Booked on the website: not booked from here.'), null);
+            }
         } catch (Throwable $e) {
             $this->orders->note($order, 'system', $note.' '.__('Could not confirm it here: :m', ['m' => $e->getMessage()]), null);
         }

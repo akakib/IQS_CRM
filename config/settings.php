@@ -22,6 +22,7 @@ return [
 
     'courier.name_prefix' => ['string', 'T_CRM', 'Written before the customer name on every parcel booked from here (e.g. T_CRM Rahim). Empty: the name only', 'Orders', ['nullable', 'string', 'max:20']],
     'courier.test_address' => ['string', 'TEST ADDRESS', 'Sent as the address on every parcel booked from here, instead of the customer address. Empty: the real address', 'Orders', ['nullable', 'string', 'max:100']],
+    'courier.book_website_called' => ['bool', false, 'Book the courier for orders already called and verified on the website. Off while the website books them itself', 'Orders', ['boolean']],
     'orders.pickup_cutoffs' => ['json', ['15:00'], 'Courier pickup cut-off times', 'Orders', ['array', 'min:1', 'max:6']],
     'orders.packaging_cost' => ['decimal', 0, 'Packaging cost per order (৳)', 'Orders', ['required', 'numeric', 'min:0', 'max:100000']],
     'returns.alert_days' => ['int', 7, 'A returned parcel not back at the shop after this many days shows red (days)', 'Returns', ['required', 'integer', 'min:1', 'max:60']],

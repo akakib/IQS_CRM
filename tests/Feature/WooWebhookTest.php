@@ -273,6 +273,9 @@ class WooWebhookTest extends TestCase
         $called = Order::firstWhere('external_ref', '5002');
         $this->assertNotNull($called);
         $this->assertDatabaseHas('order_notes', ['order_id' => $called->id, 'note_type' => 'system']);
+        $this->assertNotSame('queued', $called->fresh()->booking_state); // the website books its own called orders
+        $this->send($this->payload(['id' => 5004, 'number' => '5004', 'billing' => ['phone' => '+8801712345673'], 'status' => 'paid-by-bkash', 'date_created' => '2026-11-17T19:30:00']))->assertOk();
+        $this->assertNotNull(Order::firstWhere('external_ref', '5004')); // paid by bKash: an order right away
 
         $this->send($this->payload(['id' => 5003, 'number' => '5003', 'billing' => ['phone' => '+8801712345672'], 'status' => 'call-verified', 'date_created' => '2026-11-17T18:15:37']))->assertOk();
         $this->assertNull(Order::firstWhere('external_ref', '5003')); // placed before IQS took website orders

@@ -82,6 +82,12 @@ class UserAccessController extends Controller
         ], ['reason.required' => __('Give a reason for temporary access.')]);
 
         $this->limitedTo($request, $user, Role::find($data['role_id']));
+        // The same role twice is one role shown twice: refused while the first one has not ended.
+        $has = DB::table('user_roles')->where('user_id', $user->id)->where('role_id', $data['role_id'])
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))->exists();
+        if ($has) {
+            return back()->withInput()->withErrors(['role_id' => __(':name already has this role.', ['name' => $user->name])]);
+        }
         $row = [
             'user_id' => $user->id,
             'role_id' => (int) $data['role_id'],

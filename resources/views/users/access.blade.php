@@ -14,7 +14,8 @@
     $inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none';
 @endphp
 
-<x-layouts.app :heading="__('Access: :name', ['name' => $user->name])">
+@php($current = collect($assignments)->reject(fn ($a) => $expired($a) || ($a->starts_at && \Illuminate\Support\Carbon::parse($a->starts_at)->isFuture()))->pluck('name')->unique()->join(', '))
+<x-layouts.app :heading="__('Access: :name', ['name' => $user->name]).' · '.($current !== '' ? $current : __('No role'))">
     <div class="mb-4">
         <a href="{{ route('users.index') }}" class="text-sm text-primary hover:underline">{{ __('Back to staff') }}</a>
     </div>

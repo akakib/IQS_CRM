@@ -52,8 +52,19 @@ class UserManagementTest extends TestCase
         DB::enableQueryLog();
         $this->get('/users?per_page=25')->assertOk();
 
-        // user + permissions (2) + count + select + location eager load + location options; list budget is 10
-        $this->assertLessThanOrEqual(8, count(DB::getQueryLog()));
+        // user + permissions (2) + count + select + location eager load + location options + roles of the page; list budget is 10
+        $this->assertLessThanOrEqual(9, count(DB::getQueryLog()));
+    }
+
+    public function test_a_role_shows_on_the_list_and_cannot_be_given_twice(): void
+    {
+        $staff = User::factory()->create(['name' => 'T5 TEST Rafi']);
+        $role = \App\Models\Role::create(['name' => 'T5 TEST Desk', 'system_key' => 't5_test_desk']);
+        $this->post("/users/{$staff->id}/access/roles", ['role_id' => $role->id])->assertSessionHasNoErrors();
+        $this->post("/users/{$staff->id}/access/roles", ['role_id' => $role->id])->assertSessionHasErrors('role_id');
+        $this->assertSame(1, DB::table('user_roles')->where('user_id', $staff->id)->count());
+        $this->get('/users')->assertOk()->assertSee($role->name);
+        $this->get("/users/{$staff->id}/access")->assertOk()->assertSee('T5 TEST Rafi · '.$role->name, false);
     }
 
     public function test_staff_can_be_added_and_can_log_in(): void

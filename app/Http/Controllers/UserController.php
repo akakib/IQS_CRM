@@ -41,8 +41,17 @@ class UserController extends Controller
             ->paginate($list->perPage)
             ->withQueryString();
 
+        // One query: each listed person's roles in force now (a temporary role that ended is left out).
+        $roles = DB::table('user_roles as ur')->join('roles as r', 'r.id', '=', 'ur.role_id')
+            ->whereIn('ur.user_id', $users->pluck('id'))->whereNull('r.deleted_at')
+            ->where(fn ($q) => $q->whereNull('ur.starts_at')->orWhere('ur.starts_at', '<=', now()))
+            ->where(fn ($q) => $q->whereNull('ur.expires_at')->orWhere('ur.expires_at', '>', now()))
+            ->orderBy('r.name')->get(['ur.user_id', 'r.name'])
+            ->groupBy('user_id')->map(fn ($rows) => $rows->pluck('name')->unique()->join(', '));
+
         return view('users.index', [
             'users' => $users,
+            'roles' => $roles,
             'list' => $list,
             'employmentOptions' => EmploymentType::options(),
             'locationOptions' => $this->locationOptions(),

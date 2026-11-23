@@ -22,6 +22,7 @@
             <x-slot:head>
                 <th><x-list.sort :list="$list" column="name">{{ __('Name') }}</x-list.sort></th>
                 <th><x-list.sort :list="$list" column="email">{{ __('Email') }}</x-list.sort></th>
+                <th>{{ __('Role') }}</th>
                 <th>{{ __('Phone') }}</th>
                 <th>{{ __('Type') }}</th>
                 <th>{{ __('Location') }}</th>
@@ -32,6 +33,7 @@
                 <tr>
                     <td class="font-medium text-gray-800">{{ $user->name }}</td>
                     <td class="text-gray-600">{{ $user->email }}</td>
+                    <td class="text-gray-600">{{ $roles[$user->id] ?? '-' }}</td>
                     <td class="text-gray-600">{{ $user->phone ?? '-' }}</td>
                     <td class="text-gray-600">{{ $user->employment_type?->label() ?? '-' }}</td>
                     <td class="text-gray-600">{{ $user->workLocation?->name ?? '-' }}</td>
@@ -43,7 +45,7 @@
 
         <x-list.cards>
             @foreach ($users as $user)
-                <x-record-card :title="$user->name" :subtitle="$user->email">
+                <x-record-card :title="$user->name" :subtitle="($roles[$user->id] ?? __('No role')).' · '.$user->email">
                     @if ($user->phone)<p class="text-sm text-gray-500">{{ $user->phone }}</p>@endif
                     <x-slot:badge><x-status-badge :active="$user->is_active" /></x-slot:badge>
                     <x-slot:footer>{{ collect([$user->employment_type?->label(), $user->workLocation?->name])->filter()->join(' · ') ?: '-' }}</x-slot:footer>

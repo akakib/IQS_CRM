@@ -38,7 +38,7 @@
                 try {
                     if (empty) { localStorage.removeItem(this.draftKey); this.draftAt = null; return }
                     localStorage.setItem(this.draftKey, JSON.stringify({ at: Date.now(), data: {
-                        channel: this.channel, chatChannel: this.chatChannel, byChat: this.byChat, adSource: this.adSource, sourceAuto: this.sourceAuto, phone: this.phone, name: this.name,
+                        channel: this.channel, chatChannel: this.chatChannel, byChat: this.byChat, paid: this.paid, phone: this.phone, name: this.name,
                         addressId: this.addressId, zoneId: this.zoneId, items: this.items, orderDiscount: this.orderDiscount,
                         payMethod: this.payMethod, payAmount: this.payAmount, plain } }));
                 } catch (e) {}
@@ -48,7 +48,7 @@
                 try { saved = JSON.parse(localStorage.getItem(this.draftKey) || 'null') } catch (e) {}
                 if (!saved || saved.sent || Date.now() - saved.at > 86400000) { this.forgetDraft(); return }
                 const d = saved.data;
-                ['channel', 'chatChannel', 'byChat', 'adSource', 'sourceAuto', 'phone', 'name', 'addressId', 'zoneId', 'items', 'orderDiscount', 'payMethod', 'payAmount'].forEach(k => { if (d[k] !== undefined) this[k] = d[k] });
+                ['channel', 'chatChannel', 'byChat', 'paid', 'phone', 'name', 'addressId', 'zoneId', 'items', 'orderDiscount', 'payMethod', 'payAmount'].forEach(k => { if (d[k] !== undefined) this[k] = d[k] });
                 this.$nextTick(() => {
                     Object.entries(d.plain || {}).forEach(([n, v]) => {
                         const el = this.field(n);
@@ -67,8 +67,13 @@
             channel: @js(old('channel', $chatChannel?->orderChannel() ?? (array_key_exists((string) request('channel'), \App\Models\Order::manualChannels()) ? request('channel') : ''))),
             chatChannel: @js((string) old('chat_channel_id', $chatChannel?->id ?? '')),
             byChat: @js((bool) $chatChannel),
-            {{-- Ad or organic: picked by hand; a customer with earlier orders starts on Repeat customer (still changeable). --}}
-            adSource: @js((string) old('ad_source', '')), sourceAuto: false,
+            {{-- Organic unless Paid ad is picked; a paid order counts as the ad of its platform (Instagram: Instagram Ad).
+                 An organic order of a customer with delivered parcels counts as Repeat customer. --}}
+            paid: @js(in_array(old('ad_source'), ['fb_ad', 'ig_ad', 'wa_ad', 'other'], true)), repeat: false,
+            get adSource() {
+                if (!this.paid) return this.repeat ? 'repeat' : 'organic';
+                return { messenger: 'fb_ad', comments: 'fb_ad', instagram: 'ig_ad', whatsapp: 'wa_ad' }[this.channel] || 'other';
+            },
             chatPlatforms: @js($chatChannels->mapWithKeys(fn ($c) => [(string) $c->id => $c->orderChannel()])->all()),
             {{-- A platform picked by hand: a chat of another platform is dropped; the only chat of this platform is picked. --}}
             pickPlatform(key) {
@@ -104,8 +109,7 @@
                     const r = await fetch(@js(route('customers.lookup')) + '?phone=' + phone, { headers: { Accept: 'application/json' } });
                     const d = await r.json();
                     this.customer = d.found ? d : null;
-                    if ((!this.adSource || this.sourceAuto) && d.found && d.delivered > 0) { this.adSource = 'repeat'; this.sourceAuto = true; }
-                    else if (this.sourceAuto && !(d.found && d.delivered > 0)) { this.adSource = ''; this.sourceAuto = false; }
+                    this.repeat = !!(d.found && d.delivered > 0);
                     {{-- The saved name and address fill in (still editable); another number replaces what was filled, never what was typed. --}}
                     if (d.found) {
                         if (!this.name || this.nameAuto) { this.name = d.name; this.nameAuto = true; }
@@ -178,16 +182,16 @@
                     @error('channel')<p class="-mt-2 mb-4 text-sm text-red-600">{{ $message }}</p>@enderror
                     {{-- Which number or page the customer wrote to: counted per channel in reports. --}}
                     <p class="mb-1 text-sm font-medium text-gray-700">{{ __('Source') }}</p>
-                    <div class="mb-4 flex flex-wrap gap-2">
-                        @foreach (\App\Models\Order::SOURCES as $key => $label)
-                            <button type="button" @click="adSource = @js($key); sourceAuto = false" class="rounded-full border px-3 py-1.5 text-sm"
-                                :class="adSource === @js($key) ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ __($label) }}</button>
-                        @endforeach
+                    <div class="mb-4 flex flex-wrap items-center gap-2">
+                        <button type="button" @click="paid = false" class="rounded-full border px-3 py-1.5 text-sm"
+                            :class="!paid ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ __('Organic') }}</button>
+                        <button type="button" @click="paid = true" class="rounded-full border px-3 py-1.5 text-sm"
+                            :class="paid ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'">{{ __('Paid ad') }}</button>
+                        <span x-show="!paid && repeat" x-cloak class="text-xs text-gray-500">{{ __('Repeat customer') }}</span>
                     </div>
-                    <p x-show="!adSource" class="-mt-2 mb-4 text-sm font-medium text-amber-700">{{ __('Pick how the customer found us.') }}</p>
                     @error('ad_source')<p class="-mt-2 mb-4 text-sm text-red-600">{{ $message }}</p>@enderror
                     {{-- Which ad: the code in the ad's ready message (e.g. AD12), when the customer's first message has one. --}}
-                    <label x-show="adSource.endsWith('_ad')" x-cloak class="mb-4 block text-sm font-medium text-gray-700">{{ __('Ad code (optional)') }}
+                    <label x-show="paid" x-cloak class="mb-4 block text-sm font-medium text-gray-700">{{ __('Ad code (optional)') }}
                         <input name="ad_code" value="{{ old('ad_code') }}" maxlength="100" placeholder="AD12" class="{{ $input }} mt-1 sm:w-72">
                     </label>
                     @if ($chatChannels->isNotEmpty())

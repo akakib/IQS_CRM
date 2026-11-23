@@ -184,7 +184,7 @@ class OrderHttpTest extends TestCase
     public function test_an_order_made_by_hand_needs_its_source_and_keeps_the_ad_code(): void
     {
         $line = ['channel' => 'whatsapp', 'phone' => '01812345674', 'name' => 'Karim', 'address_line' => 'House 2', 'items' => [['variant_id' => $this->variant->id, 'qty' => 1]]];
-        $this->actingAs($this->agent)->get('/orders/create')->assertOk()->assertSee('Source')->assertSee('WhatsApp Ad')->assertSee('Repeat customer');
+        $this->actingAs($this->agent)->get('/orders/create')->assertOk()->assertSee('Source')->assertSee('Organic')->assertSee('Paid ad')->assertDontSee('WhatsApp Ad');
         $this->post('/orders', $line)->assertSessionHasErrors('ad_source');
         $this->post('/orders', $line + ['ad_source' => 'tv'])->assertSessionHasErrors('ad_source');
         $this->post('/orders', $line + ['ad_source' => 'wa_ad', 'ad_code' => ' AD12 '])->assertRedirect();

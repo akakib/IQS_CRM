@@ -197,6 +197,26 @@ class HotlineTest extends TestCase
         $this->actingAs($owner)->get('/dashboard')->assertSee('Orders today')->assertSee('Confirmed today')->assertSeeInOrder(['Open delivery issues', '2'])->assertDontSee('My orders today');
     }
 
+    public function test_the_dashboard_money_is_for_owner_and_manager_and_keeps_the_dates_until_clear(): void
+    {
+        // The moderator: no money on their home.
+        $this->actingAs($this->agent)->get('/dashboard')->assertOk()->assertDontSee('Profit after ads')->assertDontSee('Orders by hour');
+
+        $owner = $this->owner();
+        $this->actingAs($owner)->get('/dashboard')->assertOk()
+            ->assertSee('Profit after ads')->assertSee('With Steadfast, not paid yet')->assertSee('Orders by hour')->assertDontSee('?clear=1', false);
+        $this->assertSame(1, array_sum($this->get('/dashboard')->viewData('money')['hours'])); // the order made in setUp, today
+
+        // Dates picked stay until Clear.
+        $this->get('/dashboard?from=2026-01-01&to=2026-01-31')->assertOk();
+        $money = $this->get('/dashboard')->viewData('money');
+        $this->assertSame(['2026-01-01', '2026-01-31'], [$money['from'], $money['to']]);
+        $this->assertCount(31, $money['days']);
+        $this->get('/dashboard?from=2026-01-01')->assertSee('?clear=1', false);
+        $this->get('/dashboard?clear=1')->assertDontSee('2026-01-31');
+        $this->assertSame(today()->toDateString(), $this->get('/dashboard')->viewData('money')['from']);
+    }
+
     public function test_parcel_status_and_rider_calls_find_the_parcel_the_same_way(): void
     {
         $this->actingAs($this->owner());

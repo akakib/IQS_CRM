@@ -91,7 +91,21 @@ class ReportController extends Controller
                 ->paginate(20, ['id', 'product_id', 'name', 'sku', 'oos_marked_at'], 'oos_page')->withQueryString()->fragment('out-of-stock');
         }
 
-        return view('dashboard', ['tiles' => $tiles, 'myPoints' => $myPoints, 'outOfStock' => $outOfStock, 'myWorking' => DB::table('orders')->where('moderator_id', $user->id)
+        // Money and when orders come in: Owner and Manager (whoever may open Analysis and see profit).
+        // The dates stay as last picked until Clear; the first time it is today.
+        $money = null;
+        if ($user->can('analysis.view') && $user->canSeeField('profit')) {
+            if ($request->boolean('clear')) {
+                $request->session()->forget('dashboard.range');
+            } elseif ($request->hasAny(['from', 'to'])) {
+                $request->session()->put('dashboard.range', $this->range($request));
+            }
+            [$from, $to] = $request->session()->get('dashboard.range', [$today, $today]);
+            $money = app(\App\Services\Reports\HomeMoney::class)->build($from, $to) + ['from' => $from, 'to' => $to,
+                'picked' => $request->session()->has('dashboard.range'), 'seeCost' => $user->canSeeField('cost_price')];
+        }
+
+        return view('dashboard', ['tiles' => $tiles, 'myPoints' => $myPoints, 'outOfStock' => $outOfStock, 'money' => $money, 'myWorking' => DB::table('orders')->where('moderator_id', $user->id)
             ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified']))->get(['id', 'order_no', 'ship_name'])]);
     }
 

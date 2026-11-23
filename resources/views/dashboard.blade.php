@@ -50,6 +50,10 @@
         </div>
     @endif
 
+    @if ($money)
+        @include('dashboard._money')
+    @endif
+
     <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
         @foreach ($tiles as [$label, $value, $href, $trend])
             <x-stat-tile :label="$label" :value="number_format($value)" :href="$href" :trend="$trend" />

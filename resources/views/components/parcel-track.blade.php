@@ -29,7 +29,7 @@
 @if ($s)
     <div {{ $attributes->class([$flat ? '' : 'rounded-xl border border-gray-200 bg-white p-4']) }}>
         <div class="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-            <span class="font-semibold text-gray-900">{{ __('Parcel') }} <span class="font-mono font-normal text-gray-600">{{ __('CN') }} {{ $s->consignment_id ?? '-' }}</span></span>
+            <span class="font-semibold text-gray-900">{{ __('Parcel') }} <x-consignment-link :cn="$s->consignment_id" :courier="$s->courier" class="font-normal text-gray-600" /></span>
             <span class="text-xs text-gray-500">{{ __('last change :t', ['t' => \Illuminate\Support\Carbon::parse($s->updated_at)->format('d M, g:i A')]) }}</span>
         </div>
         <div class="mt-2 flex flex-wrap items-center gap-2">

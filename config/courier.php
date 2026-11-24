@@ -12,5 +12,7 @@ return [
         'api_key' => env('STEADFAST_API_KEY'),
         'secret_key' => env('STEADFAST_SECRET_KEY'),
         'webhook_token' => env('STEADFAST_WEBHOOK_TOKEN'),
+        // The parcel's own page in the Steadfast merchant panel; the consignment id goes on the end.
+        'consignment_url' => 'https://steadfast.com.bd/user/consignment/',
     ],
 ];

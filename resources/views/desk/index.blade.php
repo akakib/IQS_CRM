@@ -327,6 +327,8 @@
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
                                     <x-courier-word :status="$detail['parcel']->courier_status ?? null" :courier="$detail['parcel']->courier ?? null" />
+                                    {{-- Once booked: the CN, opening the parcel in the Steadfast panel. --}}
+                                    @if ($detail['consignment'])<x-consignment-link :cn="$detail['consignment']" :courier="$detail['parcel']->courier" class="font-medium" />@endif
                                     {{-- Who has it (and who packs it): shown to managers and whenever it is not the viewer's own order. --}}
                                     @if (! $embed && ($order->moderator_id !== auth()->id() || auth()->user()->can('orders.reassign')))
                                         <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-0.5 pr-2 text-xs text-gray-700" title="{{ __('Assigned to') }}">
@@ -445,7 +447,7 @@
                                 @elseif ($order->booking_state === 'failed')
                                     <p class="font-medium text-red-700">{{ __('Courier booking failed: :e', ['e' => $order->booking_error]) }}</p>
                                 @else
-                                    <p class="text-gray-700">{{ __('CN :cn', ['cn' => $detail['consignment'] ?? '-']) }} · {{ __('in the packaging queue since :t', ['t' => $order->packaging_sent_at?->format('g:i A') ?? '-']) }}</p>
+                                    <p class="text-gray-700"><x-consignment-link :cn="$detail['consignment']" :courier="$detail['parcel']->courier ?? null" /> · {{ __('in the packaging queue since :t', ['t' => $order->packaging_sent_at?->format('g:i A') ?? '-']) }}</p>
                                     <p class="mt-2 flex items-center gap-2 font-medium text-gray-900">
                                         @if ($order->packer)<x-avatar :name="$order->packer->name" :photo="$order->packer->photo_path" size="sm" />@endif
                                         <span>

@@ -76,8 +76,10 @@
             <x-stat-tile soft :label="__('Cost per order')" :value="$confirmedN ? $tk($pl['ad_cost'] / $confirmedN) : '-'" :hint="$confirmedN ? __('Ad spend per confirmed order') : __('No confirmed orders')" />
         </div>
 
-        <div class="mt-4 grid gap-4 lg:grid-cols-2">
-            {{-- Orders per day (per month past two months). One series: the title names it; hover a column for its number. --}}
+        @php($oneDay = count($money['days']) < 2)
+        <div class="mt-4 grid gap-4 {{ $oneDay ? '' : 'lg:grid-cols-2' }}">
+            {{-- Orders per day (per month past two months), only when there is more than one; one day is the hour chart alone. --}}
+            @unless ($oneDay)
             <div x-data="{ tip: null }">
                 <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                     <p class="text-sm text-gray-600">{{ $money['monthly'] ? __('Orders by month') : __('Orders by day') }}</p>
@@ -93,9 +95,10 @@
                 </div>
                 <div class="mt-1 flex justify-between text-[11px] text-gray-500">
                     <span>{{ $money['days'][0]['label'] ?? '' }}</span>
-                    @if (count($money['days']) > 1)<span>{{ last($money['days'])['label'] }}</span>@endif
+                    <span>{{ last($money['days'])['label'] }}</span>
                 </div>
             </div>
+            @endunless
 
             {{-- Orders per hour of the day. --}}
             <div x-data="{ tip: null }">

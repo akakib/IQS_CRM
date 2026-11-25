@@ -32,7 +32,7 @@
 
 <x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="__('Order management')">
 <div @iqs-pulse.window="follow($event.detail.mine)" x-data="{
-        reasonMode: null, reason: null,
+        reasonMode: null, reason: null, holdDate: null,
         // Live list: when the orders in their hand change (one given, taken back, a call due), the tabs and the list
         // update by themselves. Nothing open: the page reloads. An order open (maybe mid-typing): only the list and
         // tabs are swapped, the open order stays as it is.
@@ -78,6 +78,12 @@
         },
     }" @keydown.window="keys($event)" @desk-cancel-wrong.window="wrongNumber({{ (int) array_search('Wrong number', $reasons['cancel'] ?? []) }})">
 
+    {{-- An action that did not go through says why (the hold limit has its own box with "Ask your manager"). --}}
+    @if ($errors->any() && ! $errors->has('hold_limit'))
+        <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            @foreach (array_unique($errors->all()) as $message)<p>{{ $message }}</p>@endforeach
+        </div>
+    @endif
     {{-- New orders: nobody picks; "Take next" always gives the oldest one. --}}
     @unless ($embed)
     <div @class(['mb-4 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
@@ -622,7 +628,7 @@
                                 @endforeach
                             </div>
                             @if ($mode === 'hold')
-                                <div class="mt-3"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Follow-up date')" full-width /></div>
+                                <div class="mt-3" @date-change="holdDate = $event.detail"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Follow-up date (needed)')" full-width /></div>
                             @endif
                             @if ($mode === 'hold')
                                 <div x-data="{ need: @js($holdNeedsNote ?? []) }">
@@ -639,7 +645,7 @@
                             @endif
                             <div class="mt-4 flex gap-2">
                                 <button type="button" @click="reasonMode = null" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">{{ __('Back') }}</button>
-                                <button type="submit" :disabled="!reason" class="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 {{ $mode === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary-dark' }}">{{ $mode === 'cancel' ? __('Cancel the order') : __('Put on hold') }}</button>
+                                <button type="submit" :disabled="!reason{{ $mode === 'hold' ? ' || !holdDate' : '' }}" class="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 {{ $mode === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary-dark' }}">{{ $mode === 'cancel' ? __('Cancel the order') : __('Put on hold') }}</button>
                             </div>
                         </form>
                     </div>

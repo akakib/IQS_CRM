@@ -17,11 +17,15 @@
         .small { font-size: 10px; }
         .cod { font-size: 22px; font-weight: 800; text-align: right; line-height: 1; }
         .cod span { display: block; font-size: 9px; font-weight: 600; }
+        /* The courier's CN: the biggest thing on the label, the whole number on one line, so the courier never misreads it. */
+        .cn { margin-top: 3px; border: 2px solid #000; border-radius: 4px; padding: 1px 6px; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+        .cn span { font-size: 10px; font-weight: 700; }
+        .cn b { font-family: Arial, Helvetica, sans-serif; font-size: 27px; font-weight: 800; letter-spacing: 1px; line-height: 1.1; white-space: nowrap; }
         .to { margin-top: 4px; font-size: 12px; line-height: 1.25; }
         .to b { font-size: 13px; }
         .items { font-size: 9px; margin-top: 3px; color: #222; max-height: 0.42in; overflow: hidden; }
         .codes { margin-top: auto; text-align: center; }
-        .codes svg { width: 100%; height: 0.62in; }
+        .codes svg { width: 100%; height: 0.46in; }
         .bc-text { font-family: monospace; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
         @media print { body { background: #fff; } .toolbar { display: none; } .label { margin: 0; } }
     </style>
@@ -37,10 +41,11 @@
                 <div>
                     <div class="store">{{ settings('store.label_name') }}</div>
                     @if (settings('store.hotline'))<div class="small">{{ __('Rider hotline') }}: <b>{{ settings('store.hotline') }}</b></div>@endif
-                    <div class="small">{{ $l ? ucfirst($l->courier).' CN '.$l->consignment_id : __('Not booked') }}</div>
+                    @unless ($l)<div class="small">{{ __('Not booked') }}</div>@endunless
                 </div>
                 <div class="cod"><span>COD</span>৳{{ number_format((float) ($l->cod_on_label ?? $o->cod_amount)) }}</div>
             </div>
+            @if ($l)<div class="cn"><span>{{ ucfirst($l->courier) }} CN</span><b>{{ $l->consignment_id }}</b></div>@endif
             <div class="to">
                 <b>{{ $o->ship_name }}</b> · {{ $o->ship_phone }}{{ $o->ship_alt_phone ? ' / '.$o->ship_alt_phone : '' }}<br>
                 {{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}

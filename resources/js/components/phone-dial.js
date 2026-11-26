@@ -36,17 +36,25 @@ export default function phoneDial(phone, orderId = null, urls = {}) {
             if (!this.orderId) return;
             this.$watch('sheet', (open) => { if (!open && !this.saving) this.thenConfirm = false; });
             // Back on this order with its call not saved yet: the panel comes back.
+            // Only the person who started it, and only while the server says it is still to be saved
+            // (saved on another device, or the order already moved on there: forgotten here too).
             try {
                 const live = JSON.parse(localStorage.getItem(LIVE) || 'null');
-                if (live && live.item === 'o' + this.orderId) {
-                    this.after = true; this.sheet = true; this.callId = live.callId || null; this.startedAt = live.started;
+                if (live && live.item === 'o' + this.orderId && (!live.user || live.user === urls.user)) {
+                    fetch(urls.live + '?call=' + (live.callId || '') + '&order=' + this.orderId, { headers: { Accept: 'application/json' } })
+                        .then((r) => (r.ok ? r.json() : { open: true }))
+                        .then((d) => {
+                            if (d.open) { this.after = true; this.sheet = true; this.callId = live.callId || null; this.startedAt = live.started; }
+                            else { try { localStorage.removeItem(LIVE); } catch {} }
+                        })
+                        .catch(() => {});
                 }
             } catch {}
         },
 
         live() {
             try {
-                localStorage.setItem(LIVE, JSON.stringify({ item: 'o' + this.orderId, name: urls.name || this.phone, url: location.pathname + location.search, started: this.startedAt, callId: this.callId }));
+                localStorage.setItem(LIVE, JSON.stringify({ item: 'o' + this.orderId, name: urls.name || this.phone, url: location.pathname + location.search, started: this.startedAt, callId: this.callId, user: urls.user, live: urls.live }));
             } catch {}
         },
 

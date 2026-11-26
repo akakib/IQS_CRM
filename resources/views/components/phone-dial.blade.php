@@ -14,7 +14,7 @@
     $faces = [0 => '😠', 25 => '🙁', 50 => '😐', 75 => '🙂', 100 => '😍'];
 @endphp
 
-<div x-data="phoneDial({{ \Illuminate\Support\Js::from($visible ? $phone : '') }}, {{ \Illuminate\Support\Js::from($orderId) }}, {{ \Illuminate\Support\Js::from(['start' => route('customer-calls.start'), 'finish' => route('customer-calls.finish', 0), 'proof' => 'proof-order-'.$orderId, 'name' => $name, 'talked' => $talked]) }})" @call-then-confirm.window="askConfirm()" {{ $attributes }}>
+<div x-data="phoneDial({{ \Illuminate\Support\Js::from($visible ? $phone : '') }}, {{ \Illuminate\Support\Js::from($orderId) }}, {{ \Illuminate\Support\Js::from(['start' => route('customer-calls.start'), 'finish' => route('customer-calls.finish', 0), 'proof' => 'proof-order-'.$orderId, 'name' => $name, 'talked' => $talked, 'user' => auth()->id(), 'live' => route('customer-calls.live')]) }})" @call-then-confirm.window="askConfirm()" {{ $attributes }}>
     @if ($visible)
         <a href="tel:{{ $phone }}" @click="started()" class="block font-mono text-xl font-semibold tracking-wide text-gray-900 hover:text-primary">{{ $phone }}</a>
         @if ($alt)<a href="tel:{{ $alt }}" @click="started()" class="block font-mono text-sm text-gray-500 hover:text-primary">{{ $alt }}</a>@endif

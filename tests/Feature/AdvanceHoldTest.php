@@ -182,6 +182,19 @@ class AdvanceHoldTest extends TestCase
         $this->assertNotSame('record_verified', $this->key($order));
     }
 
+    public function test_the_not_saved_call_bar_goes_once_the_call_is_done_on_another_device_or_by_someone_else(): void
+    {
+        $order = $this->web(3);
+        $this->next()->assertSessionHasNoErrors();
+        $call = $this->postJson('/customer-calls', ['order_id' => $order->id])->json('id');
+        $this->getJson("/customer-calls/live?call={$call}&order={$order->id}")->assertJson(['open' => true]);
+        // Someone else on the same PC or phone: not their call.
+        $this->actingAs($this->mod2)->getJson("/customer-calls/live?call={$call}&order={$order->id}")->assertJson(['open' => false]);
+        // Confirmed on another device (the call itself never saved here): the bar goes.
+        $this->actingAs($this->mod)->post("/desk/{$order->id}/act", ['action' => 'confirm', 'lock_version' => $order->fresh()->lock_version])->assertSessionHasNoErrors();
+        $this->getJson("/customer-calls/live?call={$call}&order={$order->id}")->assertJson(['open' => false]);
+    }
+
     public function test_paid_during_the_call_goes_straight_to_booking_no_second_call(): void
     {
         $held = $this->web(9);

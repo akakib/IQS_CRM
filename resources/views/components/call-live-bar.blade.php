@@ -1,15 +1,27 @@
 {{-- A call started and not saved yet follows the caller to every page, with its clock, until it is saved.
-     The call's page writes it to this browser (localStorage iqs-call-live: { item, name, url, started }) and
-     removes it on Save. Not shown on the call's own page, which has its own bar. Nothing goes to the server. --}}
+     The call's page writes it to this browser (localStorage iqs-call-live: { item, name, url, started, callId, user })
+     and removes it on Save. Not shown on the call's own page, which has its own bar. Only for the person who started
+     it (a shared PC or phone), and every 30 s the server is asked if it is still to be saved: saved on another device,
+     or the order already confirmed, held or cancelled there, and it goes away here too. --}}
 <div x-data="{
-        c: null, now: Date.now(), sure: false,
+        c: null, now: Date.now(), sure: false, me: {{ \Illuminate\Support\Js::from(auth()->id()) }}, checked: 0,
+        check() {
+            if (! this.c || Date.now() - this.checked < 30000) return;
+            this.checked = Date.now();
+            const order = String(this.c.item || '').replace(/^o/, '');
+            fetch({{ \Illuminate\Support\Js::from(route('customer-calls.live')) }} + '?call=' + (this.c.callId || '') + '&order=' + order, { headers: { Accept: 'application/json' } })
+                .then((r) => r.ok ? r.json() : { open: true })
+                .then((d) => { if (! d.open) this.discard() })
+                .catch(() => {});
+        },
         {{-- Discard: a call that cannot be finished (its order is gone, or it was never really made) stops following. --}}
         discard() { try { localStorage.removeItem('iqs-call-live') } catch (e) {} this.c = null; this.sure = false },
         init() { this.read(); setInterval(() => { this.now = Date.now(); this.read() }, 1000) },
         read() {
             try {
                 const v = JSON.parse(localStorage.getItem('iqs-call-live') || 'null');
-                this.c = v && v.url && Date.now() - v.started < 4 * 3600000 && v.url !== location.pathname + location.search ? v : null;
+                this.c = v && v.url && Date.now() - v.started < 4 * 3600000 && v.url !== location.pathname + location.search && (! v.user || v.user === this.me) ? v : null;
+                this.check();
             } catch (e) { this.c = null }
         },
         clock() { const s = this.c ? Math.max(0, Math.round((this.now - this.c.started) / 1000)) : 0; return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') },

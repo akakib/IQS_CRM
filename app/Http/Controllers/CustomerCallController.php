@@ -24,6 +24,23 @@ use Illuminate\View\View;
  */
 class CustomerCallController extends Controller
 {
+
+    /**
+     * Is this call still to be saved by this person? The yellow "not saved" bar (call-live-bar, phone-dial) asks, so a
+     * call saved on another device, or an order already confirmed, held or cancelled there, stops following them.
+     * Read-only: nothing changes here.
+     */
+    public function live(Request $request): JsonResponse
+    {
+        $data = $request->validate(['call' => ['nullable', 'integer'], 'order' => ['nullable', 'integer']]);
+        $user = $request->user()->id;
+        $call = ! empty($data['call']) ? DB::table('customer_calls')->where('id', $data['call'])->first(['user_id', 'outcome', 'order_id']) : null;
+        $orderId = $call->order_id ?? ($data['order'] ?? null);
+        $stillCalling = $orderId && in_array(OrderStatus::map()[DB::table('orders')->where('id', $orderId)->value('status_id')]['key'] ?? '', ['new', 'record_verified', 'no_answer', 'hold'], true);
+        $open = $stillCalling && (! $call || ((int) $call->user_id === $user && $call->outcome === null));
+
+        return response()->json(['open' => $open]);
+    }
     public const OUTCOMES = ['answered' => 'Talked', 'no_answer' => 'No answer', 'busy' => 'Busy or off', 'wrong' => 'Wrong number'];
 
     public const REASONS_IN = ['new_order' => 'Wants to order', 'question' => 'About an order', 'complaint' => 'Complaint', 'other' => 'Other'];

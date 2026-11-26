@@ -50,16 +50,12 @@ class DeskController extends Controller
             // Asking for the advance is a call too: an advance hold (not yet allowed without) sits in Call, not On hold.
             // (Asked an admin to go without the advance: nothing to call now, it waits in On hold until the answer.)
             'call' => ['(status_id = ? OR (status_id = ? AND (next_call_at IS NULL OR next_call_at <= ?)) OR (status_id = ? AND hold_reason_id = ? AND advance_waived_at IS NULL AND advance_waiver_requested_at IS NULL AND NOT EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0)))',
-                [$s('record_verified'), $s('no_answer'), $now, $s('hold'), $advanceReason]],            'again' => ['(status_id = ? AND next_call_at > ?)', [$s('no_answer'), $now]],
+                [$s('record_verified'), $s('no_answer'), $now, $s('hold'), $advanceReason]],
+            'again' => ['(status_id = ? AND next_call_at > ?)', [$s('no_answer'), $now]],
             'hold' => ['(status_id = ? AND (NOT (COALESCE(hold_reason_id, 0) = ? AND advance_waived_at IS NULL) OR advance_waiver_requested_at IS NOT NULL OR EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0)))', [$s('hold'), $advanceReason]],
             'send' => ["(status_id = ? AND booking_state IN ('none', 'failed'))", [$s('confirmed')]], // Booking failed (shown only when there is one)
             'packaging' => ["((status_id = ? AND booking_state = 'queued') OR status_id IN (?, ?, ?))", [$s('confirmed'), ...$packaging]],
         ];
-
-        // Held for stock by the system: a call to make (substitute, cancel or hold with a date), so Call, not On hold.
-        $stockCall = $this->desk->stockCallSql('orders');
-        $where['call'][0] = "({$where['call'][0]} OR {$stockCall})";
-        $where['hold'][0] = "({$where['hold'][0]} AND NOT {$stockCall})";
 
         $select = [];
         $bindings = [];
@@ -90,7 +86,7 @@ class DeskController extends Controller
             ->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('orders.id')
             ->forPage($page, self::PER_PAGE)
             ->get(['orders.id', 'order_no', 'external_ref', 'ship_name', 'ship_thana', 'ship_district', 'grand_total', 'channel', 'status_id', 'orders.created_at', 'assigned_at',
-                'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'advance_waiver_requested_at', DB::raw('EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0) as waiting_check'), 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packer_id', 'packed_at',
+                'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'advance_waiver_requested_at', DB::raw('EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0) as waiting_check'), DB::raw(\App\Services\Orders\OrderService::stockIssueSql('orders').' as stock_issue'), 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packer_id', 'packed_at',
                 'pk.name as packer_name', 'pk.photo_path as packer_photo']);
         $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ['tab' => $tab]]);
 
@@ -371,7 +367,7 @@ class DeskController extends Controller
                     : __('No response saved. It will come back to your Call tab.');
                 break;
             case 'hold':
-                $this->desk->checkHold($user, $order, $data['hold_expected_date'] ?? null);
+                $this->desk->checkHold($user, $order, $data['hold_expected_date'] ?? null, isset($data['reason_id']) ? (int) $data['reason_id'] : null);
                 $this->machine->transition($order, 'hold', $user, 'user', $reason, $note);
                 $order->forceFill(['hold_expected_date' => $data['hold_expected_date'], 'hold_note' => $note, 'hold_note_by' => $user->id, 'hold_note_at' => now()])->save();
                 $message = __(':no is on hold.', ['no' => $order->order_no]);

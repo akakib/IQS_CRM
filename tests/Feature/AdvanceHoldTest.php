@@ -151,28 +151,34 @@ class AdvanceHoldTest extends TestCase
         $this->assertContains($held->id, collect($this->getJson('/desk/pulse')->json('mine'))->pluck('id')->all());
     }
 
-    public function test_a_stock_hold_by_the_system_is_given_out_like_a_new_order_and_sits_in_call(): void
+    public function test_stock_out_is_an_orange_flag_not_a_hold_and_needs_an_admin_to_be_confirmed(): void
     {
         $order = $this->web(3);
         app(\App\Services\Orders\AvailabilityEffects::class)->changed($this->variant->id, 'in_stock', 'out_of_stock');
-        $this->assertSame('hold', $this->key($order));
-        $this->assertNull($order->fresh()->moderator_id);
-        // Waiting like any new order, and Take next gives it.
-        $this->assertSame(1, app(DeskService::class)->whereWaiting(DB::table('orders'))->count());
+        $this->variant->update(['availability_status' => 'out_of_stock']);
+        // Not held: it stays where it was and waits to be taken like any order.
+        $this->assertSame('record_verified', $this->key($order));
         $this->next()->assertRedirect("/desk?tab=call&order={$order->id}");
-        $this->assertSame($this->mod->id, $order->fresh()->moderator_id);
-        // In Call, not On hold; it fills the hand until they act on it.
-        $this->get('/desk?tab=call')->assertSee($order->order_no);
-        $this->get('/desk?tab=hold')->assertDontSee($order->order_no);
-        $this->assertSame(1, app(DeskService::class)->inHand($this->mod->id));
-        // The customer will wait: Resume, then Hold with a date. Now it is their own hold (On hold) and the hand is free.
-        $this->post("/desk/{$order->id}/act", ['action' => 'resume', 'lock_version' => $order->fresh()->lock_version])->assertSessionHasNoErrors();
-        $this->post("/desk/{$order->id}/act", ['action' => 'hold', 'reason_id' => DB::table('status_reasons')->where('system_key', 'stock_out')->value('id'),
-            'hold_expected_date' => today()->addDay()->toDateString(), 'note' => 'Customer will wait', 'lock_version' => $order->fresh()->lock_version])->assertSessionHasNoErrors();
+        $this->get("/desk?tab=call&order={$order->id}")->assertSee('Out of stock in T5 CRM')->assertSee('Ask admin: send without stock');
+
+        // The moderator cannot confirm it.
+        $this->post("/desk/{$order->id}/act", ['action' => 'confirm', 'lock_version' => $order->fresh()->lock_version])->assertSessionHasErrors('status');
+        $this->assertSame('record_verified', $this->key($order));
+
+        // They may hold it without a date, outside their hold limit.
+        $stock = (int) DB::table('status_reasons')->where('system_key', 'stock_out')->value('id');
+        $this->post("/desk/{$order->id}/act", ['action' => 'hold', 'reason_id' => $stock, 'lock_version' => $order->fresh()->lock_version])->assertSessionHasNoErrors();
+        $this->assertSame('hold', $this->key($order));
         $this->get('/desk?tab=hold')->assertSee($order->order_no);
-        $this->get('/desk?tab=call')->assertDontSee($order->order_no);
-        $this->assertSame(0, app(DeskService::class)->inHand($this->mod->id));
-        $this->assertSame(0, app(DeskService::class)->whereWaiting(DB::table('orders'))->count());
+
+        // Back to Call, ask an admin; once allowed, it can be confirmed.
+        $this->post("/desk/{$order->id}/act", ['action' => 'resume', 'lock_version' => $order->fresh()->lock_version])->assertSessionHasNoErrors();
+        $this->post("/orders/{$order->id}/stock-waiver", ['why' => 'Arrives today from the warehouse'])->assertSessionHasNoErrors();
+        $this->assertNotNull($order->fresh()->stock_waiver_requested_at);
+        $this->actingAs($this->admin)->post("/orders/{$order->id}/stock-waiver/decide", ['decision' => 'allow'])->assertSessionHasNoErrors();
+        $this->assertNotNull($order->fresh()->stock_waived_at);
+        $this->actingAs($this->mod)->post("/desk/{$order->id}/act", ['action' => 'confirm', 'lock_version' => $order->fresh()->lock_version])->assertSessionHasNoErrors();
+        $this->assertNotSame('record_verified', $this->key($order));
     }
 
     public function test_paid_during_the_call_goes_straight_to_booking_no_second_call(): void

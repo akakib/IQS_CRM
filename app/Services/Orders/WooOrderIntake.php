@@ -183,10 +183,10 @@ class WooOrderIntake
             $this->orders->note($order, 'system', __('Website total was ৳:w, IQS computed ৳:i. Please check.', ['w' => $p['total'], 'i' => $order->grand_total]), null);
         }
 
-        // Sync delay: an item that is out of stock here goes straight to Hold.
+        // Sync delay: an item that is out of stock here is not held: the order goes through Verify and Call with an
+        // orange flag, and it cannot be confirmed unless the item is swapped or an admin allows it (OrderStateMachine).
         if ($outOfStock) {
-            $reason = DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'stock_out')->value('id');
-            $this->machine->transition($order, 'hold', null, 'system', $reason, __('Out of stock: :i', ['i' => implode(', ', $outOfStock)]));
+            $this->orders->note($order, 'system', __('Out of stock in T5 CRM: :i. Swap it, hold the order, or ask an admin.', ['i' => implode(', ', $outOfStock)]), null);
         }
 
         return $order;

@@ -117,6 +117,8 @@ class Order extends Model
             'taken_back_at' => 'datetime',
             'advance_waiver_requested_at' => 'datetime',
             'advance_waived_at' => 'datetime',
+            'stock_waiver_requested_at' => 'datetime',
+            'stock_waived_at' => 'datetime',
             'advance_hold_since' => 'datetime',
             'advance_reminded_at' => 'datetime',
             'hold_date_notified_at' => 'datetime',

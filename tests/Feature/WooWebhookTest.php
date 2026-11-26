@@ -321,15 +321,17 @@ class WooWebhookTest extends TestCase
         $this->assertSame(1, Order::count());
     }
 
-    public function test_out_of_stock_item_puts_the_order_on_hold(): void
+    public function test_out_of_stock_item_flags_the_order_but_does_not_hold_it(): void
     {
         ProductVariant::where('sku', 'CASH-250')->update(['availability_status' => 'out_of_stock']);
 
         $this->send($this->payload())->assertOk();
 
         $order = Order::firstWhere('external_ref', '5001');
-        $this->assertSame('hold', OrderStatus::map()[$order->status_id]['key']);
-        $this->assertSame('stock_out', DB::table('status_reasons')->where('id', $order->hold_reason_id)->value('system_key'));
+        $this->assertNotSame('hold', OrderStatus::map()[$order->status_id]['key']); // it goes through Verify and Call (orange flag)
+        $this->assertNotEmpty(app(\App\Services\Orders\OrderService::class)->stockIssues($order));
+        $this->assertDatabaseHas('order_notes', ['order_id' => $order->id, 'note_type' => 'system']);
+        $this->assertTrue(DB::table('order_notes')->where('order_id', $order->id)->where('body', 'like', 'Out of stock in T5 CRM:%')->exists());
     }
 
     public function test_unknown_product_fails_visibly_and_can_be_retried(): void

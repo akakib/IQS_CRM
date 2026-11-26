@@ -231,7 +231,7 @@ class OrderController extends Controller
             return back()->with('success', __(':no waits in On hold for the payment check, then goes to booking by itself.', ['no' => $order->order_no]));
         }
         if ($data['to'] === 'hold') {
-            app(\App\Services\Orders\DeskService::class)->checkHold($user, $order, $data['hold_expected_date'] ?? null);
+            app(\App\Services\Orders\DeskService::class)->checkHold($user, $order, $data['hold_expected_date'] ?? null, isset($data['reason_id']) ? (int) $data['reason_id'] : null);
         }
         $this->machine->transition($order, $data['to'], $user, 'user', $data['reason_id'] ?? null, $data['note'] ?? null, (int) $data['lock_version']);
         if ($data['to'] === 'hold' && ! empty($data['hold_expected_date'])) {
@@ -371,6 +371,24 @@ class OrderController extends Controller
         $this->orders->decideAdvanceWaiver($order, $request->user(), $data['decision'] === 'allow');
 
         return back()->with('success', $data['decision'] === 'allow' ? __(':no goes on without advance.', ['no' => $order->order_no]) : __(':no keeps waiting for the advance.', ['no' => $order->order_no]));
+    }
+
+    /** Out of stock or pre-order: the moderator asks an admin to let it be confirmed without the stock. */
+    public function askStockWaiver(Order $order, Request $request): RedirectResponse
+    {
+        $this->authorizeWork($order, $request->user());
+        $data = $request->validate(['why' => ['required', 'string', 'min:5', 'max:300']]);
+        $this->orders->requestStockWaiver($order, $request->user(), $data['why']);
+
+        return back()->with('success', __('Asked. You get a notice when an admin decides.'));
+    }
+
+    public function decideStockWaiver(Order $order, Request $request): RedirectResponse
+    {
+        $data = $request->validate(['decision' => ['required', 'in:allow,refuse']]);
+        $this->orders->decideStockWaiver($order, $request->user(), $data['decision'] === 'allow');
+
+        return back()->with('success', $data['decision'] === 'allow' ? __(':no may be confirmed without stock.', ['no' => $order->order_no]) : __(':no needs the stock first.', ['no' => $order->order_no]));
     }
 
     public function edit(Order $order, Request $request): View

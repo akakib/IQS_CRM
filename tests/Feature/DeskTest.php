@@ -1122,7 +1122,8 @@ class DeskTest extends TestCase
         // + expired-timer check (2), extra-time count (1), the due-booking check (1), the Steadfast snapshot (1)
         // the advance-hold reason id (1: advance holds are counted in the Call tab), the advance holds waiting (1)
         // and the orders in hand (2: active + uncalled advance holds), the first-open mark (1), the Chat button (1: has a channel?)
-        $this->assertLessThanOrEqual(23, count(DB::getQueryLog()));
+        // + the stock hold reasons (1: Hold needs no date for stock) and the open order's stock check (1: orange box)
+        $this->assertLessThanOrEqual(25, count(DB::getQueryLog()));
         DB::disableQueryLog();
 
         $this->get('/desk/control')->assertForbidden();

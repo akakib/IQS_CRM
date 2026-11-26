@@ -36,6 +36,16 @@ class AvailabilityEffects
             ->orderBy('id')->get();
 
         foreach ($orders as $order) {
+            // Not confirmed yet: no hold. It stays in Verify or Call with the orange flag and cannot be confirmed
+            // until the item is swapped or an admin allows it; the person who has it is told.
+            if (in_array(OrderStatus::map()[$order->status_id]['key'], ['new', 'record_verified', 'no_answer'], true)) {
+                $this->orders->note($order, 'system', $to === 'backorder' ? __('An item became pre-order: swap it, hold the order, or ask an admin.') : __('An item went out of stock: swap it, hold the order, or ask an admin.'), null);
+                $this->notifications->send('order_held_for_stock', __(':no: an item is out of stock', ['no' => $order->order_no]), null, [
+                    'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => array_filter([$order->moderator_id]), 'only' => true,
+                ]);
+
+                continue;
+            }
             $wasBooked = OrderStatus::map()[$order->status_id]['key'] === 'ready_for_packaging';
             $this->machine->transition($order, 'hold', null, 'system', $reasonId, $to === 'backorder' ? __('Item became pre-order') : __('Item went out of stock'));
             if ($wasBooked) {

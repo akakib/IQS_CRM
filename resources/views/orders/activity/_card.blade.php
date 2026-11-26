@@ -10,13 +10,16 @@
         || ($left !== null && $left <= 120)
         || $o->booking_state === 'failed';
     $repack = $o->packed_version && $o->packed_version < $o->current_version && in_array($key, ['packed', 'ready_for_pickup'], true);
+    $red = $late || $repack || $o->cod_pending || $key === 'cancelled';
+    $stock = ! $red && ($o->stock_issue ?? false) && in_array($key, ['new', 'record_verified', 'no_answer', 'hold'], true); // orange, not red
 @endphp
 
 <button type="button" @click="$dispatch('open-order', {{ $o->id }}); $dispatch('order-no', @js($o->order_no))"
     @class([
         'block w-full cursor-pointer rounded-xl border bg-white p-3 text-left shadow-sm transition hover:border-primary hover:shadow',
-        'border-red-300 ring-1 ring-red-200' => $late || $repack || $o->cod_pending || $key === 'cancelled',
-        'border-gray-200' => ! $late && ! $repack && ! $o->cod_pending && $key !== 'cancelled',
+        'border-red-300 ring-1 ring-red-200' => $red,
+        'border-orange-300 ring-1 ring-orange-200' => $stock,
+        'border-gray-200' => ! $red && ! $stock,
     ])>
     <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
@@ -36,6 +39,8 @@
             <span class="font-medium text-red-700">{{ __('COD changed: update it at the courier') }}</span>
         @elseif ($repack)
             <span class="font-medium text-red-700">{{ __('Edited after packing: repack') }}</span>
+        @elseif ($stock)
+            <span class="font-medium text-orange-700">{{ __('Stock out: swap, hold or ask an admin') }}</span>
         @elseif (in_array($key, ['new', 'record_verified', 'no_answer'], true) && ! $o->moderator_id)
             <span class="text-gray-600">{{ __('Waiting for someone to take it') }}</span>
         @elseif (in_array($key, ['new', 'record_verified', 'no_answer'], true) && $left !== null)

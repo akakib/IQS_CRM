@@ -32,7 +32,7 @@
 
 <x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="__('Order management')">
 <div @iqs-pulse.window="follow($event.detail.mine)" x-data="{
-        reasonMode: null, reason: null, holdDate: null,
+        reasonMode: null, reason: null, holdDate: null, stockReasons: @js(app(\App\Services\Orders\DeskService::class)->stockReasonIds()),
         // Live list: when the orders in their hand change (one given, taken back, a call due), the tabs and the list
         // update by themselves. Nothing open: the page reloads. An order open (maybe mid-typing): only the list and
         // tabs are swapped, the open order stays as it is.
@@ -262,7 +262,7 @@
                     @endif
                     <a href="{{ $url(['tab' => $tab, 'page' => $list->currentPage() > 1 ? $list->currentPage() : null, 'order' => $row->id]) }}" data-row data-current="{{ $current ? 1 : 0 }}"
                         @class(['flex items-center justify-between gap-2 border-b border-l-4 border-b-gray-100 px-4 py-3 last:border-b-0 hover:bg-gray-50',
-                            'border-l-primary bg-primary-soft/60' => $current, 'border-l-transparent' => ! $current])>
+                            'border-l-primary bg-primary-soft/60' => $current, 'border-l-orange-400 bg-orange-50' => ! $current && $row->stock_issue, 'border-l-transparent' => ! $current && ! $row->stock_issue])>
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $row->ship_name }}</span>
                             <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }} · {{ \App\Models\Order::sourceLabel($row) }}</span>
@@ -288,6 +288,7 @@
                             @else
                                 <span class="text-xs text-gray-400">{{ $age($row->assigned_at ?? $row->created_at) }}</span>
                             @endif
+                            @if ($row->stock_issue && $tab !== 'packaging')<span class="mt-0.5 block text-[11px] font-medium text-orange-700">{{ __('Stock out') }}</span>@endif
                             @if ($row->no_response_count && $tab !== 'packaging')<span class="mt-0.5 block text-[11px] text-amber-700">{{ __('Try :n', ['n' => $row->no_response_count + 1]) }}</span>@endif
                         </span>
                     </a>
@@ -320,6 +321,7 @@
                 <x-courier-cancel :order="$order" />
                 <x-take-back :order="$order" class="mb-3" />
                 <x-advance-wait :order="$order" />
+                <x-stock-issue :order="$order" />
                 {{-- Opened from Order activity: where the parcel is, in the courier's words, and its tracking link. --}}
                 @if ($embed)<x-parcel-track :order="$order" class="mb-3" />@endif
 
@@ -628,7 +630,8 @@
                                 @endforeach
                             </div>
                             @if ($mode === 'hold')
-                                <div class="mt-3" @date-change="holdDate = $event.detail"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Follow-up date (needed)')" full-width /></div>
+                                <div class="mt-3" @date-change="holdDate = $event.detail"><x-date-input name="hold_expected_date" :min="now()->toDateString()" :placeholder="__('Follow-up date (needed)')" full-width />
+                                    <p x-show="stockReasons.includes(reason)" x-cloak class="mt-1 text-xs text-gray-500">{{ __('No date needed for stock: it comes back when the stock does.') }}</p></div>
                             @endif
                             @if ($mode === 'hold')
                                 <div x-data="{ need: @js($holdNeedsNote ?? []) }">
@@ -645,7 +648,7 @@
                             @endif
                             <div class="mt-4 flex gap-2">
                                 <button type="button" @click="reasonMode = null" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">{{ __('Back') }}</button>
-                                <button type="submit" :disabled="!reason{{ $mode === 'hold' ? ' || !holdDate' : '' }}" class="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 {{ $mode === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary-dark' }}">{{ $mode === 'cancel' ? __('Cancel the order') : __('Put on hold') }}</button>
+                                <button type="submit" :disabled="!reason{{ $mode === 'hold' ? ' || (!holdDate && !stockReasons.includes(reason))' : '' }}" class="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 {{ $mode === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary-dark' }}">{{ $mode === 'cancel' ? __('Cancel the order') : __('Put on hold') }}</button>
                             </div>
                         </form>
                     </div>

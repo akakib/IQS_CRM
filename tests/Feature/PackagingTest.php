@@ -481,7 +481,11 @@ class PackagingTest extends TestCase
             'items' => [['variant_id' => $this->dates->id, 'qty' => 1]]], $this->desk);
         $sm->transition($chat, 'record_verified', null, 'rule');
         $this->actingAs($this->desk)->post('/products/availability', ['ids' => [$this->dates->id], 'status' => 'out_of_stock']);
-        $this->assertSame(['hold', 'hold'], [$this->key($web), $this->key($chat)]); // held before anyone confirmed
+        // Not confirmed yet: not held by the system (orange flag instead); the moderator holds them for the stock.
+        $this->assertSame(['new', 'record_verified'], [$this->key($web), $this->key($chat)]);
+        $stockOut = (int) DB::table('status_reasons')->where('system_key', 'stock_out')->value('id');
+        $sm->transition($web->fresh(), 'hold', $this->desk, 'user', $stockOut);
+        $sm->transition($chat->fresh(), 'hold', $this->desk, 'user', $stockOut);
 
         // Order management offers what ending the hold will do: the chat order goes on, the website order is called first.
         $this->get(route('desk.index', ['order' => $chat->id]))->assertSee('Send to packaging')->assertDontSee('Resume, call next');

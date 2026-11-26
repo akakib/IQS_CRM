@@ -400,6 +400,50 @@ class OrderService
     }
 
     /**
+     * Items of this order that are out of stock or pre-order here (name => 'out_of_stock' | 'backorder').
+     * Such an order cannot be confirmed (go to packaging) unless an admin allows it (stock_waived_at).
+     *
+     * @return array<string, string>
+     */
+    public function stockIssues(Order $order): array
+    {
+        return DB::table('order_items as i')->join('product_variants as v', 'v.id', '=', 'i.variant_id')
+            ->where('i.order_id', $order->id)->whereIn('v.availability_status', ['out_of_stock', 'backorder'])
+            ->pluck('v.availability_status', 'i.name_snapshot')->all();
+    }
+
+    /** One SQL condition for lists (orange flag): the order has an item that is out of stock or pre-order. */
+    public static function stockIssueSql(string $alias = 'orders'): string
+    {
+        return "EXISTS (SELECT 1 FROM order_items si JOIN product_variants sv ON sv.id = si.variant_id WHERE si.order_id = {$alias}.id AND sv.availability_status IN ('out_of_stock', 'backorder'))";
+    }
+
+    public function requestStockWaiver(Order $order, User $by, string $why): void
+    {
+        $order->forceFill(['stock_waiver_requested_at' => now(), 'stock_waiver_requested_by' => $by->id, 'stock_waiver_note' => $why])->save();
+        $this->note($order, 'system', __('Asked an admin to send it without stock: :w', ['w' => $why]), $by);
+        app(\App\Services\NotificationService::class)->send('payment_to_check', __('Without stock? :no', ['no' => $order->order_no]),
+            __(':n asks: :w (:i)', ['n' => $by->name, 'w' => $why, 'i' => implode(', ', array_keys($this->stockIssues($order)))]), [
+                'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'priority' => 'urgent',
+                'user_ids' => app(DeskService::class)->managerIds(),
+            ]);
+    }
+
+    /** An admin allows (the order may be confirmed and go to packaging) or refuses (swap, hold or cancel it). */
+    public function decideStockWaiver(Order $order, User $by, bool $allow): void
+    {
+        $asker = $order->stock_waiver_requested_by;
+        $order->forceFill($allow ? ['stock_waived_by' => $by->id, 'stock_waived_at' => now(), 'stock_waiver_requested_at' => null] : ['stock_waiver_requested_at' => null])->save();
+        $this->note($order, 'system', $allow ? __('Allowed without stock by :n: it may be confirmed.', ['n' => $by->name]) : __('Without stock refused by :n: swap the item, hold or cancel.', ['n' => $by->name]), $by);
+        if ($asker && $asker !== $by->id) {
+            app(\App\Services\NotificationService::class)->send('payment_to_check', $allow ? __('Allowed without stock: :no', ['no' => $order->order_no]) : __('Stock still needed: :no', ['no' => $order->order_no]),
+                $allow ? __(':n allowed it. You can confirm it now.', ['n' => $by->name]) : __(':n refused. Swap the item, hold or cancel.', ['n' => $by->name]), [
+                    'link' => route('orders.show', $order), 'subject' => ['order', $order->id], 'user_ids' => [$asker], 'only' => true,
+                ]);
+        }
+    }
+
+    /**
      * Where an order on hold goes when the hold ends (advance allowed, stock back, Resume): Confirmed when it was
      * confirmed before the hold, or when it was taken in a chat or call (confirmed in that talk) and nothing asks
      * for a person first (a rule's manual review, the same customer's open order). Else Call: a website order

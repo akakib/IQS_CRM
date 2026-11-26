@@ -188,6 +188,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/advance-waiver', [OrderController::class, 'askWaiver'])->middleware('can:orders.edit')->name('orders.advance-waiver');
     Route::post('/orders/{order}/advance-waiver/self', [OrderController::class, 'selfWaiver'])->middleware('can:orders.edit')->name('orders.advance-waiver.self');
     Route::post('/orders/{order}/advance-waiver/decide', [OrderController::class, 'decideWaiver'])->middleware('can:orders.approve')->name('orders.advance-waiver.decide');
+    Route::post('/orders/{order}/stock-waiver', [OrderController::class, 'askStockWaiver'])->middleware('can:orders.edit')->name('orders.stock-waiver');
+    Route::post('/orders/{order}/stock-waiver/decide', [OrderController::class, 'decideStockWaiver'])->middleware('can:orders.approve')->name('orders.stock-waiver.decide');
     Route::get('/order-search', [\App\Http\Controllers\OrderSearchController::class, 'index'])->name('orders.search'); // every staff member
 
     // Call lists: managers make and give them; callers work the ones given to them.

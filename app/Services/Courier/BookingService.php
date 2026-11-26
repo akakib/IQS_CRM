@@ -40,7 +40,8 @@ class BookingService
         $byInvoice = $invoices->flip();
         $requests = $orders->map(fn (Order $o) => new BookingRequest(
             invoice: $invoices[$o->order_no],
-            recipientName: $prefix !== '' ? $prefix.' '.$o->ship_name : $o->ship_name,
+            // A mark ending in "_" joins the name (crm_Name); any other mark is followed by a space (T_CRM Name).
+            recipientName: $prefix === '' ? $o->ship_name : (str_ends_with($prefix, '_') ? $prefix : $prefix.' ').$o->ship_name,
             recipientPhone: $o->ship_phone,
             recipientAddress: $testAddress !== '' ? $testAddress : collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', '),
             codAmount: (float) $o->cod_amount,

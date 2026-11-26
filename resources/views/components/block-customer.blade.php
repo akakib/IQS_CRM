@@ -19,7 +19,7 @@
             <span class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">{{ __('Blocked') }}@if ($c->blocked_reason) · {{ $c->blocked_reason }}@endif</span>
             @if ($canBlock)
                 <form method="POST" action="{{ route('orders.unblock', $order) }}" id="unblock-{{ $order->id }}">@csrf</form>
-                <button type="button" @click="$dispatch('open-confirm', { id: 'unblock-confirm-{{ $order->id }}', form: 'unblock-{{ $order->id }}', label: @js($c->primary_phone) })"
+                <button type="button" @click="$dispatch('open-confirm', { id: 'unblock-confirm-{{ $order->id }}', form: 'unblock-{{ $order->id }}', label: @js($c->primary_phone ?: $order->ship_phone) })"
                     class="lockable rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:border-primary hover:text-primary">{{ __('Unblock') }}</button>
                 <x-confirm-modal :id="'unblock-confirm-'.$order->id" :verb="__('Unblock')" :danger="false"
                     :message="$web ? __('New orders from this customer go on as usual, here and on the website.') : __('New orders from this customer go on as usual.')" />
@@ -35,7 +35,7 @@
                     <input type="hidden" name="reason" :value="why">
                     <input type="hidden" name="cancel" :value="cancel ? 1 : 0">
                     <input type="hidden" name="cancel_reason_id" :value="cwhy">
-                    <h3 class="text-sm font-semibold text-gray-800">{{ __('Block :p?', ['p' => $c->primary_phone]) }}</h3>
+                    <h3 class="text-sm font-semibold text-gray-800">{{ __('Block :p?', ['p' => $c->primary_phone ?: $order->ship_phone]) }}</h3>
                     <p class="mt-0.5 text-xs text-gray-500">{{ $web ? __('New orders from this customer stop here and on the website.') : __('New orders from this customer stop here for a person to check.') }}</p>
 
                     <p class="mt-3 text-xs font-medium text-gray-600">{{ __('Why block?') }}</p>

@@ -1,3 +1,21 @@
+@php
+    // A page that is not in the menu (an order, a customer, an Edit page...): on a phone and tablet the menu button
+    // becomes Back, to the page you came from, or to its list when the page was opened from a link.
+    // Tabs beside a menu page (Payments > COD, Products > Categories...) count as menu pages: they keep the menu button.
+    $menuRoutes = [...collect(config('menu'))->flatMap(fn ($g) => array_column($g[1], 1))->all(),
+        'cod.index', 'refunds.index', 'calls-report.index', 'riders-report.index', 'categories.index', 'products.import', 'settings.couriers', 'settings.google-drive', 'settings.tracking'];
+    $routeName = request()->route()?->getName();
+    $backUrl = null;
+    if ($routeName && ! in_array($routeName, $menuRoutes, true)) {
+        $parent = ['calls.work' => 'calls.mine', 'journey.show' => 'customers.index', 'journey.index' => 'customers.index', 'breaks.reasons' => 'desk.control', 'hold-limits.index' => 'desk.control'][$routeName] ?? null;
+        for ($parts = explode('.', $routeName); ! $parent && count($parts) > 1; ) {
+            array_pop($parts);
+            $base = implode('.', $parts);
+            $parent = collect([$base, $base.'.index'])->first(fn ($r) => in_array($r, $menuRoutes, true));
+        }
+        $backUrl = route($parent ?? 'dashboard');
+    }
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -35,8 +53,14 @@
     <div class="app-main flex min-w-0 flex-1 flex-col transition-[margin] duration-200 lg:ml-[260px]">
         <header class="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 sm:px-4">
             <div class="flex min-w-0 items-center gap-2 sm:gap-3">
+                @if ($backUrl)
+                    <a href="{{ $backUrl }}" @click="if (document.referrer.startsWith(location.origin + '/') && history.length > 1) { $event.preventDefault(); history.back() }"
+                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100 lg:hidden" aria-label="{{ __('Back') }}" title="{{ __('Back') }}">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                    </a>
+                @endif
                 <button type="button" @click="menu()"
-                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100" aria-label="{{ __('Menu') }}" title="{{ __('Show or hide the menu') }}">
+                    class="{{ $backUrl ? 'max-lg:hidden ' : '' }}flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100" aria-label="{{ __('Menu') }}" title="{{ __('Show or hide the menu') }}">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
                 <h1 class="truncate text-base font-semibold text-gray-800">{{ $heading ?? '' }}</h1>

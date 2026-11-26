@@ -373,6 +373,27 @@ class OrderController extends Controller
         return back()->with('success', $data['decision'] === 'allow' ? __(':no goes on without advance.', ['no' => $order->order_no]) : __(':no keeps waiting for the advance.', ['no' => $order->order_no]));
     }
 
+    /** Block the customer from this order (and cancel it, and block on the website): owner and managers. */
+    public function block(Order $order, Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', Rule::in(\App\Services\Customers\CustomerBlocker::REASONS)],
+            'types' => ['nullable', 'array'], 'types.*' => [Rule::in(['phone', 'device', 'ip'])],
+            'days' => ['nullable', Rule::in(['0', '7', '30', 0, 7, 30])],
+            'cancel' => ['nullable', 'boolean'],
+            'cancel_reason_id' => [Rule::requiredIf(fn () => $request->boolean('cancel') && ! OrderStatus::map()[$order->status_id]['final']), 'nullable', 'integer'],
+            'note' => ['nullable', 'string', 'max:200'],
+        ]);
+        $data['cancel'] = $request->boolean('cancel');
+
+        return back()->with('success', app(\App\Services\Customers\CustomerBlocker::class)->block($order, $request->user(), $data));
+    }
+
+    public function unblock(Order $order, Request $request): RedirectResponse
+    {
+        return back()->with('success', app(\App\Services\Customers\CustomerBlocker::class)->unblock($order, $request->user()));
+    }
+
     /** Out of stock or pre-order: the moderator asks an admin to let it be confirmed without the stock. */
     public function askStockWaiver(Order $order, Request $request): RedirectResponse
     {

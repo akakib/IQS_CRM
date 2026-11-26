@@ -195,6 +195,34 @@ class AdvanceHoldTest extends TestCase
         $this->getJson("/customer-calls/live?call={$call}&order={$order->id}")->assertJson(['open' => false]);
     }
 
+    public function test_block_from_an_order_blocks_here_cancels_and_blocks_on_the_website(): void
+    {
+        config(['store.woocommerce.url' => 'https://shop.test', 'store.woocommerce.key' => 'ck', 'store.woocommerce.secret' => 'cs']);
+        \Illuminate\Support\Facades\Http::fake([
+            'shop.test/wp-json/t5fob/v1/block' => \Illuminate\Support\Facades\Http::response(['blocked' => ['Phone (30 days)']]),
+            'shop.test/wp-json/t5fob/v1/unblock' => \Illuminate\Support\Facades\Http::response(['removed' => 1]),
+        ]);
+        $order = $this->web(3);
+        $order->forceFill(['external_ref' => '47900'])->save();
+        $cancel = (int) DB::table('status_reasons')->where('system_key', 'fake_order')->value('id');
+
+        // A moderator cannot block.
+        $this->actingAs($this->mod)->post("/orders/{$order->id}/block", ['reason' => 'Fake or prank order'])->assertForbidden();
+
+        $this->actingAs($this->admin)->get("/desk?order={$order->id}")->assertOk()->assertSee('Block');
+        $this->post("/orders/{$order->id}/block", ['reason' => 'Fake or prank order', 'types' => ['phone'], 'days' => 30, 'cancel' => 1, 'cancel_reason_id' => $cancel])
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertSame('blocked', $order->customer->fresh()->risk_level);
+        $this->assertSame('cancelled', $this->key($order));
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_ends_with($r->url(), 't5fob/v1/block') && $r['order_id'] === 47900 && $r['types'] === ['phone'] && $r['days'] === 30);
+        $this->assertTrue(DB::table('order_notes')->where('order_id', $order->id)->where('body', 'like', '%Website blocked: Phone (30 days)%')->exists());
+        $this->get("/desk?order={$order->id}")->assertSee('Blocked')->assertSee('Unblock');
+
+        $this->post("/orders/{$order->id}/unblock")->assertSessionHasNoErrors();
+        $this->assertSame('normal', $order->customer->fresh()->risk_level);
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_ends_with($r->url(), 't5fob/v1/unblock'));
+    }
+
     public function test_paid_during_the_call_goes_straight_to_booking_no_second_call(): void
     {
         $held = $this->web(9);

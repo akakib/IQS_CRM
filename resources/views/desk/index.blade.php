@@ -417,6 +417,7 @@
                                         <button class="lockable rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:border-primary hover:text-primary">{{ __('Check again') }}</button>
                                     </form>
                                 @endif
+                                <x-block-customer :order="$order" />
                             </div>
                             <div class="rounded-lg border border-gray-200 p-4">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Duplicate check') }}</p>

@@ -52,6 +52,25 @@ class WooApi
         return $response;
     }
 
+    /**
+     * POST to a route of the website's own plugins (e.g. t5fob/v1/block, Fake Order Guard), signed with the same
+     * WooCommerce keys; throws with the website's answer when it is not 2xx.
+     */
+    public function post(string $route, array $data): Response
+    {
+        $c = $this->config();
+        if (! $c) {
+            throw new RuntimeException(__('Website API keys are not set (Settings > Connections > Website).'));
+        }
+        $response = Http::withBasicAuth($c['key'], $c['secret'])->acceptJson()->timeout(30)
+            ->post(rtrim($c['url'], '/').'/wp-json/'.ltrim($route, '/'), $data);
+        if (! $response->successful()) {
+            throw new RuntimeException("Website API {$route}: HTTP {$response->status()} ".mb_substr(strip_tags((string) $response->body()), 0, 200));
+        }
+
+        return $response;
+    }
+
     /** How many products the website has (a cheap call that also proves the keys). */
     public function productCount(): int
     {

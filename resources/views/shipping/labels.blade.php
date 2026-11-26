@@ -47,7 +47,8 @@
             </div>
             @if ($l)<div class="cn"><span>{{ ucfirst($l->courier) }} CN</span><b>{{ $l->consignment_id }}</b></div>@endif
             <div class="to">
-                <b>{{ $o->ship_name }}</b> · {{ $o->ship_phone }}{{ $o->ship_alt_phone ? ' / '.$o->ship_alt_phone : '' }}<br>
+                {{-- No customer phone on the sticker (owner 2026-11-26): the courier has it from the booking. --}}
+                <b>{{ $o->ship_name }}</b><br>
                 {{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}
             </div>
             <div class="items">@foreach ($o->items as $i)<span>{{ $i->name_snapshot }}{{ ($s = \App\Support\Units::itemSize($i)) ? ' '.$s : '' }} <b>{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b>{{ $loop->last ? '' : ' · ' }}</span>@endforeach</div>

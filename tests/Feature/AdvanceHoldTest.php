@@ -223,6 +223,31 @@ class AdvanceHoldTest extends TestCase
         \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_ends_with($r->url(), 't5fob/v1/unblock'));
     }
 
+    public function test_advance_paid_on_an_out_of_stock_order_goes_to_call_not_to_booking(): void
+    {
+        $held = $this->web(9);
+        $this->actingAs($this->mod)->post('/desk/next');
+        $this->variant->update(['availability_status' => 'out_of_stock']);
+        $this->post("/orders/{$held->id}/payments", ['called' => 1, 'advance' => ['method_id' => $this->bkash(), 'amount' => (float) $held->advance_required, 'transaction_id' => 'STOCKPAY1']])
+            ->assertSessionHas('success');
+        $this->assertSame('record_verified', $this->key($held)); // not confirmed, not booked
+        $this->assertSame(0, DB::table('shipments')->where('order_id', $held->id)->count());
+        $this->assertTrue(DB::table('order_notes')->where('order_id', $held->id)->where('body', 'like', '%Advance received, but out of stock%')->exists());
+    }
+
+    public function test_an_admins_send_without_stock_ends_when_the_items_change(): void
+    {
+        $order = $this->web(3);
+        $this->variant->update(['availability_status' => 'out_of_stock']);
+        $this->actingAs($this->admin)->post("/orders/{$order->id}/stock-waiver/decide", ['decision' => 'allow'])->assertSessionHasNoErrors();
+        $this->assertNotNull($order->fresh()->stock_waived_at);
+        $reason = (int) DB::table('status_reasons')->where('reason_type', 'amendment')->value('id');
+        // Another quantity of the item: the permission (given for the old items) ends.
+        app(\App\Services\Orders\OrderEditor::class)->request($order->fresh(), ['items' => [['variant_id' => $this->variant->id, 'qty' => 2]]], $reason, $this->admin, $order->fresh()->lock_version);
+        $this->assertNull($order->fresh()->stock_waived_at);
+        $this->assertTrue(DB::table('order_notes')->where('order_id', $order->id)->where('body', 'like', '%no longer counts%')->exists());
+    }
+
     public function test_paid_during_the_call_goes_straight_to_booking_no_second_call(): void
     {
         $held = $this->web(9);

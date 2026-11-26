@@ -70,7 +70,7 @@ class OrderStateMachine
                 throw ValidationException::withMessages(['status' => __('This order needs ৳:a in advance (the delivery charge). Add the payment, or ask an admin to allow it without advance.', ['a' => number_format((float) $fresh->advance_required)])]);
             }
             // Out of stock or pre-order here: not to packaging unless an admin allowed it (or an admin confirms it).
-            if (in_array($source, ['user', 'webhook'], true) && $to['key'] === 'confirmed' && ! $fresh->stock_waived_at && ! $user?->can('orders.approve')
+            if (in_array($source, ['user', 'webhook', 'rule'], true) && $to['key'] === 'confirmed' && ! $fresh->stock_waived_at && ! $user?->can('orders.approve')
                 && ($short = app(OrderService::class)->stockIssues($fresh))) {
                 throw ValidationException::withMessages(['status' => __('Out of stock: :i. Swap it with Edit order, hold the order, or ask an admin to send it without stock.', ['i' => implode(', ', array_keys($short))])]);
             }

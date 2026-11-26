@@ -128,6 +128,8 @@ class OrderEditor
         $oldCod = (float) $order->cod_amount;
 
         $frozen = DB::table('order_items')->where('order_id', $order->id)->whereNotNull('cost_price_snapshot')->pluck('cost_price_snapshot', 'variant_id');
+        $itemsKey = fn ($rows) => collect($rows)->map(fn ($i) => (((array) $i)['variant_id'] ?? '').'x'.(float) (((array) $i)['qty'] ?? 0))->sort()->values()->implode(',');
+        $oldItems = $itemsKey(DB::table('order_items')->where('order_id', $order->id)->get(['variant_id', 'qty']));
         DB::table('order_items')->where('order_id', $order->id)->delete();
         $items = $p['items'];
         if ($order->confirmed_at) {
@@ -135,6 +137,11 @@ class OrderEditor
             $items = array_map(fn ($i) => $i + ['cost_price_snapshot' => $frozen[$i['variant_id'] ?? 0] ?? $today[$i['variant_id'] ?? 0] ?? null], $items);
         }
         $order->items()->createMany($items);
+        // Items changed: an admin's "send without stock" was for the old items, so it (and a request still open) ends.
+        if ($oldItems !== $itemsKey($items) && ($order->stock_waived_at || $order->stock_waiver_requested_at)) {
+            $order->forceFill(['stock_waived_at' => null, 'stock_waived_by' => null, 'stock_waiver_requested_at' => null, 'stock_waiver_requested_by' => null, 'stock_waiver_note' => null]);
+            $this->orders->note($order, 'system', __('Items changed: the earlier "send without stock" no longer counts.'), $by);
+        }
         $order->fill($p['shipping'] + $p['totals']);
         $order->current_version = $version;
         $order->lock_version++;

@@ -558,8 +558,11 @@ class OrderService
             // never booked by itself (two parcels, two charges); the moderator confirms by hand ("merge first?").
             $called = $order->channel === 'web' && DB::table('order_notes')->where('order_id', $order->id)->where('note_type', 'call')->exists();
             $duplicate = $this->openDuplicate($order);
-            $machine->transition($order, ($this->resumeTarget($order) === 'confirmed' || $called) && ! $duplicate ? 'confirmed' : 'record_verified', null, 'rule', null,
-                $duplicate ? __('Advance received. Same customer has :no open: merge or confirm by hand.', ['no' => $duplicate]) : __('Advance received'));
+            // Out of stock or pre-order (and no admin allowed it): to Call, never to booking by itself.
+            $short = $order->stock_waived_at ? [] : $this->stockIssues($order);
+            $machine->transition($order, ($this->resumeTarget($order) === 'confirmed' || $called) && ! $duplicate && ! $short ? 'confirmed' : 'record_verified', null, 'rule', null,
+                $duplicate ? __('Advance received. Same customer has :no open: merge or confirm by hand.', ['no' => $duplicate])
+                    : ($short ? __('Advance received, but out of stock: :i. Change the item, hold it, or ask an admin.', ['i' => implode(', ', array_keys($short))]) : __('Advance received')));
         }
     }
 

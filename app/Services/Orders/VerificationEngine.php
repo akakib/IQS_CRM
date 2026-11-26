@@ -100,7 +100,10 @@ class VerificationEngine
             'record_verified' => $this->machine->transition($order, 'record_verified', null, 'rule', null, $ruleName),
             'record_verified_and_confirmed' => (function () use ($order, $ruleName) {
                 $this->machine->transition($order, 'record_verified', null, 'rule', null, $ruleName);
-                $this->machine->transition($order, 'confirmed', null, 'rule', null, __('Auto-confirmed: :r', ['r' => $ruleName]));
+                // Out of stock or pre-order: not confirmed by a rule, a person calls first (OrderStateMachine guards it too).
+                if (! app(OrderService::class)->stockIssues($order)) {
+                    $this->machine->transition($order, 'confirmed', null, 'rule', null, __('Auto-confirmed: :r', ['r' => $ruleName]));
+                }
             })(),
             'hold_for_advance' => (function () use ($order, $ruleName, $decision) {
                 // The rule's advance (delivery charge, a fixed amount or a percent of the total); an admin can let it go without (Ask admin).

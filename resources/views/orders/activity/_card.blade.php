@@ -14,7 +14,8 @@
     $stock = ! $red && ($o->stock_issue ?? false) && in_array($key, ['new', 'record_verified', 'no_answer', 'hold'], true); // orange, not red
 @endphp
 
-<button type="button" @click="$dispatch('open-order', {{ $o->id }}); $dispatch('order-no', @js($o->order_no))"
+{{-- Tap opens the order on the Order management page itself (owner 2026-11-26: no popup). --}}
+<a href="{{ route('desk.index', ['order' => $o->id]) }}"
     @class([
         'block w-full cursor-pointer rounded-xl border bg-white p-3 text-left shadow-sm transition hover:border-primary hover:shadow',
         'border-red-300 ring-1 ring-red-200' => $red,
@@ -97,4 +98,4 @@
             </span>
         @endif
     </div>
-</button>
+</a>

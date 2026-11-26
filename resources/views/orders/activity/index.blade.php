@@ -7,10 +7,10 @@
 <x-layouts.app :heading="__('Order activity')">
     <div x-data="{
             wide: window.matchMedia('(min-width: 768px)').matches,
-            col: 'waiting', open: null, loading: false, stamp: @js($refreshedAt->format('g:i:s A')),
+            col: 'waiting', loading: false, stamp: @js($refreshedAt->format('g:i:s A')),
             init() {
                 window.matchMedia('(min-width: 768px)').addEventListener('change', e => this.wide = e.matches);
-                setInterval(() => { if (!this.open && !document.hidden) this.refresh() }, 30000);
+                setInterval(() => { if (!document.hidden) this.refresh() }, 30000);
                 this.$el.addEventListener('click', e => { const b = e.target.closest('[data-more]'); if (b) this.more(b) });
                 this.dragScroll();
             },
@@ -57,8 +57,7 @@
                 } catch (e) {}
                 button.disabled = false;
             },
-            openNo: '',
-        }" @open-order.window="open = $event.detail" @order-no.window="openNo = $event.detail">
+        }">
 
         {{-- Filters: dates (when the order came in) and who holds it. --}}
         <div class="mb-4 space-y-3">
@@ -103,17 +102,6 @@
         </div>
         <p class="text-xs text-gray-500">{{ __('Delivered, returned and cancelled orders are in') }} <a href="{{ route('orders.index') }}" class="text-primary hover:underline">{{ __('All orders') }}</a>.</p>
 
-        {{-- The order in a large window: everything Order management shows, with every action. Closes only with Close; the board refreshes after. --}}
-        <template x-teleport="body">
-            <div x-show="open" x-cloak class="fixed inset-0 z-[120] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-6" role="dialog" aria-modal="true">
-                <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-[92vh] sm:rounded-2xl">
-                    <div class="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
-                        <h3 class="text-base font-semibold text-gray-900">{{ __('Order') }} <span class="font-mono" x-text="openNo"></span></h3>
-                        <button type="button" @click="open = null; refresh()" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Close') }}</button>
-                    </div>
-                    <template x-if="open">
-                        <iframe :src="@js(route('desk.index', ['embed' => 1])) + '&order=' + open" title="{{ __('Order') }}" class="min-h-0 w-full flex-1 border-0 bg-gray-50"></iframe>
-                    </template>
                 </div>
             </div>
         </template>

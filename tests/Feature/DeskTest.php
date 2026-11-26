@@ -911,7 +911,9 @@ class DeskTest extends TestCase
             ->assertSee('New, nobody took')->assertSee('Verify')
             ->assertSee($b->order_no)->assertSee($a->order_no)->assertSee('Mahim')
             ->assertSee('Waiting for someone to take it')
-            ->assertDontSee('Call again'); // no order there: the column is not shown
+            ->assertDontSee('Call again') // no order there: the column is not shown
+            // A card opens the order on the Order management page itself, not in a popup.
+            ->assertSee(route('desk.index', ['order' => $a->id]), false)->assertDontSee('embed=1', false);
         $this->get('/orders/activity', ['X-Board' => '1'])->assertOk()->assertDontSee('<html', false)->assertSee($a->order_no);
         $this->get('/orders/activity?staff='.$this->mahim->id)->assertOk()->assertSee($a->order_no)->assertDontSee($b->order_no);
         $this->get('/orders/activity?column=waiting&page=2')->assertOk()->assertDontSee($b->order_no); // only 2 orders: page 2 is empty

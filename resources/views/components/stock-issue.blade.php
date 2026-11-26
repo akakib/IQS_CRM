@@ -1,12 +1,14 @@
 {{-- An item of this order is out of stock or pre-order here (the website still took it). Orange, not red: the
      order goes through Verify and Call as usual, but it cannot be confirmed (go to packaging) until the item is
-     swapped (Edit order), or an admin allows it. The moderator may also hold it (no date needed for stock).
+     changed (Edit order), or an admin allows it. The moderator may also hold it (no date needed for stock). The box
+     only explains and asks the admin: Edit order, Hold and Cancel are the order's own buttons (one job, one button).
      <x-stock-issue :order="$order" /> --}}
-@props(['order'])
+@props(['order', 'short' => null])
 
 @php
     $key = \App\Models\OrderStatus::map()[$order->status_id]['key'] ?? '';
-    $short = in_array($key, ['new', 'record_verified', 'no_answer', 'hold'], true) ? app(\App\Services\Orders\OrderService::class)->stockIssues($order) : [];
+    // The page may pass what it already read (one query less); else read here.
+    $short ??= in_array($key, ['new', 'record_verified', 'no_answer', 'hold'], true) ? app(\App\Services\Orders\OrderService::class)->stockIssues($order) : [];
     $isAdmin = auth()->user()?->can('orders.approve');
 @endphp
 
@@ -17,7 +19,7 @@
         @if ($order->stock_waived_at)
             <p class="mt-1 font-medium">{{ __('An admin allowed it without stock: it may be confirmed.') }}</p>
         @else
-            <p class="mt-0.5">{{ __('Swap it with Edit order, hold the order, or cancel. To send it as it is, an admin has to allow it.') }}</p>
+            <p class="mt-0.5">{{ __('Change the item with Edit order, put it on Hold, or Cancel. To send it as it is, an admin has to allow it.') }}</p>
             @if ($order->stock_waiver_requested_at)
                 <p class="mt-2 rounded-lg bg-white px-3 py-2">{{ __('Asked an admin to send it without stock: ":w"', ['w' => $order->stock_waiver_note]) }} · {{ $order->stock_waiver_requested_at->diffForHumans() }}</p>
             @endif

@@ -40,7 +40,7 @@
         @elseif ($repack)
             <span class="font-medium text-red-700">{{ __('Edited after packing: repack') }}</span>
         @elseif ($stock)
-            <span class="font-medium text-orange-700">{{ __('Stock out: swap, hold or ask an admin') }}</span>
+            <span class="font-medium text-orange-700">{{ __('Stock out: edit, hold or ask an admin') }}</span>
         @elseif (in_array($key, ['new', 'record_verified', 'no_answer'], true) && ! $o->moderator_id)
             <span class="text-gray-600">{{ __('Waiting for someone to take it') }}</span>
         @elseif (in_array($key, ['new', 'record_verified', 'no_answer'], true) && $left !== null)

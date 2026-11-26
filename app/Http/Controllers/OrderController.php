@@ -201,7 +201,7 @@ class OrderController extends Controller
             'paymentMethods' => DB::table('payment_methods')->where('is_active', true)->orderBy('id')->pluck('name', 'id')->all(),
             'statuses' => OrderStatus::map(),
             'targets' => $this->machine->allowedTargets($order, $user),
-            'reasons' => ['cancel' => StatusReason::options('cancel'), 'hold' => StatusReason::options('hold'), 'status' => StatusReason::options('status'), 'return' => StatusReason::options('return'), 'reassign' => StatusReason::options('reassign')],
+            'reasons' => ['cancel' => StatusReason::staffOptions('cancel'), 'hold' => StatusReason::staffOptions('hold'), 'status' => StatusReason::options('status'), 'return' => StatusReason::options('return'), 'reassign' => StatusReason::options('reassign')],
             'staffOptions' => $user->can('orders.reassign') ? User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
         ]);
     }

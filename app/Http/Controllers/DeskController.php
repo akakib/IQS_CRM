@@ -132,7 +132,7 @@ class DeskController extends Controller
         $advanceWaiting = (int) $this->desk->waitingAdvanceQuery()->count(); // nobody's yet: a call to ask for the advance
         // Packer-only hold reasons (item not found on the shelf) are not offered to moderators.
         $reasons = DB::table('status_reasons')->whereIn('reason_type', ['hold', 'cancel'])->where('is_active', true)
-            ->where(fn ($q) => $q->whereNull('system_key')->orWhereNotIn('system_key', ['item_not_found', 'item_damaged']))
+            ->where(fn ($q) => $q->whereNull('system_key')->orWhereNotIn('system_key', \App\Models\StatusReason::NOT_PICKED_BY_STAFF))
             ->orderBy('sort_order')->get(['id', 'reason_type', 'label_en', 'system_key'])->groupBy('reason_type');
 
         $rules = app(\App\Services\Work\DeskRules::class)->for($user->id);
@@ -165,6 +165,7 @@ class DeskController extends Controller
                 'reasons' => \App\Models\StatusReason::options('reassign'),
                 'holder' => $order->moderator_id ? DB::table('users')->where('id', $order->moderator_id)->first(['id', 'name', 'photo_path']) : null,
             ] : null,
+            'stockOutReasonId' => ($reasons['hold'] ?? collect())->firstWhere('system_key', 'stock_out')?->id,
             'reasons' => ['hold' => ($reasons['hold'] ?? collect())->pluck('label_en', 'id')->all(), 'cancel' => ($reasons['cancel'] ?? collect())->pluck('label_en', 'id')->all()],
             // Hold reasons that are the customer's own story need a written note (same list as the server check).
             'holdNeedsNote' => ($reasons['hold'] ?? collect())->whereIn('system_key', \App\Services\Orders\DeskService::HOLD_NOTE_REASONS)->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),

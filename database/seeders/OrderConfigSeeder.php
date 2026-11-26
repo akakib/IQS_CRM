@@ -77,7 +77,7 @@ class OrderConfigSeeder extends Seeder
     /** [type, label, blame stage, system key, release mode, counts as break (break reasons only)] */
     private const REASONS = [
         ['hold', 'Stock arriving (pre-order)', 'none', 'awaiting_stock', 'on_restock'],
-        ['hold', 'Stock out', 'none', 'stock_out', 'manual'],
+        ['hold', 'Waiting for stock', 'none', 'stock_out', 'manual'],
         ['hold', 'Deliver on a date', 'customer', 'scheduled', 'on_date'],
         ['hold', 'Customer asked to wait', 'customer', 'customer_wait', 'manual'],
         ['hold', 'Waiting for advance payment', 'none', 'advance_wait', 'manual'],
@@ -86,7 +86,7 @@ class OrderConfigSeeder extends Seeder
         ['cancel', 'Customer cancelled', 'customer', 'customer_cancelled', 'manual'],
         ['cancel', 'Fake or prank order', 'customer', 'fake_order', 'manual'],
         ['cancel', 'Duplicate order', 'none', 'duplicate', 'manual'],
-        ['cancel', 'Out of stock', 'none', 'out_of_stock', 'manual'],
+        ['cancel', "Out of stock, customer won't wait", 'none', 'out_of_stock', 'manual'],
         ['cancel', 'Price or offer issue', 'sales', 'price_issue', 'manual'],
         ['cancel', 'Could not reach customer', 'customer', 'unreachable', 'manual'],
         ['cancel', 'Wrong number', 'customer', 'wrong_number', 'manual'],

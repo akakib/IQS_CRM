@@ -159,7 +159,8 @@ class AdvanceHoldTest extends TestCase
         // Not held: it stays where it was and waits to be taken like any order.
         $this->assertSame('record_verified', $this->key($order));
         $this->next()->assertRedirect("/desk?tab=call&order={$order->id}");
-        $this->get("/desk?tab=call&order={$order->id}")->assertSee('Out of stock in T5 CRM')->assertSee('Ask admin: send without stock');
+        $this->get("/desk?tab=call&order={$order->id}")->assertSee('Out of stock in T5 CRM')->assertSee('Ask admin: send without stock')
+            ->assertSee('Waiting for stock')->assertDontSee('Deliver on a date')->assertDontSee('Swap item');
 
         // The moderator cannot confirm it.
         $this->post("/desk/{$order->id}/act", ['action' => 'confirm', 'lock_version' => $order->fresh()->lock_version])->assertSessionHasErrors('status');

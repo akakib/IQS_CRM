@@ -1,5 +1,5 @@
 <x-layouts.app :heading="__('Missing-item reports')">
-    <p class="mb-4 text-sm text-gray-500">{{ __('Packers only report. Decide here: Out of stock or Pre-order (open orders move to Hold automatically), or dismiss if the item is there.') }}</p>
+    <p class="mb-4 text-sm text-gray-500">{{ __('Packers only report. Decide here: Out of stock or Pre-order (booked orders move to Hold, orders not confirmed yet get the orange flag), or dismiss if the item is there.') }}</p>
 
     @if ($reports->isEmpty())
         <x-empty-state :message="__('No open reports.')" />
@@ -25,5 +25,5 @@
             </div>
         @endforeach
     </div>
-    <x-confirm-modal id="stock-issue-confirm" :verb="__('Out of stock')" :message="__('Every open order with this item moves to Hold.')" />
+    <x-confirm-modal id="stock-issue-confirm" :verb="__('Out of stock')" :message="__('Confirmed and booked orders with this item move to Hold. Orders not confirmed yet get the orange Stock out flag.')" />
 </x-layouts.app>

@@ -6,6 +6,9 @@
     $url = fn (array $q) => route('desk.index', $q);
     $key = $order ? $statuses[$order->status_id]['key'] : null;
     $isMine = $order && $order->moderator_id === auth()->id();
+    // Out of stock or pre-order here (before Confirm): the orange box, Edit order ringed, Hold opens on Waiting for stock.
+    $stockShort = $order && in_array($key, ['new', 'record_verified', 'no_answer', 'hold'], true) ? app(\App\Services\Orders\OrderService::class)->stockIssues($order) : [];
+    $stockOutId = $stockShort ? ($stockOutReasonId ?? null) : null;
     $atLimit = $limit === 0 || $inHand > 0; // a batch at a time: the usual orders plus advance holds not called yet
     $age = fn ($t) => $t ? Carbon::parse($t)->diffForHumans(now(), ['short' => true, 'syntax' => Carbon::DIFF_ABSOLUTE, 'parts' => 1]) : '';
     $money = fn ($v) => '৳'.number_format((float) $v);
@@ -32,7 +35,7 @@
 
 <x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="__('Order management')">
 <div @iqs-pulse.window="follow($event.detail.mine)" x-data="{
-        reasonMode: null, reason: null, holdDate: null, stockReasons: @js(app(\App\Services\Orders\DeskService::class)->stockReasonIds()),
+        reasonMode: null, reason: null, holdDate: null, stockOut: @js($stockOutId), stockReasons: @js(app(\App\Services\Orders\DeskService::class)->stockReasonIds()),
         // Live list: when the orders in their hand change (one given, taken back, a call due), the tabs and the list
         // update by themselves. Nothing open: the page reloads. An order open (maybe mid-typing): only the list and
         // tabs are swapped, the open order stays as it is.
@@ -51,7 +54,7 @@
                 }
             } catch (e) {}
         },
-        openReason(mode) { this.reasonMode = mode; this.reason = null },
+        openReason(mode) { this.reasonMode = mode; this.reason = mode === 'hold' && this.stockOut ? this.stockOut : null },
         // A call saved as Wrong number: Cancel opens with Wrong number picked (only where Cancel is offered).
         wrongNumber(id) { if (document.querySelector('[data-key=x]')) { this.openReason('cancel'); this.reason = id } },
         keys(e) {
@@ -321,7 +324,7 @@
                 <x-courier-cancel :order="$order" />
                 <x-take-back :order="$order" class="mb-3" />
                 <x-advance-wait :order="$order" />
-                <x-stock-issue :order="$order" />
+                <x-stock-issue :order="$order" :short="$stockShort" />
                 {{-- Opened from Order activity: where the parcel is, in the courier's words, and its tracking link. --}}
                 @if ($embed)<x-parcel-track :order="$order" class="mb-3" />@endif
 
@@ -356,7 +359,8 @@
                                     @if ($order->no_response_count)<x-badge color="amber">{{ __('No response ×:n', ['n' => $order->no_response_count]) }}</x-badge>@endif
                                     {{-- Wrong item, address or phone: fix it in the popup without leaving this page. --}}
                                     @if (($statuses[$order->status_id]['edit_policy'] ?? 'locked') !== 'locked')
-                                        <button type="button" @click="$dispatch('open-order-edit')" class="lockable inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">
+                                        <button type="button" @click="$dispatch('open-order-edit')" @class(['lockable inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary',
+                                            'border-orange-400 ring-2 ring-orange-200' => $stockShort, 'border-gray-300' => ! $stockShort])>
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.86 4.49l2.65 2.65M4 20l1-4L16.5 4.5a1.87 1.87 0 012.65 2.65L7.65 18.65 4 20z"/></svg>
                                             {{ __('Edit order') }}
                                         </button>

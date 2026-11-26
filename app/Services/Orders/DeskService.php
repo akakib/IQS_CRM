@@ -48,7 +48,24 @@ class DeskService
     public function waitingQuery()
     {
         return DB::table('orders')->whereNull('moderator_id')
-            ->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified', 'no_answer']));
+            ->where(fn ($w) => $w->whereIn('status_id', OrderStatus::idsFor(['new', 'record_verified', 'no_answer']))->orWhereRaw($this->stockCallSql('orders')));
+    }
+
+    /**
+     * Held for stock by the system (out of stock, pre-order), not by a person: still a call to make, so it is
+     * given out and worked like any new order (substitute and confirm, cancel, or hold it with a date).
+     */
+    public function stockCallSql(string $alias = 'orders'): string
+    {
+        $app = app();
+        if (! $app->bound('desk.stock-reason-ids')) {
+            $app->instance('desk.stock-reason-ids', DB::table('status_reasons')->where('reason_type', 'hold')->whereIn('system_key', ['stock_out', 'awaiting_stock'])->pluck('id')->map(fn ($id) => (int) $id)->all());
+        }
+        $ids = implode(',', $app->make('desk.stock-reason-ids') ?: [0]);
+        $hold = (int) OrderStatus::idFor('hold');
+
+        return "({$alias}.status_id = {$hold} AND COALESCE({$alias}.hold_reason_id, 0) IN ({$ids}) AND COALESCE((SELECT e.source FROM order_events e"
+            ." WHERE e.order_id = {$alias}.id AND e.to_status_id = {$hold} ORDER BY e.id DESC LIMIT 1), 'system') <> 'user')";
     }
 
     /** One person holds at most this many orders waiting for an advance (they do not count in the active limit). */
@@ -74,6 +91,7 @@ class DeskService
         $advance = $this->advanceReasonId();
 
         return $query->whereNull("{$alias}.moderator_id")->where(fn ($w) => $w->whereIn("{$alias}.status_id", OrderStatus::idsFor(['new', 'record_verified', 'no_answer']))
+            ->orWhereRaw($this->stockCallSql($alias))
             ->orWhere(fn ($h) => $h->where("{$alias}.status_id", OrderStatus::idFor('hold'))->where("{$alias}.hold_reason_id", $advance)
                 ->whereNull("{$alias}.advance_waived_at")->whereNotNull("{$alias}.advance_required")));
     }
@@ -121,7 +139,7 @@ class DeskService
     public function workQueue(int $userId, ?int $timedId = null): array
     {
         $rows = DB::table('orders as o')->where('o.moderator_id', $userId)
-            ->where(fn ($w) => $w->where(fn ($a) => $a->where('o.channel', 'web')->whereIn('o.status_id', OrderStatus::idsFor(self::ACTIVE)))
+            ->where(fn ($w) => $w->where(fn ($a) => $a->where('o.channel', 'web')->where(fn ($s) => $s->whereIn('o.status_id', OrderStatus::idsFor(self::ACTIVE))->orWhereRaw($this->stockCallSql('o'))))
                 ->orWhere(fn ($h) => $h->where('o.status_id', OrderStatus::idFor('hold'))->where('o.hold_reason_id', $this->advanceReasonId())->whereNull('o.advance_waived_at')
                     ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('order_notes as n')->whereColumn('n.order_id', 'o.id')->where('n.note_type', 'call'))))
             ->orderBy('o.assigned_at')->orderBy('o.id')->get(['o.id', 'o.order_no']);
@@ -145,7 +163,7 @@ class DeskService
     public function activeCount(int $userId): int
     {
         return DB::table('orders')->where('moderator_id', $userId)->where('channel', 'web')
-            ->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))->count();
+            ->where(fn ($s) => $s->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))->orWhereRaw($this->stockCallSql('orders')))->count();
     }
 
     /**
@@ -158,7 +176,8 @@ class DeskService
     public function notFreeForNewOrders(): array
     {
         // A batch at a time: anyone still holding an order of their batch is busy.
-        $busy = DB::table('orders')->where('channel', 'web')->whereNotNull('moderator_id')->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))
+        $busy = DB::table('orders')->where('channel', 'web')->whereNotNull('moderator_id')
+            ->where(fn ($s) => $s->whereIn('status_id', OrderStatus::idsFor(self::ACTIVE))->orWhereRaw($this->stockCallSql('orders')))
             ->distinct()->pluck('moderator_id')->all();
         $resting = DB::table('users')->where(fn ($q) => $q->whereNotNull('current_break_id')->orWhere('desk_limit', 0))->pluck('id')->all();
         $owners = User::where('is_active', true)->get()->filter(fn (User $u) => $u->isOwner())->pluck('id')->all();

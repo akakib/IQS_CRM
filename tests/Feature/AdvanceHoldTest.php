@@ -151,6 +151,30 @@ class AdvanceHoldTest extends TestCase
         $this->assertContains($held->id, collect($this->getJson('/desk/pulse')->json('mine'))->pluck('id')->all());
     }
 
+    public function test_a_stock_hold_by_the_system_is_given_out_like_a_new_order_and_sits_in_call(): void
+    {
+        $order = $this->web(3);
+        app(\App\Services\Orders\AvailabilityEffects::class)->changed($this->variant->id, 'in_stock', 'out_of_stock');
+        $this->assertSame('hold', $this->key($order));
+        $this->assertNull($order->fresh()->moderator_id);
+        // Waiting like any new order, and Take next gives it.
+        $this->assertSame(1, app(DeskService::class)->whereWaiting(DB::table('orders'))->count());
+        $this->next()->assertRedirect("/desk?tab=call&order={$order->id}");
+        $this->assertSame($this->mod->id, $order->fresh()->moderator_id);
+        // In Call, not On hold; it fills the hand until they act on it.
+        $this->get('/desk?tab=call')->assertSee($order->order_no);
+        $this->get('/desk?tab=hold')->assertDontSee($order->order_no);
+        $this->assertSame(1, app(DeskService::class)->inHand($this->mod->id));
+        // The customer will wait: Resume, then Hold with a date. Now it is their own hold (On hold) and the hand is free.
+        $this->post("/desk/{$order->id}/act", ['action' => 'resume', 'lock_version' => $order->fresh()->lock_version])->assertSessionHasNoErrors();
+        $this->post("/desk/{$order->id}/act", ['action' => 'hold', 'reason_id' => DB::table('status_reasons')->where('system_key', 'stock_out')->value('id'),
+            'hold_expected_date' => today()->addDay()->toDateString(), 'note' => 'Customer will wait', 'lock_version' => $order->fresh()->lock_version])->assertSessionHasNoErrors();
+        $this->get('/desk?tab=hold')->assertSee($order->order_no);
+        $this->get('/desk?tab=call')->assertDontSee($order->order_no);
+        $this->assertSame(0, app(DeskService::class)->inHand($this->mod->id));
+        $this->assertSame(0, app(DeskService::class)->whereWaiting(DB::table('orders'))->count());
+    }
+
     public function test_paid_during_the_call_goes_straight_to_booking_no_second_call(): void
     {
         $held = $this->web(9);

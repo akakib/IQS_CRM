@@ -9,6 +9,7 @@
     // Out of stock or pre-order here (before Confirm): the orange box, Edit order ringed, Hold opens on Waiting for stock.
     $stockShort = $order && in_array($key, ['new', 'record_verified', 'no_answer', 'hold'], true) ? app(\App\Services\Orders\OrderService::class)->stockIssues($order) : [];
     $stockOutId = $stockShort ? ($stockOutReasonId ?? null) : null;
+    $canEdit = $order && ($statuses[$order->status_id]['edit_policy'] ?? 'locked') !== 'locked';
     $atLimit = $limit === 0 || $inHand > 0; // a batch at a time: the usual orders plus advance holds not called yet
     $age = fn ($t) => $t ? Carbon::parse($t)->diffForHumans(now(), ['short' => true, 'syntax' => Carbon::DIFF_ABSOLUTE, 'parts' => 1]) : '';
     $money = fn ($v) => '৳'.number_format((float) $v);
@@ -324,7 +325,6 @@
                 <x-courier-cancel :order="$order" />
                 <x-take-back :order="$order" class="mb-3" />
                 <x-advance-wait :order="$order" />
-                <x-stock-issue :order="$order" :short="$stockShort" />
                 {{-- Opened from Order activity: where the parcel is, in the courier's words, and its tracking link. --}}
                 @if ($embed)<x-parcel-track :order="$order" class="mb-3" />@endif
 
@@ -336,6 +336,9 @@
                                     <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-primary hover:underline">{{ $order->order_no }}</a>
                                     @if ($woo = \App\Models\Order::websiteAdminUrl($order))<a href="{{ $woo }}" target="_blank" rel="noopener" class="hover:text-primary hover:underline">{{ \App\Models\Order::sourceLabel($order) }}</a>@else<span>{{ \App\Models\Order::sourceLabel($order) }}</span>@endif
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
+                                    {{-- Phone: the amount sits on this first line (the right column is for wider screens), the rest wraps below at full width. --}}
+                                    <span class="ml-auto text-right sm:hidden"><b class="block text-base font-semibold tabular-nums text-gray-900">{{ $money($order->grand_total) }}</b><span class="block text-[11px]">{{ __('COD :c · delivery :d', ['c' => $money($order->cod_amount), 'd' => $money($order->delivery_charge)]) }}</span></span>
+                                    <span class="basis-full sm:hidden" aria-hidden="true"></span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
                                     <x-courier-word :status="$detail['parcel']->courier_status ?? null" :courier="$detail['parcel']->courier ?? null" />
                                     {{-- Once booked: the CN, opening the parcel in the Steadfast panel. --}}
@@ -358,19 +361,18 @@
                                     @if ($order->action_due_at)<x-countdown :seconds="$secondsLeft($order->action_due_at)" />@endif
                                     @if ($order->no_response_count)<x-badge color="amber">{{ __('No response ×:n', ['n' => $order->no_response_count]) }}</x-badge>@endif
                                     {{-- Wrong item, address or phone: fix it in the popup without leaving this page. --}}
-                                    @if (($statuses[$order->status_id]['edit_policy'] ?? 'locked') !== 'locked')
-                                        <button type="button" @click="$dispatch('open-order-edit')" @class(['lockable inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary',
-                                            'border-orange-400 ring-2 ring-orange-200' => $stockShort, 'border-gray-300' => ! $stockShort])>
+                                    @if ($canEdit && ! $stockShort) {{-- out of stock: Edit order sits in the orange box --}}
+                                        <button type="button" @click="$dispatch('open-order-edit')" class="lockable inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-primary hover:text-primary">
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.86 4.49l2.65 2.65M4 20l1-4L16.5 4.5a1.87 1.87 0 012.65 2.65L7.65 18.65 4 20z"/></svg>
                                             {{ __('Edit order') }}
                                         </button>
                                     @endif
                                 </div>
-                                <x-website-status :order="$order" />
-                                <h2 class="mt-1 text-2xl font-semibold text-gray-900">{{ $order->ship_name }}</h2>
+                                <x-website-status :order="$order" class="max-sm:mt-1.5 max-sm:inline-flex max-sm:rounded-full max-sm:px-2.5 max-sm:py-0.5" />
+                                <h2 class="mt-1 text-xl font-semibold sm:text-2xl text-gray-900">{{ $order->ship_name }}</h2>
                                 <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
                             </div>
-                            <div class="shrink-0 text-right">
+                            <div class="hidden shrink-0 text-right sm:block">
                                 <p class="text-xl font-semibold tabular-nums text-gray-900 sm:text-2xl">{{ $money($order->grand_total) }}</p>
                                 <p class="text-xs text-gray-500">{{ __('COD :c · delivery :d', ['c' => $money($order->cod_amount), 'd' => $money($order->delivery_charge)]) }}</p>
                             </div>
@@ -390,12 +392,13 @@
                                 @if ($order->customer_note)<p class="text-amber-800">{{ __('Customer note') }}: {{ $order->customer_note }}</p>@endif
                             </div>
                         @endif
+                        <x-stock-issue :order="$order" :short="$stockShort" :edit="$canEdit" class="!mb-0 mt-3" />
 
                         <div class="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-                            <div class="min-w-0 rounded-lg border border-gray-200 p-4 sm:col-span-2 2xl:col-span-1">
-                                <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Phone') }}</p>
+                            <div class="min-w-0 rounded-lg border border-gray-200 px-3 py-2.5 sm:col-span-2 sm:p-4 2xl:col-span-1">
+                                <p class="mb-1 hidden text-[11px] sm:block font-semibold uppercase tracking-wide text-gray-500">{{ __('Phone') }}</p>
                                 <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" :order-id="$order->id" :name="$order->ship_name" :order-no="$order->order_no"
-                                    :talked="$detail['talked']" />
+                                    :talked="$detail['talked']" compact />
                             </div>
                             <div class="rounded-lg border border-gray-200 p-4">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Customer history') }}</p>
@@ -574,27 +577,29 @@
                                 @error('order')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                                 @error('status')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                             </form>
+                            {{-- Two buttons (Resume / Cancel and the like): side by side on a phone, Cancel the small one on the left. --}}
+                            @php $pair = count($actions) === 2; $wide = $pair ? 'flex-1' : 'w-full'; @endphp
                             <div class="lockable sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-b-xl border-t border-gray-200 bg-white p-3 sm:p-4">
                                 @foreach ($actions as [$action, $label, $k, $variant])
                                     @if ($action === 'confirm' && $detail['openDuplicates']->isNotEmpty())
                                         {{-- The courier is booked right away: a second open order of the same customer is merged first, not shipped twice. --}}
                                         <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="$dispatch('open-confirm', { id: 'confirm-duplicate', form: 'desk-act' })"
-                                            class="whitespace-nowrap w-full py-3 text-base xl:w-auto xl:flex-1">
+                                            class="whitespace-nowrap {{ $wide }} py-3 text-base xl:w-auto xl:flex-1">
                                             {{ $label }} <kbd class="hidden rounded bg-white/20 px-1.5 text-[11px] uppercase sm:inline">⇧{{ $k }}</kbd>
                                         </x-button>
                                     @elseif ($action === 'confirm' && $order->channel === 'web' && auth()->user()->canSeeField('customer_contact'))
                                         {{-- Call verified: the call panel first (Talked), saving it confirms the order (phone-dial askConfirm). --}}
                                         <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="$dispatch('call-then-confirm')"
-                                            class="whitespace-nowrap w-full py-3 text-base xl:w-auto xl:flex-1">
+                                            class="whitespace-nowrap {{ $wide }} py-3 text-base xl:w-auto xl:flex-1">
                                             {{ $label }} <kbd class="hidden rounded bg-white/20 px-1.5 text-[11px] uppercase sm:inline">⇧{{ $k }}</kbd>
                                         </x-button>
                                     @elseif (in_array($action, ['hold', 'cancel'], true))
-                                        <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="openReason('{{ $action }}')" class="flex-1 whitespace-nowrap py-2.5 sm:py-3 xl:flex-none">
+                                        <x-button type="button" :variant="$variant" data-key="{{ $k }}" @click="openReason('{{ $action }}')" class="whitespace-nowrap py-2.5 sm:py-3 xl:flex-none {{ $pair ? 'order-first basis-1/3 xl:order-none xl:basis-auto' : 'flex-1' }}">
                                             {{ $label }} <kbd class="hidden rounded bg-black/5 px-1.5 text-[11px] uppercase sm:inline">⇧{{ $k }}</kbd>
                                         </x-button>
                                     @else
                                         <x-button form="desk-act" name="action" value="{{ $action }}" :variant="$variant" data-key="{{ $k }}"
-                                            class="whitespace-nowrap {{ $variant === 'primary' ? 'w-full py-3 text-base xl:w-auto xl:flex-1' : 'flex-1 py-2.5 sm:py-3 xl:flex-none' }}">
+                                            class="whitespace-nowrap {{ $variant === 'primary' ? $wide.' py-3 text-base xl:w-auto xl:flex-1' : 'flex-1 py-2.5 sm:py-3 xl:flex-none' }}">
                                             {{ $label }} <kbd class="hidden rounded {{ $variant === 'primary' ? 'bg-white/20' : 'bg-black/5' }} px-1.5 text-[11px] uppercase sm:inline">⇧{{ $k }}</kbd>
                                         </x-button>
                                     @endif

@@ -3,8 +3,9 @@
      order, each call is logged: the After-the-call panel opens over the page
      (what happened, how happy, the recording or screenshot, a note), the same
      as the call list. How long it took comes by itself.
+     compact: on a phone the number, Call and Copy sit on one line (the Desk).
      <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" :order-id="$order->id" :name="$order->ship_name" :order-no="$order->order_no" /> --}}
-@props(['phone', 'alt' => null, 'orderId' => null, 'name' => null, 'orderNo' => null, 'talked' => false])
+@props(['phone', 'alt' => null, 'orderId' => null, 'name' => null, 'orderNo' => null, 'talked' => false, 'compact' => false])
 {{-- talked: a Talked call is already saved on this order today, so Call verified (call-then-confirm) confirms at once. --}}
 
 @php
@@ -16,12 +17,21 @@
 
 <div x-data="phoneDial({{ \Illuminate\Support\Js::from($visible ? $phone : '') }}, {{ \Illuminate\Support\Js::from($orderId) }}, {{ \Illuminate\Support\Js::from(['start' => route('customer-calls.start'), 'finish' => route('customer-calls.finish', 0), 'proof' => 'proof-order-'.$orderId, 'name' => $name, 'talked' => $talked, 'user' => auth()->id(), 'live' => route('customer-calls.live')]) }})" @call-then-confirm.window="askConfirm()" {{ $attributes }}>
     @if ($visible)
+        <div @class(['max-md:flex max-md:items-center max-md:justify-between max-md:gap-2' => $compact])>
+        <div class="min-w-0">
         <a href="tel:{{ $phone }}" @click="started()" class="block font-mono text-xl font-semibold tracking-wide text-gray-900 hover:text-primary">{{ $phone }}</a>
         @if ($alt)<a href="tel:{{ $alt }}" @click="started()" class="block font-mono text-sm text-gray-500 hover:text-primary">{{ $alt }}</a>@endif
-        <div class="mt-1.5 flex flex-wrap items-center gap-3 text-xs font-medium">
-            <a href="tel:{{ $phone }}" @click="started()" class="text-primary hover:underline md:hidden">{{ __('Tap to call') }}</a>
-            <button type="button" @click="copy()" class="text-primary hover:underline" x-text="copied ? @js(__('Copied')) : @js(__('Copy'))"></button>
+        </div>
+        <div @class(['mt-1.5 flex flex-wrap items-center gap-3 text-xs font-medium', 'max-md:mt-0 max-md:shrink-0 max-md:flex-nowrap max-md:gap-1.5' => $compact])>
+            @if ($compact)
+                <a href="tel:{{ $phone }}" @click="started()" class="inline-flex min-h-8 items-center rounded-lg bg-primary px-3 font-semibold text-white md:hidden">{{ __('Call') }}</a>
+                <button type="button" @click="copy()" class="text-primary hover:underline max-md:inline-flex max-md:min-h-8 max-md:items-center max-md:rounded-lg max-md:border max-md:border-gray-300 max-md:px-3 max-md:text-gray-700 max-md:no-underline" x-text="copied ? @js(__('Copied')) : @js(__('Copy'))"></button>
+            @else
+                <a href="tel:{{ $phone }}" @click="started()" class="text-primary hover:underline md:hidden">{{ __('Tap to call') }}</a>
+                <button type="button" @click="copy()" class="text-primary hover:underline" x-text="copied ? @js(__('Copied')) : @js(__('Copy'))"></button>
+            @endif
             <button type="button" @click="toggleQr()" class="hidden text-primary hover:underline md:inline" x-text="showQr ? @js(__('Hide QR')) : @js(__('QR to call from phone'))"></button>
+        </div>
         </div>
         <div x-show="showQr" x-cloak class="mt-2 h-32 w-32 rounded-lg border border-gray-200 bg-white p-1" x-html="qr"></div>
 

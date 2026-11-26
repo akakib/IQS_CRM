@@ -22,7 +22,7 @@
             },
         }" {{ $attributes->merge(['class' => 'mt-2 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs']) }}
         :class="error ? 'bg-amber-50 text-amber-900' : 'bg-gray-50 text-gray-700'">
-        <span>{{ __('Website status:') }} <b x-text="status"></b><span x-show="done" class="text-green-700"> ✓ {{ __('set') }} <span x-text="at"></span></span></span>
+        <span><span class="sm:hidden">{{ __('Web:') }}</span><span class="max-sm:hidden">{{ __('Website status:') }}</span> <b x-text="status"></b><span x-show="done" class="text-green-700"> ✓ {{ __('set') }} <span x-text="at"></span></span></span>
         <span x-show="error" x-cloak>· {{ __('Not set:') }} <span x-text="error"></span></span>
         @if ($push->canSend($order))
             <button type="button" x-show="canSend" @click="send()" :disabled="busy"

@@ -2,8 +2,9 @@
      order goes through Verify and Call as usual, but it cannot be confirmed (go to packaging) until the item is
      changed (Edit order), or an admin allows it. The moderator may also hold it (no date needed for stock). The box
      only explains and asks the admin: Edit order, Hold and Cancel are the order's own buttons (one job, one button).
-     <x-stock-issue :order="$order" /> --}}
-@props(['order', 'short' => null])
+     edit: show the Edit order button here (the Desk moves it into this box, the fix for a missing item).
+     <x-stock-issue :order="$order" :edit="true" /> --}}
+@props(['order', 'short' => null, 'edit' => false])
 
 @php
     $key = \App\Models\OrderStatus::map()[$order->status_id]['key'] ?? '';
@@ -14,16 +15,21 @@
 
 @if ($short)
     <div x-data="{ ask: false }" {{ $attributes->merge(['class' => 'mb-3 rounded-xl border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-900']) }}>
-        <p class="font-semibold">{{ in_array('out_of_stock', $short, true) ? __('Out of stock in T5 CRM') : __('Pre-order item') }}</p>
-        <p class="mt-0.5">{{ __('The website took this order, but T5 CRM has none of: :i.', ['i' => collect($short)->map(fn ($s, $n) => $n.($s === 'backorder' ? ' ('.__('pre-order').')' : ''))->join(', ')]) }}</p>
+        <p><b class="font-semibold">{{ in_array('out_of_stock', $short, true) ? __('Out of stock:') : __('Pre-order:') }}</b>
+            {{ collect($short)->map(fn ($s, $n) => $n.($s === 'backorder' ? ' ('.__('pre-order').')' : ''))->join(', ') }}</p>
         @if ($order->stock_waived_at)
             <p class="mt-1 font-medium">{{ __('An admin allowed it without stock: it may be confirmed.') }}</p>
         @else
-            <p class="mt-0.5">{{ __('Change the item with Edit order, put it on Hold, or Cancel. To send it as it is, an admin has to allow it.') }}</p>
             @if ($order->stock_waiver_requested_at)
                 <p class="mt-2 rounded-lg bg-white px-3 py-2">{{ __('Asked an admin to send it without stock: ":w"', ['w' => $order->stock_waiver_note]) }} · {{ $order->stock_waiver_requested_at->diffForHumans() }}</p>
             @endif
             <div class="mt-2 flex flex-wrap gap-2">
+                @if ($edit)
+                    <button type="button" @click="$dispatch('open-order-edit')" class="lockable inline-flex items-center gap-1 rounded-lg border border-orange-400 bg-white px-3 py-2 text-xs font-semibold text-orange-900 ring-2 ring-orange-200 hover:bg-orange-100">
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.86 4.49l2.65 2.65M4 20l1-4L16.5 4.5a1.87 1.87 0 012.65 2.65L7.65 18.65 4 20z"/></svg>
+                        {{ __('Edit order') }}
+                    </button>
+                @endif
                 @if ($isAdmin)
                     <form method="POST" action="{{ route('orders.stock-waiver.decide', $order) }}">@csrf<input type="hidden" name="decision" value="allow">
                         <button class="rounded-lg border border-orange-400 bg-white px-3 py-2 text-xs font-semibold text-orange-900 hover:bg-orange-100">{{ __('Allow without stock') }}</button></form>

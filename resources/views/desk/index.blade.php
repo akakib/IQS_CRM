@@ -337,8 +337,8 @@
                                     @if ($woo = \App\Models\Order::websiteAdminUrl($order))<a href="{{ $woo }}" target="_blank" rel="noopener" class="hover:text-primary hover:underline">{{ \App\Models\Order::sourceLabel($order) }}</a>@else<span>{{ \App\Models\Order::sourceLabel($order) }}</span>@endif
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
                                     {{-- Phone: the amount sits on this first line (the right column is for wider screens), the rest wraps below at full width. --}}
-                                    <span class="ml-auto text-right sm:hidden"><b class="block text-base font-semibold tabular-nums text-gray-900">{{ $money($order->grand_total) }}</b><span class="block text-[11px]">{{ __('COD :c · delivery :d', ['c' => $money($order->cod_amount), 'd' => $money($order->delivery_charge)]) }}</span></span>
-                                    <span class="basis-full sm:hidden" aria-hidden="true"></span>
+                                    <b class="ml-auto text-base font-semibold tabular-nums text-gray-900 sm:hidden">{{ $money($order->grand_total) }}</b>
+                                    <span class="-mt-2 basis-full text-right text-[11px] sm:hidden">{{ __('COD :c · delivery :d', ['c' => $money($order->cod_amount), 'd' => $money($order->delivery_charge)]) }}</span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
                                     <x-courier-word :status="$detail['parcel']->courier_status ?? null" :courier="$detail['parcel']->courier ?? null" />
                                     {{-- Once booked: the CN, opening the parcel in the Steadfast panel. --}}

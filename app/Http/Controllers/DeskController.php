@@ -31,7 +31,7 @@ class DeskController extends Controller
 
     private const PER_PAGE = 25;
 
-    /** Owner and managers also see what left the desk: with the courier and ended orders, everyone's. */
+    /** What left the desk: with the courier and the ended orders (a moderator: their own). */
     public const WIDE_TABS = ['courier', 'delivered', 'returned', 'cancelled'];
 
     public function __construct(private DeskService $desk, private OrderStateMachine $machine, private OrderService $orders) {}
@@ -64,14 +64,14 @@ class DeskController extends Controller
         // sees the same page with their own orders only. Mine brings an owner back to their own.
         $wide = $user->can('orders.reassign');
         $everyone = $wide && $request->query('who') !== 'mine';
-        if ($wide) {
-            $where += [
-                'courier' => ['status_id IN (?, ?)', [$s('handed_over'), $s('in_transit')]],
-                'delivered' => ['status_id IN (?, ?)', [$s('delivered'), $s('partial_delivered')]],
-                'returned' => ['status_id = ?', [$s('returned')]],
-                'cancelled' => ['status_id = ?', [$s('cancelled')]],
-            ];
-        }
+        // What left the desk, as on the Hisab desk: with the courier, and the ended orders (today's unless dates are
+        // picked). A moderator sees their own there, the owner and managers everyone's.
+        $where += [
+            'courier' => ['status_id IN (?, ?)', [$s('handed_over'), $s('in_transit')]],
+            'delivered' => ['status_id IN (?, ?)', [$s('delivered'), $s('partial_delivered')]],
+            'returned' => ['status_id = ?', [$s('returned')]],
+            'cancelled' => ['status_id = ?', [$s('cancelled')]],
+        ];
         // Dates: nothing picked ("open") shows every order still to be worked whatever day it came, and today's in the
         // ended stages; a picked range (today, 7 days, 30 days, custom) filters every stage. Open work goes by the day
         // the order came, an ended order by its last change.
@@ -130,7 +130,7 @@ class DeskController extends Controller
         $bindings = array_merge($bindings, [$user->id, $s('new'), $s('record_verified'), $user->id]);
         $counts = (array) DB::table('orders')->tap($scope)
             ->whereIn('status_id', [$s('new'), $s('record_verified'), $s('no_answer'), $s('hold'), $s('confirmed'), ...$packaging,
-                ...($wide ? [$s('handed_over'), $s('in_transit'), $s('delivered'), $s('partial_delivered'), $s('returned'), $s('cancelled')] : [])])
+                $s('handed_over'), $s('in_transit'), $s('delivered'), $s('partial_delivered'), $s('returned'), $s('cancelled')])
             ->selectRaw(implode(', ', $select), $bindings)->first();
         $counts = collect($counts)->mapWithKeys(fn ($n, $k) => [substr($k, 2) => (int) $n])->all();
 

@@ -3,7 +3,7 @@
     use Illuminate\Support\Js;
 
     $tabLabels = ['verify' => __('Verify'), 'call' => __('Call'), 'again' => __('Call again'), 'hold' => __('On hold'), 'send' => __('Booking failed'), 'packaging' => __('Packaging')]
-        + ($wide ? ['courier' => __('With courier'), 'delivered' => __('Delivered'), 'returned' => __('Returned'), 'cancelled' => __('Cancelled')] : []);
+        + ['courier' => __('With courier'), 'delivered' => __('Delivered'), 'returned' => __('Returned'), 'cancelled' => __('Cancelled')];
     // Every link on the page keeps the search, the dates and the filters.
     $url = fn (array $q) => route('desk.index', array_filter($q + $keep, fn ($v) => $v !== null));
     $key = $order ? $statuses[$order->status_id]['key'] : null;

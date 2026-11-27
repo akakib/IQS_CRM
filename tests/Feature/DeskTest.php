@@ -153,7 +153,12 @@ class DeskTest extends TestCase
 
         // A moderator: the same page, their own orders only, also when searching; no owner controls.
         $this->actingAs($this->mahim)->get('/desk?tab=verify')->assertOk()->assertSee('Anika Rahman')->assertDontSee('Babul Mia')->assertDontSee('Chandni Akter')
-            ->assertDontSee('Everyone')->assertDontSee('With courier');
+            ->assertDontSee('Everyone')->assertSee('With courier')->assertSee('Delivered');
+        // What they finished shows in the ended stages, today's, and only their own.
+        $a2 = $this->web(); $b2 = $this->web();
+        $a2->forceFill(['ship_name' => 'Done By Mahim', 'moderator_id' => $this->mahim->id, 'status_id' => OrderStatus::idFor('delivered')])->save();
+        $b2->forceFill(['ship_name' => 'Done By Rima', 'moderator_id' => $this->rima->id, 'status_id' => OrderStatus::idFor('delivered')])->save();
+        $this->get('/desk?tab=delivered')->assertOk()->assertSee('Done By Mahim')->assertDontSee('Done By Rima');
         $this->get('/desk?tab=verify&q=Babul')->assertOk()->assertDontSee('Babul Mia');
         $this->get('/desk?tab=verify&who=all&moderator='.$this->rima->id)->assertOk()->assertDontSee('Babul Mia'); // the address cannot widen it
 

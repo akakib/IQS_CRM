@@ -405,7 +405,8 @@
                 <x-courier-mismatch :order="$order" />
                 <x-cod-update :order="$order" />
                 <x-courier-cancel :order="$order" />
-                <x-take-back :order="$order" class="mb-3" />
+                {{-- Wider screens: above the order. Phone: inside the courier box below, beside the booking it undoes. --}}
+                <x-take-back :order="$order" class="mb-3 max-sm:hidden" />
                 <x-advance-wait :order="$order" />
                 {{-- Opened from Order activity: where the parcel is, in the courier's words, and its tracking link. --}}
                 @if ($embed)<x-parcel-track :order="$order" class="mb-3" />@endif
@@ -608,6 +609,7 @@
                                         </span>
                                     </p>
                                 @endif
+                                <x-take-back :order="$order" class="mt-3 border-t border-gray-100 pt-3 sm:hidden" />
                             </div>
                         @endif
 

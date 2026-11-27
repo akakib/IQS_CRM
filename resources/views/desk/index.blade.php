@@ -421,8 +421,8 @@
                         <div class="sm:hidden">
                             <div class="flex items-baseline justify-between gap-2 text-xs text-gray-500">
                                 <span class="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                                    <span class="font-mono font-medium text-gray-900">{{ $order->order_no }}</span>
-                                    @if ($woo = \App\Models\Order::websiteAdminUrl($order))<a href="{{ $woo }}" target="_blank" rel="noopener">{{ \App\Models\Order::sourceLabel($order) }}</a>@else<span>{{ \App\Models\Order::sourceLabel($order) }}</span>@endif
+                                    <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-primary">{{ $order->order_no }}</a>
+                                    <span>{{ \App\Models\Order::sourceLabel($order) }}</span>
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
                                 </span>
                                 <b class="shrink-0 text-lg font-semibold tabular-nums text-gray-900">{{ $money($order->grand_total) }}</b>
@@ -463,8 +463,8 @@
                         <div class="flex items-start justify-between gap-3 max-sm:hidden">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                                    <span class="font-mono font-medium text-gray-900">{{ $order->order_no }}</span>
-                                    @if ($woo = \App\Models\Order::websiteAdminUrl($order))<a href="{{ $woo }}" target="_blank" rel="noopener" class="hover:text-primary hover:underline">{{ \App\Models\Order::sourceLabel($order) }}</a>@else<span>{{ \App\Models\Order::sourceLabel($order) }}</span>@endif
+                                    <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-primary hover:underline">{{ $order->order_no }}</a>
+                                    <span>{{ \App\Models\Order::sourceLabel($order) }}</span>
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
                                     <x-courier-word :status="$detail['parcel']->courier_status ?? null" :courier="$detail['parcel']->courier ?? null" />

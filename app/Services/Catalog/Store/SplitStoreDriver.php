@@ -15,6 +15,11 @@ class SplitStoreDriver implements StoreDriver
         return $this->orders->name();
     }
 
+    public function catalogLive(): bool
+    {
+        return $this->catalog->catalogLive();
+    }
+
     public function pushVariant(object $link, array $payload): void
     {
         $this->catalog->pushVariant($link, $payload);

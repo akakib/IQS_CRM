@@ -191,6 +191,8 @@ class ProductTest extends TestCase
         {
             public function name(): string { return 'broken'; }
 
+            public function catalogLive(): bool { return true; }
+
             public function pushVariant(object $link, array $payload): void { throw new \RuntimeException('HTTP 500'); }
 
             public function setOrderStatus(string $orderId, string $status): void {}
@@ -235,6 +237,29 @@ class ProductTest extends TestCase
         $this->assertSoftDeleted($cat);
         $this->assertSame(0, Product::whereNotNull('category_id')->count());
         $this->assertSame(1, Product::count());
+    }
+
+    public function test_only_what_is_switched_on_goes_to_the_website_and_test_mode_says_nothing_was_sent(): void
+    {
+        config(['store.push_fields' => ['stock_status']]); // production's default: stock only
+        $product = Product::factory()->withVariant(500)->create(['name' => 'Stock Only Dates']);
+        $v = $product->variants()->first();
+        DB::table('channel_product_links')->insert(['variant_id' => $v->id, 'channel' => 'woocommerce', 'external_product_id' => '77', 'created_at' => now(), 'updated_at' => now()]);
+        $sync = app(ChannelSync::class);
+
+        // A price or text change makes no job; a stock change does, and carries the stock only.
+        $sync->queue($v->id, ['price', 'content']);
+        $this->assertSame(0, DB::table('channel_sync_jobs')->count());
+        $sync->queue($v->id, ['price', 'stock_status']);
+        $this->assertSame('["stock_status"]', DB::table('channel_sync_jobs')->value('fields'));
+
+        // The fake (test mode) closes the job but says nothing was sent, and does not mark the link as synced.
+        $sync->run();
+        $job = DB::table('channel_sync_jobs')->first();
+        $this->assertSame('sent', $job->status);
+        $this->assertStringContainsString('Not sent', (string) $job->last_error);
+        $this->assertNull(DB::table('channel_product_links')->where('variant_id', $v->id)->value('last_sync_status'));
+        $this->assertArrayNotHasKey('regular_price', FakeStoreDriver::$sent[0]);
     }
 
     public function test_tapping_a_product_opens_the_quick_edit_only_for_who_may_change_it(): void

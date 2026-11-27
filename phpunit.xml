@@ -19,6 +19,7 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <env name="STORE_PUSH_FIELDS" value="price,stock_status,content"/>
         <env name="DEBUGBAR_ENABLED" value="false"/>
         <env name="APP_URL" value="http://localhost"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>

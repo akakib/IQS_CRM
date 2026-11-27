@@ -15,6 +15,11 @@ class FakeStoreDriver implements StoreDriver
         return 'fake';
     }
 
+    public function catalogLive(): bool
+    {
+        return false;
+    }
+
     public function pushVariant(object $link, array $payload): void
     {
         self::$sent[] = ['external_product_id' => $link->external_product_id, 'external_variant_id' => $link->external_variant_id] + $payload;

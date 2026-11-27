@@ -7,6 +7,9 @@ interface StoreDriver
 {
     public function name(): string;
 
+    /** True when product updates really reach a website (false: the fake, which only logs them). */
+    public function catalogLive(): bool;
+
     /**
      * @param  object  $link  channel_product_links row (external ids)
      * @param  array  $payload  sku + only the changed field groups

@@ -21,7 +21,8 @@ class ChannelSync
     /** @param list<string> $fields price | stock_status | content */
     public function queue(int $variantId, array $fields): void
     {
-        $fields = array_values(array_unique(array_filter($fields)));
+        // Only what may go to the website (config store.push_fields: stock unless more is switched on).
+        $fields = array_values(array_intersect(array_unique(array_filter($fields)), (array) config('store.push_fields')));
         if ($fields === []) {
             return;
         }
@@ -63,12 +64,16 @@ class ChannelSync
                     throw new \RuntimeException('Variant or website link no longer exists.');
                 }
                 $this->driver->pushVariant($link, $payload);
+                // The fake only logs: the job is closed, but it says so and the link is not marked as synced.
+                $live = $this->driver->catalogLive();
 
                 DB::table('channel_sync_jobs')->where('id', $job->id)->update([
                     'status' => 'sent', 'payload' => json_encode($payload), 'attempts' => $job->attempts + 1,
-                    'sent_at' => now(), 'last_error' => null, 'updated_at' => now(),
+                    'sent_at' => now(), 'last_error' => $live ? null : 'Not sent: the website connection is switched off here (test mode).', 'updated_at' => now(),
                 ]);
-                DB::table('channel_product_links')->where('id', $link->id)->update(['last_synced_at' => now(), 'last_sync_status' => 'ok']);
+                if ($live) {
+                    DB::table('channel_product_links')->where('id', $link->id)->update(['last_synced_at' => now(), 'last_sync_status' => 'ok']);
+                }
                 $result['sent']++;
             } catch (\Throwable $e) {
                 $attempts = $job->attempts + 1;

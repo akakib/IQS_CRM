@@ -19,6 +19,11 @@ class WooCommerceDriver implements StoreDriver
         return 'woocommerce';
     }
 
+    public function catalogLive(): bool
+    {
+        return true;
+    }
+
     public function pushVariant(object $link, array $payload): void
     {
         if (blank($this->config['url'] ?? null) || blank($this->config['key'] ?? null) || blank($this->config['secret'] ?? null)) {

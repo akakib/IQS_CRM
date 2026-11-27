@@ -293,7 +293,8 @@
                             @if ($o->packer)<x-badge color="purple">{{ __('Packing: :n', ['n' => $o->packer]) }}</x-badge>@endif
                         </span>
                         <span class="mt-0.5 block text-xs text-gray-500">
-                            {{ trans_choice(':count item|:count items', $o->items) }} · {{ \App\Support\BdDistricts::name($o->ship_district) ?: $o->ship_thana ?: '-' }}
+                            @php $area = \App\Support\BdDistricts::name($o->ship_district) ?: $o->ship_thana; @endphp
+                            {{ trans_choice(':count item|:count items', $o->items) }}@if ($area) · {{ $area }}@endif
                         </span>
                     </span>
                     <span class="flex shrink-0 items-center gap-3">

@@ -150,10 +150,10 @@
         @if ($wide)
             <input type="hidden" name="who" :value="who">
         @endif
-        <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('Name, phone, order no or CN') }}"
+        <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('Name, phone or CN') }}" aria-label="{{ __('Search by name, phone, order number or CN') }}" title="{{ __('Name, phone, order number or CN') }}"
             x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length) }"
             @input.debounce.500ms="go()" @keydown.enter.prevent="go()"
-            class="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none md:h-9 md:min-w-52 md:max-w-xs">
+            class="h-10 min-w-0 flex-1 text-ellipsis rounded-lg border border-gray-300 px-3 text-sm placeholder:text-ellipsis focus:border-primary focus:outline-none md:h-9 md:min-w-52 md:max-w-xs">
         {{-- Dates for everyone: a moderator filters their own orders by day too. --}}
             <div @class(['flex shrink-0 items-center gap-2 md:contents', 'max-md:w-40' => $wide])>
             <span data-range class="min-w-0 max-md:flex-1 max-md:[&>div]:w-full max-md:[&>div>button]:w-full md:shrink-0"><x-simple-select name="range" :options="['' => __('All open'), 'today' => __('Today'), '7' => __('7 days'), '30' => __('30 days'), 'custom' => __('Custom dates')]" :value="$range === 'open' ? '' : $range" /></span>

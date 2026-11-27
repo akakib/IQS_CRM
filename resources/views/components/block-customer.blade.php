@@ -41,18 +41,18 @@
                     {{-- Same choices as the website's Block box (Fake Order Guard). A website order is blocked there too. --}}
                     <div class="mt-3 divide-y divide-gray-100">
                         <label class="flex items-start gap-3 py-2.5">
-                            <input type="checkbox" @if ($web) name="types[]" value="phone" x-model="phone" @else checked disabled @endif class="mt-0.5 size-5 rounded border-gray-300">
+                            <input type="checkbox" @if ($web) name="types[]" value="phone" x-model="phone" @else checked disabled @endif class="mt-0.5 size-5 shrink-0 rounded border-gray-300">
                             <span><span class="block text-sm text-gray-900">{{ __('Phone :p', ['p' => $c->primary_phone ?: $order->ship_phone]) }}</span>
                                 <span class="block text-xs text-gray-500">{{ __('Most reliable, belongs to one person') }}</span></span>
                         </label>
                         @if ($web)
                             <label class="flex items-start gap-3 py-2.5">
-                                <input type="checkbox" name="types[]" value="device" x-model="device" class="mt-0.5 size-5 rounded border-gray-300">
+                                <input type="checkbox" name="types[]" value="device" x-model="device" class="mt-0.5 size-5 shrink-0 rounded border-gray-300">
                                 <span><span class="block text-sm text-gray-900">{{ __('This device') }}</span>
                                     <span class="block text-xs text-gray-500">{{ __('Works even when the IP changes') }}</span></span>
                             </label>
                             <label class="flex items-start gap-3 py-2.5">
-                                <input type="checkbox" name="types[]" value="ip" x-model="ipOn" class="mt-0.5 size-5 rounded border-gray-300">
+                                <input type="checkbox" name="types[]" value="ip" x-model="ipOn" class="mt-0.5 size-5 shrink-0 rounded border-gray-300">
                                 <span><span class="block text-sm text-gray-900">{{ __('IP') }} <span x-text="ip || ''"></span></span>
                                     <span class="block text-xs text-gray-500">{{ __('Off by default: a mobile IP is shared by many real customers. Tick only for home Wi-Fi') }}</span></span>
                             </label>

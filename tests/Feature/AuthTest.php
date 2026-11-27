@@ -23,6 +23,14 @@ class AuthTest extends TestCase
         app(\App\Services\PermissionService::class)->bump();
         $this->post('/login', ['email' => $staff->email, 'password' => 'secret-pass'])->assertRedirect(route('desk.index'));
         $this->get('/')->assertRedirect(route('desk.index'));
+        // Sent to log in from the Dashboard (or the home-screen app, which opens "/"): still Order management.
+        $this->post('/logout');
+        $this->get('/dashboard')->assertRedirect('/login');
+        $this->post('/login', ['email' => $staff->email, 'password' => 'secret-pass'])->assertRedirect(route('desk.index'));
+        // Sent away from another page: back to that page.
+        $this->post('/logout');
+        $this->get('/customers')->assertRedirect('/login');
+        $this->post('/login', ['email' => $staff->email, 'password' => 'secret-pass'])->assertRedirect(url('/customers'));
         $this->seed(\Database\Seeders\OrderConfigSeeder::class);
         $this->get('/dashboard')->assertOk(); // still there when opened on purpose
         $this->post('/logout');

@@ -47,7 +47,12 @@ class LoginController extends Controller
         RateLimiter::clear($throttleKey);
         $request->session()->regenerate();
 
-        return redirect()->intended($request->user()->homeUrl());
+        // Back to the page they were sent away from, except the Dashboard or the home address: those mean "my first page",
+        // which for staff who work orders is Order management (User::homeUrl).
+        $intended = (string) $request->session()->pull('url.intended', '');
+        $path = rtrim((string) parse_url($intended, PHP_URL_PATH), '/');
+
+        return redirect($intended !== '' && ! in_array($path, ['', '/dashboard'], true) ? $intended : $request->user()->homeUrl());
     }
 
     /** "/" opens each person's own first page (User::homeUrl). */

@@ -2,7 +2,7 @@
     "name": "T5 CRM",
     "short_name": "T5 CRM",
     "id": "/",
-    "start_url": "/dashboard",
+    "start_url": "/",
     "scope": "/",
     "display": "standalone",
     "orientation": "any",

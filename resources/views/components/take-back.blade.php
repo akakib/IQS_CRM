@@ -5,7 +5,7 @@
 
 @if (auth()->user() && app(\App\Services\Orders\DeskService::class)->canTakeBack($order, auth()->user()))
     <div x-data="{ open: false }" {{ $attributes }}>
-        <button type="button" @click="open = true" class="lockable h-8 rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-600 hover:border-red-300 hover:text-red-700">{{ __('Booked by mistake') }}</button>
+        <button type="button" @click="open = true" class="lockable h-8 rounded-lg border border-red-300 bg-white px-3 text-xs font-medium text-red-700 hover:bg-red-50">{{ __('Booked by mistake') }}</button>
         <div x-show="open" x-cloak class="fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:px-4">
             <div class="absolute inset-0 bg-black/40"></div>
             <form method="POST" action="{{ route('orders.take-back', $order) }}" class="relative w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-xl">

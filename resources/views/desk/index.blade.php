@@ -190,6 +190,8 @@
                     <a href="{{ $url(['tab' => $tab, 'who' => null]) }}" @class(['flex items-center justify-center px-3 font-medium', 'bg-primary text-white' => $everyone, 'text-gray-600 hover:bg-gray-50' => ! $everyone])>{{ __('Everyone') }}</a>
                     <a href="{{ $url(['tab' => $tab, 'who' => 'mine', 'moderator' => null]) }}" @class(['flex items-center justify-center border-l border-gray-300 px-3 font-medium', 'bg-primary text-white' => ! $everyone, 'text-gray-600 hover:bg-gray-50' => $everyone])>{{ __('Mine') }}</a>
                 </div>
+                {{-- The pickers: full width in the phone's sheet, in the row on a computer. --}}
+                <div class="grid gap-2.5 max-md:[&>div>button]:w-full md:contents">
                 <x-simple-select name="range" :options="['' => __('All open'), 'today' => __('Today'), '7' => __('7 days'), '30' => __('30 days'), 'custom' => __('Custom dates')]" :value="$range === 'open' ? '' : $range" />
                 @if ($range === 'custom')
                     <div class="grid grid-cols-2 gap-2 md:flex">
@@ -201,6 +203,7 @@
                     <x-simple-select name="moderator" :options="['' => __('Anyone')] + $staffOptions" :value="(string) ($staffId ?? '')" />
                 @endif
                 <x-simple-select name="channel" :options="['' => __('Any channel')] + array_map('__', \App\Models\Order::CHANNELS)" :value="$channel ?? ''" />
+                </div>
                 <div class="mt-2 flex items-center gap-2 md:ml-auto md:mt-0">
                     @if ($keep)
                         <a href="{{ route('desk.index', ['tab' => $tab]) }}" class="flex h-10 items-center rounded-lg border border-gray-300 px-3 text-sm text-gray-600 hover:bg-gray-50 md:h-9">{{ __('Clear') }}</a>

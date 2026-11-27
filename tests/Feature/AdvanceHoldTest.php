@@ -210,7 +210,7 @@ class AdvanceHoldTest extends TestCase
         $this->actingAs($this->mod)->post("/orders/{$order->id}/block", ['reason' => 'Fake or prank order'])->assertForbidden();
 
         $this->actingAs($this->admin)->get("/desk?order={$order->id}")->assertOk()->assertSee('Block');
-        $this->post("/orders/{$order->id}/block", ['reason' => 'Fake or prank order', 'types' => ['phone'], 'days' => 30, 'cancel' => 1, 'cancel_reason_id' => $cancel])
+        $this->post("/orders/{$order->id}/block", ['reason' => 'Fake order', 'types' => ['phone'], 'days' => 30, 'cancel' => 1, 'cancel_reason_id' => $cancel])
             ->assertSessionHasNoErrors()->assertSessionHas('success');
         $this->assertSame('blocked', $order->customer->fresh()->risk_level);
         $this->assertSame('cancelled', $this->key($order));

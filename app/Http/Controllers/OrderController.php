@@ -381,16 +381,21 @@ class OrderController extends Controller
     public function block(Order $order, Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'reason' => ['required', Rule::in(\App\Services\Customers\CustomerBlocker::REASONS)],
+            'reason' => ['nullable', 'string', 'max:200'],
             'types' => ['nullable', 'array'], 'types.*' => [Rule::in(['phone', 'device', 'ip'])],
             'days' => ['nullable', Rule::in(['0', '7', '30', 0, 7, 30])],
             'cancel' => ['nullable', 'boolean'],
             'cancel_reason_id' => [Rule::requiredIf(fn () => $request->boolean('cancel') && ! OrderStatus::map()[$order->status_id]['final']), 'nullable', 'integer'],
-            'note' => ['nullable', 'string', 'max:200'],
         ]);
         $data['cancel'] = $request->boolean('cancel');
 
         return back()->with('success', app(\App\Services\Customers\CustomerBlocker::class)->block($order, $request->user(), $data));
+    }
+
+    /** The IP a website order came from, read when the Block popup opens. */
+    public function blockInfo(Order $order): \Illuminate\Http\JsonResponse
+    {
+        return response()->json(['ip' => app(\App\Services\Customers\CustomerBlocker::class)->ip($order)]);
     }
 
     public function unblock(Order $order, Request $request): RedirectResponse

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Catalog\Store\WooApi;
 use App\Services\Orders\OrderService;
 use App\Services\Orders\OrderStateMachine;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,13 +20,10 @@ use Illuminate\Validation\ValidationException;
  */
 class CustomerBlocker
 {
-    /** Why someone is blocked (picked in the Block popup). */
-    public const REASONS = ['Fake or prank order', 'Returned again and again', 'Abusive customer', 'Wrong or fake number'];
-
     public function __construct(private OrderService $orders, private WooApi $website) {}
 
     /**
-     * @param  array{reason: string, types?: list<string>, days?: int, cancel?: bool, cancel_reason_id?: int|null, note?: string|null}  $data
+     * @param  array{reason?: string|null, types?: list<string>, days?: int, cancel?: bool, cancel_reason_id?: int|null, note?: string|null}  $data
      * @return string what happened, for the page's message
      */
     public function block(Order $order, User $by, array $data): string
@@ -34,14 +32,14 @@ class CustomerBlocker
         if (! $customer) {
             throw ValidationException::withMessages(['block' => __('This order has no customer to block.')]);
         }
-        $reason = trim($data['reason'].(filled($data['note'] ?? null) ? ': '.$data['note'] : ''));
+        $reason = trim((string) ($data['reason'] ?? ''));
 
         DB::transaction(function () use ($order, $by, $data, $customer, $reason) {
             // Cancel first: if the order cannot be cancelled (a parcel the courier already has), nothing is blocked either.
             if (! empty($data['cancel']) && ! OrderStatus::map()[$order->status_id]['final']) {
-                app(OrderStateMachine::class)->transition($order->fresh(), 'cancelled', $by, 'user', $data['cancel_reason_id'] ?? null, __('Blocked: :r', ['r' => $reason]));
+                app(OrderStateMachine::class)->transition($order->fresh(), 'cancelled', $by, 'user', $data['cancel_reason_id'] ?? null, $reason !== '' ? __('Blocked: :r', ['r' => $reason]) : __('Customer blocked'));
             }
-            $customer->forceFill(['risk_level' => 'blocked', 'blocked_reason' => mb_substr($reason, 0, 255)])->save();
+            $customer->forceFill(['risk_level' => 'blocked', 'blocked_reason' => $reason !== '' ? mb_substr($reason, 0, 255) : null])->save();
         });
 
         $website = $this->onWebsite($order, 'block', [
@@ -49,7 +47,7 @@ class CustomerBlocker
             'days' => in_array((int) ($data['days'] ?? 30), [0, 7, 30], true) ? (int) $data['days'] : 30,
             'reason' => $reason, 'by' => $by->name,
         ]);
-        $this->orders->note($order, 'system', __('Customer blocked by :n: :r.', ['n' => $by->name, 'r' => $reason]).($website ? ' '.$website : ''), $by);
+        $this->orders->note($order, 'system', ($reason !== '' ? __('Customer blocked by :n: :r.', ['n' => $by->name, 'r' => $reason]) : __('Customer blocked by :n.', ['n' => $by->name])).($website ? ' '.$website : ''), $by);
 
         return __(':no: customer blocked.', ['no' => $order->order_no]).($website ? ' '.$website : '');
     }
@@ -65,6 +63,22 @@ class CustomerBlocker
         $this->orders->note($order, 'system', __('Customer unblocked by :n.', ['n' => $by->name]).($website ? ' '.$website : ''), $by);
 
         return __(':no: customer unblocked.', ['no' => $order->order_no]).($website ? ' '.$website : '');
+    }
+
+    /** The IP a website order came from, for the Block popup (null: not a website order, or the website did not answer). */
+    public function ip(Order $order): ?string
+    {
+        if ($order->channel !== 'web' || ! $order->external_ref || ! $this->website->configured()) {
+            return null;
+        }
+
+        return Cache::remember('block-ip:'.$order->id, 3600, function () use ($order) {
+            try {
+                return (string) $this->website->get('orders/'.(int) $order->external_ref, ['_fields' => 'customer_ip_address'])->json('customer_ip_address');
+            } catch (\Throwable) {
+                return '';
+            }
+        }) ?: null;
     }
 
     /** The website's Fake Order Guard, for website orders: what it said, in a few words (null: not a website order). */

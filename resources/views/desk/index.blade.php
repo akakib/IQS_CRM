@@ -141,7 +141,7 @@
     @php $filtersOn = count(array_intersect_key($keep, ['moderator' => 1, 'channel' => 1])); @endphp
         <form method="GET" action="{{ route('desk.index') }}" x-ref="f" @submit.prevent="go()"
             @select-change="if ($event.target.closest('[data-range]')) range = $event.detail; setTimeout(() => go(), 0)"
-            @class(['order-3 min-w-0 flex-wrap items-center gap-2 md:flex-1 md:flex-nowrap', 'w-full' => $wide, 'flex-1' => ! $wide, 'flex'])>
+            @class(['order-3 min-w-0 flex-wrap items-center gap-2 md:flex-1', 'w-full' => $wide, 'flex-1' => ! $wide, 'flex'])>
         <input type="hidden" name="tab" value="{{ $tab }}">
         @if ($wide)
             <input type="hidden" name="who" :value="who">

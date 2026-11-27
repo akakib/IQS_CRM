@@ -92,22 +92,24 @@
     @endif
     {{-- New orders: nobody picks; "Take next" always gives the oldest one. --}}
     @unless ($embed)
-    <div @class(['mb-3 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between sm:p-4', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
+    {{-- A phone (as on the Hisab desk): one short row, the count and its line on the left, Sync and New order as
+         two square buttons on the right; Take next takes the row under it. A computer: one row with full buttons. --}}
+    <div @class(['mb-3 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2.5 rounded-xl border border-gray-200 bg-white p-3 sm:mb-4 sm:flex-row sm:justify-between sm:gap-3 sm:p-4', 'grid sm:flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         @php $anyWaiting = $waiting + $advanceWaiting; @endphp
         {{-- Live: the pulse (every 30 s) updates the count, the wording and Take next without a reload. --}}
-        <div class="flex items-center gap-3 sm:gap-4" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }},
+        <div class="flex min-w-0 items-center gap-3 sm:gap-4" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }},
                 label() { return this.n === 0 ? @js(__('No new orders')) : (this.adv === this.n ? (this.n === 1 ? @js(__('1 order waiting for its advance')) : this.n + ' ' + @js(__('orders waiting for their advance'))) : (this.n === 1 ? @js(__('New order waiting')) : @js(__('New orders waiting')))) } }"
             @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-bold tabular-nums sm:h-12 sm:w-12 sm:text-lg" :class="n ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'" x-text="n">{{ $anyWaiting }}</div>
-            <div>
-                <p class="text-sm font-semibold text-gray-800" x-text="label()">
+            <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-gray-800" x-text="label()">
                     @if (! $waiting && $advanceWaiting)
                         {{ trans_choice('{1} 1 order waiting for its advance|[2,*] :n orders waiting for their advance', $advanceWaiting, ['n' => $advanceWaiting]) }}
                     @else
                         {{ trans_choice('{0} No new orders|{1} New order waiting|[2,*] New orders waiting', $waiting) }}
                     @endif
                 </p>
-                <p class="text-xs text-gray-500">
+                <p class="truncate text-xs text-gray-500 sm:whitespace-normal">
                     @if ($waiting) {{ __('Oldest: :t ago', ['t' => $age($oldestWaiting)]) }} · @endif
                     @if ($waiting && $advanceWaiting) {{ __(':n waiting for advance', ['n' => $advanceWaiting]) }} · @endif
                     {{ $limit === 1 ? ($inHand ? __('One order at a time: finish yours to take the next') : __('One order at a time')) : __('You hold :a of :l', ['a' => $inHand, 'l' => $limit]) }}
@@ -115,19 +117,19 @@
                 </p>
             </div>
         </div>
-        {{-- A phone: the buttons side by side (an odd last one takes the row), not one under another. --}}
-        <div class="grid grid-cols-2 gap-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:items-center">
-        <x-website-sync />
+        <div class="contents sm:flex sm:flex-row sm:items-center sm:gap-2">
+        <div class="flex items-center gap-2 sm:contents">
+        <x-website-sync compact />
         @can('orders.create')
             {{-- New order: first "where from?", so every order counts for its number or page. --}}
             @php $myChannels = app(\App\Services\Work\ChatService::class)->channelsFor(auth()->user()); @endphp
             <div class="relative" x-data="{ pick: false, go(url) { this.pick = false; window.dispatchEvent(new CustomEvent('order-new', { detail: url })) } }" @click.outside="pick = false" @keydown.escape.window="pick = false">
-                <x-button type="button" variant="secondary" class="w-full sm:w-auto" data-key="o"
+                <x-button type="button" variant="secondary" class="max-sm:w-10 max-sm:border-primary max-sm:bg-primary max-sm:px-0 max-sm:text-lg max-sm:text-white sm:w-auto" data-key="o" aria-label="{{ __('New order') }}"
                     @click="{{ $myChannels->isEmpty() ? 'go('.\Illuminate\Support\Js::from(route('orders.create', ['embed' => 1])).')' : 'pick = ! pick' }}">
-                    + {{ __('New order') }} <kbd class="hidden rounded bg-gray-100 px-1.5 text-[11px] text-gray-500 lg:inline">⇧O</kbd>
+                    + <span class="max-sm:hidden">{{ __('New order') }}</span> <kbd class="hidden rounded bg-gray-100 px-1.5 text-[11px] text-gray-500 lg:inline">⇧O</kbd>
                 </x-button>
                 @if ($myChannels->isNotEmpty())
-                    <div x-show="pick" x-cloak x-transition class="absolute right-0 z-40 mt-2 w-full min-w-[16rem] rounded-xl border border-gray-200 bg-white py-1 shadow-lg sm:w-72">
+                    <div x-show="pick" x-cloak x-transition class="absolute right-0 z-40 mt-2 w-64 rounded-xl border border-gray-200 bg-white py-1 shadow-lg sm:w-72">
                         <p class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ __('Where did it come from?') }}</p>
                         @foreach ($myChannels as $c)
                             <button type="button" @click="go(@js(route('orders.create', ['chat_channel' => $c->id, 'embed' => 1])))" class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-gray-50">
@@ -144,8 +146,9 @@
                 @endif
             </div>
         @endcan
+        </div>
         @if ($canTake)
-            <form method="POST" action="{{ route('desk.next') }}" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
+            <form method="POST" action="{{ route('desk.next') }}" class="col-span-2" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
                 @csrf
                 {{-- A batch at a time: an advance hold not called yet fills the hand like any other. --}}
                 <x-button class="w-full sm:w-auto" data-key="t" :disabled="! $anyWaiting || $atLimit" x-bind:disabled="!n || {{ $atLimit ? 'true' : 'false' }}">
@@ -167,42 +170,45 @@
     @endif
 
     {{-- Search for everyone (a moderator: their own orders). Owner and managers: everyone's orders or their own,
-         dates, who has it, where it came from, and Export. A phone keeps one row (search + Filters); the rest opens
-         as a sheet from the bottom, the same way as the list pages (x-list.filter-bar). --}}
-    @php $filtersOn = count(array_diff_key($keep, ['q' => 1])); @endphp
-    <form method="GET" action="{{ route('desk.index') }}" x-ref="f" @submit.prevent="go()" @select-change="setTimeout(() => go(), 0)"
+         dates, who has it, where it came from, and Export; all of it changes the page in place (desk-filters.js).
+         A phone, as on the Hisab desk: Everyone / Mine on top, then search with the dates beside it; person, channel
+         and Export open from Filters as a sheet. A computer: one row. --}}
+    @php $filtersOn = count(array_intersect_key($keep, ['moderator' => 1, 'channel' => 1])); @endphp
+    <form method="GET" action="{{ route('desk.index') }}" x-ref="f" @submit.prevent="go()"
+        @select-change="if ($event.target.closest('[data-range]')) range = $event.detail; setTimeout(() => go(), 0)"
         x-data="deskFilters({ range: @js($range === 'open' ? '' : $range), who: @js($wide && ! $everyone ? 'mine' : ''), base: @js(route('desk.index')) })"
-        @class(['mb-3 items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 sm:p-3', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
+        @class(['mb-3 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 sm:p-3 md:flex-nowrap', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         <input type="hidden" name="tab" value="{{ $tab }}">
-        @if ($wide)<input type="hidden" name="who" :value="who">@endif
+        @if ($wide)
+            <input type="hidden" name="who" :value="who">
+            <div class="flex w-full items-center justify-between gap-2 md:contents">
+                <div class="grid h-10 shrink-0 grid-cols-2 overflow-hidden rounded-lg border border-gray-300 text-center text-sm md:order-2 md:flex md:h-9">
+                    <button type="button" @click="setWho('')" class="flex items-center justify-center px-4 font-medium md:px-3" :class="who === 'mine' ? 'text-gray-600 hover:bg-gray-50' : 'bg-primary text-white'">{{ __('Everyone') }}</button>
+                    <button type="button" @click="setWho('mine')" class="flex items-center justify-center border-l border-gray-300 px-4 font-medium md:px-3" :class="who === 'mine' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'">{{ __('Mine') }}</button>
+                </div>
+                <button type="button" @click="sheet = true" class="relative h-10 shrink-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-600 md:hidden">
+                    {{ __('Filters') }}
+                    <span x-show="n" x-cloak class="ml-1 rounded-full bg-primary px-1.5 text-xs text-white" x-text="n">{{ $filtersOn }}</span>
+                </button>
+            </div>
+        @endif
         <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('Name, phone, order no or CN') }}"
             x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length) }"
             @input.debounce.500ms="go()" @keydown.enter.prevent="go()"
-            class="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none md:h-9 md:max-w-xs">
+            class="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none md:order-1 md:h-9 md:max-w-xs">
         @if ($wide)
-            <button type="button" @click="sheet = true" class="relative h-10 shrink-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-600 md:hidden">
-                {{ __('Filters') }}
-                <span x-show="n" x-cloak class="ml-1 rounded-full bg-primary px-1.5 text-xs text-white" x-text="n">{{ $filtersOn }}</span>
-            </button>
+            <span data-range class="shrink-0 md:order-3"><x-simple-select name="range" :options="['' => __('All open'), 'today' => __('Today'), '7' => __('7 days'), '30' => __('30 days'), 'custom' => __('Custom dates')]" :value="$range === 'open' ? '' : $range" /></span>
+            {{-- Custom dates: the two days show as soon as it is picked, no reload. --}}
+            <div x-show="range === 'custom'" x-cloak class="grid w-full grid-cols-2 gap-2 md:order-4 md:flex md:w-auto">
+                <input type="date" name="from" value="{{ $from->toDateString() }}" @change="go()" class="h-10 min-w-0 rounded-lg border border-gray-300 px-2 text-sm md:h-9" aria-label="{{ __('From') }}">
+                <input type="date" name="to" value="{{ $to->toDateString() }}" @change="go()" class="h-10 min-w-0 rounded-lg border border-gray-300 px-2 text-sm md:h-9" aria-label="{{ __('To') }}">
+            </div>
             <div x-show="sheet" x-cloak @click="sheet = false" class="fixed inset-0 z-40 bg-black/40 md:hidden"></div>
             <div :class="sheet ? 'fixed inset-x-0 bottom-0 z-50 grid rounded-t-2xl bg-white p-5 pb-8 shadow-2xl' : 'hidden'"
-                class="gap-2.5 md:static md:z-auto md:flex md:flex-1 md:flex-wrap md:items-center md:gap-2 md:rounded-none md:p-0 md:pb-0 md:shadow-none">
+                class="gap-2.5 md:static md:z-auto md:order-5 md:flex md:flex-1 md:items-center md:gap-2 md:rounded-none md:p-0 md:pb-0 md:shadow-none">
                 <p class="mb-1 text-sm font-semibold text-gray-800 md:hidden">{{ __('Filters') }}</p>
-                <div class="grid h-10 shrink-0 grid-cols-2 overflow-hidden rounded-lg border border-gray-300 text-center text-sm md:flex md:h-9">
-                    <button type="button" @click="setWho('')" class="flex items-center justify-center px-3 font-medium" :class="who === 'mine' ? 'text-gray-600 hover:bg-gray-50' : 'bg-primary text-white'">{{ __('Everyone') }}</button>
-                    <button type="button" @click="setWho('mine')" class="flex items-center justify-center border-l border-gray-300 px-3 font-medium" :class="who === 'mine' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'">{{ __('Mine') }}</button>
-                </div>
-                {{-- The pickers: full width in the phone's sheet, in the row on a computer. --}}
-                <div class="grid gap-2.5 max-md:[&>div>button]:w-full md:contents" @select-change="if ($event.target.closest('[data-range]')) range = $event.detail">
-                <span data-range class="contents max-md:[&>div>button]:w-full"><x-simple-select name="range" :options="['' => __('All open'), 'today' => __('Today'), '7' => __('7 days'), '30' => __('30 days'), 'custom' => __('Custom dates')]" :value="$range === 'open' ? '' : $range" /></span>
-                    {{-- Custom dates: the two days show as soon as it is picked, no reload. --}}
-                    <div x-show="range === 'custom'" x-cloak class="grid grid-cols-2 gap-2 md:flex">
-                        <input type="date" name="from" value="{{ $from->toDateString() }}" @change="go()" class="h-10 min-w-0 rounded-lg border border-gray-300 px-2 text-sm md:h-9" aria-label="{{ __('From') }}">
-                        <input type="date" name="to" value="{{ $to->toDateString() }}" @change="go()" class="h-10 min-w-0 rounded-lg border border-gray-300 px-2 text-sm md:h-9" aria-label="{{ __('To') }}">
-                    </div>
-                    <span x-show="who !== 'mine'" class="contents max-md:[&>div>button]:w-full"><x-simple-select name="moderator" :options="['' => __('Anyone')] + $staffOptions" :value="(string) ($staffId ?? '')" /></span>
-                <x-simple-select name="channel" :options="['' => __('Any channel')] + array_map('__', \App\Models\Order::CHANNELS)" :value="$channel ?? ''" />
-                </div>
+                <span x-show="who !== 'mine'" class="contents max-md:[&>div>button]:w-full"><x-simple-select name="moderator" :options="['' => __('Anyone')] + $staffOptions" :value="(string) ($staffId ?? '')" /></span>
+                <span class="contents max-md:[&>div>button]:w-full"><x-simple-select name="channel" :options="['' => __('Any channel')] + array_map('__', \App\Models\Order::CHANNELS)" :value="$channel ?? ''" /></span>
                 <div class="mt-2 flex items-center gap-2 md:ml-auto md:mt-0">
                     @if ($keep)
                         <a href="{{ route('desk.index', ['tab' => $tab]) }}" class="flex h-10 items-center rounded-lg border border-gray-300 px-3 text-sm text-gray-600 hover:bg-gray-50 md:h-9">{{ __('Clear') }}</a>
@@ -323,9 +329,7 @@
                             'border-l-primary bg-primary-soft/60' => $current, 'border-l-orange-400 bg-orange-50' => ! $current && $row->stock_issue, 'border-l-transparent' => ! $current && ! $row->stock_issue])>
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $row->ship_name }}</span>
-                            <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }} · {{ \App\Models\Order::sourceLabel($row) }}</span>
-                            {{-- Everyone's orders: who has this one. --}}
-                            @if ($everyone)<span class="block truncate text-[11px] {{ $row->moderator_name ? 'text-gray-500' : 'text-amber-700' }}">{{ $row->moderator_name ?: __('Nobody yet') }}</span>@endif
+                            <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }} · {{ \App\Models\Order::sourceLabel($row) }}@if ($everyone) · <span class="font-sans {{ $row->moderator_name ? '' : 'text-amber-700' }}">{{ $row->moderator_name ?: __('Nobody yet') }}</span>@endif</span>
                         </span>
                         <span class="shrink-0 text-right">
                             @if ($row->action_due_at)

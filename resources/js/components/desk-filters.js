@@ -24,7 +24,7 @@ export default ({ range, who, base }) => ({
 
     count() {
         const f = this.fields();
-        this.n = ['range', 'moderator', 'channel', 'who'].filter((k) => f.get(k)).length;
+        this.n = ['moderator', 'channel'].filter((k) => f.get(k)).length; // what sits behind the phone's Filters button
     },
 
     setWho(w) {

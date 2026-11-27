@@ -59,14 +59,14 @@
     }" @scan="scan($event.detail)">
 
     {{-- Scan first: it is the packer's job, so it stays at the top while the list scrolls. --}}
-    <div class="sticky top-[61px] z-20 -mx-4 bg-gray-50 px-4 pb-2 pt-1 md:-mx-6 md:px-6 lg:top-[65px]">
+    <div class="sticky top-[61px] z-20 -mx-4 bg-gray-50 px-4 pb-2 pt-1 md:-mx-6 md:px-6 lg:top-[63px]">
         @if ($canPack)
             {{-- Camera mode: after Packed the camera comes back by itself for the next label; it ends when nothing is left to pack. --}}
             <x-scan-input once quiet remember="packaging" :left="$counts['waiting'] + $counts['red'] + $counts['mine']"
                 :done-message="__('All parcels packed. Camera off.')" :placeholder="__('Scan a label')" />
         @endif
         <div class="mt-2 grid grid-cols-4 gap-2">
-            @foreach ([[__('Packed today'), $myDay['packed'], false], [__('Average'), $myDay['avg'] === null ? '-' : $myDay['avg'].' min', false], [__('Scan errors'), $myDay['errors'], $myDay['errors'] > 0], [__('Waiting'), $counts['waiting'], false]] as [$label, $value, $bad])
+            @foreach ([[__('Packed'), $myDay['packed'], false], [__('Average'), $myDay['avg'] === null ? '-' : $myDay['avg'].' min', false], [__('Scan errors'), $myDay['errors'], $myDay['errors'] > 0], [__('Waiting'), $counts['waiting'], false]] as [$label, $value, $bad])
                 <div class="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5">
                     <p class="truncate text-[11px] text-gray-500">{{ $label }}</p>
                     <p @class(['text-base font-semibold tabular-nums', 'text-red-600' => $bad, 'text-gray-900' => ! $bad])>{{ $value }}</p>

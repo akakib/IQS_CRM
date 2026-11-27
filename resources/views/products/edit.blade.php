@@ -49,5 +49,5 @@
     @endif
 
     <x-confirm-modal id="delete-product" :message="__('It disappears from lists and search. Past orders keep their copy.')" />
-    <div class="h-20 lg:hidden"></div>{{-- room above the phone's Save bar --}}
+    <div class="h-16 lg:hidden"></div>{{-- room above the phone's Save bar --}}
 </x-layouts.app>

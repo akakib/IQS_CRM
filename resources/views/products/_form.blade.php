@@ -168,7 +168,7 @@
     {{-- Side column: Save, picture, publishing, SEO. On a computer it stays in view while the left side scrolls. --}}
     <div class="space-y-5 lg:sticky lg:top-4">
         {{-- One Save bar: fixed at the bottom of a phone, the first box of the side column on a computer. --}}
-        <div class="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-gray-200 bg-white px-4 py-3 lg:static lg:rounded-xl lg:border lg:p-4">
+        <div class="above-nav fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-gray-200 bg-white px-4 py-3 lg:static lg:rounded-xl lg:border lg:p-4">
             <x-button variant="secondary" :href="route('products.index')">{{ __('Cancel') }}</x-button>
             <x-button class="flex-1 justify-center">{{ __('Save product') }}</x-button>
         </div>

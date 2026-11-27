@@ -91,7 +91,7 @@
 
         @if ($canEdit)
             {{-- Saves every tab at once. --}}
-            <div class="sticky bottom-0 z-10 max-lg:bottom-16 -mx-1 flex items-center gap-3 border-t border-gray-200 bg-gray-50/95 px-1 py-3">
+            <div class="above-nav sticky bottom-0 z-10 -mx-1 flex items-center gap-3 border-t border-gray-200 bg-gray-50/95 px-1 py-3">
                 <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark">{{ __('Save settings') }}</button>
                 <span class="text-xs text-gray-500">{{ __('Saves all tabs.') }}</span>
             </div>

@@ -1,6 +1,5 @@
 {{-- Phone and tablet: the app's bottom bar (the sidebar is for a computer). Up to four places this person works in,
-     by what they may open, then More, which opens the whole menu from the right. Shown on the menu pages only;
-     a page with Back at the top (an order, an Edit page) has none, like the detail screens of an app.
+     by what they may open, then More, which opens the whole menu from the right. Shown on every page.
      <x-bottom-nav /> --}}
 @php
     $user = auth()->user();
@@ -30,7 +29,8 @@
     $onPlace = $places->contains(fn ($p) => $p[2]);
 @endphp
 
-<nav class="app-bottom-nav fixed inset-x-0 bottom-0 z-30 grid border-t border-gray-200 bg-white px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 lg:hidden"
+{{-- 62px tall plus the phone's own bottom inset: the layout's above-nav rule counts on it. --}}
+<nav class="app-bottom-nav fixed inset-x-0 bottom-0 z-30 grid h-[calc(3.875rem+env(safe-area-inset-bottom))] items-start border-t border-gray-200 bg-white px-1 pb-[env(safe-area-inset-bottom)] pt-1 lg:hidden"
     style="grid-template-columns: repeat({{ $places->count() + 1 }}, minmax(0, 1fr))" aria-label="{{ __('Main') }}">
     @foreach ($places as [$label, $url, $active, $perm, $icon])
         <a href="{{ $url }}" @if ($url === '#chat') @click.prevent="window.dispatchEvent(new CustomEvent('chat-open'))" @endif @if ($active) aria-current="page" @endif

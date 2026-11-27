@@ -15,9 +15,9 @@
         }
         $backUrl = route($parent ?? 'dashboard');
     }
-    // Phone and tablet: the bottom bar shows on the menu pages; a page with Back, or one that asks for none
-    // (:nav="false": an order open on Order management, with its own buttons at the bottom), has no bar.
-    $bottomNav = ! $backUrl && ($nav ?? true);
+    // Phone and tablet: the bottom bar is on every page, also with an order or an Edit page open; a page's own
+    // bottom buttons sit just above it (class above-nav). A page can still ask for none with :nav="false".
+    $bottomNav = $nav ?? true;
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -36,10 +36,14 @@
         }
         /* Nothing that waits for the scripts (popups, sheets, menus) may show before they run. */
         [x-cloak] { display: none !important; }
+        /* Phone and tablet: a page's own bottom buttons rest on top of the bottom bar, not under it. */
+        @media (max-width: 1023.98px) {
+            .has-bottom-nav .above-nav { bottom: calc(3.875rem + env(safe-area-inset-bottom)); }
+        }
     </style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-gray-50 font-sans text-gray-900 antialiased" x-data="{
+<body class="{{ $bottomNav ? 'has-bottom-nav ' : '' }}bg-gray-50 font-sans text-gray-900 antialiased" x-data="{
         sidebarOpen: false, more: false,
         {{-- Menu button: on a computer it folds the sidebar to icons (remembered); on a phone it opens the drawer. --}}
         menu() {

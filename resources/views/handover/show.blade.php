@@ -112,7 +112,7 @@
                     <form id="hand-one-{{ $m->id }}" method="POST" action="{{ route('handover.manual', $session->id) }}" class="hidden">@csrf<input type="hidden" name="order_ids[]" value="{{ $m->id }}"></form>
                 @endforeach
 
-                <div class="sticky bottom-0 z-10 -mx-4 border-t border-gray-200 bg-white p-3 md:mx-0 md:rounded-xl md:border">
+                <div class="above-nav sticky bottom-0 z-10 -mx-4 border-t border-gray-200 bg-white p-3 md:mx-0 md:rounded-xl md:border">
                     <button type="button" :disabled="picked.length === 0"
                         @click="$dispatch('open-confirm', { id: 'manual-handover-confirm', form: 'manual-handover', label: picked.length + ' ' + @js(__('parcels')), verb: @js(__('Hand over')), message: @js(__('Confirm the rider has these parcels in hand. They will be recorded as handed over by hand.')), danger: false })"
                         class="w-full rounded-xl bg-primary px-4 py-3.5 text-base font-semibold text-white hover:bg-primary-dark disabled:opacity-40"

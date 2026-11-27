@@ -39,7 +39,7 @@
     view()->share('navInHand', (int) $inHand);
 @endphp
 
-<x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="__('Order management')" :nav="! $showDetailOnPhone">
+<x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="__('Order management')">
 <div @iqs-pulse.window="follow($event.detail.mine)" x-data="{
         reasonMode: null, reason: null, holdDate: null, stockOut: @js($stockOutId), stockReasons: @js(app(\App\Services\Orders\DeskService::class)->stockReasonIds()),
         // Live list: when the orders in their hand change (one given, taken back, a call due), the tabs and the list
@@ -661,7 +661,7 @@
                             </form>
                             {{-- Two buttons (Resume / Cancel and the like): side by side on a phone, Cancel the small one on the left. --}}
                             @php $pair = count($actions) === 2; $wide = $pair ? 'flex-1' : 'w-full'; @endphp
-                            <div class="lockable sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-b-xl border-t border-gray-200 bg-white p-3 sm:p-4">
+                            <div class="above-nav lockable sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-b-xl border-t border-gray-200 bg-white p-3 sm:p-4">
                                 @foreach ($actions as [$action, $label, $k, $variant])
                                     @if ($action === 'confirm' && $detail['openDuplicates']->isNotEmpty())
                                         {{-- The courier is booked right away: a second open order of the same customer is merged first, not shipped twice. --}}

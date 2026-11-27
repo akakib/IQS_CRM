@@ -190,8 +190,9 @@
     </div>
 
     {{-- New orders: nobody picks; "Take next" always gives the oldest one. --}}
-    <div @class(['mb-3 items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3 sm:mb-4 sm:p-4', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
-        <div class="flex min-w-0 items-center gap-3 sm:gap-4" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }},
+    {{-- A phone: Take next sits on the right when its label is short, and takes the row under when it is long. --}}
+    <div @class(['mb-3 flex-wrap items-center justify-between gap-x-3 gap-y-2.5 rounded-xl border border-gray-200 bg-white p-3 sm:mb-4 sm:p-4', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
+        <div class="flex min-w-[11rem] flex-1 items-center gap-3 sm:gap-4" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }},
                 label() { return this.n === 0 ? @js(__('No new orders')) : (this.adv === this.n ? (this.n === 1 ? @js(__('1 order waiting for its advance')) : this.n + ' ' + @js(__('orders waiting for their advance'))) : (this.n === 1 ? @js(__('New order waiting')) : @js(__('New orders waiting')))) } }"
             @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-bold tabular-nums sm:h-12 sm:w-12 sm:text-lg" :class="n ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'" x-text="n">{{ $anyWaiting }}</div>
@@ -212,11 +213,11 @@
             </div>
         </div>
         @if ($canTake)
-            <form method="POST" action="{{ route('desk.next') }}" class="shrink-0" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
+            <form method="POST" action="{{ route('desk.next') }}" class="max-sm:flex-1" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }} }" @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
                 @csrf
                 {{-- A batch at a time: an advance hold not called yet fills the hand like any other. --}}
-                <x-button class="whitespace-nowrap" data-key="t" :disabled="! $anyWaiting || $atLimit" x-bind:disabled="!n || {{ $atLimit ? 'true' : 'false' }}">
-                    {{ $limit === 0 ? __('Website orders off for you') : ($atLimit ? ($inHand === 1 ? __('Finish this order first') : __('Finish your :n orders first', ['n' => $inHand])) : ($limit === 1 ? __('Take next') : __('Take next :n', ['n' => $limit]))) }} <kbd class="rounded bg-white/20 px-1.5 text-[11px]">⇧T</kbd>
+                <x-button class="whitespace-nowrap max-sm:w-full" data-key="t" :disabled="! $anyWaiting || $atLimit" x-bind:disabled="!n || {{ $atLimit ? 'true' : 'false' }}">
+                    {{ $limit === 0 ? __('Website orders off for you') : ($atLimit ? ($inHand === 1 ? __('Finish this order first') : __('Finish your :n orders first', ['n' => $inHand])) : ($limit === 1 ? __('Take next') : __('Take next :n', ['n' => $limit]))) }} <kbd class="hidden rounded bg-white/20 px-1.5 text-[11px] lg:inline">⇧T</kbd>
                 </x-button>
             </form>
         @endif

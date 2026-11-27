@@ -8,7 +8,7 @@ return [
     'order_status_live' => (bool) env('STORE_ORDER_STATUS_LIVE', false),
 
     // Which website order statuses IQS sets as an order moves here: record-verified only unless more are listed, any of
-    // record-verified, no-response, on-hold, call-verified, courier-processing, completed, returned, cancelled.
+    // record-verified, no-response, on-hold, call-verified, courier-processin (Courier Processing), completed, returned, cancelled.
     'order_statuses' => array_values(array_filter(array_map('trim', explode(',', (string) env('STORE_ORDER_STATUSES', 'record-verified'))))),
 
     // What a product change may send to the website: any of price, stock_status, content. Stock only unless set, so a

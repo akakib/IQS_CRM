@@ -19,11 +19,17 @@ class WebsiteStatusPush
 {
     public const STATUS = 'record-verified';
 
+    /**
+     * The website's slug for Courier Processing: cut to 17 letters there, because a status with "wc-" in front
+     * holds 20 at most (made on the website in Top5Way Tracking > Order Status).
+     */
+    public const COURIER = 'courier-processin';
+
     /** IQS status => the website's status slug. Packaging to In transit are one status there: Courier Processing. */
     public const MAP = [
         'record_verified' => 'record-verified', 'no_answer' => 'no-response', 'hold' => 'on-hold', 'confirmed' => 'call-verified',
-        'ready_for_packaging' => 'courier-processing', 'packed' => 'courier-processing', 'ready_for_pickup' => 'courier-processing',
-        'handed_over' => 'courier-processing', 'in_transit' => 'courier-processing',
+        'ready_for_packaging' => self::COURIER, 'packed' => self::COURIER, 'ready_for_pickup' => self::COURIER,
+        'handed_over' => self::COURIER, 'in_transit' => self::COURIER,
         'delivered' => 'completed', 'partial_delivered' => 'completed', 'returned' => 'returned', 'cancelled' => 'cancelled',
     ];
 
@@ -31,12 +37,18 @@ class WebsiteStatusPush
     private const ENDED = ['completed', 'refunded', 'failed', 'trash', 'cancelled'];
 
     /** Already at or past Record verified on the website: Record verified is not sent (again). */
-    private const PAST_VERIFIED = [self::STATUS, 'call-verified', 'courier-processing', 'returned'];
+    private const PAST_VERIFIED = [self::STATUS, 'call-verified', self::COURIER, 'returned'];
 
     /** IQS statuses that mean the order was verified: the website must have had Record verified by then. */
     private const VERIFIED_HERE = ['record_verified', 'confirmed', 'ready_for_packaging', 'packed', 'ready_for_pickup', 'handed_over', 'in_transit', 'delivered', 'partial_delivered'];
 
     public function __construct(private StoreDriver $store) {}
+
+    /** A website status as people read it ("courier-processin" is Courier Processing). */
+    public static function label(?string $slug): string
+    {
+        return $slug === self::COURIER ? 'Courier Processing' : \Illuminate\Support\Str::headline((string) $slug);
+    }
 
     /** @return list<string> the website statuses to set now, in order (empty: nothing to send) */
     public function plan(Order $order): array
@@ -101,7 +113,7 @@ class WebsiteStatusPush
             return false;
         }
         $order->forceFill(['external_status' => $set, 'website_pushed_at' => now(), 'website_push_error' => null])->save();
-        $name = \Illuminate\Support\Str::headline($set);
+        $name = self::label($set);
         app(OrderService::class)->note($order, 'system', $this->store->name() === 'fake'
             ? __('Test server: :s not sent to the website (no live connection).', ['s' => $name])
             : __('Website order set to :s.', ['s' => $name]), $by);

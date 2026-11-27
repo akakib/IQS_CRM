@@ -17,10 +17,10 @@ class WebsiteStatusController extends Controller
         abort_unless($push->canSend($order), 404);
         $ok = $push->push($order, $request->user());
         $order->refresh();
-        $done = __('Website order set to :s.', ['s' => Str::headline((string) $order->external_status)]);
+        $done = __('Website order set to :s.', ['s' => WebsiteStatusPush::label($order->external_status)]);
         if ($request->expectsJson()) {
             return response()->json($ok
-                ? ['ok' => true, 'message' => $done, 'status' => Str::headline((string) $order->external_status), 'at' => $order->website_pushed_at?->format('d M, g:i A')]
+                ? ['ok' => true, 'message' => $done, 'status' => WebsiteStatusPush::label($order->external_status), 'at' => $order->website_pushed_at?->format('d M, g:i A')]
                 : ['ok' => false, 'error' => __('The website did not take it: :e', ['e' => Str::limit((string) $order->website_push_error, 90)])], $ok ? 200 : 422);
         }
 

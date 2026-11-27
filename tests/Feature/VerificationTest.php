@@ -106,17 +106,17 @@ class VerificationTest extends TestCase
         $this->assertSame([], $at('record_verified', 'call-verified'));
         $this->assertSame(['record-verified'], $at('confirmed', 'processing'));
 
-        config(['store.order_statuses' => ['record-verified', 'no-response', 'on-hold', 'call-verified', 'courier-processing', 'completed', 'returned', 'cancelled']]);
+        config(['store.order_statuses' => ['record-verified', 'no-response', 'on-hold', 'call-verified', 'courier-processin', 'completed', 'returned', 'cancelled']]);
         $this->assertSame(['call-verified'], $at('confirmed', 'record-verified'));
         $this->assertSame(['record-verified', 'call-verified'], $at('confirmed', 'processing')); // Purchase first, then the status
         foreach (['ready_for_packaging', 'packed', 'handed_over', 'in_transit'] as $key) {
-            $this->assertSame(['courier-processing'], $at($key, 'call-verified'));
+            $this->assertSame(['courier-processin'], $at($key, 'call-verified'));
         }
-        $this->assertSame([], $at('packed', 'courier-processing')); // already there
+        $this->assertSame([], $at('packed', 'courier-processin')); // already there
         $this->assertSame(['no-response'], $at('no_answer', 'record-verified'));
         $this->assertSame(['on-hold'], $at('hold', 'processing'));
-        $this->assertSame(['completed'], $at('delivered', 'courier-processing'));
-        $this->assertSame(['returned'], $at('returned', 'courier-processing'));
+        $this->assertSame(['completed'], $at('delivered', 'courier-processin'));
+        $this->assertSame(['returned'], $at('returned', 'courier-processin'));
         $this->assertSame(['cancelled'], $at('cancelled', 'no-response'));
         // Ended on the website: never touched.
         foreach (['completed', 'cancelled', 'refunded'] as $web) {

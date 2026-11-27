@@ -33,7 +33,8 @@ export default ({ range, who, base }) => ({
     },
 
     async go() {
-        const url = base + '?' + this.fields().toString();
+        // The path only: the page's own address decides the host, whatever the app's configured address says.
+        const url = new URL(base, location.origin).pathname + '?' + this.fields().toString();
         this.count();
         this.pending?.abort();
         this.pending = new AbortController();
@@ -57,6 +58,6 @@ export default ({ range, who, base }) => ({
             const m = doc.documentElement.innerHTML.match(/window\.iqsOpenOrder = (\d+|null); window\.iqsBusy = (true|false)/);
             if (m) { window.iqsOpenOrder = m[1] === 'null' ? null : Number(m[1]); window.iqsBusy = m[2] === 'true'; }
         }
-        history.replaceState(history.state, '', url);
+        try { history.replaceState(history.state, '', url); } catch (e) {}
     },
 });

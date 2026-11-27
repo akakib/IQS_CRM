@@ -93,16 +93,16 @@
                             <label><span class="{{ $label }}">{{ __('Shelf') }}</span><input type="text" :name="`variants[${i}][shelf_code]`" x-model="row.shelf_code" maxlength="30" placeholder="A1" class="{{ $small }} font-mono"></label>
                         </div>
 
-                        <div class="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-[auto_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
-                            <div class="col-span-2 xl:col-span-1">
+                        <div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+                            <div class="col-span-2 md:col-span-3">
                                 <span class="{{ $label }}">{{ __('Unit') }}</span>
                                 <input type="hidden" :name="`variants[${i}][unit]`" :value="row.unit">
                                 {{-- Counted: Pcs, Packet, Box. Measured (the price is per one of the unit): Gram, KG, ML, Litre.
-                                     A phone: two rows; a wide screen: one. --}}
-                                <div class="grid grid-cols-4 overflow-hidden rounded-lg border border-gray-300 text-center text-sm xl:flex">
+                                     A phone: two rows; wider: one row, as wide as it needs. --}}
+                                <div class="grid grid-cols-4 overflow-hidden rounded-lg border border-gray-300 text-center text-sm sm:inline-flex">
                                     @foreach (\App\Support\Units::LABELS as $unit => $unitLabel)
                                         <button type="button" @click="row.unit = @js($unit)"
-                                            class="whitespace-nowrap px-2.5 py-1.5 {{ $loop->index % 4 ? 'border-l' : '' }} {{ $loop->index >= 4 ? 'border-t xl:border-t-0' : '' }} {{ $loop->index === 4 ? 'xl:border-l' : '' }} border-gray-200 {{ $loop->last ? [1 => 'col-span-4', 2 => 'col-span-3', 3 => 'col-span-2', 0 => ''][$loop->count % 4] : '' }}"
+                                            class="whitespace-nowrap px-2.5 py-1.5 {{ $loop->index % 4 ? 'border-l' : '' }} {{ $loop->index >= 4 ? 'border-t sm:border-t-0' : '' }} {{ $loop->index === 4 ? 'sm:border-l' : '' }} border-gray-200 {{ $loop->last ? [1 => 'col-span-4', 2 => 'col-span-3', 3 => 'col-span-2', 0 => ''][$loop->count % 4] : '' }}"
                                             :class="row.unit === @js($unit) ? 'bg-primary font-medium text-white' : 'bg-white text-gray-600 hover:bg-gray-50'">{{ $unitLabel }}</button>
                                     @endforeach
                                 </div>

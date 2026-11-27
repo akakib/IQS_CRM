@@ -22,7 +22,7 @@ class CustomerController extends Controller
 
     public function index(Request $request): View
     {
-        $list = ListState::from($request, ['created_at', 'name', 'orders_count'], ['risk' => ['normal', 'watch', 'blocked']], 'desc');
+        $list = ListState::from($request, ['created_at', 'name', 'orders_count', 'delivered_count'], ['risk' => ['normal', 'watch', 'blocked']], 'desc');
         $digits = (string) Phone::searchPrefix($list->search);
         // A full number finds that one customer even outside the person's own (to take an order or a call).
         $exact = $list->search !== '' ? $this->customers->findByPhone($list->search) : null;

@@ -108,11 +108,11 @@
         <div class="mt-4">{{ $products->links() }}</div>
 
         @if ($quick)
-            {{-- Quick edit: a sheet from the bottom on a phone, a panel on the right on a computer. --}}
-            <div x-show="item" x-cloak class="fixed inset-0 z-[70]" @keydown.escape.window="close()">
+            {{-- Quick edit, the app's one popup pattern (as Block, Cancel, Confirm): a sheet from the bottom on a phone,
+                 a centred box on a computer. --}}
+            <div x-show="item" x-cloak class="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4" @keydown.escape.window="close()">
                 <div class="absolute inset-0 bg-black/40" @click="close()"></div>
-                <div class="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white px-4 pb-5 pt-2.5 shadow-xl md:inset-y-0 md:left-auto md:right-0 md:w-96 md:max-h-none md:rounded-none md:pt-5">
-                    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300 md:hidden"></div>
+                <div class="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-xl">
                     <template x-if="item">
                         <div>
                             <div class="flex items-center gap-3">

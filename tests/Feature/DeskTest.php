@@ -1181,7 +1181,7 @@ class DeskTest extends TestCase
         $this->get('/kpi?view=cohort')->assertOk()->assertSee('Mahim');
         $this->post('/kpi/targets', ['user_id' => $this->mahim->id, 'delivered_count' => 300, 'delivery_rate' => 85])->assertSessionHas('success');
         $this->get('/kpi?view=cohort')->assertSee('target 300 / month');
-        $this->get('/packaging')->assertOk()->assertSee('On duty today');
+        $this->get('/packaging')->assertOk()->assertSee('On duty');
         $this->post('/packaging/shift', ['user_ids' => [$this->rima->id]])->assertSessionHas('success');
         $this->assertDatabaseHas('packer_shifts', ['user_id' => $this->rima->id]);
     }

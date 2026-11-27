@@ -105,6 +105,8 @@ class DeskController extends Controller
         $byCn = $term !== '' ? DB::table('shipments')->where('consignment_id', $term)->orWhere('tracking_code', strtoupper($term))->limit(20)->pluck('order_id')->all() : [];
         $staffId = $wide && ctype_digit((string) $request->query('moderator')) ? (int) $request->query('moderator') : null;
         $channel = $wide && isset(Order::CHANNELS[$request->query('channel')]) ? (string) $request->query('channel') : null;
+        // Biggest first: owner and managers only (a moderator works the oldest first and cannot pick the big ones).
+        $biggest = $wide && $request->query('sort') === 'biggest';
         $scope = function ($q) use ($everyone, $user, $term, $digits, $byCn, $staffId, $channel) {
             return $q->when(! $everyone, fn ($w) => $w->where('orders.moderator_id', $user->id))
                 ->when($staffId, fn ($w, $id) => $w->where('orders.moderator_id', $id))
@@ -117,7 +119,7 @@ class DeskController extends Controller
         };
         $keep = array_filter(['q' => $term, 'who' => $wide && ! $everyone ? 'mine' : null, 'range' => $range === 'open' ? null : $range,
             'from' => $range === 'custom' ? $from->toDateString() : null, 'to' => $range === 'custom' ? $to->toDateString() : null,
-            'moderator' => $staffId, 'channel' => $channel], fn ($v) => $v !== null && $v !== '');
+            'moderator' => $staffId, 'channel' => $channel, 'sort' => $biggest ? 'biggest' : null], fn ($v) => $v !== null && $v !== '');
 
         $select = [];
         $bindings = [];
@@ -152,8 +154,9 @@ class DeskController extends Controller
             ->tap($scope)
             ->when($found, fn ($q) => $q->where(fn ($w) => collect($where)->each(fn ($c) => $w->orWhereRaw($c[0], $c[1]))), fn ($q) => $q->whereRaw($where[$tab][0], $where[$tab][1]))
             // Open work: the running timer, then the oldest. Ended orders: the newest change first.
-            ->when($found || in_array($tab, $ended, true), fn ($q) => $q->orderByDesc('orders.updated_at')->orderByDesc('orders.id'),
-                fn ($q) => $q->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('orders.id'))
+            ->when($biggest, fn ($q) => $q->orderByDesc('orders.grand_total')->orderByDesc('orders.id'),
+                fn ($q) => $q->when($found || in_array($tab, $ended, true), fn ($q) => $q->orderByDesc('orders.updated_at')->orderByDesc('orders.id'),
+                    fn ($q) => $q->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('orders.id')))
             ->forPage($page, self::PER_PAGE)
             ->get(['orders.id', 'order_no', 'external_ref', 'ship_name', 'ship_thana', 'ship_district', 'grand_total', 'channel', 'status_id', 'orders.created_at', 'assigned_at',
                 'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'advance_waiver_requested_at', DB::raw('EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0) as waiting_check'), DB::raw(\App\Services\Orders\OrderService::stockIssueSql('orders').' as stock_issue'), 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packer_id', 'packed_at',

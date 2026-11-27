@@ -20,7 +20,7 @@
         <x-simple-select name="risk" :options="['' => __('Any risk'), 'normal' => __('Normal'), 'watch' => __('Watch'), 'blocked' => __('Blocked')]" :value="$list->filter('risk') ?? ''" />
         {{-- Sort, also on a phone (the table headers sort too on wider screens). Picking one opens the list in that order. --}}
         <x-simple-select :placeholder="__('Sort')" :value="$list->sort.'|'.$list->dir"
-            :options="['created_at|desc' => __('Newest first'), 'orders_count|desc' => __('Most orders'), 'delivered_count|desc' => __('Most delivered'), 'first_order_at|asc' => __('Oldest customer'), 'name|asc' => __('Name A to Z')]"
+            :options="['created_at|desc' => __('Newest first'), 'orders_count|desc' => __('Most orders'), 'delivered_count|desc' => __('Most delivered'), 'first_order_at|asc' => __('Oldest customer'), 'biggest_order|desc' => __('Biggest order'), 'name|asc' => __('Name A to Z')]"
             @select-change.stop="const [s, d] = $event.detail.split('|'); const u = new URL(location.href); u.searchParams.set('sort', s); u.searchParams.set('dir', d); u.searchParams.delete('page'); location.href = u" />
     </x-list.filter-bar>
 
@@ -38,7 +38,7 @@
             </x-slot:head>
             @foreach ($customers as $c)
                 <tr class="cursor-pointer" onclick="location.href='{{ route('customers.show', $c) }}'">
-                    <td class="font-medium text-gray-800">{{ $c->name }}</td>
+                    <td class="font-medium text-gray-800">{{ $c->name }}@isset($c->biggest_order)<span class="block text-xs font-normal text-gray-500">{{ __('Biggest order :a', ['a' => '৳'.number_format((float) $c->biggest_order)]) }}</span>@endisset</td>
                     <td class="font-mono text-gray-600">{{ Mask::value($c->primary_phone, 'customer_contact') }}</td>
                     <td class="tabular-nums text-gray-600">{{ $c->orders_count }}</td>
                     <td class="tabular-nums text-gray-600">{{ $c->delivered_count }} <span class="text-gray-400">· {{ $rate($c) }}</span></td>
@@ -53,7 +53,7 @@
                 <a href="{{ route('customers.show', $c) }}" class="block">
                     <x-record-card :title="$c->name" :subtitle="Mask::value($c->primary_phone, 'customer_contact')">
                         <x-slot:badge><x-badge :color="$riskColor[$c->risk_level]">{{ ucfirst($c->risk_level) }}</x-badge></x-slot:badge>
-                        <x-slot:footer>{{ trans_choice(':count order|:count orders', $c->orders_count, ['count' => $c->orders_count]) }} · {{ __(':n delivered (:r)', ['n' => $c->delivered_count, 'r' => $rate($c)]) }}</x-slot:footer>
+                        <x-slot:footer>{{ trans_choice(':count order|:count orders', $c->orders_count, ['count' => $c->orders_count]) }} · {{ __(':n delivered (:r)', ['n' => $c->delivered_count, 'r' => $rate($c)]) }}@isset($c->biggest_order) · {{ __('biggest ৳:a', ['a' => number_format((float) $c->biggest_order)]) }}@endisset</x-slot:footer>
                     </x-record-card>
                 </a>
             @endforeach

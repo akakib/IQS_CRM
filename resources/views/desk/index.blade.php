@@ -328,7 +328,14 @@
         @unless ($embed)
         <aside id="desk-aside" @class(['min-w-0 lg:block', 'hidden' => $showDetailOnPhone])>
             <div id="desk-list" class="overflow-hidden rounded-xl border border-gray-200 bg-white">
-                <p class="border-b border-gray-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $found ? trans_choice('{1} 1 order found|[2,*] :n orders found', max(1, $list->total()), ['n' => $list->total()]) : $tabLabels[$tab] }} · {{ $found || in_array($tab, ['delivered', 'returned', 'cancelled'], true) ? __('newest first') : __('oldest first') }}@if ($everyone) · {{ __('everyone') }}@endif</p>
+                @php $biggest = ($keep['sort'] ?? null) === 'biggest'; @endphp
+                <div class="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
+                    <p class="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $found ? trans_choice('{1} 1 order found|[2,*] :n orders found', max(1, $list->total()), ['n' => $list->total()]) : $tabLabels[$tab] }} · {{ $biggest ? __('biggest first') : ($found || in_array($tab, ['delivered', 'returned', 'cancelled'], true) ? __('newest first') : __('oldest first')) }}@if ($everyone) · {{ __('everyone') }}@endif</p>
+                    {{-- Owner and managers: the biggest orders first (by total), and back. --}}
+                    @if ($wide)
+                        <a href="{{ $url(['tab' => $found ? null : $tab, 'sort' => $biggest ? null : 'biggest', 'page' => null, 'order' => null]) }}" class="shrink-0 text-xs font-medium text-primary hover:underline">{{ $biggest ? __('Usual order') : __('Biggest first') }}</a>
+                    @endif
+                </div>
                 @forelse ($list as $row)
                     @php $current = $order && $order->id === $row->id; @endphp
                     @if (isset($locked) && $locked->has($row->id))

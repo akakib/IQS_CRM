@@ -100,7 +100,8 @@
     @php $anyWaiting = $waiting + $advanceWaiting; @endphp
     @php $filtersOn = count(array_intersect_key($keep, ['moderator' => 1, 'channel' => 1])); @endphp
     <div x-data="deskFilters({ range: @js($range === 'open' ? '' : $range), who: @js($wide && ! $everyone ? 'mine' : ''), base: @js(route('desk.index')) })"
-        @class(['mb-3 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 sm:p-3', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
+        {{-- relative z-20: an open picker (dates, person, channel, where a new order came from) lies over the boxes and tabs under this card. --}}
+        @class(['relative z-20 mb-3 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 sm:p-3', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         @if ($wide)
             {{-- A phone: two columns that line up. Everyone / Mine is as wide as the search under it, and the two
                  square buttons beside it are together as wide as the dates and Filters under them. --}}

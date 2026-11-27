@@ -22,7 +22,7 @@ class CustomerController extends Controller
 
     public function index(Request $request): View
     {
-        $list = ListState::from($request, ['created_at', 'name', 'orders_count', 'delivered_count'], ['risk' => ['normal', 'watch', 'blocked']], 'desc');
+        $list = ListState::from($request, ['created_at', 'name', 'orders_count', 'delivered_count', 'first_order_at'], ['risk' => ['normal', 'watch', 'blocked']], 'desc');
         $digits = (string) Phone::searchPrefix($list->search);
         // A full number finds that one customer even outside the person's own (to take an order or a call).
         $exact = $list->search !== '' ? $this->customers->findByPhone($list->search) : null;
@@ -38,6 +38,8 @@ class CustomerController extends Controller
                 ->where('phone', 'like', $digits.'%')))
             ->when($list->search !== '' && strlen($digits) < 4, fn ($q) => $q->where('name', 'like', $list->search.'%'))
             ->when($list->filter('risk'), fn ($q, $r) => $q->where('risk_level', $r))
+            // Oldest customer: by the first order ever; a customer with no order yet goes last.
+            ->when($list->sort === 'first_order_at', fn ($q) => $q->orderByRaw('first_order_at IS NULL'))
             ->tap(fn ($q) => $list->applySort($q))
             ->paginate($list->perPage)
             ->withQueryString();

@@ -45,10 +45,10 @@ class CustomerStats
         foreach ($ids->chunk(500) as $chunk) {
             $own = DB::table('orders')->whereIn('customer_id', $chunk)->groupBy('customer_id')
                 ->selectRaw('customer_id, COUNT(*) as n, SUM(CASE WHEN status_id IN ('.self::list($delivered).') THEN 1 ELSE 0 END) as d,
-                    SUM(CASE WHEN status_id IN ('.self::list($returned).') THEN 1 ELSE 0 END) as r')
+                    SUM(CASE WHEN status_id IN ('.self::list($returned).') THEN 1 ELSE 0 END) as r, MIN(created_at) as first')
                 ->get()->keyBy('customer_id');
             $past = DB::table('customer_past_orders')->whereIn('customer_id', $chunk)->groupBy('customer_id')
-                ->selectRaw("customer_id, COUNT(*) as n, SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as d, SUM(CASE WHEN status = 'returned' THEN 1 ELSE 0 END) as r")
+                ->selectRaw("customer_id, COUNT(*) as n, SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as d, SUM(CASE WHEN status = 'returned' THEN 1 ELSE 0 END) as r, MIN(ordered_at) as first")
                 ->get()->keyBy('customer_id');
             foreach ($chunk as $id) {
                 $o = $own[$id] ?? null;
@@ -60,6 +60,8 @@ class CustomerStats
                     'iqs_orders_count' => (int) ($o->n ?? 0),
                     'iqs_delivered_count' => (int) ($o->d ?? 0),
                     'iqs_returned_count' => (int) ($o->r ?? 0),
+                    // The first order ever, here or in an imported history (Pathao, Steadfast...): "Oldest customer" sorts by it.
+                    'first_order_at' => collect([$o->first ?? null, $p->first ?? null])->filter()->min(),
                 ]);
             }
         }

@@ -20,7 +20,7 @@
         <x-simple-select name="risk" :options="['' => __('Any risk'), 'normal' => __('Normal'), 'watch' => __('Watch'), 'blocked' => __('Blocked')]" :value="$list->filter('risk') ?? ''" />
         {{-- Sort, also on a phone (the table headers sort too on wider screens). Picking one opens the list in that order. --}}
         <x-simple-select :placeholder="__('Sort')" :value="$list->sort.'|'.$list->dir"
-            :options="['created_at|desc' => __('Newest first'), 'orders_count|desc' => __('Most orders'), 'delivered_count|desc' => __('Most delivered'), 'name|asc' => __('Name A to Z')]"
+            :options="['created_at|desc' => __('Newest first'), 'orders_count|desc' => __('Most orders'), 'delivered_count|desc' => __('Most delivered'), 'first_order_at|asc' => __('Oldest customer'), 'name|asc' => __('Name A to Z')]"
             @select-change.stop="const [s, d] = $event.detail.split('|'); const u = new URL(location.href); u.searchParams.set('sort', s); u.searchParams.set('dir', d); u.searchParams.delete('page'); location.href = u" />
     </x-list.filter-bar>
 

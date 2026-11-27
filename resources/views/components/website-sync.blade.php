@@ -6,7 +6,8 @@
             @csrf
             <x-button variant="secondary" :size="$size" class="w-full sm:w-auto" x-bind:disabled="busy">
                 <x-icon name="refresh" @class(['h-3.5 w-3.5' => $size === 'sm', 'h-4 w-4' => $size !== 'sm']) x-bind:class="busy && 'animate-spin'" />
-                <span x-text="busy ? @js(__('Syncing...')) : @js(__('Sync website orders'))">{{ __('Sync website orders') }}</span>
+                <span class="max-sm:hidden" x-text="busy ? @js(__('Syncing...')) : @js(__('Sync website orders'))">{{ __('Sync website orders') }}</span>
+                <span class="sm:hidden" x-text="busy ? @js(__('Syncing...')) : @js(__('Sync website'))">{{ __('Sync website') }}</span>
             </x-button>
         </form>
     @endif

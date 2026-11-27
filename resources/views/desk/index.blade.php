@@ -92,13 +92,13 @@
     @endif
     {{-- New orders: nobody picks; "Take next" always gives the oldest one. --}}
     @unless ($embed)
-    <div @class(['mb-4 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
+    <div @class(['mb-3 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between sm:p-4', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         @php $anyWaiting = $waiting + $advanceWaiting; @endphp
         {{-- Live: the pulse (every 30 s) updates the count, the wording and Take next without a reload. --}}
-        <div class="flex items-center gap-4" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }},
+        <div class="flex items-center gap-3 sm:gap-4" x-data="{ n: {{ $anyWaiting }}, adv: {{ $advanceWaiting }},
                 label() { return this.n === 0 ? @js(__('No new orders')) : (this.adv === this.n ? (this.n === 1 ? @js(__('1 order waiting for its advance')) : this.n + ' ' + @js(__('orders waiting for their advance'))) : (this.n === 1 ? @js(__('New order waiting')) : @js(__('New orders waiting')))) } }"
             @iqs-pulse.window="n = $event.detail.waiting; adv = $event.detail.advance_waiting">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold tabular-nums" :class="n ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'" x-text="n">{{ $anyWaiting }}</div>
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-bold tabular-nums sm:h-12 sm:w-12 sm:text-lg" :class="n ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'" x-text="n">{{ $anyWaiting }}</div>
             <div>
                 <p class="text-sm font-semibold text-gray-800" x-text="label()">
                     @if (! $waiting && $advanceWaiting)
@@ -115,7 +115,8 @@
                 </p>
             </div>
         </div>
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {{-- A phone: the buttons side by side (an odd last one takes the row), not one under another. --}}
+        <div class="grid grid-cols-2 gap-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:items-center">
         <x-website-sync />
         @can('orders.create')
             {{-- New order: first "where from?", so every order counts for its number or page. --}}
@@ -123,7 +124,7 @@
             <div class="relative" x-data="{ pick: false, go(url) { this.pick = false; window.dispatchEvent(new CustomEvent('order-new', { detail: url })) } }" @click.outside="pick = false" @keydown.escape.window="pick = false">
                 <x-button type="button" variant="secondary" class="w-full sm:w-auto" data-key="o"
                     @click="{{ $myChannels->isEmpty() ? 'go('.\Illuminate\Support\Js::from(route('orders.create', ['embed' => 1])).')' : 'pick = ! pick' }}">
-                    + {{ __('New order') }} <kbd class="rounded bg-gray-100 px-1.5 text-[11px] text-gray-500">⇧O</kbd>
+                    + {{ __('New order') }} <kbd class="hidden rounded bg-gray-100 px-1.5 text-[11px] text-gray-500 lg:inline">⇧O</kbd>
                 </x-button>
                 @if ($myChannels->isNotEmpty())
                     <div x-show="pick" x-cloak x-transition class="absolute right-0 z-40 mt-2 w-full min-w-[16rem] rounded-xl border border-gray-200 bg-white py-1 shadow-lg sm:w-72">
@@ -170,7 +171,7 @@
          as a sheet from the bottom, the same way as the list pages (x-list.filter-bar). --}}
     @php $filtersOn = count(array_diff_key($keep, ['q' => 1])); @endphp
     <form method="GET" action="{{ route('desk.index') }}" x-data="{ sheet: false }" x-ref="f" @select-change="setTimeout(() => $refs.f.requestSubmit(), 0)"
-        @class(['mb-3 items-center gap-2 rounded-xl border border-gray-200 bg-white p-3', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
+        @class(['mb-3 items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 sm:p-3', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         <input type="hidden" name="tab" value="{{ $tab }}">
         @if ($wide && ! $everyone)<input type="hidden" name="who" value="mine">@endif
         <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('Name, phone, order no or CN') }}"

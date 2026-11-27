@@ -405,8 +405,8 @@
                 <x-courier-mismatch :order="$order" />
                 <x-cod-update :order="$order" />
                 <x-courier-cancel :order="$order" />
-                {{-- Wider screens: beside Give to someone when that bar shows, else above the order. Phone: inside the courier box below. --}}
-                @unless ($reassign)<x-take-back :order="$order" class="mb-3 max-sm:hidden" />@endunless
+                {{-- Wider screens: beside Give to someone when that bar shows, else above the order on the right. Phone: inside the courier box below. --}}
+                @unless ($reassign)<x-take-back :order="$order" class="mb-3 max-sm:hidden sm:flex sm:justify-end" />@endunless
                 <x-advance-wait :order="$order" />
                 {{-- Opened from Order activity: where the parcel is, in the courier's words, and its tracking link. --}}
                 @if ($embed)<x-parcel-track :order="$order" class="mb-3" />@endif

@@ -75,7 +75,8 @@ class DeskController extends Controller
         // Dates: nothing picked ("open") shows every order still to be worked whatever day it came, and today's in the
         // ended stages; a picked range (today, 7 days, 30 days, custom) filters every stage. Open work goes by the day
         // the order came, an ended order by its last change.
-        $range = $wide && in_array($request->query('range'), ['today', '7', '30', 'custom'], true) ? $request->query('range') : 'open';
+        // (A moderator picks dates too, for their own orders.)
+        $range = in_array($request->query('range'), ['today', '7', '30', 'custom'], true) ? $request->query('range') : 'open';
         [$from, $to] = [today(), today()];
         if ($range === '7' || $range === '30') {
             $from = today()->subDays((int) $range - 1);

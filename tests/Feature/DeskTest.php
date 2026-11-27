@@ -157,6 +157,10 @@ class DeskTest extends TestCase
         $this->get('/desk?tab=verify&q=Babul')->assertOk()->assertDontSee('Babul Mia');
         $this->get('/desk?tab=verify&who=all&moderator='.$this->rima->id)->assertOk()->assertDontSee('Babul Mia'); // the address cannot widen it
 
+        // A moderator picks dates for their own orders: today's are there, a custom day before they came has none.
+        $this->get('/desk?tab=verify&range=today')->assertOk()->assertSee('Anika Rahman')->assertSee('All open');
+        $this->get('/desk?tab=verify&range=custom&from=2026-10-01&to=2026-10-02')->assertOk()->assertDontSee('Anika Rahman');
+
         // The owner: everyone's, with who has each one, the ended stages, search and the person filter.
         $this->actingAs($this->owner())->get('/desk?tab=verify')->assertOk()->assertSee('Anika Rahman')->assertSee('Babul Mia')->assertSee('Chandni Akter')
             ->assertSee('Mahim')->assertSee('Rima')->assertSee('Nobody yet')->assertSee('Everyone')->assertSee('With courier')->assertSee('Cancelled');

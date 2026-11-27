@@ -108,8 +108,9 @@
                                 </div>
                             </div>
                             <label><span class="{{ $label }}" x-text="row.unit === 'pcs' ? @js(__('Pieces')) : @js(__('Grams'))"></span><input type="number" step="0.001" min="0.001" :name="`variants[${i}][pack_qty]`" x-model="row.pack_qty" required class="{{ $small }}"></label>
-                            {{-- How much one holds, for the Sales report in kg and litres. Empty on a new item: read from the name. --}}
-                            <div>
+                            <label><span class="{{ $label }}">{{ __('Ship weight (g)') }}</span><input type="number" min="0" :name="`variants[${i}][weight_g]`" x-model="row.weight_g" class="{{ $small }}"></label>
+                            {{-- How much one holds, for the Sales report in kg and litres. Empty on a new item: read from the name. Full width on a phone. --}}
+                            <div class="col-span-2 md:col-span-1">
                                 <span class="{{ $label }}">{{ __('Size (one holds)') }}</span>
                                 <input type="hidden" :name="`variants[${i}][size_unit]`" :value="row.size_unit">
                                 <div class="flex gap-1">
@@ -122,7 +123,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <label><span class="{{ $label }}">{{ __('Ship weight (g)') }}</span><input type="number" min="0" :name="`variants[${i}][weight_g]`" x-model="row.weight_g" class="{{ $small }}"></label>
                         </div>
 
                         {{-- Prices: one small table, a price list per row. --}}

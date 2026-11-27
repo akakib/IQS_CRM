@@ -22,6 +22,15 @@
     ];
     $default = ['bg-gray-400 text-white', 'dot'];
     $count = count($entries);
+    // The file kind of each call proof (screenshot or recording), read once for all entries, so the button says what it opens.
+    $metaOf = fn ($e) => ! empty($e->meta) ? (json_decode($e->meta, true) ?: []) : [];
+    $proofIds = ['customer_calls' => [], 'rider_calls' => []];
+    foreach ($entries as $e) {
+        $m = $metaOf($e);
+        if (! empty($m['proof_call'])) $proofIds['customer_calls'][] = (int) $m['proof_call'];
+        if (! empty($m['proof_rider_call'])) $proofIds['rider_calls'][] = (int) $m['proof_rider_call'];
+    }
+    $proofPaths = collect($proofIds)->map(fn ($ids, $table) => $ids ? \Illuminate\Support\Facades\DB::table($table)->whereIn('id', $ids)->pluck('proof_path', 'id')->all() : []);
 @endphp
 
 <ol {{ $attributes }}>
@@ -36,11 +45,14 @@
             <div class="min-w-0 flex-1 pt-0.5">
                 <p class="break-words text-sm text-gray-800">{{ $entry->body }}</p>
                 @php
-                    $meta = ! empty($entry->meta) ? (json_decode($entry->meta, true) ?: []) : [];
+                    $meta = $metaOf($entry);
                     $recording = $meta['recording_url'] ?? null;
                     $uploaded = ! empty($meta['proof_call']) ? route('calls.proof', $meta['proof_call']) : (! empty($meta['proof_rider_call']) ? route('rider-calls.proof', $meta['proof_rider_call']) : null);
                 @endphp
-                @if ($uploaded)<x-play-call :url="$uploaded" :title="$entry->body" :sub="$entry->user ?? ''" class="mt-1" />
+                @php
+                    $proofPath = ! empty($meta['proof_call']) ? ($proofPaths['customer_calls'][$meta['proof_call']] ?? null) : (! empty($meta['proof_rider_call']) ? ($proofPaths['rider_calls'][$meta['proof_rider_call']] ?? null) : null);
+                @endphp
+                @if ($uploaded)<x-play-call :url="$uploaded" :call="$proofPath ? (object) ['proof_path' => $proofPath] : null" :title="$entry->body" :sub="$entry->user ?? ''" class="mt-1" />
                 @elseif ($recording)<a href="{{ $recording }}" target="_blank" rel="noopener" class="text-xs font-medium text-primary hover:underline">{{ __('Call recording') }}</a>@endif
                 <p class="mt-0.5 text-xs text-gray-400">{{ $entry->user ?? __('System') }} · {{ \Illuminate\Support\Carbon::parse($entry->created_at)->format($withYear ? 'd M Y, g:i A' : 'd M, g:i A') }}</p>
             </div>

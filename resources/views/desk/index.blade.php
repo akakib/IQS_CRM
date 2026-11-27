@@ -98,6 +98,7 @@
          waiting orders with Take next on its right. A computer: the same pieces on one row.
          Search and filters change the page in place (desk-filters.js). --}}
     @php $anyWaiting = $waiting + $advanceWaiting; @endphp
+    @php $filtersOn = count(array_intersect_key($keep, ['moderator' => 1, 'channel' => 1])); @endphp
     <div x-data="deskFilters({ range: @js($range === 'open' ? '' : $range), who: @js($wide && ! $everyone ? 'mine' : ''), base: @js(route('desk.index')) })"
         @class(['mb-3 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 sm:p-3', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         @if ($wide)
@@ -109,7 +110,13 @@
             </div>
         @endif
         {{-- Sync and New order: after Everyone / Mine on a phone (a moderator: after the search), last on a computer. --}}
-        <div @class(['flex shrink-0 items-center gap-2 md:order-4', 'order-2 max-md:w-40 max-md:[&>*]:flex-1 max-md:[&>*>button]:!w-full' => $wide, 'order-4' => ! $wide])>
+        <div @class(['flex shrink-0 items-center gap-2 md:order-4', 'order-2 max-md:w-34' => $wide, 'order-4' => ! $wide])>
+        @if ($wide)
+            <button type="button" @click="sheet = true" class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 md:hidden" aria-label="{{ __('Filters') }}">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" d="M4 6h16M7 12h10M10 18h4"/></svg>
+                <span x-show="n" x-cloak class="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 text-[10px] font-semibold text-white" x-text="n">{{ $filtersOn }}</span>
+            </button>
+        @endif
         <x-website-sync compact />
         @can('orders.create')
             {{-- New order: first "where from?", so every order counts for its number or page. --}}
@@ -142,7 +149,6 @@
          dates, who has it, where it came from, and Export; all of it changes the page in place (desk-filters.js).
          A phone, as on the Hisab desk: Everyone / Mine on top, then search with the dates beside it; person, channel
          and Export open from Filters as a sheet. A computer: one row. --}}
-    @php $filtersOn = count(array_intersect_key($keep, ['moderator' => 1, 'channel' => 1])); @endphp
         <form method="GET" action="{{ route('desk.index') }}" x-ref="f" @submit.prevent="go()"
             @select-change="if ($event.target.closest('[data-range]')) range = $event.detail; setTimeout(() => go(), 0)"
             @class(['order-3 min-w-0 flex-wrap items-center gap-2 md:flex-1', 'w-full' => $wide, 'flex-1' => ! $wide, 'flex'])>
@@ -150,19 +156,13 @@
         @if ($wide)
             <input type="hidden" name="who" :value="who">
         @endif
-        <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('Name, phone, CN') }}" aria-label="{{ __('Search by name, phone, order number or CN') }}" title="{{ __('Name, phone, order number or CN') }}"
+        <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('CN, phone, order, name') }}" aria-label="{{ __('Search by name, phone, order number or CN') }}" title="{{ __('Name, phone, order number or CN') }}"
             x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length) }"
             @input.debounce.500ms="go()" @keydown.enter.prevent="go()"
-            class="h-10 min-w-0 flex-1 text-ellipsis rounded-lg border border-gray-300 px-3 text-sm placeholder:text-ellipsis focus:border-primary focus:outline-none md:h-9 md:min-w-52 md:max-w-xs">
+            class="h-10 min-w-0 flex-1 text-ellipsis rounded-lg border border-gray-300 px-3 text-sm placeholder:text-ellipsis focus:border-primary focus:outline-none max-md:px-2.5 max-md:placeholder:text-[13px] md:h-9 md:min-w-52 md:max-w-xs">
         {{-- Dates for everyone: a moderator filters their own orders by day too. --}}
-            <div @class(['flex shrink-0 items-center gap-2 md:contents', 'max-md:w-40' => $wide])>
+            <div @class(['flex shrink-0 items-center gap-2 md:contents', 'max-md:w-34' => $wide])>
             <span data-range class="min-w-0 max-md:flex-1 max-md:[&>div]:w-full max-md:[&>div>button]:w-full md:shrink-0"><x-simple-select name="range" :options="['' => __('All open'), 'today' => __('Today'), '7' => __('7 days'), '30' => __('30 days'), 'custom' => __('Custom dates')]" :value="$range === 'open' ? '' : $range" /></span>
-            @if ($wide)
-            <button type="button" @click="sheet = true" class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 md:hidden" aria-label="{{ __('Filters') }}">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" d="M4 6h16M7 12h10M10 18h4"/></svg>
-                <span x-show="n" x-cloak class="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 text-[10px] font-semibold text-white" x-text="n">{{ $filtersOn }}</span>
-            </button>
-            @endif
             </div>
             {{-- Custom dates: the two days show as soon as it is picked, no reload. --}}
             <div x-show="range === 'custom'" x-cloak class="grid w-full grid-cols-2 gap-2 md:flex md:w-auto">

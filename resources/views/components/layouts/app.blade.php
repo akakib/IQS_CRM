@@ -43,8 +43,9 @@
     <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-black/50 lg:hidden"></div>
 
     {{-- A computer: the sidebar on the left. A phone and tablet: the menu slides in from the right (More in the bottom bar). --}}
-    <aside :class="sidebarOpen ? 'translate-x-0' : 'max-lg:translate-x-full'"
-        class="app-sidebar fixed top-0 z-50 flex h-dvh w-[260px] flex-col border-gray-200 bg-white transition-[transform,width] duration-200 max-lg:right-0 max-lg:border-l lg:left-0 lg:translate-x-0 lg:border-r">
+    {{-- Closed is in the markup itself (off the right edge), so the menu never shows for a moment while a page loads. --}}
+    <aside :class="sidebarOpen && 'max-lg:!translate-x-0'"
+        class="app-sidebar fixed top-0 z-50 flex h-dvh w-[260px] flex-col border-gray-200 bg-white transition-[transform,width] duration-200 max-lg:right-0 max-lg:translate-x-full max-lg:border-l lg:left-0 lg:translate-x-0 lg:border-r">
         <div class="mini-center flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <a href="{{ route('dashboard') }}" class="text-xl font-bold text-gray-800"><span class="mini-hide">{{ config('app.name') }}</span><span class="mini-only">{{ \Illuminate\Support\Str::of(config('app.name'))->before(' ') }}</span></a>
             <button type="button" @click="sidebarOpen = false" class="text-gray-500 hover:text-gray-700 lg:hidden" aria-label="{{ __('Close menu') }}">

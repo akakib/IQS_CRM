@@ -34,9 +34,11 @@
     $canExtend = $armed && ! $armed->timer_extended_at && $extendsLeft > 0;
     // embed=1: one order inside the Order activity popup (no list, no tabs, no header).
     $embed = request()->boolean('embed');
+    // The bottom bar's Orders badge: this page already knows how many are in their hand (no second count).
+    view()->share('navInHand', (int) $inHand);
 @endphp
 
-<x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="__('Order management')">
+<x-dynamic-component :component="$embed ? 'layouts.embed' : 'layouts.app'" :heading="__('Order management')" :nav="! $showDetailOnPhone">
 <div @iqs-pulse.window="follow($event.detail.mine)" x-data="{
         reasonMode: null, reason: null, holdDate: null, stockOut: @js($stockOutId), stockReasons: @js(app(\App\Services\Orders\DeskService::class)->stockReasonIds()),
         // Live list: when the orders in their hand change (one given, taken back, a call due), the tabs and the list

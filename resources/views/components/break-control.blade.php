@@ -34,8 +34,9 @@
 @elseif ($part === 'button' && ! $user->current_break_id)
     <div x-data="{ open: false, reasons: null, reason: null,
             failed: false,
-            async show() { this.open = true; this.failed = false; if (!this.reasons) { try { const r = await fetch(@js(route('breaks.reasons')), { headers: { Accept: 'application/json' } }); if (!r.ok) throw 0; this.reasons = await r.json() } catch (e) { this.failed = true } } } }">
-        <button type="button" @click="show()" class="flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-100 sm:w-auto sm:px-3" aria-label="{{ __('Break') }}">
+            async show() { this.open = true; this.failed = false; if (!this.reasons) { try { const r = await fetch(@js(route('breaks.reasons')), { headers: { Accept: 'application/json' } }); if (!r.ok) throw 0; this.reasons = await r.json() } catch (e) { this.failed = true } } } }" x-on:break-open.window="show()">
+        {{-- A phone and tablet open it from the three-dot menu at the top. --}}
+        <button type="button" @click="show()" class="flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-100 max-lg:hidden sm:w-auto sm:px-3" aria-label="{{ __('Break') }}">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span class="hidden sm:inline">{{ __('Break') }}</span>
         </button>

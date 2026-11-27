@@ -310,7 +310,7 @@
     @endif
 
     {{-- Picked orders: print their labels together (with their A4 packing sheet). --}}
-    <div x-show="picked.length" x-cloak class="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white px-4 py-3 shadow-lg">
+    <div x-show="picked.length" x-cloak class="fixed inset-x-0 bottom-0 z-30 max-lg:bottom-16 border-t border-gray-200 bg-white px-4 py-3 shadow-lg">
         <div class="mx-auto flex max-w-3xl items-center justify-between gap-3">
             <button type="button" @click="picked = []" class="text-sm font-medium text-gray-600 hover:underline">{{ __('Clear') }}</button>
             <button type="button" @click="printPicked(picked)" class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white hover:bg-primary-dark" x-text="@js(__('Print selected')) + ' (' + picked.length + ')'"></button>

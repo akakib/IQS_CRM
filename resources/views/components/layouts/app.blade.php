@@ -34,6 +34,8 @@
             .app-sidebar { translate: 100% 0; visibility: hidden; transition: translate .2s ease, visibility 0s linear .2s; }
             .app-sidebar.is-open { translate: 0 0; visibility: visible; transition: translate .2s ease; }
         }
+        /* Nothing that waits for the scripts (popups, sheets, menus) may show before they run. */
+        [x-cloak] { display: none !important; }
     </style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -63,7 +65,7 @@
     </aside>
 
     <div class="app-main flex min-w-0 flex-1 flex-col transition-[margin] duration-200 lg:ml-[260px]">
-        <header class="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 sm:px-4">
+        <header class="app-header sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 sm:px-4">
             <div class="flex min-w-0 items-center gap-2 sm:gap-3">
                 @if ($backUrl)
                     <a href="{{ $backUrl }}" @click="if (document.referrer.startsWith(location.origin + '/') && history.length > 1) { $event.preventDefault(); history.back() }"

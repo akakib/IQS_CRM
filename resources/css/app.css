@@ -55,6 +55,32 @@
     display: none !important;
 }
 
+/* Going from page to page: the old page fades into the new one instead of blinking white, and the top bar and
+   the phone's bottom bar stay where they are while the page between them changes (browsers without this
+   simply load the page as before). */
+@view-transition {
+    navigation: auto;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 0.12s;
+}
+.app-header {
+    view-transition-name: app-header;
+}
+.app-bottom-nav {
+    view-transition-name: app-bottom-nav;
+}
+::view-transition-group(app-header),
+::view-transition-group(app-bottom-nav) {
+    animation-duration: 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+    @view-transition {
+        navigation: none;
+    }
+}
+
 /* Date picker on phones: centred on screen instead of under the field. */
 @media (max-width: 639px) {
     .picker-panel {

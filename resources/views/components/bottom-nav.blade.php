@@ -30,7 +30,7 @@
     $onPlace = $places->contains(fn ($p) => $p[2]);
 @endphp
 
-<nav class="fixed inset-x-0 bottom-0 z-30 grid border-t border-gray-200 bg-white px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 lg:hidden"
+<nav class="app-bottom-nav fixed inset-x-0 bottom-0 z-30 grid border-t border-gray-200 bg-white px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 lg:hidden"
     style="grid-template-columns: repeat({{ $places->count() + 1 }}, minmax(0, 1fr))" aria-label="{{ __('Main') }}">
     @foreach ($places as [$label, $url, $active, $perm, $icon])
         <a href="{{ $url }}" @if ($url === '#chat') @click.prevent="window.dispatchEvent(new CustomEvent('chat-open'))" @endif @if ($active) aria-current="page" @endif

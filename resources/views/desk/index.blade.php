@@ -405,8 +405,6 @@
                 <x-courier-mismatch :order="$order" />
                 <x-cod-update :order="$order" />
                 <x-courier-cancel :order="$order" />
-                {{-- Wider screens: beside Give to someone when that bar shows, else above the order on the right. Phone: inside the courier box below. --}}
-                @unless ($reassign)<x-take-back :order="$order" class="mb-3 max-sm:hidden sm:flex sm:justify-end" />@endunless
                 <x-advance-wait :order="$order" />
                 {{-- Opened from Order activity: where the parcel is, in the courier's words, and its tracking link. --}}
                 @if ($embed)<x-parcel-track :order="$order" class="mb-3" />@endif
@@ -501,6 +499,8 @@
                                 <h2 class="mt-1 text-xl font-semibold sm:text-2xl text-gray-900">{{ $order->ship_name }}</h2>
                                 <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
                             </div>
+                            {{-- Booked by mistake, wider screens: beside Give to someone when that bar shows, else here, left of the amount. Phone: in the courier box below. --}}
+                            @unless ($reassign)<x-take-back :order="$order" class="shrink-0" />@endunless
                             <div class="shrink-0 text-right">
                                 <p class="text-xl font-semibold tabular-nums text-gray-900 sm:text-2xl">{{ $money($order->grand_total) }}</p>
                                 <p class="text-xs text-gray-500">{{ __('COD :c · delivery :d', ['c' => $money($order->cod_amount), 'd' => $money($order->delivery_charge)]) }}</p>

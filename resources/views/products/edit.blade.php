@@ -1,6 +1,16 @@
 <x-layouts.app :heading="__('Edit product')">
     <div class="mb-4 flex items-center justify-between">
-        <a href="{{ route('products.index') }}" class="text-sm text-primary hover:underline">{{ __('Back to products') }}</a>
+        <div class="flex items-center gap-4">
+            <a href="{{ route('products.index') }}" class="text-sm text-primary hover:underline">{{ __('Back to products') }}</a>
+            {{-- The product's own page on the website, in a new tab: WordPress turns the id into the real address. --}}
+            @php($site = rtrim((string) (\App\Models\WebsiteAccount::current()?->url ?: config('store.woocommerce.url')), '/'))
+            @if ($site && $product->external_id)
+                <a href="{{ $site }}/?post_type=product&p={{ $product->external_id }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+                    {{ __('View on website') }}
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                </a>
+            @endif
+        </div>
         @can('products.delete')
             <form id="delete-product" method="POST" action="{{ route('products.destroy', $product) }}">
                 @csrf

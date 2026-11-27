@@ -42,6 +42,12 @@ class AuthTest extends TestCase
         $this->get('/')->assertRedirect(route('orders.activity'));
         $this->post('/logout');
 
+        $packer = User::factory()->create(['password' => 'packer-pass']);
+        $packer->roles()->attach($this->role(['packaging.view', 'packaging.create'], [], 'Packaging')->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->post('/login', ['email' => $packer->email, 'password' => 'packer-pass'])->assertRedirect(route('packaging.index'));
+        $this->post('/logout');
+
         $owner = $this->owner(['password' => 'owner-pass']);
         $this->post('/login', ['email' => $owner->email, 'password' => 'owner-pass'])->assertRedirect(route('dashboard'));
         $this->get('/')->assertRedirect(route('dashboard'));

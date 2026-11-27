@@ -106,13 +106,14 @@ class User extends Authenticatable
     }
 
     /** Where this person lands after login and on "/": the owner on the Dashboard, managers (who see everyone's orders)
-     *  on Order activity, staff who work orders on Order management, anyone else on the Dashboard. */
+     *  on Order activity, staff who work orders on Order management, packers on Packaging, anyone else on the Dashboard. */
     public function homeUrl(): string
     {
         return match (true) {
             $this->isOwner() => route('dashboard'),
             $this->can('orders.reassign') => route('orders.activity'),
             $this->can('orders.edit') => route('desk.index'),
+            $this->can('packaging.view') => route('packaging.index'),
             default => route('dashboard'),
         };
     }

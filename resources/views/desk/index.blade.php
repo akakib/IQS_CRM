@@ -415,7 +415,8 @@
                         {{-- Phone: fixed lines instead of one wrapping row of chips: order and amount, status and COD, the customer,
                              then who and where (Courier with the CN once booked, Website, Assigned, Packing). Wider screens keep the row below. --}}
                         @php
-                            $showHolder = ! $embed && ($order->moderator_id !== auth()->id() || auth()->user()->can('orders.reassign'));
+                            // The Assigned card above already names who has it (managers); the line here is for everyone else.
+                            $showHolder = ! $embed && empty($reassign) && $order->moderator_id !== auth()->id();
                             $parcelWord = $detail['parcel']->courier_status ?? null;
                         @endphp
                         <div class="sm:hidden">
@@ -440,7 +441,7 @@
                             <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
                             @php $web = $order->channel === 'web' && $order->external_ref; @endphp
                             @if ($detail['consignment'] || $parcelWord || $web || $showHolder || $order->packer)
-                                <dl class="mt-3 grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-y-2 border-t border-gray-100 pt-3 text-[13px] text-gray-800">
+                                <dl class="mt-3 grid grid-cols-[4.5rem_minmax(0,1fr)] items-baseline gap-y-2 border-t border-gray-100 pt-3 text-[13px] text-gray-800">
                                     @if ($detail['consignment'] || $parcelWord)
                                         <dt class="text-xs text-gray-400">{{ __('Courier') }}</dt>
                                         <dd>@if ($parcelWord){{ ucfirst((string) ($detail['parcel']->courier ?: __('Courier'))) }}: {{ ucfirst(str_replace('_', ' ', $parcelWord)) }}@endif @if ($detail['consignment'])@if ($parcelWord)· @endif<x-consignment-link :cn="$detail['consignment']" :courier="$detail['parcel']->courier" class="font-semibold !no-underline" />@endif</dd>
@@ -527,7 +528,7 @@
                                 <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" :order-id="$order->id" :name="$order->ship_name" :order-no="$order->order_no"
                                     :talked="$detail['talked']" compact />
                             </div>
-                            <div class="relative rounded-lg border border-gray-200 p-4 max-sm:px-3 max-sm:py-2.5">
+                            <div class="rounded-lg border border-gray-200 p-4 max-sm:px-3 max-sm:py-2.5">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Customer history') }}</p>
                                 @php $c = $order->customer; @endphp
                                 @if ($c && $c->orders_count > 1)
@@ -549,7 +550,7 @@
                                 @endif
                                 <x-block-customer :order="$order" />
                             </div>
-                            <div class="rounded-lg border border-gray-200 p-4">
+                            <div @class(['rounded-lg border border-gray-200 p-4 max-sm:px-3 max-sm:py-2.5', 'max-sm:hidden' => collect($detail['duplicates'])->isEmpty()])>
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Duplicate check') }}</p>
                                 @forelse ($detail['duplicates'] as $d)
                                     <a href="{{ route('orders.show', $d->id) }}" class="block text-sm text-gray-800 hover:text-primary">
@@ -577,7 +578,7 @@
                                     <span class="min-w-0 text-gray-800">{{ $i->name_snapshot }} <b class="whitespace-nowrap">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b></span>
                                     <span class="flex shrink-0 items-center gap-3">
                                         <span class="tabular-nums text-gray-600">{{ $money($i->line_total) }}</span>
-                                        <x-badge :color="$stock[$i->availability_status][0] ?? 'gray'">{{ $stock[$i->availability_status][1] ?? $i->availability_status }}</x-badge>
+                                        <span @class(['max-sm:hidden' => $i->availability_status === 'in_stock'])><x-badge :color="$stock[$i->availability_status][0] ?? 'gray'">{{ $stock[$i->availability_status][1] ?? $i->availability_status }}</x-badge></span>
                                     </span>
                                 </div>
                             @endforeach

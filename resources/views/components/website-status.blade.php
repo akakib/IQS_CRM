@@ -1,4 +1,4 @@
-{{-- A website order's own status on the website, and Woo Record Verified to set it there without leaving the page
+{{-- A website order's own status on the website, and Set Record Verified to set it there without leaving the page
      (done by itself on record verified; this is for when it did not go). Used on the Desk and the order page.
      <x-website-status :order="$order" /> --}}
 @props(['order', 'label' => true])
@@ -23,11 +23,11 @@
         }" {{ $attributes->merge(['class' => 'mt-2 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs']) }}
         :class="error ? 'bg-amber-50 text-amber-900' : 'bg-gray-50 text-gray-700'">
         <span>@if ($label)<span class="sm:hidden">{{ __('Web:') }}</span><span class="max-sm:hidden">{{ __('Website status:') }}</span> @endif<b x-text="status"></b><span x-show="done" class="text-green-700"> ✓ {{ __('set') }} <span x-text="at"></span></span></span>
-        <span x-show="error" x-cloak>· {{ __('Not set:') }} <span x-text="error"></span></span>
+        <span x-show="error" x-cloak @class(['basis-full' => ! $label])>@if ($label)· @endif{{ __('Not set:') }} <span x-text="error"></span></span>
         @if ($push->canSend($order))
             <button type="button" x-show="canSend" @click="send()" :disabled="busy"
-                class="lockable rounded-lg border border-gray-300 bg-white px-2.5 py-1 font-semibold text-gray-800 hover:border-primary hover:text-primary disabled:opacity-50"
-                x-text="busy ? @js(__('Sending…')) : @js(__('Woo :s', ['s' => \App\Services\Orders\WebsiteStatusPush::label($push->target($order))]))"></button>
+                class="lockable h-8 rounded-lg border border-gray-300 bg-white px-2.5 font-semibold text-gray-800 hover:border-primary hover:text-primary disabled:opacity-50"
+                x-text="busy ? @js(__('Sending…')) : @js(__('Set :s', ['s' => \App\Services\Orders\WebsiteStatusPush::label($push->target($order))]))"></button>
         @endif
     </div>
 @endif

@@ -149,7 +149,7 @@
         <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('Name, phone, order no or CN') }}"
             x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length) }"
             @input.debounce.500ms="go()" @keydown.enter.prevent="go()"
-            class="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none md:h-9 md:max-w-xs">
+            class="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none md:h-9 md:min-w-52 md:max-w-xs">
         @if ($wide)
             <span data-range class="shrink-0"><x-simple-select name="range" :options="['' => __('All open'), 'today' => __('Today'), '7' => __('7 days'), '30' => __('30 days'), 'custom' => __('Custom dates')]" :value="$range === 'open' ? '' : $range" /></span>
             <button type="button" @click="sheet = true" class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 md:hidden" aria-label="{{ __('Filters') }}">

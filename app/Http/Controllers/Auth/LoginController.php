@@ -47,7 +47,13 @@ class LoginController extends Controller
         RateLimiter::clear($throttleKey);
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended($request->user()->homeUrl());
+    }
+
+    /** "/" opens each person's own first page (User::homeUrl). */
+    public function home(Request $request): RedirectResponse
+    {
+        return redirect($request->user()->homeUrl());
     }
 
     public function destroy(Request $request): RedirectResponse

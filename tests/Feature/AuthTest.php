@@ -16,6 +16,22 @@ class AuthTest extends TestCase
         $this->get('/locations')->assertRedirect('/login');
     }
 
+    public function test_staff_land_on_order_management_and_the_owner_on_the_dashboard(): void
+    {
+        $staff = User::factory()->create(['password' => 'secret-pass']);
+        $staff->roles()->attach($this->role(['orders.view' => 'own', 'orders.edit' => 'own'])->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->post('/login', ['email' => $staff->email, 'password' => 'secret-pass'])->assertRedirect(route('desk.index'));
+        $this->get('/')->assertRedirect(route('desk.index'));
+        $this->seed(\Database\Seeders\OrderConfigSeeder::class);
+        $this->get('/dashboard')->assertOk(); // still there when opened on purpose
+        $this->post('/logout');
+
+        $owner = $this->owner(['password' => 'owner-pass']);
+        $this->post('/login', ['email' => $owner->email, 'password' => 'owner-pass'])->assertRedirect(route('dashboard'));
+        $this->get('/')->assertRedirect(route('dashboard'));
+    }
+
     public function test_login_page_renders(): void
     {
         $this->get('/login')->assertOk()->assertSee('Log in');

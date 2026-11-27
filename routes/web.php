@@ -63,7 +63,7 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::redirect('/', '/dashboard');
+    Route::get('/', [\App\Http\Controllers\Auth\LoginController::class, 'home'])->name('home');
     Route::get('/dashboard', [ReportController::class, 'dashboard'])->name('dashboard');
     Route::get('/kpi', [ReportController::class, 'kpi'])->name('kpi.index'); // own numbers for everyone; kpi.view sees the team
     Route::get('/analysis', [ReportController::class, 'analysis'])->middleware('can:analysis.view')->name('analysis.index');

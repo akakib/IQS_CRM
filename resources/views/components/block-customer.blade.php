@@ -14,7 +14,8 @@
 @endphp
 
 @if ($c && ($blocked || $canBlock))
-    <div class="mt-3 flex flex-wrap items-center gap-2" x-data="{ open: false, cancel: {{ $final ? 'false' : 'true' }}, cwhy: null, phone: true, device: true, ipOn: false, days: 30, ip: null, asked: false,
+    {{-- Phone: the Block button sits at the top right of its card (the card is relative); a blocked customer's mark keeps its own line. --}}
+    <div @class(['mt-3 flex flex-wrap items-center gap-2', 'max-sm:absolute max-sm:right-3 max-sm:top-2 max-sm:mt-0' => ! $blocked]) x-data="{ open: false, cancel: {{ $final ? 'false' : 'true' }}, cwhy: null, phone: true, device: true, ipOn: false, days: 30, ip: null, asked: false,
             show() { this.open = true; if ({{ $web ? 'true' : 'false' }} && ! this.asked) { this.asked = true; fetch(@js(route('orders.block-info', $order)), { headers: { Accept: 'application/json' } }).then(r => r.json()).then(d => this.ip = d.ip).catch(() => {}); } } }">
         @if ($blocked)
             <span class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">{{ __('Blocked') }}@if ($c->blocked_reason) · {{ $c->blocked_reason }}@endif</span>

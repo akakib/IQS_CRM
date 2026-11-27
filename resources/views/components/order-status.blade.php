@@ -1,6 +1,7 @@
 {{-- Status chip in the status's own colour (from the database), plus the
      repack / edited mark after packaging. --}}
-@props(['order', 'statuses' => null])
+{{-- brief: the badges only, the page writes the duplicate's detail on its own line. --}}
+@props(['order', 'statuses' => null, 'brief' => false])
 
 @php
     $map = $statuses ?? \App\Models\OrderStatus::map();
@@ -16,7 +17,7 @@
         {{-- Same items to the same address = most likely a real duplicate (red); anything else is worth a look (amber). --}}
         @php $twinSame = ($order->duplicate_items ?? null) === 'same' && ($order->duplicate_address ?? null) === 'same'; @endphp
         <x-badge :color="$twinSame ? 'red' : 'amber'">{{ __('Possible duplicate') }}</x-badge>
-        @if ($order->duplicate_of_no ?? null)
+        @if (! $brief && ($order->duplicate_of_no ?? null))
             <span class="text-xs text-gray-600">{{ __('of :no: :m', ['no' => $order->duplicate_of_no, 'm' => \App\Services\Orders\DuplicateCheck::label($order->duplicate_items, $order->duplicate_address)]) }}</span>
         @endif
     @endif

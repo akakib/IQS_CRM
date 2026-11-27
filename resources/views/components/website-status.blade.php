@@ -1,7 +1,7 @@
 {{-- A website order's own status on the website, and Woo Record Verified to set it there without leaving the page
      (done by itself on record verified; this is for when it did not go). Used on the Desk and the order page.
      <x-website-status :order="$order" /> --}}
-@props(['order'])
+@props(['order', 'label' => true])
 @php $push = app(\App\Services\Orders\WebsiteStatusPush::class); @endphp
 @if ($order->channel === 'web' && $order->external_ref)
     <div x-data="{
@@ -22,7 +22,7 @@
             },
         }" {{ $attributes->merge(['class' => 'mt-2 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs']) }}
         :class="error ? 'bg-amber-50 text-amber-900' : 'bg-gray-50 text-gray-700'">
-        <span><span class="sm:hidden">{{ __('Web:') }}</span><span class="max-sm:hidden">{{ __('Website status:') }}</span> <b x-text="status"></b><span x-show="done" class="text-green-700"> ✓ {{ __('set') }} <span x-text="at"></span></span></span>
+        <span>@if ($label)<span class="sm:hidden">{{ __('Web:') }}</span><span class="max-sm:hidden">{{ __('Website status:') }}</span> @endif<b x-text="status"></b><span x-show="done" class="text-green-700"> ✓ {{ __('set') }} <span x-text="at"></span></span></span>
         <span x-show="error" x-cloak>· {{ __('Not set:') }} <span x-text="error"></span></span>
         @if ($push->canSend($order))
             <button type="button" x-show="canSend" @click="send()" :disabled="busy"

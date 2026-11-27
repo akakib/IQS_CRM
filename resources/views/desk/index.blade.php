@@ -412,15 +412,60 @@
 
                 <div class="rounded-xl border border-gray-200 bg-white">
                     <div class="p-5">
-                        <div class="flex items-start justify-between gap-3">
+                        {{-- Phone: fixed lines instead of one wrapping row of chips: order and amount, status and COD, the customer,
+                             then who and where (Courier with the CN once booked, Website, Assigned, Packing). Wider screens keep the row below. --}}
+                        @php
+                            $showHolder = ! $embed && ($order->moderator_id !== auth()->id() || auth()->user()->can('orders.reassign'));
+                            $parcelWord = $detail['parcel']->courier_status ?? null;
+                        @endphp
+                        <div class="sm:hidden">
+                            <div class="flex items-baseline justify-between gap-2 text-xs text-gray-500">
+                                <span class="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                                    <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-primary">{{ $order->order_no }}</a>
+                                    @if ($woo = \App\Models\Order::websiteAdminUrl($order))<a href="{{ $woo }}" target="_blank" rel="noopener">{{ \App\Models\Order::sourceLabel($order) }}</a>@else<span>{{ \App\Models\Order::sourceLabel($order) }}</span>@endif
+                                    <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
+                                </span>
+                                <b class="shrink-0 text-lg font-semibold tabular-nums text-gray-900">{{ $money($order->grand_total) }}</b>
+                            </div>
+                            <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                                <x-order-status :order="$order" :statuses="$statuses" brief />
+                                @if ($order->action_due_at)<x-countdown :seconds="$secondsLeft($order->action_due_at)" />@endif
+                                @if ($order->no_response_count)<x-badge color="amber">{{ __('No response ×:n', ['n' => $order->no_response_count]) }}</x-badge>@endif
+                                <span class="ml-auto whitespace-nowrap text-[11px]">{{ __('COD :c · delivery :d', ['c' => $money($order->cod_amount), 'd' => $money($order->delivery_charge)]) }}</span>
+                            </div>
+                            @if ($order->is_duplicate_flag && ($order->duplicate_of_no ?? null))
+                                <p class="mt-1 text-xs text-gray-600">{{ __('of :no: :m', ['no' => $order->duplicate_of_no, 'm' => \App\Services\Orders\DuplicateCheck::label($order->duplicate_items, $order->duplicate_address)]) }}</p>
+                            @endif
+                            <h2 class="mt-3 text-xl font-semibold text-gray-900">{{ $order->ship_name }}</h2>
+                            <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
+                            @php $web = $order->channel === 'web' && $order->external_ref; @endphp
+                            @if ($detail['consignment'] || $parcelWord || $web || $showHolder || $order->packer)
+                                <dl class="mt-3 grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-y-2 border-t border-gray-100 pt-3 text-[13px] text-gray-800">
+                                    @if ($detail['consignment'] || $parcelWord)
+                                        <dt class="text-xs text-gray-400">{{ __('Courier') }}</dt>
+                                        <dd>@if ($parcelWord){{ ucfirst((string) ($detail['parcel']->courier ?: __('Courier'))) }}: {{ ucfirst(str_replace('_', ' ', $parcelWord)) }}@endif @if ($detail['consignment'])@if ($parcelWord)· @endif<x-consignment-link :cn="$detail['consignment']" :courier="$detail['parcel']->courier" class="font-semibold !no-underline" />@endif</dd>
+                                    @endif
+                                    @if ($web)
+                                        <dt class="text-xs text-gray-400">{{ __('Website') }}</dt>
+                                        <dd><x-website-status :order="$order" :label="false" class="!mt-0 !bg-transparent !p-0 !text-[13px]" /></dd>
+                                    @endif
+                                    @if ($showHolder)
+                                        <dt class="text-xs text-gray-400">{{ __('Assigned') }}</dt>
+                                        <dd>{{ $order->moderator ? ($order->moderator_id === auth()->id() ? __('You') : $order->moderator->name) : __('Nobody') }}@if ($order->covered_for_id && $order->covered_for_id !== $order->moderator_id) · <span class="text-amber-800">{{ __(':n\'s order', ['n' => \App\Models\User::whereKey($order->covered_for_id)->value('name') ?? '-']) }}</span>@endif</dd>
+                                    @endif
+                                    @if ($order->packer)
+                                        <dt class="text-xs text-gray-400">{{ __('Packing') }}</dt>
+                                        <dd>{{ $order->packer->name }}</dd>
+                                    @endif
+                                </dl>
+                            @endif
+                        </div>
+                        <div class="flex items-start justify-between gap-3 max-sm:hidden">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                                     <a href="{{ route('orders.show', $order) }}" class="font-mono font-medium text-primary hover:underline">{{ $order->order_no }}</a>
                                     @if ($woo = \App\Models\Order::websiteAdminUrl($order))<a href="{{ $woo }}" target="_blank" rel="noopener" class="hover:text-primary hover:underline">{{ \App\Models\Order::sourceLabel($order) }}</a>@else<span>{{ \App\Models\Order::sourceLabel($order) }}</span>@endif
                                     <span>{{ __(':t ago', ['t' => $age($order->created_at)]) }}</span>
-                                    {{-- Phone: the amount sits on this first line (the right column is for wider screens), the rest wraps below at full width. --}}
-                                    <b class="ml-auto text-base font-semibold tabular-nums text-gray-900 sm:hidden">{{ $money($order->grand_total) }}</b>
-                                    <span class="-mt-2 basis-full text-right text-[11px] sm:hidden">{{ __('COD :c · delivery :d', ['c' => $money($order->cod_amount), 'd' => $money($order->delivery_charge)]) }}</span>
                                     <x-order-status :order="$order" :statuses="$statuses" />
                                     <x-courier-word :status="$detail['parcel']->courier_status ?? null" :courier="$detail['parcel']->courier ?? null" />
                                     {{-- Once booked: the CN, opening the parcel in the Steadfast panel. --}}
@@ -450,11 +495,11 @@
                                         </button>
                                     @endif
                                 </div>
-                                <x-website-status :order="$order" class="max-sm:mt-1.5 max-sm:inline-flex max-sm:rounded-full max-sm:px-2.5 max-sm:py-0.5" />
+                                <x-website-status :order="$order" />
                                 <h2 class="mt-1 text-xl font-semibold sm:text-2xl text-gray-900">{{ $order->ship_name }}</h2>
                                 <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
                             </div>
-                            <div class="hidden shrink-0 text-right sm:block">
+                            <div class="shrink-0 text-right">
                                 <p class="text-xl font-semibold tabular-nums text-gray-900 sm:text-2xl">{{ $money($order->grand_total) }}</p>
                                 <p class="text-xs text-gray-500">{{ __('COD :c · delivery :d', ['c' => $money($order->cod_amount), 'd' => $money($order->delivery_charge)]) }}</p>
                             </div>
@@ -482,12 +527,12 @@
                                 <x-phone-dial :phone="$order->ship_phone" :alt="$order->ship_alt_phone" :order-id="$order->id" :name="$order->ship_name" :order-no="$order->order_no"
                                     :talked="$detail['talked']" compact />
                             </div>
-                            <div class="rounded-lg border border-gray-200 p-4">
+                            <div class="relative rounded-lg border border-gray-200 p-4 max-sm:px-3 max-sm:py-2.5">
                                 <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ __('Customer history') }}</p>
                                 @php $c = $order->customer; @endphp
                                 @if ($c && $c->orders_count > 1)
-                                    <p class="text-base font-semibold text-gray-900">{{ __(':d delivered · :r returned', ['d' => $c->delivered_count, 'r' => $c->returned_count]) }}</p>
-                                    <p class="mt-1 text-xs {{ $c->returned_count > $c->delivered_count ? 'text-red-600' : 'text-green-800' }}">{{ __(':n orders in total', ['n' => $c->orders_count]) }}@if ($c->risk_level && $c->risk_level !== 'normal') · {{ \App\Support\Labels::risk($c->risk_level) }}@endif</p>
+                                    <p class="text-base font-semibold text-gray-900 max-sm:inline max-sm:text-sm">{{ __(':d delivered · :r returned', ['d' => $c->delivered_count, 'r' => $c->returned_count]) }}<span class="sm:hidden"> ·</span></p>
+                                    <p class="mt-1 text-xs max-sm:mt-0 max-sm:inline max-sm:text-sm {{ $c->returned_count > $c->delivered_count ? 'text-red-600' : 'text-green-800' }}">{{ __(':n orders in total', ['n' => $c->orders_count]) }}@if ($c->risk_level && $c->risk_level !== 'normal') · {{ \App\Support\Labels::risk($c->risk_level) }}@endif</p>
                                 @else
                                     <p class="text-base font-semibold text-gray-900">{{ __('New customer') }}</p>
                                     <p class="mt-1 text-xs text-gray-500">{{ __('First order with us') }}</p>
@@ -537,6 +582,12 @@
                                 </div>
                             @endforeach
                         </div>
+                        @if ($canEdit && ! $stockShort)
+                            <button type="button" @click="$dispatch('open-order-edit')" class="lockable mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 sm:hidden">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.86 4.49l2.65 2.65M4 20l1-4L16.5 4.5a1.87 1.87 0 012.65 2.65L7.65 18.65 4 20z"/></svg>
+                                {{ __('Edit order') }}
+                            </button>
+                        @endif
 
                         @if ($tab === 'packaging' || in_array($key, ['ready_for_packaging', 'packed', 'ready_for_pickup'], true))
                             <div class="mt-3 rounded-lg border border-gray-200 px-4 py-3 text-sm">

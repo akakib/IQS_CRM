@@ -173,7 +173,9 @@
             </div>
         @if ($wide)
             <div x-show="sheet" x-cloak @click="sheet = false" class="fixed inset-0 z-40 bg-black/40 md:hidden"></div>
-            <div :class="sheet ? 'fixed inset-x-0 bottom-0 z-50 grid rounded-t-2xl bg-white p-5 pb-8 shadow-2xl' : 'hidden'"
+            {{-- A phone's sheet: an open picker's list sits in the sheet itself (not floating past the screen edge),
+                 and the sheet scrolls when it grows tall. --}}
+            <div :class="sheet ? 'fixed inset-x-0 bottom-0 z-50 grid max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white p-5 pb-8 shadow-2xl max-md:[&_.absolute.z-30]:static max-md:[&_.absolute.z-30]:shadow-none' : 'hidden'"
                 class="gap-2.5 md:static md:z-auto md:flex md:flex-1 md:items-center md:gap-2 md:rounded-none md:p-0 md:pb-0 md:shadow-none">
                 <p class="mb-1 text-sm font-semibold text-gray-800 md:hidden">{{ __('Filters') }}</p>
                 <span x-show="who !== 'mine'" class="contents max-md:[&>div>button]:w-full"><x-simple-select name="moderator" :options="['' => __('Anyone')] + $staffOptions" :value="(string) ($staffId ?? '')" /></span>

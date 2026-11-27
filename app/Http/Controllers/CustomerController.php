@@ -83,9 +83,11 @@ class CustomerController extends Controller
         abort_unless(Customer::canOpen($request->user(), $customer->id), 403);
         $customer->load(['phones', 'addresses.zone:id,name']);
         $checks = $customer->fraudChecks()->with('provider:id,name,system_key')->latest('checked_at')->limit(20)->get();
-        // Came from the search: remembered for this customer, so it stays after a reload or an action here.
+        // Came from the search or the customer list: remembered for this customer (the latest one wins),
+        // so it stays after a reload or an action here, and Back goes to the page it really came from.
         $from = (string) url()->previous();
-        if (str_contains((string) parse_url($from, PHP_URL_PATH), '/order-search')) {
+        $path = rtrim((string) parse_url($from, PHP_URL_PATH), '/');
+        if (str_contains($path, '/order-search') || str_ends_with($path, '/customers')) {
             $request->session()->put('customer_back.'.$customer->id, $from);
         }
 

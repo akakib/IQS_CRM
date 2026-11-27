@@ -19,7 +19,7 @@
             @if ($embed)
                 <span></span>
             @elseif ($backToResults)
-                <a href="{{ $backToResults }}" class="text-sm text-primary hover:underline">{{ __('Back to results') }}</a>
+                <a href="{{ $backToResults }}" class="text-sm text-primary hover:underline">{{ str_ends_with(rtrim((string) parse_url($backToResults, PHP_URL_PATH), '/'), '/customers') ? __('Back to customers') : __('Back to results') }}</a>
             @else
                 <a href="{{ route('customers.index') }}" class="text-sm text-primary hover:underline">{{ __('Back to customers') }}</a>
             @endif

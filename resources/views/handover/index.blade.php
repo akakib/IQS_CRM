@@ -45,13 +45,14 @@
             </form>
             @forelse ($sessions as $s)
                 {{-- The row opens the handover; Print and Excel give its full parcel list (same columns as the orders export), any time. --}}
-                <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-2 py-3 text-sm last:border-0 hover:bg-gray-50">
+                {{-- Phone: the buttons go under the text, so the date and rider keep the full width. --}}
+                <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-2 py-3 text-sm last:border-0 hover:bg-gray-50 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
                     <a href="{{ $s->closed_at ? route('handover.manifest', $s->id) : route('handover.show', $s->id) }}" class="min-w-0 flex-1">
                         <span class="block font-medium text-gray-900">{{ \Illuminate\Support\Carbon::parse($s->started_at)->format('d M Y, g:i A') }} · {{ $s->rider_name ?? __('Rider') }}</span>
                         <span class="block text-xs text-gray-500">{{ trans_choice(':count parcel|:count parcels', $s->parcels) }}{{ $s->rider_phone ? ' · '.$s->rider_phone : '' }}{{ $s->by ? ' · '.__('by :n', ['n' => $s->by]) : '' }}</span>
                     </a>
                     {{-- Scanning: the rider is still being given parcels; Handed over: closed, the pickup sheet is ready. --}}
-                    <span class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <span class="flex shrink-0 flex-wrap items-center justify-end gap-2 max-sm:justify-start">
                         <x-badge :color="$s->closed_at ? 'green' : 'blue'">{{ $s->closed_at ? __('Handed over') : __('Scanning') }}</x-badge>
                         @if ($s->parcels)
                             <x-export-buttons :print="route('handover.print', $s->id)" :excel="route('handover.excel', $s->id)" />

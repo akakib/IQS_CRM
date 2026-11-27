@@ -308,7 +308,7 @@
     <div @class(['grid gap-4', 'lg:grid-cols-[300px_minmax(0,1fr)]' => ! $embed])>
         {{-- My orders in this stage --}}
         @unless ($embed)
-        <aside id="desk-aside" @class(['lg:block', 'hidden' => $showDetailOnPhone])>
+        <aside id="desk-aside" @class(['min-w-0 lg:block', 'hidden' => $showDetailOnPhone])>
             <div id="desk-list" class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                 <p class="border-b border-gray-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $tabLabels[$tab] }} · {{ in_array($tab, ['delivered', 'returned', 'cancelled'], true) ? __('newest first') : __('oldest first') }}@if ($everyone) · {{ __('everyone') }}@endif</p>
                 @forelse ($list as $row)

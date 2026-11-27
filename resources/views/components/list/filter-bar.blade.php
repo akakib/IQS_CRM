@@ -12,7 +12,7 @@
 @php($activeFilters = count(array_filter($list->filters, fn ($v) => $v !== null)))
 
 <form method="GET" action="{{ $action }}" x-ref="filters" data-list-bar
-    x-data="listBar"
+    x-data="listBar" @list-refresh.window="refresh(true)"
     @select-change="setTimeout(() => $refs.filters.requestSubmit(), 0)"
     class="mb-4 flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3">
     <input type="hidden" name="sort" value="{{ $list->sort }}">

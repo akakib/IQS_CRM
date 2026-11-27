@@ -47,8 +47,17 @@ class ProductController extends Controller
             ->paginate($list->perPage)
             ->withQueryString();
 
+        // Quick edit (tap a product): how many open orders hold each variant, one query for the page; only for who can change stock.
+        $openOrders = $request->user()->can('products.availability') && $products->isNotEmpty()
+            ? DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')
+                ->whereIn('order_items.variant_id', $products->getCollection()->flatMap(fn ($p) => $p->variants)->pluck('id'))
+                ->join('order_statuses', 'order_statuses.id', '=', 'orders.status_id')->whereIn('order_statuses.system_key', \App\Services\Orders\AvailabilityEffects::OPEN)
+                ->groupBy('order_items.variant_id')->selectRaw('order_items.variant_id, COUNT(DISTINCT orders.id) as n')->pluck('n', 'variant_id')
+            : collect();
+
         return view('products.index', [
             'products' => $products,
+            'openOrders' => $openOrders,
             'list' => $list,
             'categoryOptions' => Category::orderBy('name')->pluck('name', 'id')->all(),
         ]);

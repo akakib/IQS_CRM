@@ -144,7 +144,7 @@ class ProductTest extends TestCase
 
         \Illuminate\Support\Facades\DB::enableQueryLog();
         $this->get('/products?per_page=25')->assertOk()->assertSee('data-view="table"', false);
-        $this->assertLessThanOrEqual(10, count(\Illuminate\Support\Facades\DB::getQueryLog()));
+        $this->assertLessThanOrEqual(11, count(\Illuminate\Support\Facades\DB::getQueryLog())); // 10 + the open-order counts for the quick edit
     }
 
     public function test_availability_change_logs_event_and_queues_website_sync(): void
@@ -235,6 +235,24 @@ class ProductTest extends TestCase
         $this->assertSoftDeleted($cat);
         $this->assertSame(0, Product::whereNotNull('category_id')->count());
         $this->assertSame(1, Product::count());
+    }
+
+    public function test_tapping_a_product_opens_the_quick_edit_only_for_who_may_change_it(): void
+    {
+        $product = Product::factory()->withVariant(500)->create(['name' => 'Quick Dates']);
+        $variant = $product->variants()->first();
+
+        // Owner: tap opens it, with the stock switch and the full form link; a stock change saves from it.
+        $this->get('/products')->assertOk()->assertSee('open(', false)->assertSee('Edit in full form');
+        $this->postJson(route('products.availability.update'), ['ids' => [$variant->id], 'status' => 'out_of_stock'])->assertOk()->assertJson(['changed' => 1]);
+        $this->assertSame('out_of_stock', $variant->fresh()->availability_status);
+
+        // A moderator who may only look: no quick edit at all, and the stock change is refused.
+        $viewer = User::factory()->create();
+        $viewer->roles()->attach($this->role(['products.view'])->id);
+        $this->actingAs($viewer);
+        $this->get('/products')->assertOk()->assertSee('Quick Dates')->assertDontSee('open(', false)->assertDontSee('Edit in full form');
+        $this->postJson(route('products.availability.update'), ['ids' => [$variant->id], 'status' => 'in_stock'])->assertForbidden();
     }
 
     public function test_a_search_matches_words_in_any_order_and_puts_the_best_match_first(): void

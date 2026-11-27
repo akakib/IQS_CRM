@@ -8,6 +8,7 @@ import voiceAlerts from './components/voice-alerts';
 import orderPresence from './components/order-presence';
 import pageTabs from './components/page-tabs';
 import listBar from './components/list-bar';
+import productQuick from './components/product-quick';
 
 window.Alpine = Alpine;
 Alpine.data('dateInput', dateInput);
@@ -18,6 +19,7 @@ Alpine.data('voiceAlerts', voiceAlerts);
 Alpine.data('orderPresence', orderPresence);
 Alpine.data('tabs', pageTabs);
 Alpine.data('listBar', listBar);
+Alpine.data('productQuick', productQuick);
 Alpine.start();
 
 // One click, one action. Once a form is on its way to the server, a second

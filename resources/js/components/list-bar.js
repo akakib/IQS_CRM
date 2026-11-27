@@ -18,11 +18,11 @@ export default () => ({
         this.$refs.filters.requestSubmit();
     },
 
-    async refresh() {
+    async refresh(force = false) {
         const form = this.$refs.filters;
         const url = new URL(form.action, location.origin);
         new FormData(form).forEach((v, k) => { if (v !== '') url.searchParams.append(k, v); });
-        if (url.href === location.href) return;
+        if (url.href === location.href && !force) return;
 
         this.pending?.abort();
         this.pending = new AbortController();

@@ -41,7 +41,7 @@ class AvailabilityController extends Controller
         return view('products.availability', compact('variants', 'list', 'status', 'counts', 'reviewDue'));
     }
 
-    public function update(Request $request, ProductService $products): RedirectResponse
+    public function update(Request $request, ProductService $products): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $data = $request->validate([
             'ids' => ['required', 'array', 'max:500'],
@@ -52,6 +52,10 @@ class AvailabilityController extends Controller
         ]);
 
         $changed = $products->setAvailability($data['ids'], $data['status'], $request->user()->id, $data['expected_restock_date'] ?? null, $data['note'] ?? null);
+
+        if ($request->expectsJson()) { // the Products quick edit
+            return response()->json(['changed' => $changed]);
+        }
 
         return back()->with('success', trans_choice(':count variant updated.|:count variants updated.', $changed, ['count' => $changed]));
     }

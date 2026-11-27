@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
  */
 class AvailabilityEffects
 {
-    private const OPEN = ['new', 'record_verified', 'no_answer', 'confirmed', 'ready_for_packaging'];
+    /** Orders still open for an item change (also counted on the Products quick edit). */
+    public const OPEN = ['new', 'record_verified', 'no_answer', 'confirmed', 'ready_for_packaging'];
 
     public function __construct(private OrderStateMachine $machine, private OrderService $orders, private NotificationService $notifications) {}
 

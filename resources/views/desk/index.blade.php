@@ -113,7 +113,7 @@
             {{-- New order: first "where from?", so every order counts for its number or page. --}}
             @php $myChannels = app(\App\Services\Work\ChatService::class)->channelsFor(auth()->user()); @endphp
             <div class="relative" x-data="{ pick: false, go(url) { this.pick = false; window.dispatchEvent(new CustomEvent('order-new', { detail: url })) } }" @click.outside="pick = false" @keydown.escape.window="pick = false">
-                <x-button type="button" variant="secondary" class="max-sm:w-10 max-sm:border-primary max-sm:bg-primary max-sm:px-0 max-sm:text-lg max-sm:text-white sm:w-auto" data-key="o" aria-label="{{ __('New order') }}"
+                <x-button type="button" variant="secondary" class="max-sm:w-10 max-sm:border-primary max-sm:bg-primary max-sm:px-0 max-sm:py-0 max-sm:text-lg max-sm:leading-none max-sm:text-white sm:w-auto" data-key="o" aria-label="{{ __('New order') }}"
                     @click="{{ $myChannels->isEmpty() ? 'go('.\Illuminate\Support\Js::from(route('orders.create', ['embed' => 1])).')' : 'pick = ! pick' }}">
                     + <span class="max-sm:hidden">{{ __('New order') }}</span> <kbd class="hidden rounded bg-gray-100 px-1.5 text-[11px] text-gray-500 lg:inline">⇧O</kbd>
                 </x-button>

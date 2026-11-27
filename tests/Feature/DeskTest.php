@@ -170,6 +170,11 @@ class DeskTest extends TestCase
         $this->actingAs($this->owner())->get('/desk?tab=verify')->assertOk()->assertSee('Anika Rahman')->assertSee('Babul Mia')->assertSee('Chandni Akter')
             ->assertSee('Mahim')->assertSee('Rima')->assertSee('Nobody yet')->assertSee('Everyone')->assertSee('With courier')->assertSee('Cancelled');
         $this->get('/desk?tab=verify&q=babul')->assertOk()->assertSee('Babul Mia')->assertDontSee('Anika Rahman');
+        // A search with no stage picked finds an order wherever it is, says its stage, and is not held to today.
+        $b->forceFill(['status_id' => OrderStatus::idFor('delivered'), 'updated_at' => now()->subDays(5)])->save();
+        $this->get('/desk?q=babul')->assertOk()->assertSee('Babul Mia')->assertSee('1 order found')->assertSee('Delivered');
+        $this->get('/desk?q=0000000')->assertOk()->assertSee('Nothing here.');
+        $b->forceFill(['status_id' => OrderStatus::idFor('new'), 'updated_at' => now()])->save();
         $this->get('/desk?tab=verify&q='.$a->order_no)->assertOk()->assertSee('Anika Rahman')->assertDontSee('Babul Mia');
         $this->get('/desk?tab=verify&moderator='.$this->rima->id)->assertOk()->assertSee('Babul Mia')->assertDontSee('Anika Rahman')->assertDontSee('Chandni Akter');
         $this->get('/desk?tab=verify&who=mine')->assertOk()->assertDontSee('Anika Rahman')->assertDontSee('Babul Mia');

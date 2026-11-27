@@ -17,6 +17,7 @@ export default ({ range, who, base }) => ({
         const out = new URLSearchParams();
         data.forEach((v, k) => {
             if (v === '' || (k === 'from' || k === 'to') && data.get('range') !== 'custom' || k === 'moderator' && data.get('who') === 'mine') return;
+            if (k === 'tab' && data.get('q')) return; // a search shows what it finds in every stage, not only the open tab
             out.append(k, v);
         });
         return out;

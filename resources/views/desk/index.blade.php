@@ -4,6 +4,7 @@
 
     $tabLabels = ['verify' => __('Verify'), 'call' => __('Call'), 'again' => __('Call again'), 'hold' => __('On hold'), 'send' => __('Booking failed'), 'packaging' => __('Packaging')]
         + ['courier' => __('With courier'), 'delivered' => __('Delivered'), 'returned' => __('Returned'), 'cancelled' => __('Cancelled')];
+    $found = $tab === 'found'; // a search across every stage: one list, each row with its stage
     // Every link on the page keeps the search, the dates and the filters.
     $url = fn (array $q) => route('desk.index', array_filter($q + $keep, fn ($v) => $v !== null));
     $key = $order ? $statuses[$order->status_id]['key'] : null;
@@ -323,7 +324,7 @@
         @unless ($embed)
         <aside id="desk-aside" @class(['min-w-0 lg:block', 'hidden' => $showDetailOnPhone])>
             <div id="desk-list" class="overflow-hidden rounded-xl border border-gray-200 bg-white">
-                <p class="border-b border-gray-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $tabLabels[$tab] }} · {{ in_array($tab, ['delivered', 'returned', 'cancelled'], true) ? __('newest first') : __('oldest first') }}@if ($everyone) · {{ __('everyone') }}@endif</p>
+                <p class="border-b border-gray-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $found ? trans_choice('{1} 1 order found|[2,*] :n orders found', max(1, $list->total()), ['n' => $list->total()]) : $tabLabels[$tab] }} · {{ $found || in_array($tab, ['delivered', 'returned', 'cancelled'], true) ? __('newest first') : __('oldest first') }}@if ($everyone) · {{ __('everyone') }}@endif</p>
                 @forelse ($list as $row)
                     @php $current = $order && $order->id === $row->id; @endphp
                     @if (isset($locked) && $locked->has($row->id))
@@ -337,7 +338,7 @@
                         </div>
                         @continue
                     @endif
-                    <a href="{{ $url(['tab' => $tab, 'page' => $list->currentPage() > 1 ? $list->currentPage() : null, 'order' => $row->id]) }}" data-row data-current="{{ $current ? 1 : 0 }}"
+                    <a href="{{ $url(['tab' => $found ? null : $tab, 'page' => $list->currentPage() > 1 ? $list->currentPage() : null, 'order' => $row->id]) }}" data-row data-current="{{ $current ? 1 : 0 }}"
                         @class(['flex items-center justify-between gap-2 border-b border-l-4 border-b-gray-100 px-4 py-3 last:border-b-0 hover:bg-gray-50',
                             'border-l-primary bg-primary-soft/60' => $current, 'border-l-orange-400 bg-orange-50' => ! $current && $row->stock_issue, 'border-l-transparent' => ! $current && ! $row->stock_issue])>
                         <span class="min-w-0">
@@ -346,7 +347,10 @@
                                 {{ $row->order_no }} · {{ $money($row->grand_total) }} · @if ($everyone)<span class="font-sans {{ $row->moderator_name ? '' : 'text-amber-700' }}">{{ $row->moderator_name ?: __('Nobody yet') }}</span>@else{{ \App\Models\Order::sourceLabel($row) }}@endif</span>
                         </span>
                         <span class="shrink-0 text-right">
-                            @if ($row->action_due_at)
+                            @if ($found)
+                                {{-- Found by a search: which stage the order is in. --}}
+                                <x-badge :color="$statuses[$row->status_id]['color']">{{ __($statuses[$row->status_id]['name']) }}</x-badge>
+                            @elseif ($row->action_due_at)
                                 <x-countdown :seconds="$secondsLeft($row->action_due_at)" />
                             @elseif ($tab === 'again')
                                 <span class="text-xs text-amber-700">{{ Carbon::parse($row->next_call_at)->isToday() ? Carbon::parse($row->next_call_at)->format('g:i A') : Carbon::parse($row->next_call_at)->format('d M, g A') }}</span>
@@ -388,7 +392,7 @@
                 </div>
             @else
                 @unless ($embed)
-                <a href="{{ $url(['tab' => $tab]) }}" class="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-primary lg:hidden">&larr; {{ __('My orders') }} · {{ $tabLabels[$tab] }} ({{ $counts[$tab] }})</a>
+                <a href="{{ $url(['tab' => $found ? null : $tab]) }}" class="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-primary lg:hidden">&larr; {{ $found ? __('Found') : __('My orders').' · '.$tabLabels[$tab] }} ({{ $counts[$tab] }})</a>
                 @endunless
                 @if ($reassign)
                     @include('desk._reassign', ['order' => $order, 'reassign' => $reassign])
@@ -641,7 +645,7 @@
                             <form id="desk-act" method="POST" action="{{ route('desk.act', $order) }}" class="px-5 pb-4">
                                 @csrf
                                 <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">
-                                <input type="hidden" name="tab" value="{{ $tab }}">
+                                <input type="hidden" name="tab" value="{{ in_array($tab, \App\Http\Controllers\DeskController::TABS, true) ? $tab : '' }}">{{-- a stage the action can come back to; none from a search or an ended stage --}}
                             @if ($embed)<input type="hidden" name="embed" value="1">@endif
                                 @if ($embed)<input type="hidden" name="embed" value="1">@endif
                                 @if (in_array($key, ['record_verified', 'no_answer'], true))
@@ -700,7 +704,7 @@
                             @csrf
                             <input type="hidden" name="action" value="{{ $mode }}">
                             <input type="hidden" name="lock_version" value="{{ $order->lock_version }}">
-                            <input type="hidden" name="tab" value="{{ $tab }}">
+                            <input type="hidden" name="tab" value="{{ in_array($tab, \App\Http\Controllers\DeskController::TABS, true) ? $tab : '' }}">{{-- a stage the action can come back to; none from a search or an ended stage --}}
                             @if ($embed)<input type="hidden" name="embed" value="1">@endif
                             <input type="hidden" name="reason_id" :value="reason">
                             <h3 class="text-sm font-semibold text-gray-800">{{ $title }}</h3>

@@ -27,6 +27,14 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? config('app.name') }}</title>
     <x-theme-head />
+    {{-- Phone and tablet: the menu rests off the right edge and is not drawn at all until it is opened. Written here,
+         in the page itself, so it holds from the first moment, before the stylesheet and the scripts arrive. --}}
+    <style>
+        @media (max-width: 1023.98px) {
+            .app-sidebar { translate: 100% 0; visibility: hidden; transition: translate .2s ease, visibility 0s linear .2s; }
+            .app-sidebar.is-open { translate: 0 0; visibility: visible; transition: translate .2s ease; }
+        }
+    </style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-gray-50 font-sans text-gray-900 antialiased" x-data="{
@@ -43,9 +51,8 @@
     <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-black/50 lg:hidden"></div>
 
     {{-- A computer: the sidebar on the left. A phone and tablet: the menu slides in from the right (More in the bottom bar). --}}
-    {{-- Closed is in the markup itself (off the right edge), so the menu never shows for a moment while a page loads. --}}
-    <aside :class="sidebarOpen && 'max-lg:!translate-x-0'"
-        class="app-sidebar fixed top-0 z-50 flex h-dvh w-[260px] flex-col border-gray-200 bg-white transition-[transform,width] duration-200 max-lg:right-0 max-lg:translate-x-full max-lg:border-l lg:left-0 lg:translate-x-0 lg:border-r">
+    <aside :class="{ 'is-open': sidebarOpen }"
+        class="app-sidebar fixed top-0 z-50 flex h-dvh w-[260px] flex-col border-gray-200 bg-white max-lg:right-0 max-lg:border-l lg:left-0 lg:border-r lg:transition-[width] lg:duration-200">
         <div class="mini-center flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <a href="{{ route('dashboard') }}" class="text-xl font-bold text-gray-800"><span class="mini-hide">{{ config('app.name') }}</span><span class="mini-only">{{ \Illuminate\Support\Str::of(config('app.name'))->before(' ') }}</span></a>
             <button type="button" @click="sidebarOpen = false" class="text-gray-500 hover:text-gray-700 lg:hidden" aria-label="{{ __('Close menu') }}">

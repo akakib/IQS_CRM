@@ -29,7 +29,7 @@ class DeskController extends Controller
 {
     public const TABS = ['verify', 'call', 'again', 'hold', 'send', 'packaging'];
 
-    private const PER_PAGE = 25;
+    private const PER_PAGE = 10; // a short list, then Prev / Next
 
     /** What left the desk: with the courier and the ended orders (a moderator: their own). */
     public const WIDE_TABS = ['courier', 'delivered', 'returned', 'cancelled'];
@@ -92,14 +92,15 @@ class DeskController extends Controller
             }
         }
         $ended = ['delivered', 'returned', 'cancelled'];
+        // A search looks in every stage and every day (unless dates are picked): an order found is shown wherever it is.
+        $term = trim(mb_substr((string) $request->query('q'), 0, 60));
         foreach ($where as $t => [$sql, $b]) {
-            if ($range !== 'open' || in_array($t, $ended, true)) {
+            if ($range !== 'open' || (in_array($t, $ended, true) && $term === '')) {
                 $col = in_array($t, $ended, true) ? 'orders.updated_at' : 'orders.created_at';
                 $where[$t] = ["({$sql} AND {$col} BETWEEN ? AND ?)", [...$b, $from->toDateTimeString(), $to->copy()->endOfDay()->toDateTimeString()]];
             }
         }
         // Search (name, phone, order number, CN or tracking code) and the owner's filters narrow every stage and its count.
-        $term = trim(mb_substr((string) $request->query('q'), 0, 60));
         $digits = preg_replace('/\D/', '', $term);
         $byCn = $term !== '' ? DB::table('shipments')->where('consignment_id', $term)->orWhere('tracking_code', strtoupper($term))->limit(20)->pluck('order_id')->all() : [];
         $staffId = $wide && ctype_digit((string) $request->query('moderator')) ? (int) $request->query('moderator') : null;
@@ -139,21 +140,25 @@ class DeskController extends Controller
         $toTimed = $timed && ! $request->has('tab') && ! $request->has('order');
 
         // Default tab: the running order's tab, else the first one with work in it.
-        $tab = isset($where[$request->query('tab')]) ? $request->query('tab')
-            : ($toTimed ? ($timed->status_id === $s('new') ? 'verify' : 'call') : (collect(self::TABS)->first(fn ($t) => $counts[$t] > 0) ?? 'call'));
+        // Searching without a stage picked: one list of everything found, each row saying its stage ("found").
+        $found = $term !== '' && ! isset($where[$request->query('tab')]);
+        $tab = $found ? 'found' : (isset($where[$request->query('tab')]) ? $request->query('tab')
+            : ($toTimed ? ($timed->status_id === $s('new') ? 'verify' : 'call') : (collect(self::TABS)->first(fn ($t) => $counts[$t] > 0) ?? 'call')));
+        $counts['found'] = array_sum(array_intersect_key($counts, $where));
 
         $this->desk->bookDue(); // a booking whose own request died, or a retry that is due, is sent after this page
         $page = max(1, (int) $request->query('page', 1));
         $rows = DB::table('orders')->leftJoin('users as pk', 'pk.id', '=', 'orders.packer_id')->leftJoin('users as md', 'md.id', '=', 'orders.moderator_id')
-            ->tap($scope)->whereRaw($where[$tab][0], $where[$tab][1])
+            ->tap($scope)
+            ->when($found, fn ($q) => $q->where(fn ($w) => collect($where)->each(fn ($c) => $w->orWhereRaw($c[0], $c[1]))), fn ($q) => $q->whereRaw($where[$tab][0], $where[$tab][1]))
             // Open work: the running timer, then the oldest. Ended orders: the newest change first.
-            ->when(in_array($tab, $ended, true), fn ($q) => $q->orderByDesc('orders.updated_at')->orderByDesc('orders.id'),
+            ->when($found || in_array($tab, $ended, true), fn ($q) => $q->orderByDesc('orders.updated_at')->orderByDesc('orders.id'),
                 fn ($q) => $q->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('orders.id'))
             ->forPage($page, self::PER_PAGE)
             ->get(['orders.id', 'order_no', 'external_ref', 'ship_name', 'ship_thana', 'ship_district', 'grand_total', 'channel', 'status_id', 'orders.created_at', 'assigned_at',
                 'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'advance_waiver_requested_at', DB::raw('EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0) as waiting_check'), DB::raw(\App\Services\Orders\OrderService::stockIssueSql('orders').' as stock_issue'), 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packer_id', 'packed_at',
                 'pk.name as packer_name', 'pk.photo_path as packer_photo', 'orders.moderator_id', 'md.name as moderator_name', 'orders.updated_at']);
-        $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ['tab' => $tab] + $keep]);
+        $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ($found ? [] : ['tab' => $tab]) + $keep]);
 
         // One at a time: with more than one order in hand, only the one to work now opens; the rest wait their turn.
         // (With the countdown on, the running timer already keeps one order at a time.)

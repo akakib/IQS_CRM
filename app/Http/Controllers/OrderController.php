@@ -30,9 +30,13 @@ class OrderController extends Controller
 
     public function __construct(private OrderService $orders, private OrderStateMachine $machine) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): View|\Illuminate\Http\RedirectResponse
     {
         $user = $request->user();
+        // All orders is for the owner and managers; a moderator (a link, Back from an order) lands on Order management.
+        if (! $user->can('orders.reassign')) {
+            return redirect()->route('desk.index');
+        }
         $statusKeys = array_filter(array_column(OrderStatus::map(), 'key'));
         $list = ListState::from($request, ['id', 'grand_total'], [
             'tab' => ['take', 'mine', 'all'],

@@ -16,7 +16,8 @@ return [
         ['Search', 'orders.search', 'orders.search', null, 'search'],
         ['Order activity', 'orders.activity', 'orders.activity', 'orders.reassign', 'board'],
         ['Order management', 'desk.index', 'desk.index', 'orders.edit', 'clipboard'],
-        ['All orders', 'orders.index', 'orders.index', 'orders.view', 'list'],
+        // Owner and managers only (2026-11-27): moderators work every order from Order management.
+        ['All orders', 'orders.index', 'orders.index', 'orders.reassign', 'list'],
         ['New order', 'orders.create', 'orders.create', 'orders.create', 'plus'],
         ['Courier booking', 'shipping.index', 'shipping.*', 'shipping.view', 'truck'],
         ['Packaging', 'packaging.index', 'packaging.*', 'packaging.view', 'box'],

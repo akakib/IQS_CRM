@@ -695,7 +695,7 @@ class DeskTest extends TestCase
         $this->assertSame($packer->id, (int) $b->fresh()->packer_id);
         $this->post("/orders/{$b->id}/take-back", ['why' => 'Customer had not confirmed'])->assertSessionHasErrors('order');
         $manager = User::factory()->create();
-        $manager->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'orders.approve'], [], 'Manager')->id);
+        $manager->roles()->attach($this->role(['orders.view' => 'all', 'orders.edit', 'orders.approve', 'orders.reassign'], [], 'Manager')->id);
         app(\App\Services\PermissionService::class)->bump();
         $this->actingAs($manager)->post("/orders/{$b->id}/take-back", ['why' => 'Wrong customer confirmed'])->assertSessionHas('success');
         $b->refresh();

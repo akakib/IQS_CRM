@@ -110,16 +110,17 @@ class OrderHttpTest extends TestCase
 
         $this->assertSame(0, DB::table('app_notifications')->where('subject_id', $order->id)->count()); // no "New order" to everyone
 
-        $this->actingAs($this->agent)->get('/orders?tab=take')->assertOk()->assertSee($order->order_no);
+        // A moderator has no All orders (owner and managers only): the address takes them to Order management.
+        $this->actingAs($this->agent)->get('/orders?tab=take')->assertRedirect(route('desk.index'));
         $this->get("/orders/{$order->id}")->assertOk()->assertDontSee('Assign to me');
         $this->post('/desk/next')->assertSessionHas('success');
         $this->assertSame($this->agent->id, $order->fresh()->moderator_id);
-        $this->get('/orders?tab=mine')->assertSee($order->order_no);
+        $this->get('/desk')->assertSee($order->order_no); // theirs, on Order management
 
         // Cancelled: found by the status filter with why, by whom and when.
         $reason = DB::table('status_reasons')->where('reason_type', 'cancel')->where('system_key', 'unreachable')->value('id');
         app(\App\Services\Orders\OrderStateMachine::class)->transition($order->fresh(), 'cancelled', $this->agent, 'user', $reason);
-        $this->get('/orders?tab=all&status=cancelled')->assertOk()->assertSee($order->order_no)->assertSee('Could not reach customer · by '.$this->agent->name, false);
+        $this->actingAs($this->owner())->get('/orders?tab=all&status=cancelled')->assertOk()->assertSee($order->order_no)->assertSee('Could not reach customer · by '.$this->agent->name, false);
     }
 
     public function test_owner_moves_status_from_the_order_page_with_reason(): void

@@ -2,8 +2,10 @@
     use Illuminate\Support\Carbon;
     use Illuminate\Support\Js;
 
-    $tabLabels = ['verify' => __('Verify'), 'call' => __('Call'), 'again' => __('Call again'), 'hold' => __('On hold'), 'send' => __('Booking failed'), 'packaging' => __('Packaging')];
-    $url = fn (array $q) => route('desk.index', $q);
+    $tabLabels = ['verify' => __('Verify'), 'call' => __('Call'), 'again' => __('Call again'), 'hold' => __('On hold'), 'send' => __('Booking failed'), 'packaging' => __('Packaging')]
+        + ($wide ? ['courier' => __('With courier'), 'delivered' => __('Delivered'), 'returned' => __('Returned'), 'cancelled' => __('Cancelled')] : []);
+    // Every link on the page keeps the search, the dates and the filters.
+    $url = fn (array $q) => route('desk.index', array_filter($q + $keep, fn ($v) => $v !== null));
     $key = $order ? $statuses[$order->status_id]['key'] : null;
     $isMine = $order && $order->moderator_id === auth()->id();
     // Out of stock or pre-order here (before Confirm): the orange box, Edit order ringed, Hold opens on Waiting for stock.
@@ -163,6 +165,42 @@
         </div>
     @endif
 
+    {{-- Search for everyone (a moderator: their own orders). Owner and managers: everyone's orders or their own,
+         dates, who has it, where it came from, and Export. --}}
+    <form method="GET" action="{{ route('desk.index') }}" x-data x-ref="f" @select-change="setTimeout(() => $refs.f.requestSubmit(), 0)"
+        @class(['mb-3 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-3', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
+        <input type="hidden" name="tab" value="{{ $tab }}">
+        @if ($wide && ! $everyone)<input type="hidden" name="who" value="mine">@endif
+        <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('Name, phone, order no or CN') }}"
+            x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length) }"
+            @input.debounce.600ms="$refs.f.requestSubmit()" @keydown.enter.prevent="$refs.f.requestSubmit()"
+            class="h-9 min-w-0 flex-1 basis-48 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none sm:max-w-xs">
+        @if ($wide)
+            <div class="flex h-9 shrink-0 overflow-hidden rounded-lg border border-gray-300 text-sm">
+                <a href="{{ $url(['tab' => $tab, 'who' => null]) }}" @class(['flex items-center px-3 font-medium', 'bg-primary text-white' => $everyone, 'text-gray-600 hover:bg-gray-50' => ! $everyone])>{{ __('Everyone') }}</a>
+                <a href="{{ $url(['tab' => $tab, 'who' => 'mine', 'moderator' => null]) }}" @class(['flex items-center border-l border-gray-300 px-3 font-medium', 'bg-primary text-white' => ! $everyone, 'text-gray-600 hover:bg-gray-50' => $everyone])>{{ __('Mine') }}</a>
+            </div>
+            <x-simple-select name="range" :options="['' => __('All open'), 'today' => __('Today'), '7' => __('7 days'), '30' => __('30 days'), 'custom' => __('Custom dates')]" :value="$range === 'open' ? '' : $range" />
+            @if ($range === 'custom')
+                <input type="date" name="from" value="{{ $from->toDateString() }}" @change="$refs.f.requestSubmit()" class="h-9 rounded-lg border border-gray-300 px-2 text-sm" aria-label="{{ __('From') }}">
+                <input type="date" name="to" value="{{ $to->toDateString() }}" @change="$refs.f.requestSubmit()" class="h-9 rounded-lg border border-gray-300 px-2 text-sm" aria-label="{{ __('To') }}">
+            @endif
+            @if ($everyone)
+                <x-simple-select name="moderator" :options="['' => __('Anyone')] + $staffOptions" :value="(string) ($staffId ?? '')" />
+            @endif
+            <x-simple-select name="channel" :options="['' => __('Any channel')] + array_map('__', \App\Models\Order::CHANNELS)" :value="$channel ?? ''" />
+            @if ($keep)
+                <a href="{{ route('desk.index', ['tab' => $tab]) }}" class="flex h-9 items-center rounded-lg border border-gray-300 px-3 text-sm text-gray-600 hover:bg-gray-50">{{ __('Clear') }}</a>
+            @endif
+            <span class="ml-auto">
+                <x-order-export :from="$range === 'open' ? today()->subDays(29)->toDateString() : $from->toDateString()" :to="$to->toDateString()" :staff="$staffId"
+                    :people="collect($staffOptions)->map(fn ($name, $id) => (object) ['id' => $id, 'name' => $name])->values()" />
+            </span>
+        @elseif ($term !== '')
+            <a href="{{ route('desk.index', ['tab' => $tab]) }}" class="flex h-9 items-center rounded-lg border border-gray-300 px-3 text-sm text-gray-600 hover:bg-gray-50">{{ __('Clear') }}</a>
+        @endif
+    </form>
+
     <div @class(['hidden lg:block' => $showDetailOnPhone])>
         <x-tabs id="desk-tabs" :tabs="collect($tabLabels)->reject(fn ($label, $t) => $t === 'send' && ! $counts['send'] && $tab !== 'send')->map(fn ($label, $t) => [$label, $url(['tab' => $t]), $counts[$t]])->all()" :active="$tab" />
     </div>
@@ -250,7 +288,7 @@
         @unless ($embed)
         <aside @class(['lg:block', 'hidden' => $showDetailOnPhone])>
             <div id="desk-list" class="overflow-hidden rounded-xl border border-gray-200 bg-white">
-                <p class="border-b border-gray-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $tabLabels[$tab] }} · {{ __('oldest first') }}</p>
+                <p class="border-b border-gray-100 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $tabLabels[$tab] }} · {{ in_array($tab, ['delivered', 'returned', 'cancelled'], true) ? __('newest first') : __('oldest first') }}@if ($everyone) · {{ __('everyone') }}@endif</p>
                 @forelse ($list as $row)
                     @php $current = $order && $order->id === $row->id; @endphp
                     @if (isset($locked) && $locked->has($row->id))
@@ -270,6 +308,8 @@
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $row->ship_name }}</span>
                             <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }} · {{ \App\Models\Order::sourceLabel($row) }}</span>
+                            {{-- Everyone's orders: who has this one. --}}
+                            @if ($everyone)<span class="block truncate text-[11px] {{ $row->moderator_name ? 'text-gray-500' : 'text-amber-700' }}">{{ $row->moderator_name ?: __('Nobody yet') }}</span>@endif
                         </span>
                         <span class="shrink-0 text-right">
                             @if ($row->action_due_at)

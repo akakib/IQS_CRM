@@ -142,6 +142,37 @@ class DeskTest extends TestCase
             ->update(['points' => $points]);
     }
 
+    public function test_owner_sees_everyones_orders_with_search_and_filters_and_a_moderator_only_their_own(): void
+    {
+        [$a, $b, $c] = [$this->web(), $this->web(), $this->web()];
+        $a->forceFill(['ship_name' => 'Anika Rahman'])->save();
+        $b->forceFill(['ship_name' => 'Babul Mia'])->save();
+        $c->forceFill(['ship_name' => 'Chandni Akter'])->save();
+        $this->actingAs($this->mahim)->post('/desk/next'); // Mahim holds a
+        $this->actingAs($this->rima)->post('/desk/next');  // Rima holds b; c is nobody's
+
+        // A moderator: the same page, their own orders only, also when searching; no owner controls.
+        $this->actingAs($this->mahim)->get('/desk?tab=verify')->assertOk()->assertSee('Anika Rahman')->assertDontSee('Babul Mia')->assertDontSee('Chandni Akter')
+            ->assertDontSee('Everyone')->assertDontSee('With courier');
+        $this->get('/desk?tab=verify&q=Babul')->assertOk()->assertDontSee('Babul Mia');
+        $this->get('/desk?tab=verify&who=all&moderator='.$this->rima->id)->assertOk()->assertDontSee('Babul Mia'); // the address cannot widen it
+
+        // The owner: everyone's, with who has each one, the ended stages, search and the person filter.
+        $this->actingAs($this->owner())->get('/desk?tab=verify')->assertOk()->assertSee('Anika Rahman')->assertSee('Babul Mia')->assertSee('Chandni Akter')
+            ->assertSee('Mahim')->assertSee('Rima')->assertSee('Nobody yet')->assertSee('Everyone')->assertSee('With courier')->assertSee('Cancelled');
+        $this->get('/desk?tab=verify&q=babul')->assertOk()->assertSee('Babul Mia')->assertDontSee('Anika Rahman');
+        $this->get('/desk?tab=verify&q='.$a->order_no)->assertOk()->assertSee('Anika Rahman')->assertDontSee('Babul Mia');
+        $this->get('/desk?tab=verify&moderator='.$this->rima->id)->assertOk()->assertSee('Babul Mia')->assertDontSee('Anika Rahman')->assertDontSee('Chandni Akter');
+        $this->get('/desk?tab=verify&who=mine')->assertOk()->assertDontSee('Anika Rahman')->assertDontSee('Babul Mia');
+        // The owner opens anyone's order with its details; it stays with its moderator.
+        $this->get('/desk?tab=verify&order='.$b->id)->assertOk()->assertSee($b->order_no);
+        $this->assertSame($this->rima->id, $b->fresh()->moderator_id);
+        // A range hides older open work from the list; "All open" never does.
+        $this->travelTo(now()->addDays(2));
+        $this->get('/desk?tab=verify&range=today')->assertOk()->assertDontSee('Anika Rahman');
+        $this->get('/desk?tab=verify')->assertOk()->assertSee('Anika Rahman');
+    }
+
     public function test_take_next_gives_a_batch_and_the_next_batch_only_when_all_are_done(): void
     {
         app(\App\Services\SettingsService::class)->set(['desk.active_limit' => 2]);

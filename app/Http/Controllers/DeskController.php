@@ -31,6 +31,9 @@ class DeskController extends Controller
 
     private const PER_PAGE = 25;
 
+    /** Owner and managers also see what left the desk: with the courier and ended orders, everyone's. */
+    public const WIDE_TABS = ['courier', 'delivered', 'returned', 'cancelled'];
+
     public function __construct(private DeskService $desk, private OrderStateMachine $machine, private OrderService $orders) {}
 
     public function index(Request $request): View
@@ -57,17 +60,76 @@ class DeskController extends Controller
             'packaging' => ["((status_id = ? AND booking_state = 'queued') OR status_id IN (?, ?, ?))", [$s('confirmed'), ...$packaging]],
         ];
 
+        // Owner and managers (orders.reassign) see everyone's orders here, search, filter and export them; a moderator
+        // sees the same page with their own orders only. Mine brings an owner back to their own.
+        $wide = $user->can('orders.reassign');
+        $everyone = $wide && $request->query('who') !== 'mine';
+        if ($wide) {
+            $where += [
+                'courier' => ['status_id IN (?, ?)', [$s('handed_over'), $s('in_transit')]],
+                'delivered' => ['status_id IN (?, ?)', [$s('delivered'), $s('partial_delivered')]],
+                'returned' => ['status_id = ?', [$s('returned')]],
+                'cancelled' => ['status_id = ?', [$s('cancelled')]],
+            ];
+        }
+        // Dates: nothing picked ("open") shows every order still to be worked whatever day it came, and today's in the
+        // ended stages; a picked range (today, 7 days, 30 days, custom) filters every stage. Open work goes by the day
+        // the order came, an ended order by its last change.
+        $range = $wide && in_array($request->query('range'), ['today', '7', '30', 'custom'], true) ? $request->query('range') : 'open';
+        [$from, $to] = [today(), today()];
+        if ($range === '7' || $range === '30') {
+            $from = today()->subDays((int) $range - 1);
+        } elseif ($range === 'custom') {
+            try {
+                $from = \Illuminate\Support\Carbon::parse((string) $request->query('from'))->startOfDay();
+                $to = \Illuminate\Support\Carbon::parse((string) $request->query('to', $request->query('from')))->startOfDay();
+            } catch (\Throwable) {
+                $range = 'open';
+            }
+            if ($to->lt($from)) {
+                [$from, $to] = [$to, $from];
+            }
+        }
+        $ended = ['delivered', 'returned', 'cancelled'];
+        foreach ($where as $t => [$sql, $b]) {
+            if ($range !== 'open' || in_array($t, $ended, true)) {
+                $col = in_array($t, $ended, true) ? 'orders.updated_at' : 'orders.created_at';
+                $where[$t] = ["({$sql} AND {$col} BETWEEN ? AND ?)", [...$b, $from->toDateTimeString(), $to->copy()->endOfDay()->toDateTimeString()]];
+            }
+        }
+        // Search (name, phone, order number, CN or tracking code) and the owner's filters narrow every stage and its count.
+        $term = trim(mb_substr((string) $request->query('q'), 0, 60));
+        $digits = preg_replace('/\D/', '', $term);
+        $byCn = $term !== '' ? DB::table('shipments')->where('consignment_id', $term)->orWhere('tracking_code', strtoupper($term))->limit(20)->pluck('order_id')->all() : [];
+        $staffId = $wide && ctype_digit((string) $request->query('moderator')) ? (int) $request->query('moderator') : null;
+        $channel = $wide && isset(Order::CHANNELS[$request->query('channel')]) ? (string) $request->query('channel') : null;
+        $scope = function ($q) use ($everyone, $user, $term, $digits, $byCn, $staffId, $channel) {
+            return $q->when(! $everyone, fn ($w) => $w->where('orders.moderator_id', $user->id))
+                ->when($staffId, fn ($w, $id) => $w->where('orders.moderator_id', $id))
+                ->when($channel, fn ($w, $c) => $w->where('orders.channel', $c))
+                ->when($term !== '', fn ($w) => $w->where(fn ($x) => $x
+                    ->where('orders.order_no', strtoupper($term))
+                    ->when(strlen($digits) >= 4, fn ($x) => $x->orWhere('orders.ship_phone', 'like', '%'.substr($digits, -10).'%')->orWhere('orders.order_no', 'IQ'.$digits)->orWhere('orders.external_ref', $digits))
+                    ->orWhere('orders.ship_name', 'like', '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term).'%')
+                    ->when($byCn, fn ($x) => $x->orWhereIn('orders.id', $byCn))));
+        };
+        $keep = array_filter(['q' => $term, 'who' => $wide && ! $everyone ? 'mine' : null, 'range' => $range === 'open' ? null : $range,
+            'from' => $range === 'custom' ? $from->toDateString() : null, 'to' => $range === 'custom' ? $to->toDateString() : null,
+            'moderator' => $staffId, 'channel' => $channel], fn ($v) => $v !== null && $v !== '');
+
         $select = [];
         $bindings = [];
         foreach ($where as $tab => [$sql, $b]) {
             $select[] = "SUM(CASE WHEN {$sql} THEN 1 ELSE 0 END) as n_{$tab}"; // prefixed: "call" is a reserved word in MariaDB
             $bindings = array_merge($bindings, $b);
         }
-        $select[] = "SUM(CASE WHEN channel = 'web' AND status_id IN (?, ?) THEN 1 ELSE 0 END) as n_active";
-        $select[] = 'SUM(CASE WHEN action_due_at IS NOT NULL THEN 1 ELSE 0 END) as n_timed';
-        $bindings = array_merge($bindings, [$s('new'), $s('record_verified')]);
-        $counts = (array) DB::table('orders')->where('moderator_id', $user->id)
-            ->whereIn('status_id', [$s('new'), $s('record_verified'), $s('no_answer'), $s('hold'), $s('confirmed'), ...$packaging])
+        // Their own work in hand and their own running timer, whoever's orders the list shows.
+        $select[] = "SUM(CASE WHEN moderator_id = ? AND channel = 'web' AND status_id IN (?, ?) THEN 1 ELSE 0 END) as n_active";
+        $select[] = 'SUM(CASE WHEN moderator_id = ? AND action_due_at IS NOT NULL THEN 1 ELSE 0 END) as n_timed';
+        $bindings = array_merge($bindings, [$user->id, $s('new'), $s('record_verified'), $user->id]);
+        $counts = (array) DB::table('orders')->tap($scope)
+            ->whereIn('status_id', [$s('new'), $s('record_verified'), $s('no_answer'), $s('hold'), $s('confirmed'), ...$packaging,
+                ...($wide ? [$s('handed_over'), $s('in_transit'), $s('delivered'), $s('partial_delivered'), $s('returned'), $s('cancelled')] : [])])
             ->selectRaw(implode(', ', $select), $bindings)->first();
         $counts = collect($counts)->mapWithKeys(fn ($n, $k) => [substr($k, 2) => (int) $n])->all();
 
@@ -76,23 +138,25 @@ class DeskController extends Controller
         $toTimed = $timed && ! $request->has('tab') && ! $request->has('order');
 
         // Default tab: the running order's tab, else the first one with work in it.
-        $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab')
+        $tab = isset($where[$request->query('tab')]) ? $request->query('tab')
             : ($toTimed ? ($timed->status_id === $s('new') ? 'verify' : 'call') : (collect(self::TABS)->first(fn ($t) => $counts[$t] > 0) ?? 'call'));
 
         $this->desk->bookDue(); // a booking whose own request died, or a retry that is due, is sent after this page
         $page = max(1, (int) $request->query('page', 1));
-        $rows = DB::table('orders')->leftJoin('users as pk', 'pk.id', '=', 'orders.packer_id')
-            ->where('moderator_id', $user->id)->whereRaw($where[$tab][0], $where[$tab][1])
-            ->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('orders.id')
+        $rows = DB::table('orders')->leftJoin('users as pk', 'pk.id', '=', 'orders.packer_id')->leftJoin('users as md', 'md.id', '=', 'orders.moderator_id')
+            ->tap($scope)->whereRaw($where[$tab][0], $where[$tab][1])
+            // Open work: the running timer, then the oldest. Ended orders: the newest change first.
+            ->when(in_array($tab, $ended, true), fn ($q) => $q->orderByDesc('orders.updated_at')->orderByDesc('orders.id'),
+                fn ($q) => $q->orderByRaw('action_due_at IS NULL')->orderBy('action_due_at')->orderBy('assigned_at')->orderBy('orders.id'))
             ->forPage($page, self::PER_PAGE)
             ->get(['orders.id', 'order_no', 'external_ref', 'ship_name', 'ship_thana', 'ship_district', 'grand_total', 'channel', 'status_id', 'orders.created_at', 'assigned_at',
                 'action_due_at', 'next_call_at', 'no_response_count', 'booking_state', 'advance_waiver_requested_at', DB::raw('EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0) as waiting_check'), DB::raw(\App\Services\Orders\OrderService::stockIssueSql('orders').' as stock_issue'), 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address', 'packer_id', 'packed_at',
-                'pk.name as packer_name', 'pk.photo_path as packer_photo']);
-        $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ['tab' => $tab]]);
+                'pk.name as packer_name', 'pk.photo_path as packer_photo', 'orders.moderator_id', 'md.name as moderator_name', 'orders.updated_at']);
+        $list = new LengthAwarePaginator($rows, $counts[$tab], self::PER_PAGE, $page, ['path' => route('desk.index'), 'query' => ['tab' => $tab] + $keep]);
 
         // One at a time: with more than one order in hand, only the one to work now opens; the rest wait their turn.
         // (With the countdown on, the running timer already keeps one order at a time.)
-        [$working, $locked] = ! settings('desk.timer_enabled') && $counts['verify'] + $counts['call'] >= 2 ? $this->desk->workQueue($user->id) : [null, collect()];
+        [$working, $locked] = ! $everyone && ! settings('desk.timer_enabled') && $counts['verify'] + $counts['call'] >= 2 ? $this->desk->workQueue($user->id) : [null, collect()];
 
         // The open order: the one asked for (if it is mine and not waiting its turn), else the first in the list.
         // (An order just taken back is not reopened, even if the address still names it.)
@@ -138,6 +202,9 @@ class DeskController extends Controller
         $rules = app(\App\Services\Work\DeskRules::class)->for($user->id);
 
         return view('desk.index', [
+            'wide' => $wide, 'everyone' => $everyone, 'keep' => $keep, 'range' => $range, 'from' => $from, 'to' => $to, 'term' => $term,
+            'staffId' => $staffId, 'channel' => $channel,
+            'staffOptions' => $wide ? \App\Models\User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
             'tab' => $tab,
             'counts' => $counts,
             'list' => $list,

@@ -150,7 +150,7 @@
         @if ($wide)
             <input type="hidden" name="who" :value="who">
         @endif
-        <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('Name, phone or CN') }}" aria-label="{{ __('Search by name, phone, order number or CN') }}" title="{{ __('Name, phone, order number or CN') }}"
+        <input type="search" name="q" value="{{ $term }}" maxlength="60" enterkeyhint="search" placeholder="{{ __('Name, phone, CN') }}" aria-label="{{ __('Search by name, phone, order number or CN') }}" title="{{ __('Name, phone, order number or CN') }}"
             x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length) }"
             @input.debounce.500ms="go()" @keydown.enter.prevent="go()"
             class="h-10 min-w-0 flex-1 text-ellipsis rounded-lg border border-gray-300 px-3 text-sm placeholder:text-ellipsis focus:border-primary focus:outline-none md:h-9 md:min-w-52 md:max-w-xs">

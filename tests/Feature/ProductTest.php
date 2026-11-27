@@ -237,6 +237,22 @@ class ProductTest extends TestCase
         $this->assertSame(1, Product::count());
     }
 
+    public function test_a_search_matches_words_in_any_order_and_puts_the_best_match_first(): void
+    {
+        $this->actingAs($this->owner());
+        Product::factory()->withVariant(4160, ['sku' => 'DANO-225'])->create(['name' => 'Dano Full Cream Milk Powder 2.25kg (Denmark)']);
+        Product::factory()->withVariant(5700, ['sku' => 'DANO-25'])->create(['name' => 'Dano Full Cream Milk Powder 2.5kg (Denmark)']);
+        Product::factory()->withVariant(900, ['sku' => 'MILKY'])->create(['name' => 'Almarai Milk Powder 2.25 kg']);
+        Product::factory()->withVariant(300, ['sku' => 'MLK'])->create(['name' => 'Milk Candy']);
+
+        $names = fn (string $q) => collect($this->getJson(route('products.search', ['q' => $q]))->assertOk()->json())->pluck('label')->all();
+        $this->assertSame(['Dano Full Cream Milk Powder 2.5kg (Denmark)'], $names('dano 2.5kg')); // words apart, in the name
+        $this->assertSame(['Dano Full Cream Milk Powder 2.25kg (Denmark)', 'Dano Full Cream Milk Powder 2.5kg (Denmark)'], $names('denmark dano')); // any order
+        $this->assertSame('Milk Candy', $names('milk')[0]); // the name starting with it comes first
+
+        $this->get(route('products.index', ['q' => 'milk']))->assertOk()->assertSeeInOrder(['Milk Candy', 'Almarai Milk Powder']);
+    }
+
     public function test_a_search_finds_words_that_mean_the_same_and_the_description(): void
     {
         $this->actingAs($this->owner());

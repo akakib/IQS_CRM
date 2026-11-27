@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * The one product search: what someone types, plus every word that means the same (Settings > Search words: one line
  * per group, "খেজুর, dates, khejur"), matched in the name, size and SKU first and then in the short and long
- * description. So "খেজুর" finds "Saudi Dates" and "dates" finds "কালমি খেজুর". Used by every product search box.
+ * description; several words match in any order, and rank() puts the best match first. So "খেজুর" finds "Saudi Dates" and "dates" finds "কালমি খেজুর". Used by every product search box.
  */
 final class ProductSearch
 {
@@ -43,12 +43,52 @@ final class ProductSearch
             return $query;
         }
 
-        return $query->where(function ($w) use ($terms, $variantText, $productId) {
+        $words = self::words($q);
+
+        return $query->where(function ($w) use ($terms, $words, $variantText, $productId) {
             foreach ($terms as $t) {
                 $w->orWhere($variantText, 'like', '%'.$t.'%');
             }
             $w->orWhereIn($productId, self::inDescription($terms));
+            // Several words: each one somewhere, in any order ("dano 2.5" finds "Dano Full Cream Milk Powder 2.5kg").
+            if (count($words) > 1) {
+                $w->orWhere(function ($all) use ($words, $variantText, $productId) {
+                    foreach ($words as $word) {
+                        $alts = self::terms($word);
+                        $all->where(function ($one) use ($alts, $variantText, $productId) {
+                            foreach ($alts as $a) {
+                                $one->orWhere($variantText, 'like', '%'.$a.'%');
+                            }
+                            $one->orWhereIn($productId, self::inDescription($alts));
+                        });
+                    }
+                });
+            }
         });
+    }
+
+    /**
+     * Best match first, for an ORDER BY on a name column: the name itself, the name starting with what was typed,
+     * a word of the name starting with it, the name holding it, every typed word in the name, then the rest
+     * (found through a word that means the same, or only in the description).
+     *
+     * @return array{0: string, 1: list<string>} SQL and its bindings
+     */
+    public static function rank(string $q, string $name): array
+    {
+        $q = mb_strtolower(trim($q));
+        $words = self::words($q);
+        $all = $words === [] ? '0' : implode(' AND ', array_fill(0, count($words), "LOWER({$name}) LIKE ?"));
+
+        return ["CASE WHEN LOWER({$name}) = ? THEN 0 WHEN LOWER({$name}) LIKE ? THEN 1 WHEN LOWER({$name}) LIKE ? THEN 2 WHEN LOWER({$name}) LIKE ? THEN 3 WHEN {$all} THEN 4 ELSE 5 END",
+            [$q, $q.'%', '% '.$q.'%', '%'.$q.'%', ...array_map(fn ($w) => '%'.$w.'%', $words)]];
+    }
+
+    /** @return list<string> the typed words (2+ letters or a number), lower case */
+    private static function words(string $q): array
+    {
+        return array_values(array_unique(array_filter(preg_split('/\s+/u', mb_strtolower(trim($q))) ?: [],
+            fn ($w) => mb_strlen($w) >= 2 || is_numeric($w))));
     }
 
     /**

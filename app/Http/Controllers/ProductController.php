@@ -41,6 +41,8 @@ class ProductController extends Controller
             ->when($list->filter('category'), fn ($query, $id) => $query->where('category_id', $id))
             ->when($list->filter('status'), fn ($query, $s) => $query->where('status', $s))
             ->when($list->filter('availability'), fn ($query, $a) => $query->whereIn('id', ProductVariant::query()->select('product_id')->where('availability_status', $a)))
+            // Searching with the default order: best match first (ProductSearch::rank), then by name.
+            ->when($q !== '' && $list->sort === 'name' && $list->dir === 'asc', fn ($query) => $query->orderByRaw(...\App\Support\ProductSearch::rank($q, 'products.name')))
             ->tap(fn ($query) => $list->applySort($query))
             ->paginate($list->perPage)
             ->withQueryString();
@@ -110,7 +112,8 @@ class ProductController extends Controller
             ->whereNull('v.deleted_at')->whereNull('p.deleted_at')->where('v.is_active', true)->where('p.status', '!=', 'archived')
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => \App\Support\ProductSearch::apply($w, $q, 'v.search_text', 'v.product_id')->orWhere('v.barcode', $q)))
             // What was typed, in the name, first; a match found only through a word that means the same, or in the description, after.
-            ->orderByRaw('CASE WHEN v.sku = ? OR v.barcode = ? THEN 0 WHEN v.search_text LIKE ? THEN 1 WHEN v.search_text LIKE ? THEN 2 ELSE 3 END', [$q, $q, $q.'%', '%'.$q.'%'])
+            ->orderByRaw('CASE WHEN v.sku = ? OR v.barcode = ? THEN 0 ELSE 1 END', [$q, $q])
+            ->when($q !== '', fn ($query) => $query->orderByRaw(...\App\Support\ProductSearch::rank($q, 'p.name')))
             ->orderBy('p.name')
             ->limit(20)
             ->get(['v.id', 'v.sku', 'v.name as variant', 'v.unit', 'v.weight_g', 'v.availability_status', 'p.name as product', 'p.image_url', 'vp.regular_price', 'vp.sale_price', 'vp.sale_starts_at', 'vp.sale_ends_at']);

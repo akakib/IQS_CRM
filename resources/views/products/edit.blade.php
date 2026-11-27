@@ -1,7 +1,8 @@
 <x-layouts.app :heading="__('Edit product')">
     <div class="mb-4 flex items-center justify-between">
         <div class="flex items-center gap-4">
-            <a href="{{ route('products.index') }}" class="text-sm text-primary hover:underline">{{ __('Back to products') }}</a>
+            {{-- Phones and tablets have Back at the top left already. --}}
+            <a href="{{ route('products.index') }}" class="hidden text-sm text-primary hover:underline lg:inline">{{ __('Back to products') }}</a>
             {{-- The product's own page on the website, in a new tab: WordPress turns the id into the real address. --}}
             @php($site = rtrim((string) (\App\Models\WebsiteAccount::current()?->url ?: config('store.woocommerce.url')), '/'))
             @if ($site && $product->external_id)

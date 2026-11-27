@@ -70,7 +70,7 @@
                             @can('products.availability')
                                 <div x-show="row.id" class="grid w-full grid-cols-3 overflow-hidden rounded-lg border border-gray-300 text-center text-sm sm:w-auto">
                                     @foreach (['in_stock' => 'bg-primary', 'backorder' => 'bg-amber-600', 'out_of_stock' => 'bg-red-600'] as $key => $on)
-                                        <button type="button" class="whitespace-nowrap px-3 py-1.5 {{ $loop->first ? '' : 'border-l border-gray-200' }}"
+                                        <button type="button" class="whitespace-nowrap px-1 py-1.5 sm:px-3 {{ $loop->first ? '' : 'border-l border-gray-200' }}"
                                             :class="row.status === @js($key) ? '{{ $on }} font-medium text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
                                             @click="if (row.status === @js($key)) return; (async () => { const f = new FormData(); f.append('_token', document.querySelector('meta[name=csrf-token]').content); f.append('ids[]', row.id); f.append('status', @js($key));
                                                 const r = await fetch(@js(route('products.availability.update')), { method: 'POST', body: f, headers: { Accept: 'application/json' } }); if (r.ok) row.status = @js($key); })()">{{ __(\App\Models\ProductVariant::AVAILABILITY[$key]) }}</button>

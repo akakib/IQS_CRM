@@ -75,7 +75,8 @@ class PackagingController extends Controller
             'onDuty' => $onDuty,
             'helpersToday' => DB::table('packer_shifts')->where('work_date', $today)->pluck('helpers', 'user_id'),
             'canManage' => $canManage,
-            'staff' => $canManage ? User::where('is_active', true)->orderBy('name')->pluck('name', 'id')->all() : [],
+            // Today's packers: staff only; the owner and managers (who approve orders) do not pack.
+            'staff' => $canManage ? User::where('is_active', true)->orderBy('name')->get()->reject(fn ($u) => $u->isOwner() || $u->can('orders.approve'))->pluck('name', 'id')->all() : [],
             'counts' => $counts,
             'filter' => $filter,
             'queue' => $queue,

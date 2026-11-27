@@ -86,13 +86,8 @@
 
     {{-- Alerts: one short line each, the action on the right. --}}
     <div class="mt-2 space-y-2">
-        @if ($pause && $controlsPause)
-            <form method="POST" action="{{ route('packaging.pause') }}" class="flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-                @csrf
-                <span><b>{{ __('Packaging paused') }}</b> · {{ __('since :t by :n', ['t' => Carbon::parse($pause->paused_at)->format('g:i A'), 'n' => $pause->by ?? '-']) }} · {{ trans_choice(':n order waiting|:n orders waiting', $held, ['n' => $held]) }}</span>
-                <x-button size="sm" class="shrink-0">{{ __('Resume') }}</x-button>
-            </form>
-        @endif
+        {{-- Owner and managers: pause or resume, always in sight (not inside Manage). --}}
+        <x-packaging-pause />
         @if ($newLabels)
             <a href="{{ route('packaging.labels') }}" target="_blank" class="flex items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm font-medium text-orange-900">
                 <span>{{ trans_choice(':n new label to print|:n new labels to print', $newLabels, ['n' => $newLabels]) }}</span>
@@ -121,14 +116,6 @@
                 @if ($newLabels)<a href="{{ route('packaging.labels') }}" target="_blank" class="flex h-10 items-center justify-center rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Print new labels (:n)', ['n' => $newLabels]) }}</a>@endif
                 @if ($openIssues)<a href="{{ route('packaging.issues') }}" class="flex h-10 items-center justify-center rounded-lg border border-red-200 text-sm font-medium text-red-700 hover:bg-red-50">{{ __('Missing items (:n)', ['n' => $openIssues]) }}</a>@endif
             </div>
-            @if ($controlsPause && ! $pause)
-                {{-- Managers only: stop new orders reaching the packers' list (booking goes on). The packers are not told. --}}
-                <form method="POST" action="{{ route('packaging.pause') }}" class="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-700">
-                    @csrf
-                    <span>{{ __('New booked orders go to the packers now.') }}</span>
-                    <x-button size="sm" variant="secondary" class="shrink-0">{{ __('Pause packaging') }}</x-button>
-                </form>
-            @endif
             @if ($canManage)
                 <form method="POST" action="{{ route('packaging.shift') }}" class="mt-3 border-t border-gray-100 pt-3">
                     @csrf

@@ -3,6 +3,9 @@
         <p class="mb-4 text-sm text-gray-600">{{ __('Welcome, :name.', ['name' => auth()->user()->name]) }}</p>
     @endunless
 
+    {{-- Owner and managers: pause or resume packaging from here too. --}}
+    <x-packaging-pause class="mb-4" />
+
     @if ($myWorking->isNotEmpty())
         <div class="mb-4 rounded-xl border border-green-200 bg-primary-soft p-3 text-sm text-primary">
             {{ __('You are working on:') }}

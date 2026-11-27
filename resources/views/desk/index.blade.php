@@ -101,6 +101,8 @@
     @php $anyWaiting = $waiting + $advanceWaiting; @endphp
     @php $filtersOn = count(array_intersect_key($keep, ['moderator' => 1, 'channel' => 1])); @endphp
     <div x-data="deskFilters({ range: @js($range === 'open' ? '' : $range), who: @js($wide && ! $everyone ? 'mine' : ''), base: @js(route('desk.index')) })"
+        {{-- The Filters sheet lives in this card: while it is open the card goes over the bottom bar and the top bar. --}}
+        :style="sheet ? 'z-index: 60' : ''"
         {{-- relative z-20: an open picker (dates, person, channel, where a new order came from) lies over the boxes and tabs under this card. --}}
         @class(['relative z-20 mb-3 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 sm:p-3', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         @if ($wide)

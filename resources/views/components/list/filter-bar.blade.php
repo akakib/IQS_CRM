@@ -1,4 +1,4 @@
-{{-- Index-page filter bar. Search runs on Enter or the Search button (nothing while typing; emptying the box shows all again); any x-simple-select
+{{-- Index-page filter bar. The list follows the search box while typing (resources/js/components/list-bar.js); Enter or the Search button sends it at once; any x-simple-select
      inside submits on change. Desktop: one row. Phone: search stays on top,
      the filters open as a bottom sheet (the SAME controls, rendered once, so
      no field is sent twice). State lives in the query string.
@@ -11,19 +11,19 @@
 
 @php($activeFilters = count(array_filter($list->filters, fn ($v) => $v !== null)))
 
-<form method="GET" action="{{ $action }}" x-ref="filters"
-    x-data="{ sheet: false }"
+<form method="GET" action="{{ $action }}" x-ref="filters" data-list-bar
+    x-data="listBar"
     @select-change="setTimeout(() => $refs.filters.requestSubmit(), 0)"
     class="mb-4 flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3">
     <input type="hidden" name="sort" value="{{ $list->sort }}">
     <input type="hidden" name="dir" value="{{ $list->dir }}">
 
-    {{-- Enter searches, also a short text; the box's own clear (x) shows everything again. After the search the cursor stays at the end. --}}
-    <input type="search" name="q" value="{{ $list->search }}" @keydown.enter.prevent="$refs.filters.requestSubmit()" @search="$el.value === '' && $refs.filters.requestSubmit()" enterkeyhint="search" placeholder="{{ $placeholder }}"
+    {{-- Typing searches after a short pause; Enter at once; the box's own clear (x) shows everything again. After a full search the cursor stays at the end. --}}
+    <input type="search" name="q" value="{{ $list->search }}" @input="typed()" @keydown.enter.prevent="submitNow()" enterkeyhint="search" placeholder="{{ $placeholder }}"
         x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length) }"
         class="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none md:max-w-xs">
     {{-- Search button: the same as Enter, for anyone who does not find the keyboard's search key. --}}
-    <button type="submit" aria-label="{{ __('Search') }}" title="{{ __('Search') }}"
+    <button type="submit" @click.prevent="submitNow()" aria-label="{{ __('Search') }}" title="{{ __('Search') }}"
         class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white hover:opacity-90">
         <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m20 20-3.5-3.5"/></svg>
     </button>

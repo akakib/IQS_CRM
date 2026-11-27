@@ -56,16 +56,17 @@
                 <template x-for="(row, i) in rows" :key="i">
                     <div class="rounded-lg border border-gray-200 p-3">
                         <input type="hidden" :name="`variants[${i}][id]`" :value="row.id ?? ''">
-                        <div class="mb-2 flex items-center justify-between">
+                        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                             <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">
                                 <span x-text="i === 0 ? @js(__('Main variant')) : @js(__('Variant')) + ' ' + (i + 1)"></span>
                                 <span x-show="row.availability" class="ml-2 font-normal normal-case text-gray-400" x-text="row.availability"></span>
                             </p>
                             @can('products.availability')
                                 {{-- Stock status from here (no need to find it on the Stock status page). Saved at once. --}}
-                                <span x-show="row.id" class="flex gap-1">
+                                {{-- Phone: on a row of their own, under the title, so the three buttons never squeeze into circles. --}}
+                                <span x-show="row.id" class="order-last flex w-full gap-1 sm:order-none sm:w-auto">
                                     @foreach (\App\Models\ProductVariant::AVAILABILITY as $key => $label)
-                                        <button type="button" class="rounded-full border border-gray-300 px-2 py-0.5 text-[11px] text-gray-600 hover:border-primary hover:text-primary"
+                                        <button type="button" class="whitespace-nowrap rounded-full border border-gray-300 px-2.5 py-1 text-[11px] text-gray-600 sm:px-2 sm:py-0.5 hover:border-primary hover:text-primary"
                                             @click="(async () => { const f = new FormData(); f.append('_token', document.querySelector('meta[name=csrf-token]').content); f.append('ids[]', row.id); f.append('status', @js($key));
                                                 const r = await fetch(@js(route('products.availability.update')), { method: 'POST', body: f }); if (r.ok) row.availability = @js(__($label)); })()">{{ __($label) }}</button>
                                     @endforeach
@@ -85,12 +86,12 @@
                             <label class="text-xs text-gray-500">SKU<input type="text" :name="`variants[${i}][sku]`" x-model="row.sku" required maxlength="60" class="{{ $small }} mt-1 font-mono"></label>
                             <label class="text-xs text-gray-500">{{ __('Barcode') }}<input type="text" :name="`variants[${i}][barcode]`" x-model="row.barcode" maxlength="60" class="{{ $small }} mt-1 font-mono"></label>
                             <label class="text-xs text-gray-500">{{ __('Shelf') }}<input type="text" :name="`variants[${i}][shelf_code]`" x-model="row.shelf_code" maxlength="30" placeholder="A1" class="{{ $small }} mt-1 font-mono"></label>
-                            <div class="text-xs text-gray-500">{{ __('Unit') }}
+                            <div class="col-span-2 text-xs text-gray-500 md:col-span-1">{{ __('Unit') }}
                                 <input type="hidden" :name="`variants[${i}][unit]`" :value="row.unit">
                                 {{-- Counted: Pcs, Packet, Box. Measured (the price is per one of the unit): Gram, KG, ML, Litre. --}}
                                 <div class="mt-1 grid grid-cols-4 gap-px overflow-hidden rounded-md border border-gray-300 bg-gray-300 text-center">
                                     @foreach (\App\Support\Units::LABELS as $unit => $unitLabel)
-                                        <button type="button" @click="row.unit = @js($unit)" class="py-1.5 text-xs"
+                                        <button type="button" @click="row.unit = @js($unit)" class="whitespace-nowrap py-1.5 text-xs {{ $loop->last ? [1 => 'col-span-4', 2 => 'col-span-3', 3 => 'col-span-2', 0 => ''][$loop->count % 4] : '' }}"
                                             :class="row.unit === @js($unit) ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50'">{{ $unitLabel }}</button>
                                     @endforeach
                                 </div>

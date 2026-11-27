@@ -99,13 +99,15 @@
     <div x-data="deskFilters({ range: @js($range === 'open' ? '' : $range), who: @js($wide && ! $everyone ? 'mine' : ''), base: @js(route('desk.index')) })"
         @class(['mb-3 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 sm:p-3', 'flex' => ! $showDetailOnPhone, 'hidden lg:flex' => $showDetailOnPhone])>
         @if ($wide)
-            <div class="order-1 grid h-10 shrink-0 grid-cols-2 overflow-hidden rounded-lg border border-gray-300 text-center text-sm md:h-9">
+            {{-- A phone: two columns that line up. Everyone / Mine is as wide as the search under it, and the two
+                 square buttons beside it are together as wide as the dates and Filters under them. --}}
+            <div class="order-1 grid h-10 min-w-0 grid-cols-2 overflow-hidden rounded-lg border border-gray-300 text-center text-sm max-md:flex-1 md:h-9 md:shrink-0">
                 <button type="button" @click="setWho('')" class="flex items-center justify-center px-4 font-medium md:px-3" :class="who === 'mine' ? 'text-gray-600 hover:bg-gray-50' : 'bg-primary text-white'">{{ __('Everyone') }}</button>
                 <button type="button" @click="setWho('mine')" class="flex items-center justify-center border-l border-gray-300 px-4 font-medium md:px-3" :class="who === 'mine' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'">{{ __('Mine') }}</button>
             </div>
         @endif
         {{-- Sync and New order: after Everyone / Mine on a phone (a moderator: after the search), last on a computer. --}}
-        <div @class(['flex shrink-0 items-center gap-2 md:order-4', 'order-2 ml-auto md:ml-0' => $wide, 'order-4' => ! $wide])>
+        <div @class(['flex shrink-0 items-center gap-2 md:order-4', 'order-2 max-md:w-36 max-md:[&>*]:flex-1 max-md:[&>*>button]:!w-full' => $wide, 'order-4' => ! $wide])>
         <x-website-sync compact />
         @can('orders.create')
             {{-- New order: first "where from?", so every order counts for its number or page. --}}
@@ -151,11 +153,13 @@
             @input.debounce.500ms="go()" @keydown.enter.prevent="go()"
             class="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none md:h-9 md:min-w-52 md:max-w-xs">
         @if ($wide)
-            <span data-range class="shrink-0"><x-simple-select name="range" :options="['' => __('All open'), 'today' => __('Today'), '7' => __('7 days'), '30' => __('30 days'), 'custom' => __('Custom dates')]" :value="$range === 'open' ? '' : $range" /></span>
+            <div class="flex shrink-0 items-center gap-2 max-md:w-36 md:contents">
+            <span data-range class="min-w-0 max-md:flex-1 max-md:[&>div]:w-full max-md:[&>div>button]:w-full md:shrink-0"><x-simple-select name="range" :options="['' => __('All open'), 'today' => __('Today'), '7' => __('7 days'), '30' => __('30 days'), 'custom' => __('Custom dates')]" :value="$range === 'open' ? '' : $range" /></span>
             <button type="button" @click="sheet = true" class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 md:hidden" aria-label="{{ __('Filters') }}">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" d="M4 6h16M7 12h10M10 18h4"/></svg>
                 <span x-show="n" x-cloak class="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 text-[10px] font-semibold text-white" x-text="n">{{ $filtersOn }}</span>
             </button>
+            </div>
             {{-- Custom dates: the two days show as soon as it is picked, no reload. --}}
             <div x-show="range === 'custom'" x-cloak class="grid w-full grid-cols-2 gap-2 md:flex md:w-auto">
                 <input type="date" name="from" value="{{ $from->toDateString() }}" @change="go()" class="h-10 min-w-0 rounded-lg border border-gray-300 px-2 text-sm md:h-9" aria-label="{{ __('From') }}">

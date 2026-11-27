@@ -6,7 +6,7 @@
 @if ($order->channel === 'web' && $order->external_ref)
     <div x-data="{
             status: @js(\Illuminate\Support\Str::headline((string) ($order->external_status ?: __('not known')))),
-            done: @js($order->external_status === \App\Services\Orders\WebsiteStatusPush::STATUS && $order->website_pushed_at),
+            done: @js($order->website_pushed_at && ! $push->applies($order)),
             at: @js($order->website_pushed_at?->format('d M, g:i A')),
             error: @js($order->website_push_error ? \Illuminate\Support\Str::limit($order->website_push_error, 90) : null),
             canSend: @js($push->canSend($order)), busy: false,
@@ -27,7 +27,7 @@
         @if ($push->canSend($order))
             <button type="button" x-show="canSend" @click="send()" :disabled="busy"
                 class="lockable rounded-lg border border-gray-300 bg-white px-2.5 py-1 font-semibold text-gray-800 hover:border-primary hover:text-primary disabled:opacity-50"
-                x-text="busy ? @js(__('Sending…')) : @js(__('Woo Record Verified'))"></button>
+                x-text="busy ? @js(__('Sending…')) : @js(__('Woo :s', ['s' => \Illuminate\Support\Str::headline((string) $push->target($order))]))"></button>
         @endif
     </div>
 @endif

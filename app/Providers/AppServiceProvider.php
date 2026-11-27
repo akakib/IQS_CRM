@@ -115,11 +115,10 @@ class AppServiceProvider extends ServiceProvider
                     ] + ($order->packer_id ? ['user_ids' => [(int) $order->packer_id], 'only' => true] : []));
             }
         });
-        // A website order record-verified here is set to Record verified on the website too (after the response); one
-        // confirmed without passing Record verified (held for an advance, then confirmed) is set then. Only once: after
-        // it is set, applies() is false.
+        // A website order follows its status here on the website too, after the response, for the statuses switched on
+        // (WebsiteStatusPush::plan; Record verified only unless more are set). Once set, applies() is false.
         \App\Services\Orders\OrderStateMachine::listen(function ($order, $from, $to) {
-            if (in_array($to['key'], ['record_verified', 'confirmed'], true) && app(\App\Services\Orders\WebsiteStatusPush::class)->applies($order)) {
+            if (app(\App\Services\Orders\WebsiteStatusPush::class)->applies($order)) {
                 $id = $order->id;
                 app()->terminating(fn () => app(\App\Services\Orders\WebsiteStatusPush::class)->push(\App\Models\Order::find($id)));
             }

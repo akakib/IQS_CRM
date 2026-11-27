@@ -8,50 +8,103 @@ use App\Services\Catalog\Store\StoreDriver;
 use Illuminate\Support\Facades\Log;
 
 /**
- * A website order that IQS record-verifies is set to the website's own "Record verified" status
- * (record-verified), which fires the website's Meta Purchase. Done after the response when the order
- * reaches record_verified; if the website does not take it, the reason is kept on the order and the
- * desk shows Send to website. Never moves a website order back from done, cancelled or refunded.
+ * A website order follows its IQS status on the website too, for the statuses switched on (config
+ * store.order_statuses; Record verified only unless more is set). The website's own "Record verified" fires
+ * its Meta Purchase, so an order that passes it here without the website having had it (confirmed after an
+ * advance, say) is set to Record verified first. Sent after the response; if the website does not take it,
+ * the reason is kept on the order and the desk shows the button to send it. A finished website order
+ * (completed, refunded, failed, in the bin) and one the customer cancelled there are never touched.
  */
 class WebsiteStatusPush
 {
     public const STATUS = 'record-verified';
 
-    private const LEAVE = [self::STATUS, 'completed', 'cancelled', 'refunded', 'failed', 'trash'];
+    /** IQS status => the website's status slug. Packaging to In transit are one status there: Courier Processing. */
+    public const MAP = [
+        'record_verified' => 'record-verified', 'no_answer' => 'no-response', 'hold' => 'on-hold', 'confirmed' => 'call-verified',
+        'ready_for_packaging' => 'courier-processing', 'packed' => 'courier-processing', 'ready_for_pickup' => 'courier-processing',
+        'handed_over' => 'courier-processing', 'in_transit' => 'courier-processing',
+        'delivered' => 'completed', 'partial_delivered' => 'completed', 'returned' => 'returned', 'cancelled' => 'cancelled',
+    ];
+
+    /** Ended on the website: left as it is. */
+    private const ENDED = ['completed', 'refunded', 'failed', 'trash', 'cancelled'];
+
+    /** Already at or past Record verified on the website: Record verified is not sent (again). */
+    private const PAST_VERIFIED = [self::STATUS, 'call-verified', 'courier-processing', 'returned'];
+
+    /** IQS statuses that mean the order was verified: the website must have had Record verified by then. */
+    private const VERIFIED_HERE = ['record_verified', 'confirmed', 'ready_for_packaging', 'packed', 'ready_for_pickup', 'handed_over', 'in_transit', 'delivered', 'partial_delivered'];
 
     public function __construct(private StoreDriver $store) {}
 
-    public function applies(Order $order): bool
+    /** @return list<string> the website statuses to set now, in order (empty: nothing to send) */
+    public function plan(Order $order): array
     {
-        return $order->channel === 'web' && filled($order->external_ref) && ! in_array((string) $order->external_status, self::LEAVE, true);
+        if ($order->channel !== 'web' || blank($order->external_ref)) {
+            return [];
+        }
+        $now = (string) $order->external_status;
+        if (in_array($now, self::ENDED, true)) {
+            return [];
+        }
+        $on = (array) config('store.order_statuses');
+        $key = \App\Models\OrderStatus::map()[$order->status_id]['key'] ?? null;
+        $steps = [];
+        if (in_array(self::STATUS, $on, true) && in_array($key, self::VERIFIED_HERE, true) && ! in_array($now, self::PAST_VERIFIED, true)) {
+            $steps[] = self::STATUS;
+        }
+        $target = self::MAP[$key] ?? null;
+        if ($target && $target !== self::STATUS && in_array($target, $on, true) && $target !== $now) {
+            $steps[] = $target;
+        }
+
+        return $steps;
     }
 
-    /** A person may send it: a website order IQS has record-verified (or moved past), not one still new, held or ended. */
+    public function applies(Order $order): bool
+    {
+        return $this->plan($order) !== [];
+    }
+
+    /** A person may send it whenever something is waiting to go. */
     public function canSend(Order $order): bool
     {
-        $key = \App\Models\OrderStatus::map()[$order->status_id]['key'] ?? null;
+        return $this->applies($order);
+    }
 
-        return $this->applies($order) && ! in_array($key, ['new', 'hold', 'cancelled', 'returned'], true);
+    /** The website status the order ends on when sent now (null: nothing to send). */
+    public function target(Order $order): ?string
+    {
+        $plan = $this->plan($order);
+
+        return $plan ? end($plan) : null;
     }
 
     /** Send it now; true when the website took it. */
     public function push(Order $order, ?User $by = null): bool
     {
-        if (! $this->applies($order)) {
+        $plan = $this->plan($order);
+        if ($plan === []) {
             return false;
         }
+        $set = null;
         try {
-            $this->store->setOrderStatus((string) $order->external_ref, self::STATUS);
+            foreach ($plan as $status) {
+                $this->store->setOrderStatus((string) $order->external_ref, $status);
+                $set = $status;
+            }
         } catch (\Throwable $e) {
-            $order->forceFill(['website_push_error' => mb_substr($e->getMessage(), 0, 250)])->save();
+            $order->forceFill(array_filter(['external_status' => $set]) + ['website_push_error' => mb_substr($e->getMessage(), 0, 250)])->save();
             Log::warning('Website status push failed', ['order' => $order->order_no, 'error' => $e->getMessage()]);
 
             return false;
         }
-        $order->forceFill(['external_status' => self::STATUS, 'website_pushed_at' => now(), 'website_push_error' => null])->save();
+        $order->forceFill(['external_status' => $set, 'website_pushed_at' => now(), 'website_push_error' => null])->save();
+        $name = \Illuminate\Support\Str::headline($set);
         app(OrderService::class)->note($order, 'system', $this->store->name() === 'fake'
-            ? __('Test server: Record verified not sent to the website (no live connection).')
-            : __('Website order set to Record verified.'), $by);
+            ? __('Test server: :s not sent to the website (no live connection).', ['s' => $name])
+            : __('Website order set to :s.', ['s' => $name]), $by);
 
         return true;
     }

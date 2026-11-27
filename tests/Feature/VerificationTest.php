@@ -91,6 +91,46 @@ class VerificationTest extends TestCase
         $this->get(route('orders.index'))->assertSee('Woo #25288');
     }
 
+    public function test_a_website_order_follows_its_status_here_for_the_statuses_switched_on(): void
+    {
+        $push = app(\App\Services\Orders\WebsiteStatusPush::class);
+        $order = $this->order('01712345679', 1, ['external_ref' => '9902']);
+        $at = function (string $key, string $web) use ($order, $push) {
+            $order->forceFill(['status_id' => \App\Models\OrderStatus::idFor($key), 'external_status' => $web])->save();
+
+            return $push->plan($order->fresh());
+        };
+
+        // Only Record verified is on unless more is set: a later status sends nothing, and never Record verified over a later one.
+        $this->assertSame([], $at('confirmed', 'record-verified'));
+        $this->assertSame([], $at('record_verified', 'call-verified'));
+        $this->assertSame(['record-verified'], $at('confirmed', 'processing'));
+
+        config(['store.order_statuses' => ['record-verified', 'no-response', 'on-hold', 'call-verified', 'courier-processing', 'completed', 'returned', 'cancelled']]);
+        $this->assertSame(['call-verified'], $at('confirmed', 'record-verified'));
+        $this->assertSame(['record-verified', 'call-verified'], $at('confirmed', 'processing')); // Purchase first, then the status
+        foreach (['ready_for_packaging', 'packed', 'handed_over', 'in_transit'] as $key) {
+            $this->assertSame(['courier-processing'], $at($key, 'call-verified'));
+        }
+        $this->assertSame([], $at('packed', 'courier-processing')); // already there
+        $this->assertSame(['no-response'], $at('no_answer', 'record-verified'));
+        $this->assertSame(['on-hold'], $at('hold', 'processing'));
+        $this->assertSame(['completed'], $at('delivered', 'courier-processing'));
+        $this->assertSame(['returned'], $at('returned', 'courier-processing'));
+        $this->assertSame(['cancelled'], $at('cancelled', 'no-response'));
+        // Ended on the website: never touched.
+        foreach (['completed', 'cancelled', 'refunded'] as $web) {
+            $this->assertSame([], $at('in_transit', $web));
+        }
+
+        // Sent in order, and the order remembers where the website is.
+        \App\Services\Catalog\Store\FakeStoreDriver::$sent = [];
+        $at('confirmed', 'processing');
+        $this->assertTrue($push->push($order->fresh()));
+        $this->assertSame([['order' => '9902', 'status' => 'record-verified'], ['order' => '9902', 'status' => 'call-verified']], \App\Services\Catalog\Store\FakeStoreDriver::$sent);
+        $this->assertSame('call-verified', $order->fresh()->external_status);
+    }
+
     public function test_a_record_verified_website_order_is_set_to_record_verified_on_the_website(): void
     {
         \App\Services\Catalog\Store\FakeStoreDriver::$sent = [];

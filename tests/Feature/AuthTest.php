@@ -35,6 +35,13 @@ class AuthTest extends TestCase
         $this->get('/dashboard')->assertOk(); // still there when opened on purpose
         $this->post('/logout');
 
+        $manager = User::factory()->create(['password' => 'manager-pass']);
+        $manager->roles()->attach($this->role(['orders.view', 'orders.edit', 'orders.reassign'], [], 'Manager')->id);
+        app(\App\Services\PermissionService::class)->bump();
+        $this->post('/login', ['email' => $manager->email, 'password' => 'manager-pass'])->assertRedirect(route('orders.activity'));
+        $this->get('/')->assertRedirect(route('orders.activity'));
+        $this->post('/logout');
+
         $owner = $this->owner(['password' => 'owner-pass']);
         $this->post('/login', ['email' => $owner->email, 'password' => 'owner-pass'])->assertRedirect(route('dashboard'));
         $this->get('/')->assertRedirect(route('dashboard'));

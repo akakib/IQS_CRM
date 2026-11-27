@@ -105,10 +105,16 @@ class User extends Authenticatable
         return app(PermissionService::class)->for($this)->scope($key);
     }
 
-    /** Where this person lands after login and on "/": the owner on the Dashboard, staff who work orders on Order management. */
+    /** Where this person lands after login and on "/": the owner on the Dashboard, managers (who see everyone's orders)
+     *  on Order activity, staff who work orders on Order management, anyone else on the Dashboard. */
     public function homeUrl(): string
     {
-        return ! $this->isOwner() && $this->can('orders.edit') ? route('desk.index') : route('dashboard');
+        return match (true) {
+            $this->isOwner() => route('dashboard'),
+            $this->can('orders.reassign') => route('orders.activity'),
+            $this->can('orders.edit') => route('desk.index'),
+            default => route('dashboard'),
+        };
     }
 
     public function isOwner(): bool

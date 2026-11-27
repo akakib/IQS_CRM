@@ -27,7 +27,7 @@
     </form>
 
     @if ($history->isNotEmpty())
-        <x-card :title="__('Price history')" :subtitle="__('Last 30 changes. Nothing here can be edited.')" class="mt-6">
+        <x-card :title="__('Price history')" :subtitle="__('Last 30 changes. Nothing here can be edited.')" class="mt-5">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="text-left text-xs uppercase tracking-wide text-gray-500"><tr><th class="py-2 pr-4">{{ __('When') }}</th><th class="py-2 pr-4">{{ __('Variant') }}</th><th class="py-2 pr-4">{{ __('Price') }}</th><th class="py-2 pr-4">{{ __('Change') }}</th><th class="py-2">{{ __('By') }}</th></tr></thead>
@@ -48,4 +48,5 @@
     @endif
 
     <x-confirm-modal id="delete-product" :message="__('It disappears from lists and search. Past orders keep their copy.')" />
+    <div class="h-20 lg:hidden"></div>{{-- room above the phone's Save bar --}}
 </x-layouts.app>

@@ -152,7 +152,7 @@ class ProductController extends Controller
                 'id' => $v->id, 'name' => $v->name, 'sku' => $v->sku, 'barcode' => $v->barcode, 'shelf_code' => $v->shelf_code, 'unit' => $v->unit,
                 'pack_qty' => (float) $v->pack_qty, 'weight_g' => $v->weight_g, 'cost_price' => $v->cost_price,
                 'size_qty' => $v->size_qty !== null ? (float) $v->size_qty : '', 'size_unit' => $v->size_unit === 'pc' ? 'none' : ($v->size_unit ?? ''),
-                'is_active' => $v->is_active, 'availability' => $v->availabilityLabel(),
+                'is_active' => $v->is_active, 'availability' => $v->availabilityLabel(), 'status' => $v->availability_status,
                 'prices' => $lists->mapWithKeys(fn ($l) => [$l->system_key => [
                     'regular' => optional($v->prices->firstWhere('price_list_id', $l->id))->regular_price,
                     'sale' => optional($v->prices->firstWhere('price_list_id', $l->id))->sale_price,

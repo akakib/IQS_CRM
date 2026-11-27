@@ -329,7 +329,8 @@
                             'border-l-primary bg-primary-soft/60' => $current, 'border-l-orange-400 bg-orange-50' => ! $current && $row->stock_issue, 'border-l-transparent' => ! $current && ! $row->stock_issue])>
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $row->ship_name }}</span>
-                            <span class="block truncate font-mono text-xs text-gray-500">{{ $row->order_no }} · {{ $money($row->grand_total) }} · {{ \App\Models\Order::sourceLabel($row) }}@if ($everyone) · <span class="font-sans {{ $row->moderator_name ? '' : 'text-amber-700' }}">{{ $row->moderator_name ?: __('Nobody yet') }}</span>@endif</span>
+                            <span class="block truncate font-mono text-xs text-gray-500">{{-- Everyone's orders: who has it, in place of where it came from (that is on the order itself). --}}
+                                {{ $row->order_no }} · {{ $money($row->grand_total) }} · @if ($everyone)<span class="font-sans {{ $row->moderator_name ? '' : 'text-amber-700' }}">{{ $row->moderator_name ?: __('Nobody yet') }}</span>@else{{ \App\Models\Order::sourceLabel($row) }}@endif</span>
                         </span>
                         <span class="shrink-0 text-right">
                             @if ($row->action_due_at)

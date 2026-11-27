@@ -382,7 +382,7 @@
                     <p class="px-4 py-10 text-center text-sm text-gray-400">{{ __('Nothing here.') }}</p>
                 @endforelse
             </div>
-            @if ($list->hasPages())<div class="mt-3">{{ $list->links() }}</div>@endif
+            <x-page-numbers :pages="$list" class="mt-3" />
             <p class="mt-3 hidden text-[11px] text-gray-400 lg:block">{{ __('Keys (hold Shift): J / K next and previous order · the letter on a button presses it · T take next') }}</p>
         </aside>
         @endunless

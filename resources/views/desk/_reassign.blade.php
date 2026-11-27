@@ -13,8 +13,12 @@
                 <b class="text-gray-500">{{ __('Nobody') }}</b>
             @endif
         </div>
-        <button type="button" @click="editing = !editing" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            x-text="editing ? @js(__('Cancel')) : @js($reassign['holder'] ? __('Give to someone else') : __('Give to someone'))"></button>
+        <div class="flex items-center gap-2">
+            {{-- Wider screens only: on a phone it sits in the courier box, beside the booking it undoes. --}}
+            <x-take-back :order="$order" class="max-sm:hidden" />
+            <button type="button" @click="editing = !editing" class="h-8 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                x-text="editing ? @js(__('Cancel')) : @js($reassign['holder'] ? __('Give to someone else') : __('Give to someone'))"></button>
+        </div>
     </div>
 
     <form id="reassign-form" x-show="editing" x-cloak method="POST" action="{{ route('orders.reassign', $order) }}" class="lockable mt-4 space-y-3 border-t border-gray-100 pt-4">

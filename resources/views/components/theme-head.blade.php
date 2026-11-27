@@ -26,5 +26,10 @@
 <script>
     try { if (localStorage.getItem('iqs_theme') === 'dark') document.documentElement.classList.add('dark') } catch (e) {}
     try { if (localStorage.getItem('iqs_sidebar_mini') === '1') document.documentElement.classList.add('sidebar-mini') } catch (e) {}
+    // iPhone zooms the page in when a box with text under 16px is tapped, and the page then runs off the right edge.
+    // maximum-scale=1 stops that; iPhone still lets people pinch to zoom (Android is left as it is).
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        const vp = document.querySelector('meta[name=viewport]'); if (vp) vp.content = 'width=device-width, initial-scale=1, maximum-scale=1';
+    }
     if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 </script>

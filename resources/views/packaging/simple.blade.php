@@ -67,8 +67,8 @@
                     <div>
                         <button type="button" @click="open = open === {{ $o->id }} ? null : {{ $o->id }}" class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
                             <span class="min-w-0">
-                                <span class="block font-mono text-lg font-semibold text-gray-900">{{ $o->order_no }}</span>
-                                @if ($cns[$o->id] ?? null)<span class="block text-sm text-gray-600">CN <b class="font-semibold text-gray-900">{{ $cns[$o->id] }}</b></span>@endif
+                                <span class="flex flex-wrap items-baseline gap-x-3"><span class="font-mono text-lg font-semibold text-gray-900">{{ $o->order_no }}</span>
+                                @if ($cns[$o->id] ?? null)<span class="text-sm text-gray-600">CN <b class="font-semibold text-gray-900">{{ $cns[$o->id] }}</b></span>@endif</span>
                             </span>
                             <span class="flex shrink-0 items-center gap-2 text-sm text-gray-500">{{ trans_choice(':count item|:count items', $its->count(), ['count' => $its->count()]) }}
                                 <svg class="h-5 w-5 transition" :class="open === {{ $o->id }} ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg></span>
@@ -99,7 +99,8 @@
                 <div @class(['rounded-2xl border bg-white p-4', 'border-red-400 bg-red-50' => $repack, 'border-gray-200' => ! $repack])>
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="font-mono text-xl font-bold text-gray-900">{{ $label->barcode ?? $o->order_no }}</p>
+                            <p class="flex flex-wrap items-baseline gap-x-3"><span class="font-mono text-xl font-bold text-gray-900">{{ $label->barcode ?? $o->order_no }}</span>
+                                @if ($cns[$o->id] ?? null)<span class="text-sm text-gray-600">CN <b class="font-semibold text-gray-900">{{ $cns[$o->id] }}</b></span>@endif</p>
                             <p class="text-sm text-gray-500">{{ collect([$o->ship_thana, \App\Support\BdDistricts::name($o->ship_district)])->filter()->unique()->join(', ') ?: '-' }} · {{ trans_choice(':count item|:count items', $its->count(), ['count' => $its->count()]) }}</p>
                             @if ($repack)<p class="mt-1 text-sm font-semibold text-red-700">{{ __('Changed after packing: open the box and pack it again') }}</p>@endif
                         </div>

@@ -27,15 +27,16 @@ window.IqsPrint = (() => {
     // One 51 x 76 mm sticker at 203 dpi (408 x 608 dots): IQS, COD, CN, name, address, barcode, label no, batch no.
     function sticker(s, store) {
         // 48 mm wide (384 dots): the print head of a 58 mm label printer; a wider picture loses its right edge.
-        const W = 384, H = 608, [c, g] = canvas(W, H), L = 12, R = W - 12;
+        // Smaller than the 51 x 76 mm sticker, with a margin all round: 46 x 66 mm (368 x 528 dots), placed 1 mm in and 3 mm down.
+        const W = 368, H = 528, [c, g] = canvas(W, H), L = 8, R = W - 8;
         g.font = 'bold 26px Arial'; g.fillText(store || 'IQS', L, 34);
         g.textAlign = 'right'; g.font = 'bold 16px Arial'; g.fillText('COD', R, 28); g.font = 'bold 40px Arial'; g.fillText('৳' + s.cod, R, 46); g.textAlign = 'left';
         g.lineWidth = 4; g.strokeRect(L, 98, R - L, 86); g.font = 'bold 16px Arial'; g.fillText('Steadfast CN', L + 10, 106); g.font = 'bold 46px Arial'; g.fillText(s.cn || '-', L + 10, 128);
         g.font = 'bold 26px Arial'; let y = 198; for (const l of wrap(g, s.name, R - L).slice(0, 2)) { g.fillText(l, L, y); y += 30; }
-        g.font = '22px Arial'; for (const l of wrap(g, s.address, R - L).slice(0, 5)) { g.fillText(l, L, y); y += 26; }
+        g.font = '22px Arial'; for (const l of wrap(g, s.address, R - L).slice(0, 4)) { g.fillText(l, L, y); y += 26; }
         // Barcode: whole dots per module, centred, off the bottom edge.
         const widths = String(s.bars).split('').map(Number), modules = widths.reduce((a, b) => a + b, 0), m = Math.max(1, Math.floor((R - L) / modules));
-        let x = Math.round((W - modules * m) / 2); const top = 440, bh = 80;
+        let x = Math.round((W - modules * m) / 2); const top = 380, bh = 72;
         widths.forEach((w, i) => { if (i % 2 === 0) g.fillRect(x, top, w * m, bh); x += w * m; });
         g.textAlign = 'center'; g.font = 'bold 30px monospace'; g.fillText(s.barcode, W / 2, top + bh + 6); g.font = 'bold 24px Arial'; g.fillText(s.batch || '', W / 2, top + bh + 40); g.textAlign = 'left';
         return c;
@@ -139,7 +140,7 @@ window.IqsPrint = (() => {
             progress('Sticker ' + (n + 1) + ' of ' + list.length);
             const b = bits(sticker(s, store)); // TSPL: a 0 bit prints black, so flipped below
             const inv = b.data.map(v => ~v & 0xff);
-            await bleSend(ch, new Uint8Array([...enc.encode('SIZE 51 mm,76 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 0\r\nCLS\r\nBITMAP 0,0,' + b.row + ',' + b.h + ',0,'), ...inv, ...enc.encode('\r\nPRINT 1\r\n')]));
+            await bleSend(ch, new Uint8Array([...enc.encode('SIZE 51 mm,76 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 0\r\nCLS\r\nBITMAP 8,24,' + b.row + ',' + b.h + ',0,'), ...inv, ...enc.encode('\r\nPRINT 1\r\n')]));
             await wait(2500); // the printer finishes this sticker before the next one arrives
         }
     }

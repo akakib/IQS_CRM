@@ -216,7 +216,10 @@ class PackagingTest extends TestCase
         // Printed: the button is Done. One yes = packed and the label on.
         $this->get(route('packaging.labels', ['orders' => $a->id]));
         $this->get('/packaging')->assertSee('Yes, done')->assertDontSee('Print label</a>', false);
-        $this->post(route('packaging.mark-done', $a->id))->assertSessionHasNoErrors();
+        // Done needs the label on the box scanned: none or another label is refused, this order's label goes through.
+        $this->post(route('packaging.mark-done', $a->id))->assertSessionHasErrors('code');
+        $this->post(route('packaging.mark-done', $a->id), ['code' => 'IQ99999-1'])->assertSessionHasErrors('code');
+        $this->post(route('packaging.mark-done', $a->id), ['code' => strtolower(DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('barcode'))])->assertSessionHasNoErrors();
         $this->assertSame('packed', $this->key($a));
         $this->assertNotNull(DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('applied_at'));
         $this->get('/packaging?show=ongoing')->assertSee('Nothing in hand.'); // left Ongoing (the page now opens on To pack)
@@ -258,7 +261,7 @@ class PackagingTest extends TestCase
         // Sent back to packaging: Ongoing again (its sticker is printed, its batch kept).
         app(OrderStateMachine::class)->transition($a->fresh(), 'ready_for_packaging', $this->desk);
         $this->get('/packaging?show=ongoing')->assertSee($a->order_no)->assertSee('>Done</button>', false); // its label not marked printed: Done all the same (the yes marks it printed)
-        $this->post(route('packaging.mark-done', $a->id))->assertSessionHasNoErrors();
+        $this->post(route('packaging.mark-done', $a->id), ['code' => DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('barcode')])->assertSessionHasNoErrors();
         $this->assertNotNull(DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('printed_at')); // on the box = printed
     }
 

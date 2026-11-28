@@ -76,6 +76,7 @@ export default function scanInput({ once = false, remember = null, left = null, 
             this.level = detail.level || (this.good ? 'ok' : 'red');
             // Camera mode: close only to show the page's work (a checklist); a refused label keeps it open for the next.
             if (remember && once && this.camera && !detail.keep) this.stopCamera();
+            if (detail.close) this.closeCamera(); // the page got what it needed (e.g. the right label for Done)
             this.beep(this.good);
             setTimeout(() => (this.state = null), 2500);
         },

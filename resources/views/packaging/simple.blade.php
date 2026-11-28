@@ -11,7 +11,13 @@
 @endphp
 
 <x-layouts.app :heading="__('Packaging')">
-<div class="mx-auto max-w-2xl" x-data="{ pop: null, hold: null }" @keydown.escape.window="pop = null; hold = null">
+<div class="mx-auto max-w-2xl" x-data="{ pop: null, hold: null,
+        // Done = scan the label on the box first: only this order's label lets the yes through (the server checks it again).
+        check(c) {
+            const code = String(c || '').trim().toUpperCase(), ok = !!this.pop && code === this.pop.label;
+            window.dispatchEvent(new CustomEvent('scan-result', { detail: ok ? { ok: true, message: @js(__('Right label.')), close: true } : { ok: false, message: @js(__('Wrong label')) + ': ' + code + '. ' + @js(__('This box needs')) + ' ' + (this.pop?.label || '') } }));
+            if (ok) { this.pop.code = code; this.pop.scanned = true; }
+        } }" @keydown.escape.window="pop = null; hold = null">
 
     {{-- Print the next batch of stickers (the oldest orders waiting): on To pack only. --}}
     @if ($nextBatch && $nextBatch['ids'] && $filter === 'all')
@@ -116,7 +122,7 @@
                         @if (! $label || (! $printed && $label->printed_at))
                             <a href="{{ route('packaging.labels', ['orders' => $o->id]) }}" target="_blank" class="flex h-12 w-full items-center justify-center rounded-xl border-2 border-primary bg-white text-base font-semibold text-primary">{{ __('Print label') }}</a>
                         @else
-                            <button type="button" @click="pop = { no: @js($o->order_no), label: @js($label->barcode), items: @js($popItems), url: @js(route('packaging.mark-done', $o->id)), repack: @js($repack) }"
+                            <button type="button" @click="pop = { no: @js($o->order_no), label: @js(strtoupper($label->barcode)), items: @js($popItems), url: @js(route('packaging.mark-done', $o->id)), repack: @js($repack), scanned: false, code: '' }; $nextTick(() => document.querySelector('#done-scan button[aria-label]')?.click())"
                                 @class(['lockable flex h-12 w-full items-center justify-center rounded-xl text-base font-semibold text-white', 'bg-red-600 hover:bg-red-700' => $repack, 'bg-primary hover:bg-primary-dark' => ! $repack])>{{ $repack ? __('Repack done') : __('Done') }}</button>
                         @endif
                         @if ($filter === 'ongoing')
@@ -160,7 +166,14 @@
         <div class="absolute inset-0" @click="pop = null"></div>
         <form method="POST" :action="pop?.url" class="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
             @csrf
-            <template x-if="pop">
+            <input type="hidden" name="code" :value="pop?.code || ''">
+            {{-- Step 1: the label on the box, by camera (opens by itself) or typed. --}}
+            <div x-show="pop && !pop.scanned">
+                <p class="font-mono text-2xl font-bold text-gray-900" x-text="pop?.no"></p>
+                <p class="mt-1 mb-3 text-base font-medium text-gray-700">প্যাকেজের লেবেলটা scan করুন</p>
+                <div id="done-scan"><x-scan-input quiet @scan="check($event.detail)" :placeholder="__('Scan the label or type its code')" /></div>
+            </div>
+            <template x-if="pop && pop.scanned">
                 <div>
                     <p class="font-mono text-2xl font-bold text-gray-900" x-text="pop.no"></p>
                     <p class="mt-1 text-base font-medium text-gray-700">সব প্রোডাক্ট এই প্যাকেজে দেওয়া হয়েছে?</p>{{-- Bangla on purpose: the owner asked for the packer's two questions in Bangla (2026-11-28). --}}
@@ -173,15 +186,15 @@
                             </div>
                         </template>
                     </div>
-                    <div class="mt-4 rounded-xl bg-gray-50 p-3 text-center">
-                        <p class="text-base font-medium text-gray-700">এই লেবেলটা কি বক্সে লাগানো হয়েছে?</p>
+                    <div class="mt-4 rounded-xl bg-green-50 p-3 text-center">
+                        <p class="text-base font-semibold text-green-800">✓ {{ __('Label matched') }}</p>
                         <p class="font-mono text-2xl font-bold tracking-wider text-gray-900" x-text="pop.label"></p>
                     </div>
                 </div>
             </template>
             <div class="mt-4 grid grid-cols-2 gap-2">
                 <button type="button" @click="pop = null" class="h-12 rounded-xl border border-gray-300 text-base text-gray-700">{{ __('Cancel') }}</button>
-                <button class="lockable h-12 rounded-xl bg-primary text-base font-semibold text-white hover:bg-primary-dark">{{ __('Yes, done') }}</button>
+                <button x-show="pop?.scanned" class="lockable h-12 rounded-xl bg-primary text-base font-semibold text-white hover:bg-primary-dark">{{ __('Yes, done') }}</button>
             </div>
         </form>
     </div>

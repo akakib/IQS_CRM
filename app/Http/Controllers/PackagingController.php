@@ -427,6 +427,14 @@ class PackagingController extends Controller
     /** Done (the simple page): everything in the box and the label on it, one yes. */
     public function markDone(Request $request, Order $order, \App\Services\Packaging\PackMarks $marks): RedirectResponse
     {
+        // A packer's Done needs the label on the box scanned (or typed): it must be this order's label.
+        if ($this->isSimple($request->user())) {
+            $code = strtoupper(trim((string) $request->input('code')));
+            $barcode = DB::table('shipment_labels')->where('order_id', $order->id)->whereNull('voided_at')->orderByDesc('id')->value('barcode');
+            if ($code === '' || ! $barcode || $code !== strtoupper($barcode)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['code' => __('Scan the label on the box: it must be :l.', ['l' => $barcode ?: '-'])]);
+            }
+        }
         DB::transaction(function () use ($order, $request, $marks) {
             $marks->packed($order, $request->user());
             $marks->labelOn($order->refresh(), $request->user());

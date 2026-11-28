@@ -1,6 +1,7 @@
 @php
     use Illuminate\Support\Carbon;
-    $filters = ['all' => __('All'), 'red' => __('Repack'), 'waiting' => __('Waiting'), 'mine' => __('Mine'), 'hold' => __('On hold')];
+    // The work first (what to pack), then what is done (today's, and any day by date).
+    $filters = ['all' => __('To pack'), 'red' => __('Repack'), 'waiting' => __('Waiting'), 'mine' => __('Mine'), 'hold' => __('On hold'), 'today' => __("Today's packed"), 'packed' => __('Packed')];
     $wait = fn ($t) => $t ? Carbon::parse($t)->diffForHumans(now(), ['short' => true, 'syntax' => Carbon::DIFF_ABSOLUTE, 'parts' => 1]) : '-';
     $canPack = auth()->user()->can('packaging.create') && $working;
 @endphp
@@ -231,17 +232,20 @@
     @endif
 
     {{-- Shared queue --}}
-    <div class="mt-4 grid grid-cols-5 gap-1 rounded-xl bg-gray-200/70 p-1">
+    {{-- Seven tabs: one row from a tablet up; on a phone the row slides sideways. --}}
+    <div class="mt-4 flex gap-1 overflow-x-auto rounded-xl bg-gray-200/70 p-1 sm:grid sm:grid-cols-7">
         @foreach ($filters as $f => $label)
             <a href="{{ route('packaging.index', $f === 'all' ? [] : ['show' => $f]) }}"
-                @class(['flex flex-col items-center justify-center rounded-lg py-1.5 text-[11px] leading-tight sm:text-xs',
+                @class(['flex min-w-[4.5rem] shrink-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-center text-[11px] leading-tight sm:min-w-0 sm:text-xs',
                     'bg-white font-semibold text-gray-900 shadow-sm' => $filter === $f, 'text-gray-600 hover:bg-white/60' => $filter !== $f])>
                 <span class="text-base font-semibold tabular-nums">{{ $counts[$f] }}</span>{{ $label }}
             </a>
         @endforeach
     </div>
 
-    @if ($filter === 'hold')
+    @if (in_array($filter, ['today', 'packed'], true))
+        @include('packaging._packed')
+    @elseif ($filter === 'hold')
         {{-- Reached the shop, then put on hold: set the parcel aside with its label; do not send it. It leaves this list when it goes on. --}}
         <div class="mt-3 space-y-2">
             @forelse ($heldInShop as $h)

@@ -12,6 +12,7 @@ use App\Services\Packaging\LabelPrinter;
 use App\Services\Packaging\PackagingPause;
 use App\Services\Packaging\ScanService;
 use App\Services\Packaging\StockIssueService;
+use App\Support\Lists\ListState;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,6 +31,54 @@ class PackagingController extends Controller
 {
     private const PER_PAGE = 25;
 
+    /**
+     * Orders already packed (Today's packed / Packed by date): who packed, when, the items with their photos,
+     * and whether the rider has it. The customer's phone only for people who may see orders (never the shop).
+     * Counts: 2 queries; the list (Today's packed / Packed): 1 page query + 1 for the items.
+     *
+     * @return array{today: int, total: int, rows: ?\Illuminate\Contracts\Pagination\LengthAwarePaginator, items: \Illuminate\Support\Collection, list: ?ListState, phone: bool, packers: array}
+     */
+    private function packedList(Request $request, User $user, bool $canManage, string $filter): array
+    {
+        $own = fn ($q) => $q->whereNotNull('o.packed_at')->when(! $canManage, fn ($w) => $w->where('o.packer_id', $user->id));
+        $out = [
+            'today' => DB::table('orders as o')->tap($own)->where('o.packed_at', '>=', today())->count(),
+            'total' => DB::table('orders as o')->tap($own)->count(),
+            'rows' => null, 'items' => collect(), 'list' => null, 'phone' => $user->can('orders.view'), 'packers' => [],
+        ];
+        if (! in_array($filter, ['today', 'packed'], true)) {
+            return $out;
+        }
+        $list = ListState::from($request, ['packed_at'], ['from' => 'date', 'to' => 'date', 'packer' => 'int', 'rider' => ['waiting', 'handed']], 'desc');
+        $q = $list->search;
+        $digits = preg_replace('/\D/', '', $q);
+        $handover = 'SELECT l.created_at FROM scan_logs l WHERE l.order_id = o.id AND l.station = \'handover\' AND l.result = \'ok\' ORDER BY l.id DESC LIMIT 1';
+        $rider = 'SELECT s.rider_name FROM scan_logs l JOIN handover_sessions s ON s.id = l.handover_session_id WHERE l.order_id = o.id AND l.station = \'handover\' AND l.result = \'ok\' ORDER BY l.id DESC LIMIT 1';
+        $out['rows'] = DB::table('orders as o')->tap($own)
+            ->leftJoin('users as p', 'p.id', '=', 'o.packer_id')->leftJoin('shipments as sh', 'sh.id', '=', 'o.active_shipment_id')
+            ->when($filter === 'today', fn ($w) => $w->where('o.packed_at', '>=', today()))
+            ->when($filter === 'packed' && $list->filter('from'), fn ($w, $d) => $w->where('o.packed_at', '>=', $list->filter('from').' 00:00:00'))
+            ->when($filter === 'packed' && $list->filter('to'), fn ($w) => $w->where('o.packed_at', '<=', $list->filter('to').' 23:59:59'))
+            ->when($canManage && $list->filter('packer'), fn ($w, $id) => $w->where('o.packer_id', $list->filter('packer')))
+            ->when($list->filter('rider') === 'waiting', fn ($w) => $w->whereRaw("NOT EXISTS ({$handover})"))
+            ->when($list->filter('rider') === 'handed', fn ($w) => $w->whereRaw("EXISTS ({$handover})"))
+            // Order no, CN or name; a phone only for people who may see it (the shop goes by the order no).
+            ->when($q !== '', fn ($w) => $w->where(fn ($s) => $s->where('o.order_no', strtoupper($q))->orWhere('sh.consignment_id', $q)->orWhere('o.ship_name', 'like', '%'.$q.'%')
+                ->when($out['phone'] && strlen($digits) >= 6, fn ($x) => $x->orWhere('o.ship_phone', 'like', '%'.$digits.'%'))))
+            ->orderByDesc('o.packed_at')->orderByDesc('o.id')
+            ->selectRaw("o.id, o.order_no, o.status_id, o.ship_name, o.ship_district, o.ship_thana, o.packed_at, o.packer_id, p.name as packer, sh.consignment_id,
+                ".($out['phone'] ? 'o.ship_phone' : 'NULL as ship_phone').", ({$handover}) as handed_at, ({$rider}) as rider")
+            ->paginate(self::PER_PAGE)->withQueryString();
+        $ids = $out['rows']->pluck('id');
+        $out['items'] = $ids->isEmpty() ? collect() : DB::table('order_items as i')->leftJoin('product_variants as v', 'v.id', '=', 'i.variant_id')->leftJoin('products as pr', 'pr.id', '=', 'v.product_id')
+            ->whereIn('i.order_id', $ids)->orderBy('i.id')->get(['i.order_id', 'i.name_snapshot', 'i.qty', 'i.unit', 'pr.image_url'])->groupBy('order_id');
+        $out['list'] = $list;
+        $out['packers'] = $canManage ? User::whereIn('id', DB::table('orders')->whereNotNull('packed_at')->where('packed_at', '>=', now()->subDays(60))->distinct()->pluck('packer_id')->filter())
+            ->orderBy('name')->pluck('name', 'id')->all() : [];
+
+        return $out;
+    }
+
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -47,7 +96,11 @@ class PackagingController extends Controller
         $pause = app(\App\Services\Packaging\PackagingPause::class);
         $controls = $pause->canControl($user);
 
-        $filter = in_array($request->query('show'), ['red', 'waiting', 'mine', 'hold'], true) ? $request->query('show') : 'all';
+        $filter = in_array($request->query('show'), ['red', 'waiting', 'mine', 'hold', 'today', 'packed'], true) ? $request->query('show') : 'all';
+        // Packed already: today's, or any day by date. A packer sees their own; a manager everyone's (by packer).
+        $packed = $this->packedList($request, $user, $canManage, $filter);
+        $counts['today'] = $packed['today'];
+        $counts['packed'] = $packed['total'];
         // Reached the packers, then put on hold: the parcel is set aside (its label stays with it) until it goes on.
         $heldQuery = DB::table('orders as o')->where('o.status_id', OrderStatus::idFor('hold'))->whereNotNull('o.packaging_sent_at')->whereNotNull('o.active_shipment_id');
         $counts['hold'] = (clone $heldQuery)->count();
@@ -57,7 +110,7 @@ class PackagingController extends Controller
                 DB::raw('(SELECT barcode FROM shipment_labels l WHERE l.order_id = o.id AND l.voided_at IS NULL ORDER BY l.id DESC LIMIT 1) as label')]);
         $queue = DB::table('orders as o')
             ->leftJoin('users as m', 'm.id', '=', 'o.moderator_id')->leftJoin('users as p', 'p.id', '=', 'o.packer_id')
-            ->whereRaw($inQueue)
+            ->whereRaw($inQueue)->when(in_array($filter, ['today', 'packed'], true), fn ($q) => $q->whereRaw('0 = 1'))
             ->when($filter === 'red', fn ($q) => $q->whereRaw($red))
             ->when($filter === 'waiting', fn ($q) => $q->where('o.status_id', $rfp)->whereNull('o.packer_id'))
             ->when($filter === 'mine', fn ($q) => $q->where('o.packer_id', $user->id))
@@ -80,6 +133,7 @@ class PackagingController extends Controller
             'counts' => $counts,
             'filter' => $filter,
             'queue' => $queue,
+            'packed' => $packed,
             'heldInShop' => $held,
             'myDay' => [
                 'packed' => $mine->count(),

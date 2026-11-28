@@ -87,6 +87,37 @@ class PackagingTest extends TestCase
         $this->postJson("/packaging/orders/{$o->id}/pack", ['items' => DB::table('order_items')->where('order_id', $o->id)->pluck('id')->all()])->assertJson(['ok' => true]);
     }
 
+    public function test_packed_tabs_list_what_was_packed_own_for_a_packer_all_for_a_manager_without_the_phone_for_the_shop(): void
+    {
+        $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2]]);
+        $b = $this->booked('01822222222', [['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        $other = User::factory()->create(['name' => 'Second packer']);
+        $other->roles()->attach(DB::table('roles')->where('system_key', 'packaging')->value('id'));
+        $this->actingAs($this->packer);
+        $this->packIt($a);
+        $this->actingAs($other);
+        $this->packIt($b);
+
+        // The packer: their own only, with the items, who packed, waiting for the rider, the label again; never a phone.
+        $this->actingAs($this->packer)->get('/packaging?show=today')->assertOk()
+            ->assertSeeInOrder(['To pack', 'Repack', 'Waiting', 'Mine', 'On hold', "Today's packed", 'Packed'], false)
+            ->assertSee($a->order_no)->assertDontSee($b->order_no)->assertSee('Dates')->assertSee('Packed by Packer')
+            ->assertSee('Waiting for rider')->assertSee('Print label again')->assertDontSee('01811111111');
+        $this->get('/packaging?show=packed&q=01811111111')->assertDontSee($a->order_no); // no search by phone for the shop
+        $this->get('/packaging?show=packed&q='.$a->order_no)->assertSee($a->order_no);
+        $this->get('/packaging?show=packed&from='.today()->subDay()->toDateString().'&to='.today()->subDay()->toDateString())->assertDontSee($a->order_no);
+
+        // A manager: everyone's, by packer, with the phone and search by it.
+        $this->actingAs($this->desk)->get('/packaging?show=today')->assertSee($a->order_no)->assertSee($b->order_no)->assertSee('01811111111');
+        $this->get('/packaging?show=packed&packer='.$other->id)->assertSee($b->order_no)->assertDontSee($a->order_no);
+        $this->get('/packaging?show=packed&q=01822222222')->assertSee($b->order_no)->assertDontSee($a->order_no);
+
+        // The label prints again (the same one: the box still scans).
+        $before = $this->label($a);
+        $this->actingAs($this->packer)->get(route('packaging.labels', ['orders' => $a->id]))->assertOk()->assertSee($before);
+        $this->assertSame($before, $this->label($a));
+    }
+
     public function test_a_packers_bottom_bar_is_packaging_and_handover_only(): void
     {
         $bar = fn ($html) => \Illuminate\Support\Str::between($html, 'app-bottom-nav', '</nav>');

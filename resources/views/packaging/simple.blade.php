@@ -36,10 +36,25 @@
 
     @if ($filter === 'packed')
         @php $from = $packed['list']?->filter('from'); @endphp
-        <div class="mb-1 flex gap-2">
-            @foreach ([today()->toDateString() => __('Today'), today()->subDay()->toDateString() => __('Yesterday')] as $d => $label)
-                <a href="{{ $day($d) }}" @class(['rounded-full border px-4 py-1.5 text-sm', 'border-primary bg-primary text-white' => $from === $d && $packed['list']->filter('to') === $d, 'border-gray-300 bg-white text-gray-700' => ! ($from === $d && $packed['list']->filter('to') === $d)])>{{ $label }}</a>
-            @endforeach
+        @php
+            $to = $packed['list']?->filter('to');
+            $isDay = fn ($d) => $from === $d && $to === $d;
+            $custom = $from && ! $isDay(today()->toDateString()) && ! $isDay(today()->subDay()->toDateString());
+        @endphp
+        {{-- Today, Yesterday, or any dates: From and To, then Show. --}}
+        <div class="mb-1" x-data="{ range: @js($custom) }">
+            <div class="flex flex-wrap gap-2">
+                @foreach ([today()->toDateString() => __('Today'), today()->subDay()->toDateString() => __('Yesterday')] as $d => $label)
+                    <a href="{{ $day($d) }}" @class(['rounded-full border px-4 py-1.5 text-sm', 'border-primary bg-primary text-white' => $isDay($d), 'border-gray-300 bg-white text-gray-700' => ! $isDay($d)])>{{ $label }}</a>
+                @endforeach
+                <button type="button" @click="range = !range" @class(['rounded-full border px-4 py-1.5 text-sm', 'border-primary bg-primary text-white' => $custom, 'border-gray-300 bg-white text-gray-700' => ! $custom])>{{ __('Date range') }}</button>
+            </div>
+            <form x-show="range" x-cloak method="GET" action="{{ route('packaging.index') }}" class="mt-2 flex flex-wrap items-end gap-2 rounded-2xl border border-gray-200 bg-white p-3">
+                <input type="hidden" name="show" value="packed">
+                <label class="min-w-0 flex-1 text-xs text-gray-500">{{ __('From') }}<x-date-input name="from" :value="$from" :max="today()->toDateString()" full-width class="mt-1" /></label>
+                <label class="min-w-0 flex-1 text-xs text-gray-500">{{ __('To') }}<x-date-input name="to" :value="$to" :max="today()->toDateString()" full-width class="mt-1" /></label>
+                <button class="h-10 rounded-xl bg-primary px-5 text-sm font-semibold text-white">{{ __('Show') }}</button>
+            </form>
         </div>
         @include('packaging._packed')
     @elseif ($filter === 'all')

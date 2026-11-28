@@ -58,17 +58,14 @@
         </div>
         @include('packaging._packed')
     @elseif ($filter === 'all')
-        {{-- To pack: how many wait, and their numbers to see. Nothing to press here but Print next batch. --}}
-        <div class="rounded-2xl border border-gray-200 bg-white p-5 text-center">
-            <p class="text-4xl font-bold tabular-nums text-gray-900">{{ $counts['to_pack'] }}</p>
-            <p class="text-base text-gray-600">{{ __('to print, then pack') }}</p>
-            @if ($counts['ongoing'])<a href="{{ route('packaging.index', ['show' => 'ongoing']) }}" class="mt-3 inline-block text-sm font-medium text-blue-700 underline">{{ __(':n in Ongoing: finish them first', ['n' => $counts['ongoing']]) }}</a>@endif
-        </div>
+        {{-- To pack: the order numbers only (owner 2026-11-28). Nothing to press here but Print next batch. --}}
         @if ($queue->isNotEmpty())
-            <div class="mt-3 flex flex-wrap gap-1.5">
-                @foreach ($queue as $o)<span class="rounded-lg border border-gray-200 bg-white px-2 py-1 font-mono text-xs text-gray-600">{{ $o->order_no }}</span>@endforeach
+            <div class="divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white">
+                @foreach ($queue as $o)<p class="px-4 py-3 font-mono text-lg font-semibold text-gray-900">{{ $o->order_no }}</p>@endforeach
             </div>
             <div class="mt-3">{{ $queue->links() }}</div>
+        @else
+            <div class="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-base text-gray-500">{{ __('Nothing waiting.') }}</div>
         @endif
     @else
         <div class="space-y-3">

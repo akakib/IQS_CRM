@@ -197,8 +197,9 @@ class OrderEditor
         $changes = $this->describe(json_decode($a->changes, true));
         $labels = $oldLabel ? __('Old label :o, new label :n.', ['o' => $oldLabel->barcode, 'n' => $newLabel]) : '';
         $title = match (true) {
-            ($wasPacked || $oldLabel?->applied_at) && $a->edit_class === 'content' => __(':no edited after packaging: repack', ['no' => $order->order_no]),
-            $wasPacked || $oldLabel?->applied_at => __(':no edited: replace the label', ['no' => $order->order_no]),
+            // In the box already: packed, the label on, or a packer started it (scanned it at packing).
+            ($wasPacked || $oldLabel?->applied_at || $order->packaging_started_at) && $a->edit_class === 'content' => __(':no edited after packaging: repack', ['no' => $order->order_no]),
+            $wasPacked || $oldLabel?->applied_at || $order->packaging_started_at => __(':no edited: replace the label', ['no' => $order->order_no]),
             (bool) $oldLabel?->printed_at => __(':no edited: print the new label', ['no' => $order->order_no]).($a->edit_class === 'content' ? ' '.__('(items changed, check the box)') : ''),
             default => null,
         };

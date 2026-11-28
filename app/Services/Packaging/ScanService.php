@@ -70,11 +70,7 @@ class ScanService
             return $this->log('packaging', null, $code, $order, $label, $this->fail('blocked', __('Old label: the order changed. Print the new label first.')), $by);
         }
 
-        // Scanned at packing = this label is on the box (first time only).
-        if (! $label->applied_at) {
-            DB::table('shipment_labels')->where('id', $label->id)->update(['applied_at' => now(), 'applied_by' => $by->id, 'updated_at' => now()]);
-            $this->orders->note($order, 'system', __('Label :l on the box (scanned by :n).', ['l' => $label->barcode, 'n' => $by->name]), $by);
-        }
+        // A scan only finds the order: the sticker on the box is the Label on tick of the Today sheet (PackMarks).
 
         if ((int) $order->packer_id !== $by->id) {
             $previous = $order->packer_id ? DB::table('users')->where('id', $order->packer_id)->value('name') : null;

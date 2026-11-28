@@ -79,6 +79,38 @@ class PackagingController extends Controller
         return $out;
     }
 
+    /**
+     * The Today sheet: today's batches (and orders packed today outside a batch), each order with its label, items
+     * and the two ticks. Queries: batches 1, orders 1, items 1, labels 1, open undo requests 1.
+     *
+     * @return array{groups: \Illuminate\Support\Collection, items: \Illuminate\Support\Collection, labels: \Illuminate\Support\Collection, asks: \Illuminate\Support\Collection, totals: array}
+     */
+    private function todaySheet(): array
+    {
+        $batches = DB::table('batches as b')->leftJoin('users as u', 'u.id', '=', 'b.released_by')->where('b.created_at', '>=', today())
+            ->orderByDesc('b.id')->get(['b.id', 'b.batch_no', 'b.released_at', 'u.name as by']);
+        $orders = DB::table('orders as o')->leftJoin('users as p', 'p.id', '=', 'o.packer_id')
+            ->where(fn ($w) => $w->whereIn('o.batch_id', $batches->pluck('id'))->orWhere(fn ($x) => $x->whereNull('o.batch_id')->where('o.packed_at', '>=', today())))
+            ->orderBy('o.packaging_sent_at')->orderBy('o.id')
+            ->get(['o.id', 'o.order_no', 'o.batch_id', 'o.status_id', 'o.ship_district', 'o.ship_thana', 'o.cod_amount', 'o.packed_at', 'o.packed_version', 'o.current_version', 'o.label_version', 'p.name as packer']);
+        $ids = $orders->pluck('id');
+        $items = $ids->isEmpty() ? collect() : DB::table('order_items as i')->leftJoin('product_variants as v', 'v.id', '=', 'i.variant_id')->leftJoin('products as pr', 'pr.id', '=', 'v.product_id')
+            ->whereIn('i.order_id', $ids)->orderBy('i.id')->get(['i.order_id', 'i.name_snapshot', 'i.qty', 'i.unit', 'v.size_qty', 'v.size_unit', 'pr.image_url'])->groupBy('order_id');
+        $labels = $ids->isEmpty() ? collect() : DB::table('shipment_labels as l')->leftJoin('users as u', 'u.id', '=', 'l.applied_by')->whereIn('l.order_id', $ids)->whereNull('l.voided_at')
+            ->orderBy('l.id')->get(['l.order_id', 'l.barcode', 'l.applied_at', 'u.name as by'])->keyBy('order_id');
+        $asks = $ids->isEmpty() ? collect() : DB::table('packing_undo_requests as r')->leftJoin('users as u', 'u.id', '=', 'r.requested_by')->whereIn('r.order_id', $ids)->where('r.status', 'open')
+            ->get(['r.id', 'r.order_id', 'r.mark', 'r.reason', 'r.created_at', 'u.name as by'])->groupBy('order_id');
+        $repack = fn ($o) => $o->packed_version !== null && (int) $o->packed_version < (int) $o->current_version;
+        $groups = $batches->map(fn ($b) => ['batch' => $b, 'orders' => $orders->where('batch_id', $b->id)->values()])
+            ->push(['batch' => null, 'orders' => $orders->whereNull('batch_id')->values()])->filter(fn ($g) => $g['orders']->isNotEmpty())->values();
+
+        return ['groups' => $groups, 'items' => $items, 'labels' => $labels, 'asks' => $asks, 'repack' => $repack, 'totals' => [
+            'orders' => $orders->count(),
+            'packed' => $orders->filter(fn ($o) => $o->packed_at && ! $repack($o))->count(),
+            'label' => $orders->filter(fn ($o) => $labels->get($o->id)?->applied_at)->count(),
+        ]];
+    }
+
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -134,6 +166,8 @@ class PackagingController extends Controller
             'filter' => $filter,
             'queue' => $queue,
             'packed' => $packed,
+            'sheet' => $filter === 'today' ? $this->todaySheet() : null,
+            'canUndo' => $this->canUndo($user),
             'heldInShop' => $held,
             'myDay' => [
                 'packed' => $mine->count(),
@@ -319,6 +353,47 @@ class PackagingController extends Controller
         ])->values();
 
         return view('packaging.sheet', ['rows' => $rows, 'summary' => $summary]);
+    }
+
+    /** The Today sheet: Packed or Label on, after the yes in its popup. Locked once given. */
+    public function mark(Request $request, Order $order, string $mark, \App\Services\Packaging\PackMarks $marks): RedirectResponse
+    {
+        $message = $mark === 'packed' ? $marks->packed($order, $request->user()) : $marks->labelOn($order, $request->user());
+
+        return redirect()->to(route('packaging.index', ['show' => 'today']).'#o'.$order->id)->with('success', $message);
+    }
+
+    /** A packer asks the owner or a manager to take a tick back. */
+    public function undoAsk(Request $request, Order $order, \App\Services\Packaging\PackMarks $marks): RedirectResponse
+    {
+        $data = $request->validate(['mark' => ['required', Rule::in(['packed', 'label'])], 'reason' => ['required', 'string', 'min:3', 'max:300']]);
+        $marks->ask($order, $data['mark'], $data['reason'], $request->user());
+
+        return redirect()->to(route('packaging.index', ['show' => 'today']).'#o'.$order->id)->with('success', __('Asked. The tick stays until the owner or a manager answers.'));
+    }
+
+    /** The owner or a manager answers an undo request. */
+    public function undoDecide(Request $request, int $undo, \App\Services\Packaging\PackMarks $marks): RedirectResponse
+    {
+        abort_unless($this->canUndo($request->user()), 403);
+        $message = $marks->decide($undo, $request->input('decision') === 'approve', $request->user());
+
+        return redirect()->route('packaging.index', ['show' => 'today'])->with('success', $message);
+    }
+
+    /** The owner or a manager takes a tick back themselves, with a reason. */
+    public function undoNow(Request $request, Order $order, \App\Services\Packaging\PackMarks $marks): RedirectResponse
+    {
+        abort_unless($this->canUndo($request->user()), 403);
+        $data = $request->validate(['mark' => ['required', Rule::in(['packed', 'label'])], 'reason' => ['required', 'string', 'min:3', 'max:300']]);
+        DB::transaction(fn () => $marks->undo($order, $data['mark'], $request->user(), $data['reason']));
+
+        return redirect()->to(route('packaging.index', ['show' => 'today']).'#o'.$order->id)->with('success', __('Taken back on :no.', ['no' => $order->order_no]));
+    }
+
+    private function canUndo(User $user): bool
+    {
+        return $user->isOwner() || $user->can('packaging.manage');
     }
 
     /** Print next batch: the oldest orders that fit the batch list (BatchService::nextUp), then its print page. */

@@ -33,6 +33,7 @@ return [
         'break_not_closed' => ['Someone went on break and did not come back', 'normal'],
         'order_left_idle' => ['An order was left untouched and taken back', 'normal'],
         'points_review' => ['Points: flag or dispute to review', 'normal'],
+        'packing_undo_request' => ['Packer asks to undo a Packed or Label on tick', 'normal'],
         'system_test' => ['Test notification', 'info'],
     ],
 

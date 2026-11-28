@@ -100,7 +100,8 @@ class PackagingTest extends TestCase
 
         // The packer: their own only, with the items, who packed, waiting for the rider, the label again; never a phone.
         $this->actingAs($this->packer)->get('/packaging?show=today')->assertOk()
-            ->assertSeeInOrder(['To pack', 'Repack', 'Waiting', 'Mine', 'On hold', "Today's packed", 'Packed'], false)
+            ->assertSeeInOrder(['To pack', 'Repack', 'Waiting', 'Mine', 'On hold', 'Today', 'Packed'], false);
+        $this->get('/packaging?show=packed&from='.today()->toDateString().'&to='.today()->toDateString())->assertOk()
             ->assertSee($a->order_no)->assertDontSee($b->order_no)->assertSee('Dates')->assertSee('Packed by Packer')
             ->assertSee('Waiting for rider')->assertSee('Print label again')->assertDontSee('01811111111');
         $this->get('/packaging?show=packed&q=01811111111')->assertDontSee($a->order_no); // no search by phone for the shop
@@ -108,7 +109,7 @@ class PackagingTest extends TestCase
         $this->get('/packaging?show=packed&from='.today()->subDay()->toDateString().'&to='.today()->subDay()->toDateString())->assertDontSee($a->order_no);
 
         // A manager: everyone's, by packer, with the phone and search by it.
-        $this->actingAs($this->desk)->get('/packaging?show=today')->assertSee($a->order_no)->assertSee($b->order_no)->assertSee('01811111111');
+        $this->actingAs($this->desk)->get('/packaging?show=packed')->assertSee($a->order_no)->assertSee($b->order_no)->assertSee('01811111111');
         $this->get('/packaging?show=packed&packer='.$other->id)->assertSee($b->order_no)->assertDontSee($a->order_no);
         $this->get('/packaging?show=packed&q=01822222222')->assertSee($b->order_no)->assertDontSee($a->order_no);
 
@@ -159,6 +160,41 @@ class PackagingTest extends TestCase
 
         // Its labels: the sticker points to the batch list for items that do not fit.
         $this->get(route('packaging.labels', ['orders' => $a->id]))->assertOk()->assertSee('see batch list '.$first->batch_no)->assertSee('Batch list (80 mm)');
+    }
+
+    public function test_today_sheet_ticks_packed_then_label_on_locks_them_and_only_a_manager_takes_one_back(): void
+    {
+        \Illuminate\Support\Facades\Artisan::call('notifications:sync');
+        $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2]]);
+        $this->actingAs($this->packer)->post(route('packaging.next-batch'));
+        $label = $this->label($a);
+
+        // The sheet: the label, the items, Packed to press; Label on waits for Packed.
+        $this->get('/packaging?show=today')->assertOk()->assertSee($label)->assertSee('Dates')->assertSee('After Packed')->assertDontSee('01811111111');
+        $this->post(route('packaging.mark', [$a->id, 'label']))->assertSessionHasErrors('order'); // not before Packed
+
+        // Packed: one yes, no scan needed. Then Label on.
+        $this->post(route('packaging.mark', [$a->id, 'packed']))->assertSessionHasNoErrors();
+        $this->assertSame('packed', $this->key($a));
+        $this->assertSame($this->packer->id, (int) $a->fresh()->packer_id);
+        $this->post(route('packaging.mark', [$a->id, 'label']))->assertSessionHasNoErrors();
+        $this->assertNotNull(DB::table('shipment_labels')->where('barcode', $label)->value('applied_at'));
+        $this->get('/packaging?show=today')->assertSee('✓ Packed', false)->assertSee('✓ Label on', false)->assertSee('Ask to undo')->assertSeeText('Packed 1/1 · Label 1/1');
+
+        // Locked: a packer cannot take it back, only ask; the managers are told.
+        $this->post(route('packaging.undo-now', $a->id), ['mark' => 'label', 'reason' => 'wrong box'])->assertForbidden();
+        $this->post(route('packaging.undo-ask', $a->id), ['mark' => 'label', 'reason' => 'Put it on the wrong box'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $this->desk->id, 'title' => 'Undo Label on? '.$a->order_no]);
+        $this->assertNotNull(DB::table('shipment_labels')->where('barcode', $label)->value('applied_at')); // stays until answered
+
+        // The manager approves: Label on goes, Packed stays. Then takes Packed back themselves: back to packing.
+        $ask = DB::table('packing_undo_requests')->value('id');
+        $this->actingAs($this->desk)->post(route('packaging.undo-decide', $ask), ['decision' => 'approve'])->assertSessionHasNoErrors();
+        $this->assertNull(DB::table('shipment_labels')->where('barcode', $label)->value('applied_at'));
+        $this->assertSame('packed', $this->key($a));
+        $this->post(route('packaging.undo-now', $a->id), ['mark' => 'packed', 'reason' => 'Box was empty'])->assertSessionHasNoErrors();
+        $this->assertSame('ready_for_packaging', $this->key($a));
+        $this->assertNull($a->fresh()->packed_at);
     }
 
     public function test_a_packers_bottom_bar_is_packaging_and_handover_only(): void
@@ -216,9 +252,9 @@ class PackagingTest extends TestCase
         $this->get(route('packaging.sheet', ['run' => $run]))->assertOk()->assertSeeInOrder([$labelA, 'Dates', $this->label($b)])->assertSee('Label on')
             ->assertDontSee($b->fresh()->ship_phone); // no customer phone on the sheet: the shop goes by the order no
 
-        // The label is on the box when the packer scans it.
+        // A scan only finds the order: the label counts as on the box when Label on is ticked (Today sheet).
         $this->postJson('/packaging/scan', ['code' => $labelA])->assertJson(['ok' => true]);
-        $this->assertNotNull(DB::table('shipment_labels')->where('barcode', $labelA)->value('applied_at'));
+        $this->assertNull(DB::table('shipment_labels')->where('barcode', $labelA)->value('applied_at'));
 
         // Edited now (no manager needed): the packers hear it at once with the old and new label; the old one names the new one.
         $type = DB::table('notification_types')->where('system_key', 'order_needs_repack')->value('id');

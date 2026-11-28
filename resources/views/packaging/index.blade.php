@@ -1,7 +1,7 @@
 @php
     use Illuminate\Support\Carbon;
     // The work first (what to pack), then what is done (today's, and any day by date).
-    $filters = ['all' => __('To pack'), 'red' => __('Repack'), 'waiting' => __('Waiting'), 'mine' => __('Mine'), 'hold' => __('On hold'), 'today' => __("Today's packed"), 'packed' => __('Packed')];
+    $filters = ['all' => __('To pack'), 'red' => __('Repack'), 'waiting' => __('Waiting'), 'mine' => __('Mine'), 'hold' => __('On hold'), 'today' => __('Today'), 'packed' => __('Packed')];
     $wait = fn ($t) => $t ? Carbon::parse($t)->diffForHumans(now(), ['short' => true, 'syntax' => Carbon::DIFF_ABSOLUTE, 'parts' => 1]) : '-';
     $canPack = auth()->user()->can('packaging.create') && $working;
 @endphp
@@ -265,7 +265,7 @@
     </div>
 
     @if (in_array($filter, ['today', 'packed'], true))
-        @include('packaging._packed')
+        @include($filter === 'today' ? 'packaging._today' : 'packaging._packed')
     @elseif ($filter === 'hold')
         {{-- Reached the shop, then put on hold: set the parcel aside with its label; do not send it. It leaves this list when it goes on. --}}
         <div class="mt-3 space-y-2">

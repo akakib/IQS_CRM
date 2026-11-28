@@ -139,7 +139,8 @@ class PackagingTest extends TestCase
         $page = $this->actingAs($this->packer)->get(route('packaging.labels'))->assertOk()->assertSee('Packing sheet (A4)');
         $run = DB::table('shipment_labels')->where('barcode', $labelA)->value('print_run');
         $this->assertNotNull($run);
-        $this->get(route('packaging.sheet', ['run' => $run]))->assertOk()->assertSeeInOrder([$labelA, 'Dates', $this->label($b)])->assertSee('Label on');
+        $this->get(route('packaging.sheet', ['run' => $run]))->assertOk()->assertSeeInOrder([$labelA, 'Dates', $this->label($b)])->assertSee('Label on')
+            ->assertDontSee($b->fresh()->ship_phone); // no customer phone on the sheet: the shop goes by the order no
 
         // The label is on the box when the packer scans it.
         $this->postJson('/packaging/scan', ['code' => $labelA])->assertJson(['ok' => true]);

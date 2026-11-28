@@ -60,8 +60,7 @@
                     <td>
                         <div class="id">{{ $r->label }}</div>
                         <div class="area">{{ collect([$r->order->ship_thana, $r->order->ship_district])->filter()->join(', ') ?: '-' }}</div>
-                        {{-- The customer's phone is on this sheet, not on the sticker, in full for everyone who prints it (owner 2026-11-26). --}}
-                        <div class="area">{{ $r->order->ship_phone }}{{ $r->order->ship_alt_phone ? ' / '.$r->order->ship_alt_phone : '' }}</div>
+                        {{-- No customer phone (owner 2026-11-28): the shop goes by the order no; managers, moderators and the owner see the phone on the order. --}}
                     </td>
                     <td class="items">
                         @if ($r->changed)<div class="warn">{{ __('CHANGED: use the new label :l', ['l' => $r->current ?? '-']) }}</div>@endif

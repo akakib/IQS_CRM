@@ -37,12 +37,50 @@
     </style>
 </head>
 <body>
+    {{-- Straight to the shop printers from the Android phone: stickers over Bluetooth, the list over the USB (OTG) cable. --}}
     <div class="bar">
-        <button type="button" class="main" onclick="window.print()">{{ __('Print this list') }}</button>
-        <a class="alt" href="{{ route('packaging.labels', ['orders' => $orders->pluck('id')->join(',')]) }}" target="_blank">{{ __('Print :n labels', ['n' => $orders->count()]) }}</a>
+        <button type="button" class="main" id="pr-stickers" onclick="iqsRun('stickers')">{{ __('Print :n stickers', ['n' => $orders->count()]) }}</button>
+        <button type="button" class="main" id="pr-list" onclick="iqsRun('list')">{{ __('Print the list') }}</button>
         <a class="alt" href="{{ route('packaging.index') }}">← {{ __('Back to packaging') }}</a>
-        <p>{{ __('The list goes to the 80 mm receipt printer, the labels to the sticker printer.') }}</p>
+        <label style="width:100%;text-align:center;font-size:12px;color:#4b5563"><input type="checkbox" id="pr-choose"> {{ __('Choose the printer again (a new or another printer)') }}</label>
+        <p id="pr-msg" style="font-weight:600"></p>
+        <p>{{ __('Stickers go to the sticker printer over Bluetooth, the list to the receipt printer on its cable. Other ways:') }}
+            <a href="#" onclick="window.print(); return false">{{ __('phone print') }}</a> ·
+            <a href="{{ route('packaging.labels', ['orders' => $orders->pluck('id')->join(',')]) }}" target="_blank">{{ __('sticker page') }}</a></p>
     </div>
+    @php
+        $receipt = [
+            'batch' => $batch->batch_no, 'lines' => $orders->sum(fn ($o) => $o->items->count() + 1),
+            'head' => [$at->format('d M Y · g:i A').' · '.($batch->by ?? '-'), trans_choice(':count order|:count orders', $orders->count(), ['count' => $orders->count()]).' · '.trans_choice(':count item|:count items', $pieces, ['count' => $pieces]).' · '.__('Batch :n of the day', ['n' => $dayNo]), __('Today so far: :n orders', ['n' => $todayTotal])],
+            'orders' => $orders->map(fn ($o) => ['no' => $o->order_no, 'area' => collect([$o->ship_thana, \App\Support\BdDistricts::name($o->ship_district)])->filter()->unique()->join(', ') ?: '-', 'cn' => $cn[$o->active_shipment_id] ?? '',
+                'items' => $o->items->map(fn ($it) => ['name' => $it->name_snapshot.(($s = \App\Support\Units::itemSize($it)) && ! str_contains(mb_strtolower(str_replace(' ', '', $it->name_snapshot)), mb_strtolower(str_replace(' ', '', $s))) ? ' '.$s : ''), 'qty' => $qty($it->qty, $it->unit)])->values()])->values(),
+            'foot' => $batch->batch_no.' · '.__('printed :t', ['t' => now()->format('d M, g:i A')]),
+        ];
+    @endphp
+    @include('packaging._direct-print')
+    <script>
+        async function iqsRun(what) {
+            const msg = document.getElementById('pr-msg'), choose = document.getElementById('pr-choose').checked, btn = document.getElementById(what === 'stickers' ? 'pr-stickers' : 'pr-list');
+            const say = t => { msg.textContent = t; msg.style.color = '#111'; };
+            btn.disabled = true;
+            try {
+                if (what === 'stickers') {
+                    if (!IqsPrint.ok.ble) throw new Error(@js(__('Open this page in Chrome on the Android phone.')));
+                    await IqsPrint.printStickers(@js($stickers), @js($store), choose, say);
+                    await IqsPrint.marked(@js(route('packaging.batch-printed', $batch->id)), @js(csrf_token()));
+                    say(@js(__('Stickers printed. Now print the list, then pack in Ongoing.')));
+                } else {
+                    if (!IqsPrint.ok.usb) throw new Error(@js(__('Open this page in Chrome on the Android phone.')));
+                    await IqsPrint.printReceipt(@js($receipt), choose, say);
+                    say(@js(__('List printed.')));
+                }
+            } catch (e) {
+                msg.style.color = '#b91c1c';
+                msg.textContent = e.name === 'NotFoundError' ? @js(__('No printer chosen. Is it on (and its cable in)?')) : (e.message || String(e));
+            }
+            btn.disabled = false;
+        }
+    </script>
 
     <div class="paper">
         <div class="head">

@@ -462,10 +462,33 @@ class PackagingController extends Controller
         $cn = DB::table('shipments')->whereIn('id', $orders->pluck('active_shipment_id')->filter())->pluck('consignment_id', 'id');
         $dayNo = DB::table('batches')->whereDate('created_at', \Illuminate\Support\Carbon::parse($b->created_at)->toDateString())->where('id', '<=', $b->id)->count();
 
+        // For printing straight from the phone (Bluetooth sticker printer, USB receipt printer): each sticker's parts.
+        $full = DB::table('orders')->whereIn('id', $orders->pluck('id'))->get(['id', 'ship_name', 'ship_address', 'ship_thana', 'ship_district', 'cod_amount'])->keyBy('id');
+        $labels = DB::table('shipment_labels')->whereIn('order_id', $orders->pluck('id'))->whereNull('voided_at')->orderBy('id')->get(['order_id', 'barcode', 'cod_on_label'])->keyBy('order_id');
+        $stickers = $orders->map(function ($o) use ($full, $labels, $cn, $b) {
+            $f = $full[$o->id]; $l = $labels[$o->id] ?? null;
+
+            return ['order_no' => $o->order_no, 'barcode' => $l->barcode ?? $o->order_no, 'cn' => $cn[$o->active_shipment_id] ?? '', 'cod' => number_format((float) ($l->cod_on_label ?? $f->cod_amount)),
+                'name' => $f->ship_name, 'address' => \App\Support\LabelAddress::of($f), 'batch' => $b->batch_no,
+                'bars' => \App\Support\Barcode\Code128::widths($l->barcode ?? $o->order_no)];
+        })->values();
+
         return view('packaging.batch-list', [
+            'stickers' => $stickers, 'store' => (string) settings('store.label_name'),
             'batch' => $b, 'orders' => $orders, 'cn' => $cn, 'dayNo' => $dayNo,
             'todayTotal' => DB::table('orders')->whereIn('batch_id', DB::table('batches')->whereDate('created_at', \Illuminate\Support\Carbon::parse($b->created_at)->toDateString())->where('id', '<=', $b->id)->pluck('id'))->count(),
         ]);
+    }
+
+    /** The stickers of a batch were printed straight from the phone: their labels count as printed (Ongoing shows Done). */
+    public function batchPrinted(int $batch, Request $request): JsonResponse
+    {
+        $ids = DB::table('orders')->where('batch_id', $batch)->pluck('id');
+        $run = now()->format('ymdHis').substr((string) $request->user()->id, -4);
+        $n = DB::table('shipment_labels')->whereIn('order_id', $ids)->whereNull('voided_at')->whereNull('printed_at')
+            ->update(['printed_at' => now(), 'printed_by' => $request->user()->id, 'print_run' => $run, 'updated_at' => now()]);
+
+        return response()->json(['ok' => true, 'marked' => $n]);
     }
 
     // ── Batches (older flow, kept for bulk pick lists; not in the menu) ──

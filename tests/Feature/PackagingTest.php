@@ -209,9 +209,9 @@ class PackagingTest extends TestCase
             ->assertSee('Print next batch')->assertSee($a->order_no)->assertSee('Dates')->assertDontSee('>Done</button>', false)->assertDontSee('>Hold</button>', false)
             ->assertDontSee('Tools')->assertDontSee('Select all')->assertDontSee('01811111111');
 
-        // Printed as a batch: it is Ongoing, opened first, with its items; the sticker not printed yet = Print label.
+        // Printed as a batch: it is Ongoing, opened first, with its items; a label not marked printed (a PDF) still gets Done.
         $this->post(route('packaging.next-batch'));
-        $this->get('/packaging')->assertSee('Dates')->assertSee('Nuts')->assertSee('Print label')->assertDontSee('Print next batch');
+        $this->get('/packaging')->assertSee('Dates')->assertSee('Nuts')->assertSee('>Done</button>', false)->assertDontSee('Print label')->assertDontSee('Print next batch');
 
         // Printed: the button is Done. One yes = packed and the label on.
         $this->get(route('packaging.labels', ['orders' => $a->id]));
@@ -257,7 +257,9 @@ class PackagingTest extends TestCase
 
         // Sent back to packaging: Ongoing again (its sticker is printed, its batch kept).
         app(OrderStateMachine::class)->transition($a->fresh(), 'ready_for_packaging', $this->desk);
-        $this->get('/packaging?show=ongoing')->assertSee($a->order_no)->assertSee('Print label'); // its sticker not printed in this test: Print label, then Done
+        $this->get('/packaging?show=ongoing')->assertSee($a->order_no)->assertSee('>Done</button>', false); // its label not marked printed: Done all the same (the yes marks it printed)
+        $this->post(route('packaging.mark-done', $a->id))->assertSessionHasNoErrors();
+        $this->assertNotNull(DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('printed_at')); // on the box = printed
     }
 
     public function test_the_print_station_makes_the_next_batch_and_gives_its_stickers_and_list_without_leaving_the_page(): void
@@ -433,7 +435,7 @@ class PackagingTest extends TestCase
             DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'customer_request')->value('id'), $this->desk, $order->fresh()->lock_version);
         $this->assertSame('repack', $order->fresh()->packMark());
         // The red banner stays on top of the packaging page until the box is repacked.
-        $this->get('/packaging')->assertSee('Changed after packing: open the box and pack it again')->assertSee('Print label'); // the packer's simple page: the new label first, then Repack done
+        $this->get('/packaging')->assertSee('Changed after packing: open the box and pack it again')->assertSee('Repack done'); // the packer's simple page: Repack done (its yes says the new label is on, so printed)
 
         $old = $order->order_no.'-1';
         // The edit itself issued the new label (unprinted), so the packer can print it without asking anyone.

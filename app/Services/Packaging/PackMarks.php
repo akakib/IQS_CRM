@@ -56,7 +56,9 @@ class PackMarks
         if ($label->applied_at) {
             return __('Label :l is already on.', ['l' => $label->barcode]);
         }
-        DB::table('shipment_labels')->where('id', $label->id)->update(['applied_at' => now(), 'applied_by' => $by->id, 'updated_at' => now()]);
+        // On the box means printed: a label printed from a PDF (not by the CRM's printer) is marked printed here.
+        DB::table('shipment_labels')->where('id', $label->id)->update(['applied_at' => now(), 'applied_by' => $by->id, 'updated_at' => now()]
+            + ($label->printed_at ? [] : ['printed_at' => now(), 'printed_by' => $by->id]));
         $this->orders->note($order, 'system', __('Label :l on the box: ticked by :n.', ['l' => $label->barcode, 'n' => $by->name]), $by);
 
         return __('Label :l is on.', ['l' => $label->barcode]);

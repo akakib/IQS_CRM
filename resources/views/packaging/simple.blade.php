@@ -111,7 +111,9 @@
                         @endforeach
                     </div>
                     <div class="mt-3">
-                        @if (! $printed)
+                        {{-- Print label only when the printed one is out of date (the order changed after). A label not marked printed yet
+                             (made from a PDF) still gets Done: its yes says the label is on the box, so it is marked printed then. --}}
+                        @if (! $label || (! $printed && $label->printed_at))
                             <a href="{{ route('packaging.labels', ['orders' => $o->id]) }}" target="_blank" class="flex h-12 w-full items-center justify-center rounded-xl border-2 border-primary bg-white text-base font-semibold text-primary">{{ __('Print label') }}</a>
                         @else
                             <button type="button" @click="pop = { no: @js($o->order_no), label: @js($label->barcode), items: @js($popItems), url: @js(route('packaging.mark-done', $o->id)), repack: @js($repack) }"

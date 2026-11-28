@@ -34,7 +34,7 @@
         .s .cod { font-size: 15px; } .s .cod span { font-size: 7px; }
         .s .cn { padding: 1px 3px; border-width: 1.5px; } .s .cn span { font-size: 7px; } .s .cn b { font-size: 15px; letter-spacing: 0; }
         .s .to { font-size: 9px; line-height: 1.2; max-height: 0.62in; overflow: hidden; } .s .to b { font-size: 10px; }
-        .s .items { font-size: 8px; max-height: 0.4in; }
+        .s .items { font-size: 8px; max-height: 0.82in; }
         .s .codes svg { height: 0.42in; } .s .bc-text { font-size: 9px; letter-spacing: 0; }
         .batch { font-size: 8px; font-weight: 700; }
         @media print { body { background: #fff; } .toolbar { display: none; } .label { margin: 0; } }
@@ -64,7 +64,7 @@
                 <b>{{ $o->ship_name }}</b><br>
                 {{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}
             </div>
-            <div class="items" data-more="{{ ($bn = $batchNos[$o->batch_id] ?? null) ? __('see batch list :b', ['b' => $bn]) : __('see packing sheet') }}">@foreach ($o->items as $i)<span>{{ $i->name_snapshot }}{{ ($s = \App\Support\Units::itemSize($i)) ? ' '.$s : '' }} <b>{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b>{{ $loop->last ? '' : ' · ' }}</span>@endforeach</div>
+            <div class="items" data-more="{{ ($bn = $batchNos[$o->batch_id] ?? null) ? __('see batch list :b', ['b' => $bn]) : __('see packing sheet') }}">@foreach ($o->items as $i)<span>{{ $i->name_snapshot }}{{ ($s = \App\Support\Units::itemSize($i)) && ! str_contains(mb_strtolower(str_replace(' ', '', $i->name_snapshot)), mb_strtolower(str_replace(' ', '', $s))) ? ' '.$s : '' }} <b>{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b>{{ $loop->last ? '' : ' · ' }}</span>@endforeach</div>
             @if ($l)
                 <div class="codes">
                     {!! \App\Support\Barcode\Code128::svg($l->barcode, 2, 60) !!}

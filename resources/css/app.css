@@ -263,3 +263,11 @@ html.board-grabbing,
 html.board-grabbing * {
     cursor: grabbing !important;
 }
+
+/* The bar of a ticked list (x-list.selectable): dark in both themes, white text; sits above the phone's bottom bar. */
+.action-bar { background: #111827; color: #fff; }
+html.dark .action-bar { background: #1e293b; border: 1px solid #334155; }
+html.dark .action-bar .bg-white { background: #fff; }
+html.dark .action-bar .text-gray-900 { color: #111827; }
+.action-bar .text-gray-300 { color: #cbd5e1; }
+.action-bar .text-gray-400 { color: #94a3b8; }

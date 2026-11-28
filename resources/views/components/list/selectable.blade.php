@@ -26,7 +26,7 @@
 
     @if ($actions)
         <div x-show="selected.length" x-cloak x-transition
-            class="sticky bottom-3 z-30 mx-auto mt-4 flex max-w-xl flex-wrap items-center gap-3 rounded-xl bg-gray-900 px-4 py-3 text-sm text-white shadow-xl">
+            class="action-bar sticky bottom-3 z-30 mx-auto mt-4 flex max-w-xl flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-sm shadow-xl max-lg:bottom-[calc(4.5rem+env(safe-area-inset-bottom))]">
             <span><span x-text="selected.length"></span> {{ __('selected') }}<span x-show="selected.some(id => ! all.includes(id))" class="text-gray-400"> · {{ __('some on other pages') }}</span></span>
             <div class="flex flex-wrap items-center gap-2">{{ $actions }}</div>
             <button type="button" @click="selected = []" class="ml-auto text-xs text-gray-300 hover:text-white">{{ __('Clear') }}</button>

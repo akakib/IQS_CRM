@@ -164,12 +164,12 @@ class PackagingController extends Controller
         $mine = DB::table('orders')->where('packer_id', $user->id)->where('packed_at', '>=', $since)->get(['packaging_started_at', 'packed_at']);
 
         // A packer (no orders, no packaging management): the simple page, two tabs, one button per order.
-        if ($simple && in_array($filter, ['all', 'ongoing', 'packed'], true)) {
+        if ($simple && in_array($filter, ['all', 'ongoing', 'packed', 'hold'], true)) {
             $ids = $queue->pluck('id');
             $counts['ongoing'] = $onGoingCount;
             $counts['to_pack'] = max(0, $counts['all'] - $onGoingCount);
             return view('packaging.simple', [
-                'filter' => $filter, 'queue' => $queue, 'packed' => $packed, 'counts' => $counts,
+                'filter' => $filter, 'queue' => $queue, 'packed' => $packed, 'counts' => $counts, 'heldInShop' => $held,
                 'nextBatch' => $user->can('packaging.create') ? app(BatchService::class)->nextUp($user) : null,
                 'items' => $ids->isEmpty() ? collect() : DB::table('order_items as i')->leftJoin('product_variants as v', 'v.id', '=', 'i.variant_id')->leftJoin('products as pr', 'pr.id', '=', 'v.product_id')
                     ->whereIn('i.order_id', $ids)->orderBy('i.id')->get(['i.order_id', 'i.name_snapshot', 'i.qty', 'i.unit', 'v.size_qty', 'v.size_unit', 'pr.image_url'])->groupBy('order_id'),

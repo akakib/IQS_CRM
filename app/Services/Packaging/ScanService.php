@@ -164,7 +164,9 @@ class ScanService
             throw ValidationException::withMessages(['order' => __('Another packer is on this order: only they can put it on hold.')]);
         }
         $this->machine->transition($order, 'hold', $by, 'scan', $reasonId, $note);
-        $order->forceFill(['packer_id' => null, 'packaging_started_at' => null])->save();
+        // The note shows in On hold (the packer's page and the full page), like a moderator's hold note.
+        $order->forceFill(['packer_id' => null, 'packaging_started_at' => null]
+            + (trim((string) $note) !== '' ? ['hold_note' => trim($note), 'hold_note_by' => $by->id, 'hold_note_at' => now()] : []))->save();
 
         $reason = DB::table('status_reasons')->where('id', $reasonId)->value('label_en');
         app(\App\Services\NotificationService::class)->send('order_held_by_packer', __(':no held by packer :n', ['no' => $order->order_no, 'n' => $by->name]), trim($reason.($note ? ' · '.$note : '')), [

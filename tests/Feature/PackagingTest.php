@@ -204,10 +204,10 @@ class PackagingTest extends TestCase
         $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
         DB::table('shipment_labels')->where('order_id', $a->id)->update(['printed_at' => null]);
 
-        // Three tabs. To pack: how many wait and Print next batch; nothing to press on an order. No manager tools, no phone.
-        $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSeeInOrder(['To pack', 'Ongoing', 'Packed'])
+        // Four tabs (On hold last). To pack: how many wait and Print next batch; nothing to press on an order. No manager tools, no phone.
+        $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSeeInOrder(['To pack', 'Ongoing', 'Packed', 'On hold', 'Stock'])
             ->assertSee('Print next batch')->assertSee($a->order_no)->assertSee('Dates')->assertDontSee('>Done</button>', false)->assertDontSee('>Hold</button>', false)
-            ->assertDontSee('Tools')->assertDontSee('On hold')->assertDontSee('Select all')->assertDontSee('01811111111');
+            ->assertDontSee('Tools')->assertDontSee('Select all')->assertDontSee('01811111111');
 
         // Printed as a batch: it is Ongoing, opened first, with its items; the sticker not printed yet = Print label.
         $this->post(route('packaging.next-batch'));
@@ -252,6 +252,8 @@ class PackagingTest extends TestCase
         $this->get('/packaging?show=ongoing')->assertSee('Nothing in hand.');
         $this->get('/packaging?show=all')->assertDontSee($a->order_no.'</span>', false);
         $this->assertDatabaseHas('app_notifications', ['title' => $a->order_no.' held by packer Packer']);
+        // The packer sees it in On hold, with the reason and the note.
+        $this->get('/packaging?show=hold')->assertOk()->assertSee($a->order_no)->assertSee('Item not found while packaging')->assertSee('Dates not on the shelf');
 
         // Sent back to packaging: Ongoing again (its sticker is printed, its batch kept).
         app(OrderStateMachine::class)->transition($a->fresh(), 'ready_for_packaging', $this->desk);

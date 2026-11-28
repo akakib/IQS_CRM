@@ -13,6 +13,7 @@
         'users' => 'M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19m16 0v-1.5a3.5 3.5 0 0 0-2.5-3.35M14.5 4.2a3.5 3.5 0 0 1 0 6.6M13.5 7.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z',
         'more' => 'M4 7h16M4 12h16M4 17h16',
         'swap' => 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4',
+        'stock' => 'M4 20V10m6 10V4m6 16v-7m4 7H2',
     ];
     // In the order they are offered: the first four this person may open are shown.
     $places = collect([
@@ -23,12 +24,13 @@
         ['Products', route('products.index'), request()->routeIs('products.*', 'categories.*'), 'products.view', 'tag'],
         ['Customers', route('customers.index'), request()->routeIs('customers.*'), 'customers.view', 'users'],
     ])->filter(fn ($p) => $p[1] && $p[3] !== 'never' && $can($p[3]))->take(4)->values();
-    // A packer (packaging, no order work): only their job, Packaging and Handover.
+    // A packer (packaging, no order work): only their job, Packaging, Handover and Stock (when they may see products).
     if (! $user->isOwner() && $user->can('packaging.view') && ! $user->can('orders.edit') && \Illuminate\Support\Facades\Route::has('handover.index')) {
         $places = collect([
             ['Packaging', route('packaging.index'), request()->routeIs('packaging.*'), null, 'box'],
             ['Handover', route('handover.index'), request()->routeIs('handover.*'), null, 'swap'],
-        ]);
+            ['Stock', route('products.stock'), request()->routeIs('products.stock*'), 'products.view', 'stock'],
+        ])->filter(fn ($p) => $can($p[3]))->values();
     }
     // Orders in their hand to work now (new and record verified): one indexed count, only for who takes orders.
     // (Order management passes its own number in $navInHand.)

@@ -22,6 +22,8 @@
                 <button type="button" @click="run(p, 'picture')" :disabled="busy || !supported" class="h-12 rounded-xl bg-blue-600 text-base font-semibold text-white disabled:opacity-50">{{ __('Print test') }}</button>
                 <button type="button" @click="run(p, 'text')" :disabled="busy || !supported" class="h-12 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 disabled:opacity-50">{{ __('Text only test') }}</button>
             </div>
+            <button type="button" x-show="p.key === 'receipt'" @click="runUsb(p)" :disabled="busy || !usb" class="mt-2 h-12 w-full rounded-xl border-2 border-blue-600 text-sm font-semibold text-blue-700 disabled:opacity-50">{{ __('Print test over USB cable (OTG)') }}</button>
+            <p x-show="p.key === 'receipt' && !usb" x-cloak class="mt-1 text-xs text-gray-500">{{ __('USB printing needs Chrome on Android or a computer.') }}</p>
             <label x-show="p.key === 'sticker'" class="mt-2 flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" x-model="invert"> {{ __('Printed white on black? Tick this and print again.') }}</label>
             <p class="mt-3 whitespace-pre-line rounded-lg px-3 py-2 text-sm" x-show="p.msg" :class="p.ok ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900'" x-text="p.msg"></p>
         </div>
@@ -35,7 +37,7 @@ function printerTest() {
     const SERVICES = [0x18f0, 0xff00, 0xfee7, 0xffe0, 0xae30, 0xfff0, 0xffb0, 0x1101,
         '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '0000ff00-0000-1000-8000-00805f9b34fb'];
     return {
-        supported: !!navigator.bluetooth, busy: false, invert: false,
+        supported: !!navigator.bluetooth, usb: !!navigator.usb, busy: false, invert: false,
         printers: [
             { key: 'sticker', name: 'Sticker printer (Ruyi BT-58TSC)', hint: '51 x 76 mm sticker, TSPL', msg: '', ok: false },
             { key: 'receipt', name: 'Receipt printer (Rongta RP328)', hint: '80 mm roll (76 mm print), ESC/POS', msg: '', ok: false },
@@ -90,6 +92,26 @@ function printerTest() {
             const { bits, row, hDots } = this.picture(576, 220);
             const head = [0x1d, 0x76, 0x30, 0, row & 0xff, row >> 8, hDots & 0xff, hDots >> 8];
             return new Uint8Array([...init, ...head, ...bits, ...feed, ...cut]);
+        },
+        // The receipt printer on a USB (OTG) cable: Chrome talks to it straight, no app (for printers on classic Bluetooth only).
+        async runUsb(p) {
+            this.busy = true; p.msg = 'Choose the printer in the list…'; p.ok = false;
+            try {
+                const d = await navigator.usb.requestDevice({ filters: [] });
+                await d.open();
+                if (d.configuration === null) await d.selectConfiguration(1);
+                let iface = null, ep = null;
+                for (const i of d.configuration.interfaces) for (const a of i.alternates) for (const e of a.endpoints)
+                    if (!ep && e.direction === 'out' && e.type === 'bulk') { iface = i.interfaceNumber; ep = e.endpointNumber; }
+                if (ep === null) throw new Error('Connected to ' + (d.productName || 'the printer') + ', but it has no way to send print data.');
+                await d.claimInterface(iface);
+                await d.transferOut(ep, this.escpos('picture'));
+                p.ok = true; p.msg = 'Sent over USB to ' + (d.productName || 'the printer') + '. Did it print? Send a photo of the paper.';
+                await d.close();
+            } catch (e) {
+                p.msg = e.name === 'NotFoundError' ? 'No printer chosen, or it was not in the list. Is the cable in and the printer on?' : (e.message || String(e));
+            }
+            this.busy = false;
         },
         async run(p, kind) {
             this.busy = true; p.msg = 'Choose the printer in the list…'; p.ok = false;

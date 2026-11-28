@@ -19,8 +19,13 @@ class StockController extends Controller
 {
     public function index(Request $request): View
     {
-        $list = ListState::from($request, ['name', 'stock_qty', 'stock_counted_at'], ['show' => ['all', 'out', 'not_counted', 'low']], 'asc');
-        $show = $list->filter('show') ?? 'all';
+        $list = ListState::from($request, ['name', 'stock_qty', 'stock_counted_at'], ['show' => ['all', 'out', 'in', 'not_counted', 'low']], 'asc');
+        // A packer (sees stock, cannot change it): the simple page, Out of stock first, then In stock.
+        $simple = ! $request->user()->isOwner() && ! $request->user()->can('products.availability');
+        $show = $list->filter('show') ?? ($simple ? 'out' : 'all');
+        if ($simple && ! in_array($show, ['out', 'in'], true)) {
+            $show = 'out';
+        }
         $q = mb_strtolower($list->search);
 
         $variants = ProductVariant::query()
@@ -30,6 +35,7 @@ class StockController extends Controller
             ->when($show === 'low', fn ($w) => $w->where('stock_qty', '>', 0)->where('stock_qty', '<=', 5))
             // Out of stock: counted to 0 or set by hand (the Stock status page's list, here for everyone who sees stock).
             ->when($show === 'out', fn ($w) => $w->where('availability_status', 'out_of_stock'))
+            ->when($show === 'in', fn ($w) => $w->where('availability_status', '<>', 'out_of_stock'))
             ->when($q !== '', fn ($w) => \App\Support\ProductSearch::apply($w, $q))
             ->tap(fn ($w) => $list->applySort($w))
             ->paginate($list->perPage)
@@ -38,9 +44,13 @@ class StockController extends Controller
         $counts = ProductVariant::query()->selectRaw('COUNT(*) as all_n, SUM(CASE WHEN stock_qty IS NULL THEN 1 ELSE 0 END) as not_counted,
             SUM(CASE WHEN stock_qty > 0 AND stock_qty <= 5 THEN 1 ELSE 0 END) as low, SUM(CASE WHEN availability_status = \'out_of_stock\' THEN 1 ELSE 0 END) as out_n')->first();
 
+        if ($simple) {
+            return view('products.stock-simple', compact('variants', 'list', 'show', 'counts'));
+        }
+
         $last = app(StockService::class)->lastChanges($variants->pluck('id')->all());
 
-        return view('products.stock', compact('variants', 'list', 'show', 'counts', 'last'));
+        return view('products.stock',compact('variants', 'list', 'show', 'counts', 'last'));
     }
 
     /** The number counted on the shelf. */

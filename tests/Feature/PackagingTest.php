@@ -742,6 +742,16 @@ class PackagingTest extends TestCase
         $this->assertDatabaseHas('stock_issue_reports', ['reported_by' => $this->packer->id]);
     }
 
+    public function test_a_packer_sees_the_simple_stock_page_out_of_stock_first_then_in_stock(): void
+    {
+        $this->dates->forceFill(['availability_status' => 'out_of_stock'])->save();
+        $this->actingAs($this->packer)->get('/products/stock')->assertOk()->assertSeeInOrder(['Out of stock', 'In stock'])
+            ->assertSee($this->dates->product->name)->assertDontSee('Not counted')->assertDontSee('History');
+        $this->get('/products/stock?show=in')->assertOk()->assertDontSee($this->dates->product->name.' ', false);
+        // Who counts stock keeps the full page.
+        $this->actingAs($this->desk)->get('/products/stock')->assertOk()->assertSee('Stock count')->assertSee('Not counted');
+    }
+
     public function test_counted_stock_goes_down_when_packed_back_up_when_the_box_is_put_back_and_out_at_zero(): void
     {
         // Count Dates on the shelf: 3. Nuts are not counted, so they are not tracked.

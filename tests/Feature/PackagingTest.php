@@ -765,6 +765,17 @@ class PackagingTest extends TestCase
         $this->actingAs($this->desk)->get('/products/stock')->assertOk()->assertSee('Stock count')->assertSee('Not counted');
     }
 
+    public function test_a_packer_who_may_change_stock_taps_a_row_to_turn_it_in_or_out(): void
+    {
+        $this->dates->forceFill(['availability_status' => 'out_of_stock'])->save();
+        $this->actingAs($this->packer)->get('/products/stock')->assertOk()->assertDontSee('Mark in stock'); // look only
+        $keeper = User::factory()->create(['name' => 'Stock keeper']);
+        $keeper->roles()->attach($this->role(['products.availability', 'packaging.view', 'products.view'], [], 'Keeper')->id);
+        $this->actingAs($keeper)->get('/products/stock')->assertOk()->assertSee('Mark in stock')->assertSee('Yes, all sizes');
+        $this->postJson(route('products.availability.update'), ['ids' => [$this->dates->id], 'status' => 'in_stock'])->assertOk()->assertJson(['changed' => 1]);
+        $this->assertSame('in_stock', $this->dates->fresh()->availability_status);
+    }
+
     public function test_counted_stock_goes_down_when_packed_back_up_when_the_box_is_put_back_and_out_at_zero(): void
     {
         // Count Dates on the shelf: 3. Nuts are not counted, so they are not tracked.

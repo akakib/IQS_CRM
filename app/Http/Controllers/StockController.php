@@ -47,7 +47,13 @@ class StockController extends Controller
             SUM(CASE WHEN stock_qty > 0 AND stock_qty <= 5 THEN 1 ELSE 0 END) as low, SUM(CASE WHEN availability_status = \'out_of_stock\' THEN 1 ELSE 0 END) as out_n')->first();
 
         if ($simple) {
-            return view('products.stock-simple', compact('variants', 'list', 'show', 'counts'));
+            // Who may change stock taps a row: In stock <-> Out of stock. The product's other sizes come along
+            // (one query for the page), so the popup can offer all sizes at once.
+            $canChange = $u->can('products.availability');
+            $sizes = $canChange ? ProductVariant::query()->whereIn('product_id', $variants->pluck('product_id')->unique())
+                ->orderBy('sort_order')->orderBy('id')->get(['id', 'product_id', 'name', 'availability_status'])->groupBy('product_id') : collect();
+
+            return view('products.stock-simple', compact('variants', 'list', 'show', 'counts', 'canChange', 'sizes'));
         }
 
         $last = app(StockService::class)->lastChanges($variants->pluck('id')->all());

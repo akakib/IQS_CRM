@@ -127,16 +127,18 @@
 
             @if ($open)
                 {{-- Finish: the question in Bangla, big (owner 2026-11-29, like the packer's Done popup). --}}
+                {{-- Hind Siliguri (owner 2026-11-29): a calmer Bangla face, loaded only on this page. --}}
+                <link rel="stylesheet" href="https://fonts.bunny.net/css?family=hind-siliguri:400,600&display=swap">
                 <div x-data="{ ask: false, bn: n => Number(n).toLocaleString('bn-BD') }">
                     <button type="button" :disabled="!given.length" @click="ask = true" class="mt-4 h-14 w-full rounded-xl bg-green-600 text-lg font-semibold text-white disabled:opacity-40">{{ __('Finish') }}</button>
                     <div x-show="ask" x-cloak class="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 px-4" @click.self="ask = false" @keydown.escape.window="ask = false">
-                        <form method="POST" action="{{ route('handover.close', $session->id) }}" class="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-xl">@csrf
-                            <p class="text-2xl font-bold text-gray-900">হ্যান্ডওভার শেষ</p>
-                            <p class="mt-4 text-xl leading-relaxed text-gray-800"><b class="text-green-700" x-text="bn(given.length) + 'টা'"></b> পার্সেল রাইডার <b>{{ $session->rider_name ?? '' }}</b>-কে দেওয়া হয়েছে।</p>
-                            <p x-show="ready.length" class="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xl leading-relaxed text-amber-900"><b x-text="bn(ready.length) + 'টা'"></b> পার্সেল পরের পিকআপে যাবে।</p>
+                        <form method="POST" action="{{ route('handover.close', $session->id) }}" class="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-xl" style="font-family: 'Hind Siliguri', sans-serif">@csrf
+                            <p class="text-xl font-semibold text-gray-900">হ্যান্ডওভার শেষ</p>
+                            <p class="mt-3 text-lg leading-relaxed text-gray-800"><b class="font-semibold text-green-700" x-text="bn(given.length) + 'টা'"></b> পার্সেল রাইডার <b>{{ $session->rider_name ?? '' }}</b>-কে দেওয়া হয়েছে।</p>
+                            <p x-show="ready.length" class="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-lg leading-relaxed text-amber-900"><b x-text="bn(ready.length) + 'টা'"></b> পার্সেল পরের পিকআপে যাবে।</p>
                             <div class="mt-6 grid grid-cols-2 gap-3">
-                                <button type="button" @click="ask = false" class="h-14 rounded-xl border-2 border-gray-300 text-xl font-semibold text-gray-700">না</button>
-                                <button class="h-14 rounded-xl bg-green-600 text-xl font-semibold text-white">হ্যাঁ, শেষ</button>
+                                <button type="button" @click="ask = false" class="h-12 rounded-xl border-2 border-gray-300 text-lg font-semibold text-gray-700">না</button>
+                                <button class="h-12 rounded-xl bg-green-600 text-lg font-semibold text-white">হ্যাঁ, শেষ</button>
                             </div>
                         </form>
                     </div>

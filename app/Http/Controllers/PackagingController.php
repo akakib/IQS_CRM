@@ -452,7 +452,11 @@ class PackagingController extends Controller
      * One batch on the 80 mm receipt printer: what to take from the shelves (by item), then each order with its
      * items to tick. No customer name or phone: the shop goes by the order no. Prints again the same (lost or torn).
      */
-    public function batchList(int $batch, BatchService $batches): View
+    /**
+     * One batch, ready to print: its orders, and what the phone draws for the sticker printer (each sticker's parts)
+     * and the receipt printer (the list, order by order). Used by the batch page and the print station.
+     */
+    private function batchPrintData(int $batch): array
     {
         $b = DB::table('batches as b')->leftJoin('users as u', 'u.id', '=', 'b.released_by')->where('b.id', $batch)->first(['b.*', 'u.name as by']);
         abort_unless($b, 404);
@@ -460,9 +464,10 @@ class PackagingController extends Controller
             ->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,shelf_code,size_qty,size_unit')
             ->get(['id', 'order_no', 'ship_thana', 'ship_district', 'active_shipment_id', 'packed_at']);
         $cn = DB::table('shipments')->whereIn('id', $orders->pluck('active_shipment_id')->filter())->pluck('consignment_id', 'id');
-        $dayNo = DB::table('batches')->whereDate('created_at', \Illuminate\Support\Carbon::parse($b->created_at)->toDateString())->where('id', '<=', $b->id)->count();
+        $day = \Illuminate\Support\Carbon::parse($b->created_at)->toDateString();
+        $dayNo = DB::table('batches')->whereDate('created_at', $day)->where('id', '<=', $b->id)->count();
+        $todayTotal = DB::table('orders')->whereIn('batch_id', DB::table('batches')->whereDate('created_at', $day)->where('id', '<=', $b->id)->pluck('id'))->count();
 
-        // For printing straight from the phone (Bluetooth sticker printer, USB receipt printer): each sticker's parts.
         $full = DB::table('orders')->whereIn('id', $orders->pluck('id'))->get(['id', 'ship_name', 'ship_address', 'ship_thana', 'ship_district', 'cod_amount'])->keyBy('id');
         $labels = DB::table('shipment_labels')->whereIn('order_id', $orders->pluck('id'))->whereNull('voided_at')->orderBy('id')->get(['order_id', 'barcode', 'cod_on_label'])->keyBy('order_id');
         $stickers = $orders->map(function ($o) use ($full, $labels, $cn, $b) {
@@ -473,11 +478,59 @@ class PackagingController extends Controller
                 'bars' => \App\Support\Barcode\Code128::widths($l->barcode ?? $o->order_no)];
         })->values();
 
+        $at = \Illuminate\Support\Carbon::parse($b->released_at ?? $b->created_at);
+        $pieces = $orders->sum(fn ($o) => $o->items->count());
+        $sizeOf = fn ($it) => ($s = \App\Support\Units::itemSize($it)) && ! str_contains(mb_strtolower(str_replace(' ', '', $it->name_snapshot)), mb_strtolower(str_replace(' ', '', $s))) ? ' '.$s : '';
+        $receipt = [
+            'batch' => $b->batch_no, 'lines' => $pieces + $orders->count(),
+            'head' => [$at->format('d M Y · g:i A').' · '.($b->by ?? '-'),
+                trans_choice(':count order|:count orders', $orders->count(), ['count' => $orders->count()]).' · '.trans_choice(':count item|:count items', $pieces, ['count' => $pieces]).' · '.__('Batch :n of the day', ['n' => $dayNo]),
+                __('Today so far: :n orders', ['n' => $todayTotal])],
+            'orders' => $orders->map(fn ($o) => ['no' => $o->order_no, 'area' => collect([$o->ship_thana, \App\Support\BdDistricts::name($o->ship_district)])->filter()->unique()->join(', ') ?: '-',
+                'cn' => $cn[$o->active_shipment_id] ?? '', 'items' => $o->items->map(fn ($it) => ['name' => $it->name_snapshot.$sizeOf($it), 'qty' => \App\Support\Units::qty($it->qty, $it->unit)])->values()])->values(),
+            'foot' => $b->batch_no.' · '.__('printed :t', ['t' => now()->format('d M, g:i A')]),
+        ];
+
+        return compact('b', 'orders', 'cn', 'dayNo', 'todayTotal', 'stickers', 'receipt');
+    }
+
+    public function batchList(int $batch): View
+    {
+        $d = $this->batchPrintData($batch);
+
         return view('packaging.batch-list', [
-            'stickers' => $stickers, 'store' => (string) settings('store.label_name'),
-            'batch' => $b, 'orders' => $orders, 'cn' => $cn, 'dayNo' => $dayNo,
-            'todayTotal' => DB::table('orders')->whereIn('batch_id', DB::table('batches')->whereDate('created_at', \Illuminate\Support\Carbon::parse($b->created_at)->toDateString())->where('id', '<=', $b->id)->pluck('id'))->count(),
+            'stickers' => $d['stickers'], 'receipt' => $d['receipt'], 'store' => (string) settings('store.label_name'),
+            'batch' => $d['b'], 'orders' => $d['orders'], 'cn' => $d['cn'], 'dayNo' => $d['dayNo'], 'todayTotal' => $d['todayTotal'],
         ]);
+    }
+
+    /**
+     * The print station: one page open all day on the shop's Android phone, printers connected once.
+     * Print next batch makes the batch and prints it here, without leaving the page (a new page drops the printers).
+     */
+    public function printStation(Request $request): View
+    {
+        $user = $request->user();
+
+        return view('packaging.print-station', [
+            'store' => (string) settings('store.label_name'),
+            'next' => app(BatchService::class)->nextUp($user),
+            'recent' => DB::table('batches')->where('created_at', '>=', today())->orderByDesc('id')->limit(10)->get(['id', 'batch_no', 'released_at',
+                DB::raw('(SELECT COUNT(*) FROM orders o WHERE o.batch_id = batches.id) as orders')]),
+        ]);
+    }
+
+    /** The print station's Print next batch (or Print again): the batch's print data as JSON. */
+    public function stationBatch(Request $request, BatchService $batches): JsonResponse
+    {
+        $id = $request->filled('batch') ? (int) $request->input('batch') : $batches->makeNext($request->user());
+        if (! $id) {
+            return response()->json(['ok' => false, 'message' => __('No new order to print.')]);
+        }
+        $d = $this->batchPrintData($id);
+
+        return response()->json(['ok' => true, 'batch' => $d['b']->batch_no, 'id' => $id, 'stickers' => $d['stickers'], 'receipt' => $d['receipt'],
+            'printed' => route('packaging.batch-printed', $id), 'next' => count($batches->nextUp($request->user())['ids'])]);
     }
 
     /** The stickers of a batch were printed straight from the phone: their labels count as printed (Ongoing shows Done). */

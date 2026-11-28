@@ -15,17 +15,15 @@
 
     {{-- Print the next batch of stickers (the oldest orders waiting): on To pack only. --}}
     @if ($nextBatch && $nextBatch['ids'] && $filter === 'all')
-        <form method="POST" action="{{ route('packaging.next-batch') }}" class="mb-3">
-            @csrf
-            {{-- Blue (owner 2026-11-28): a call to act, apart from the green Done; not red, which reads as an error. --}}
-            <button class="lockable flex w-full items-center justify-between gap-3 rounded-2xl bg-blue-600 px-5 py-4 text-left text-white hover:bg-blue-700">
-                <span class="text-lg font-semibold">{{ __('Print next batch') }}</span>
-                <span class="text-sm">{{ __(':n orders', ['n' => count($nextBatch['ids'])]) }}</span>
-            </button>
-        </form>
+        {{-- Blue (owner 2026-11-28): a call to act, apart from the green Done. Printing happens on the print station
+             (one page open all day on the printing phone, printers connected once). --}}
+        <a href="{{ route('packaging.print-station') }}" class="mb-3 flex w-full items-center justify-between gap-3 rounded-2xl bg-blue-600 px-5 py-4 text-left text-white hover:bg-blue-700">
+            <span class="text-lg font-semibold">{{ __('Print next batch') }}</span>
+            <span class="text-sm">{{ __(':n orders', ['n' => count($nextBatch['ids'])]) }}</span>
+        </a>
     @endif
 
-    <a href="{{ route('packaging.printer-test') }}" class="mb-3 block text-right text-sm font-medium text-blue-700 underline">{{ __('Printer test') }}</a>
+    <p class="mb-3 flex justify-end gap-4 text-sm font-medium"><a href="{{ route('packaging.print-station') }}" class="text-blue-700 underline">{{ __('Print station') }}</a><a href="{{ route('packaging.printer-test') }}" class="text-blue-700 underline">{{ __('Printer test') }}</a></p>
 
     {{-- Three tabs: waiting to print, the work in hand (the only place with Done), what is done. --}}
     <div class="mb-3 grid grid-cols-3 gap-1 rounded-2xl bg-gray-200/70 p-1">

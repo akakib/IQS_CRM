@@ -48,15 +48,7 @@
             <a href="#" onclick="window.print(); return false">{{ __('phone print') }}</a> ·
             <a href="{{ route('packaging.labels', ['orders' => $orders->pluck('id')->join(',')]) }}" target="_blank">{{ __('sticker page') }}</a></p>
     </div>
-    @php
-        $receipt = [
-            'batch' => $batch->batch_no, 'lines' => $orders->sum(fn ($o) => $o->items->count() + 1),
-            'head' => [$at->format('d M Y · g:i A').' · '.($batch->by ?? '-'), trans_choice(':count order|:count orders', $orders->count(), ['count' => $orders->count()]).' · '.trans_choice(':count item|:count items', $pieces, ['count' => $pieces]).' · '.__('Batch :n of the day', ['n' => $dayNo]), __('Today so far: :n orders', ['n' => $todayTotal])],
-            'orders' => $orders->map(fn ($o) => ['no' => $o->order_no, 'area' => collect([$o->ship_thana, \App\Support\BdDistricts::name($o->ship_district)])->filter()->unique()->join(', ') ?: '-', 'cn' => $cn[$o->active_shipment_id] ?? '',
-                'items' => $o->items->map(fn ($it) => ['name' => $it->name_snapshot.(($s = \App\Support\Units::itemSize($it)) && ! str_contains(mb_strtolower(str_replace(' ', '', $it->name_snapshot)), mb_strtolower(str_replace(' ', '', $s))) ? ' '.$s : ''), 'qty' => $qty($it->qty, $it->unit)])->values()])->values(),
-            'foot' => $batch->batch_no.' · '.__('printed :t', ['t' => now()->format('d M, g:i A')]),
-        ];
-    @endphp
+    {{-- $receipt comes from PackagingController::batchPrintData (the print station uses the same). --}}
     @include('packaging._direct-print')
     <script>
         async function iqsRun(what) {

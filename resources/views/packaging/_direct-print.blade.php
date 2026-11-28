@@ -80,8 +80,23 @@ window.IqsPrint = (() => {
     async function bleSend(ch, bytes) {
         for (let i = 0; i < bytes.length; i += 180) { const p = bytes.slice(i, i + 180); ch.properties.writeWithoutResponse ? await ch.writeValueWithoutResponse(p) : await ch.writeValue(p); await wait(20); }
     }
+    // Connected once, kept open while the page stays open (no list, no new connect for the next batch).
+    let ble = null, usb = null;
+    async function sticker_(choose) {
+        if (!choose && ble && ble.d.gatt.connected) return ble;
+        ble = await bleDevice(choose);
+        ble.d.addEventListener('gattserverdisconnected', () => { ble = null; window.dispatchEvent(new Event('iqs-printers')); });
+        window.dispatchEvent(new Event('iqs-printers'));
+        return ble;
+    }
+    async function receipt_(choose) {
+        if (!choose && usb && usb.d.opened) return usb;
+        usb = await usbPrinter(choose);
+        window.dispatchEvent(new Event('iqs-printers'));
+        return usb;
+    }
     async function printStickers(list, store, choose, progress) {
-        const { d, ch } = await bleDevice(choose);
+        const { d, ch } = await sticker_(choose);
         for (const [n, s] of list.entries()) {
             progress('Sticker ' + (n + 1) + ' of ' + list.length);
             const b = bits(sticker(s, store)); // TSPL: a 0 bit prints black, so flipped below
@@ -89,14 +104,14 @@ window.IqsPrint = (() => {
             await bleSend(ch, new Uint8Array([...enc.encode('SIZE 51 mm,76 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 0\r\nCLS\r\nBITMAP 0,0,' + b.row + ',' + b.h + ',0,'), ...inv, ...enc.encode('\r\nPRINT 1\r\n')]));
             await wait(400);
         }
-        try { d.gatt.disconnect(); } catch (e) {}
     }
 
     // ── USB receipt printer ──
     async function usbPrinter(choose) {
         const known = await navigator.usb.getDevices();
         const d = known.length && !choose ? known[0] : await navigator.usb.requestDevice({ filters: [] });
-        await d.open(); if (d.configuration === null) await d.selectConfiguration(1);
+        if (!d.opened) await d.open();
+        if (d.configuration === null) await d.selectConfiguration(1);
         let iface = null, ep = null;
         for (const i of d.configuration.interfaces) for (const a of i.alternates) for (const e of a.endpoints) if (ep === null && e.direction === 'out' && e.type === 'bulk') { iface = i.interfaceNumber; ep = e.endpointNumber; }
         if (ep === null) throw new Error('Receipt printer: no way to send.');
@@ -104,7 +119,7 @@ window.IqsPrint = (() => {
     }
     async function printReceipt(r, choose, progress) {
         progress('Receipt');
-        const { d, ep } = await usbPrinter(choose);
+        const { d, ep } = await receipt_(choose);
         const b = bits(receipt(r));
         await d.transferOut(ep, new Uint8Array([0x1b, 0x40]));
         for (let y = 0; y < b.h; y += 200) { // bands, so the printer's memory never overflows
@@ -113,11 +128,15 @@ window.IqsPrint = (() => {
             await wait(30);
         }
         await d.transferOut(ep, new Uint8Array([0x1b, 0x64, 4, 0x1d, 0x56, 0x42, 0]));
-        try { await d.close(); } catch (e) {}
     }
 
     async function marked(url, csrf) { try { await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json' } }); } catch (e) {} }
 
-    return { sticker, receipt, printStickers, printReceipt, marked, ok: { ble: !!navigator.bluetooth, usb: !!navigator.usb } };
+    // The cable printer, if Chrome remembers it: opened on page load, no tap needed.
+    if (navigator.usb) { navigator.usb.getDevices().then(l => { if (l.length) receipt_(false).catch(() => {}); }); navigator.usb.addEventListener('disconnect', () => { usb = null; window.dispatchEvent(new Event('iqs-printers')); }); }
+
+    return { sticker, receipt, printStickers, printReceipt, marked, connectSticker: sticker_, connectReceipt: receipt_,
+        status: () => ({ sticker: !!(ble && ble.d.gatt.connected), stickerName: ble?.d.name || '', receipt: !!(usb && usb.d.opened), receiptName: usb?.d.productName || '' }),
+        ok: { ble: !!navigator.bluetooth, usb: !!navigator.usb } };
 })();
 </script>

@@ -258,6 +258,26 @@ class PackagingTest extends TestCase
         $this->get('/packaging?show=ongoing')->assertSee($a->order_no)->assertSee('Print label'); // its sticker not printed in this test: Print label, then Done
     }
 
+    public function test_the_print_station_makes_the_next_batch_and_gives_its_stickers_and_list_without_leaving_the_page(): void
+    {
+        $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        $this->actingAs($this->packer)->get('/packaging')->assertSee(route('packaging.print-station'), false);
+        $this->get(route('packaging.print-station'))->assertOk()->assertSee('Keep this page open')->assertSee('Print next batch');
+
+        $r = $this->postJson(route('packaging.station-batch'))->assertOk()->assertJsonPath('ok', true)->json();
+        $this->assertCount(1, $r['stickers']);
+        $this->assertSame($a->order_no, $r['stickers'][0]['order_no']);
+        $this->assertNotSame('', $r['stickers'][0]['bars']);
+        $this->assertStringNotContainsString('01811111111', json_encode($r)); // never the phone
+        $this->assertCount(2, $r['receipt']['orders'][0]['items']);
+        $this->postJson($r['printed'])->assertJsonPath('marked', 1);
+        $this->get('/packaging?show=ongoing')->assertSee('Done');
+
+        // Print again: the same batch; nothing left: a clear no.
+        $this->postJson(route('packaging.station-batch'), ['batch' => $r['id']])->assertJsonPath('batch', $r['batch']);
+        $this->postJson(route('packaging.station-batch'))->assertJsonPath('ok', false);
+    }
+
     public function test_a_packers_bottom_bar_is_packaging_and_handover_only(): void
     {
         $bar = fn ($html) => \Illuminate\Support\Str::between($html, 'app-bottom-nav', '</nav>');

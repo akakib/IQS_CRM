@@ -274,6 +274,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/packaging/release', [PackagingController::class, 'release'])->name('packaging.release');
         Route::post('/packaging/batches/next', [PackagingController::class, 'nextBatch'])->name('packaging.next-batch');
         Route::post('/packaging/batches/{batch}/printed', [PackagingController::class, 'batchPrinted'])->whereNumber('batch')->name('packaging.batch-printed');
+        Route::get('/packaging/print-station', [PackagingController::class, 'printStation'])->name('packaging.print-station');
+        Route::post('/packaging/print-station/batch', [PackagingController::class, 'stationBatch'])->name('packaging.station-batch');
         Route::post('/packaging/orders/{order}/mark/{mark}', [PackagingController::class, 'mark'])->whereIn('mark', ['packed', 'label'])->name('packaging.mark');
         Route::post('/packaging/orders/{order}/undo-ask', [PackagingController::class, 'undoAsk'])->name('packaging.undo-ask');
         Route::post('/packaging/orders/{order}/done', [PackagingController::class, 'markDone'])->name('packaging.mark-done');

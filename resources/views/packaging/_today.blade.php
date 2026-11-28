@@ -5,7 +5,12 @@
     $statusMap = \App\Models\OrderStatus::map();
     $canTick = auth()->user()->can('packaging.create');
     $t = $sheet['totals'];
-    $size = fn ($i) => \App\Support\Units::itemSize((object) ['unit' => $i->unit, 'variant' => (object) ['size_qty' => $i->size_qty, 'size_unit' => $i->size_unit]]);
+    // The pack size, unless the name already says it ("Mix Chocolate 500g" stays as it is).
+    $size = function ($i) {
+        $s = \App\Support\Units::itemSize((object) ['unit' => $i->unit, 'variant' => (object) ['size_qty' => $i->size_qty, 'size_unit' => $i->size_unit]]);
+
+        return $s && ! str_contains(mb_strtolower(str_replace(' ', '', $i->name_snapshot)), mb_strtolower(str_replace(' ', '', $s))) ? $s : null;
+    };
     $at = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('g:i A') : '';
 @endphp
 

@@ -63,7 +63,7 @@
                 <div class="top"><span>{{ $o->order_no }}</span><span>{{ $i + 1 }}/{{ $orders->count() }}</span></div>
                 <div class="area">{{ collect([$o->ship_thana, \App\Support\BdDistricts::name($o->ship_district)])->filter()->unique()->join(', ') ?: '-' }}@if ($cn[$o->active_shipment_id] ?? null) · CN {{ $cn[$o->active_shipment_id] }}@endif</div>
                 @foreach ($o->items as $it)
-                    <div class="row"><span class="n"><span class="box"></span>{{ $it->name_snapshot }}{{ ($s = \App\Support\Units::itemSize($it)) ? ' '.$s : '' }}</span><span class="q">{{ $qty($it->qty, $it->unit) }}</span></div>
+                    <div class="row"><span class="n"><span class="box"></span>{{ $it->name_snapshot }}{{ ($s = \App\Support\Units::itemSize($it)) && ! str_contains(mb_strtolower(str_replace(' ', '', $it->name_snapshot)), mb_strtolower(str_replace(' ', '', $s))) ? ' '.$s : '' }}</span><span class="q">{{ $qty($it->qty, $it->unit) }}</span></div>
                 @endforeach
             </div>
         @endforeach

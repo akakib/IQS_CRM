@@ -22,6 +22,8 @@
                 <button type="button" @click="run(p, 'picture')" :disabled="busy || !supported" class="h-12 rounded-xl bg-blue-600 text-base font-semibold text-white disabled:opacity-50">{{ __('Print test') }}</button>
                 <button type="button" @click="run(p, 'text')" :disabled="busy || !supported" class="h-12 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 disabled:opacity-50">{{ __('Text only test') }}</button>
             </div>
+            <button type="button" x-show="p.key === 'receipt'" @click="runUsb(p)" :disabled="busy || !usb" class="mt-2 h-12 w-full rounded-xl border-2 border-blue-600 text-sm font-semibold text-blue-700 disabled:opacity-50">{{ __('Print test over USB cable (OTG)') }}</button>
+            <p x-show="p.key === 'receipt' && !usb" x-cloak class="mt-1 text-xs text-gray-500">{{ __('USB printing needs Chrome on Android or a computer.') }}</p>
             <label x-show="p.key === 'sticker'" class="mt-2 flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" x-model="invert"> {{ __('Printed white on black? Tick this and print again.') }}</label>
             <p class="mt-3 whitespace-pre-line rounded-lg px-3 py-2 text-sm" x-show="p.msg" :class="p.ok ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900'" x-text="p.msg"></p>
         </div>
@@ -120,6 +122,7 @@ function printerTest() {
             return new Uint8Array([...init, ...head, ...bits, ...feed, ...cut]);
         },
         // The receipt printer on a USB (OTG) cable: Chrome talks to it straight, no app (for printers on classic Bluetooth only).
+        async runUsb(p) {
             this.busy = true; p.msg = 'Choose the printer in the list…'; p.ok = false;
             try {
                 const d = await navigator.usb.requestDevice({ filters: [] });

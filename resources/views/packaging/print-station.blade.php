@@ -95,11 +95,11 @@ function station() {
             } catch (e) { this.fail(e); }
             this.st = IqsPrint.status(); this.busy = false;
         },
-        // PDF mode: hold the batch, then each tap saves one file (labels mark the batch's labels printed, as a print does).
+        // PDF mode: hold the batch, then each tap saves one file. Saving does not mark the labels printed (only a real print does).
         keep(b) { this.ready = { batch: b.batch, labels: b.stickers, list: b.receipt, printed: b.printed }; this.say(b.batch + ': ' + @js(__('ready. Tap Labels PDF and List PDF to save them.'))); },
         savePdf(what) {
             const r = this.ready; if (!r) return;
-            if (what === 'labels') { IqsPrint.marked(r.printed, csrf); IqsPrint.labelsPdf(r.labels, store, r.batch + '-labels.pdf'); } // the mark goes first
+            if (what === 'labels') IqsPrint.labelsPdf(r.labels, store, r.batch + '-labels.pdf'); // a saved PDF is not a printed label: no mark
             else IqsPrint.listPdf(r.list, r.batch + '-list.pdf');
         },
         async again(id, what) {

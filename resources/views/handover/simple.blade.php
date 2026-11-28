@@ -59,7 +59,7 @@
                         } }">
                     <button type="button" x-show="canPrint" :disabled="busy" @click="print()" class="flex h-14 w-full items-center justify-center rounded-xl bg-primary text-base font-semibold text-white disabled:opacity-50">{{ __('Print slip') }}</button>
                     <button type="button" @click="IqsPrint.slipPdf(@js($slip), @js('handover-'.$session->id.'.pdf'))" :class="canPrint ? 'border-2 border-primary bg-white text-primary' : 'bg-primary text-white'" class="flex h-12 w-full items-center justify-center rounded-xl text-base font-semibold">{{ __('Slip PDF') }}</button>
-                    <a href="{{ route('handover.print', $session->id) }}" target="_blank" class="flex h-12 w-full items-center justify-center rounded-xl border border-gray-300 bg-white text-base font-medium text-gray-700">{{ __('A4 print') }}</a>
+                    <a href="{{ route('handover.manifest', $session->id) }}" class="flex h-12 w-full items-center justify-center rounded-xl border border-gray-300 bg-white text-base font-medium text-gray-700">{{ __('A4 print') }}</a>
                     <p x-show="msg" x-text="msg" class="text-center text-sm font-medium" :class="bad ? 'text-red-700' : 'text-green-800'"></p>
                 </div>
             @endif

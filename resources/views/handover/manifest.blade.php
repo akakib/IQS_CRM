@@ -23,7 +23,7 @@
         <thead><tr><th>#</th><th>{{ __('Order') }}</th><th>CN</th><th>{{ __('Customer') }}</th><th>{{ __('Area') }}</th><th class="n">{{ __('COD') }}</th></tr></thead>
         <tbody>
             @foreach ($handed as $i => $h)
-                <tr><td>{{ $i + 1 }}</td><td>{{ $h->order_no }}{{ $h->manual ? ' *' : '' }}</td><td>{{ $h->consignment_id }}</td><td>{{ $h->ship_name }}</td><td>{{ $h->ship_thana }}</td><td class="n">৳{{ number_format((float) $h->cod_amount) }}</td></tr>
+                <tr><td>{{ $i + 1 }}</td><td>{{ $h->order_no }}{{ $h->manual ? ' *' : '' }}</td><td>{{ $h->consignment_id }}</td><td>{{ $h->ship_name }}</td><td>{{ collect([$h->ship_thana, $h->ship_district])->filter()->join(', ') }}</td><td class="n">৳{{ number_format((float) $h->cod_amount) }}</td></tr>
             @endforeach
             <tr><th colspan="5">{{ __('Total: :n parcels', ['n' => $handed->count()]) }}</th><th class="n">৳{{ number_format((float) $handed->sum('cod_amount')) }}</th></tr>
         </tbody>

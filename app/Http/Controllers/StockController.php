@@ -36,15 +36,17 @@ class StockController extends Controller
             ->when($show === 'not_counted', fn ($w) => $w->whereNull('stock_qty'))
             ->when($show === 'low', fn ($w) => $w->where('stock_qty', '>', 0)->where('stock_qty', '<=', 5))
             // Out of stock: counted to 0 or set by hand (the Stock status page's list, here for everyone who sees stock).
-            ->when($show === 'out', fn ($w) => $w->where('availability_status', 'out_of_stock'))
-            ->when($show === 'in', fn ($w) => $w->where('availability_status', '<>', 'out_of_stock'))
+            // Packer's page: Out of stock = not on the shelf, so Pre-order is here too (first: it is coming); In stock = on the shelf.
+            ->when($show === 'out', fn ($w) => $simple ? $w->whereIn('availability_status', ['out_of_stock', 'backorder'])->orderByRaw("availability_status = 'backorder' DESC") : $w->where('availability_status', 'out_of_stock'))
+            ->when($show === 'in', fn ($w) => $simple ? $w->where('availability_status', 'in_stock') : $w->where('availability_status', '<>', 'out_of_stock'))
             ->when($q !== '', fn ($w) => \App\Support\ProductSearch::apply($w, $q))
             ->tap(fn ($w) => $list->applySort($w))
             ->paginate($list->perPage)
             ->withQueryString();
 
         $counts = ProductVariant::query()->selectRaw('COUNT(*) as all_n, SUM(CASE WHEN stock_qty IS NULL THEN 1 ELSE 0 END) as not_counted,
-            SUM(CASE WHEN stock_qty > 0 AND stock_qty <= 5 THEN 1 ELSE 0 END) as low, SUM(CASE WHEN availability_status = \'out_of_stock\' THEN 1 ELSE 0 END) as out_n')->first();
+            SUM(CASE WHEN stock_qty > 0 AND stock_qty <= 5 THEN 1 ELSE 0 END) as low, SUM(CASE WHEN availability_status = \'out_of_stock\' THEN 1 ELSE 0 END) as out_n,
+            SUM(CASE WHEN availability_status = \'backorder\' THEN 1 ELSE 0 END) as pre_n')->first();
 
         if ($simple) {
             // Who may change stock taps a row: In stock <-> Out of stock. The product's other sizes come along

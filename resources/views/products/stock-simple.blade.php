@@ -3,11 +3,12 @@
      (in stock -> out of stock, out -> in); a product with more sizes lists them and asks: all sizes, or only this one. --}}
 @php
     $tab = fn (string $key) => request()->fullUrlWithQuery(['show' => $key, 'page' => null]);
-    $in = (int) $counts->all_n - (int) $counts->out_n;
+    $out = (int) $counts->out_n + (int) $counts->pre_n; // Pre-order is not on the shelf either
+    $in = (int) $counts->all_n - $out;
 @endphp
 <x-layouts.app :heading="__('Stock')">
     <div class="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-gray-200/70 p-1">
-        <a href="{{ $tab('out') }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-red-700 shadow-sm' => $show === 'out', 'text-gray-600' => $show !== 'out'])>{{ __('Out of stock') }}<br><b class="tabular-nums">{{ (int) $counts->out_n }}</b></a>
+        <a href="{{ $tab('out') }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-red-700 shadow-sm' => $show === 'out', 'text-gray-600' => $show !== 'out'])>{{ __('Out of stock') }}<br><b class="tabular-nums">{{ $out }}</b></a>
         <a href="{{ $tab('in') }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-green-700 shadow-sm' => $show === 'in', 'text-gray-600' => $show !== 'in'])>{{ __('In stock') }}<br><b class="tabular-nums">{{ $in }}</b></a>
     </div>
 
@@ -38,13 +39,13 @@
                     $all = $canChange ? ($sizes[$v->product_id] ?? collect()) : collect();
                 @endphp
                 <{{ $canChange ? 'button type=button' : 'div' }} @if ($canChange)
-                    @click="pick = { id: {{ $v->id }}, name: @js($v->product->name ?? '-'), size: @js($size($v->name)), out: @js($v->availability_status === 'out_of_stock'),
-                        sizes: @js($all->map(fn ($x) => ['id' => $x->id, 'name' => $size($x->name) ?: '-', 'out' => $x->availability_status === 'out_of_stock'])->values()) }; error = ''"
+                    @click="pick = { id: {{ $v->id }}, name: @js($v->product->name ?? '-'), size: @js($size($v->name)), out: @js($v->availability_status !== 'in_stock'), pre: @js($v->availability_status === 'backorder'),
+                        sizes: @js($all->map(fn ($x) => ['id' => $x->id, 'name' => $size($x->name) ?: '-', 'out' => $x->availability_status !== 'in_stock', 'pre' => $x->availability_status === 'backorder'])->values()) }; error = ''"
                     @endif class="flex w-full items-center gap-3 px-3 py-2.5 text-left">
                     <x-product-thumb :src="$v->product?->image_url" size="lg" />
                     <div class="min-w-0 flex-1">
                         <p class="text-base font-medium leading-snug text-gray-900">{{ $v->product->name ?? '-' }}@if ($v->name && $v->name !== 'Default') <b class="font-semibold">· {{ $v->name }}</b>@endif</p>
-                        @if ($v->availability_status === 'backorder')<p class="text-sm font-medium text-amber-700">{{ __('Pre-order') }}</p>@endif
+                        @if ($v->availability_status === 'backorder')<span class="mt-0.5 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-sm font-semibold text-amber-800">{{ __('Pre-order') }}</span>@endif
                     </div>
                     @if ($show === 'in' && $v->stock_qty !== null)
                         <span class="shrink-0 text-right text-sm text-gray-500"><b class="block text-lg tabular-nums text-gray-900">{{ (int) $v->stock_qty }}</b>{{ __('left') }}</span>
@@ -57,7 +58,7 @@
                 <div x-show="pick" x-cloak class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" @click.self="busy || (pick = null)" @keydown.escape.window="busy || (pick = null)">
                     <div class="w-full max-w-md rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-2xl">
                         <p class="text-lg font-semibold text-gray-900"><span x-text="pick?.name"></span> <b x-show="pick?.size" x-text="'· ' + pick?.size"></b></p>
-                        <p class="mt-1 text-sm" :class="pick?.out ? 'text-red-700' : 'text-green-700'" x-text="pick?.out ? @js(__('Now: Out of stock')) : @js(__('Now: In stock'))"></p>
+                        <p class="mt-1 text-sm" :class="pick?.pre ? 'text-amber-700' : (pick?.out ? 'text-red-700' : 'text-green-700')" x-text="pick?.pre ? @js(__('Now: Pre-order')) : (pick?.out ? @js(__('Now: Out of stock')) : @js(__('Now: In stock')))"></p>
 
                         <template x-if="pick && pick.sizes.length > 1">
                             <div class="mt-3">
@@ -65,7 +66,7 @@
                                     <template x-for="z in pick.sizes" :key="z.id">
                                         <div class="flex items-center justify-between px-3 py-2 text-base" :class="z.id === pick.id && 'bg-gray-50 font-semibold'">
                                             <span x-text="z.name"></span>
-                                            <span class="text-sm font-medium" :class="z.out ? 'text-red-700' : 'text-green-700'" x-text="z.out ? @js(__('Out of stock')) : @js(__('In stock'))"></span>
+                                            <span class="text-sm font-medium" :class="z.pre ? 'text-amber-700' : (z.out ? 'text-red-700' : 'text-green-700')" x-text="z.pre ? @js(__('Pre-order')) : (z.out ? @js(__('Out of stock')) : @js(__('In stock')))"></span>
                                         </div>
                                     </template>
                                 </div>

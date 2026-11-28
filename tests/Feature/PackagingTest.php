@@ -774,6 +774,10 @@ class PackagingTest extends TestCase
         $this->actingAs($keeper)->get('/products/stock')->assertOk()->assertSee('Mark in stock')->assertSee('Yes, all sizes');
         $this->postJson(route('products.availability.update'), ['ids' => [$this->dates->id], 'status' => 'in_stock'])->assertOk()->assertJson(['changed' => 1]);
         $this->assertSame('in_stock', $this->dates->fresh()->availability_status);
+        // Pre-order is not on the shelf: the packer sees it under Out of stock, first.
+        $this->dates->forceFill(['availability_status' => 'backorder'])->save();
+        $this->get('/products/stock?show=out')->assertSee('Pre-order')->assertSee($this->dates->product->name);
+        $this->get('/products/stock?show=in')->assertDontSee($this->dates->product->name.' ', false);
     }
 
     public function test_counted_stock_goes_down_when_packed_back_up_when_the_box_is_put_back_and_out_at_zero(): void

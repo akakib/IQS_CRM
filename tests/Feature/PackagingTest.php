@@ -238,6 +238,26 @@ class PackagingTest extends TestCase
             ->assertDontSee('BD-10')->assertDontSee('01712-345678')->assertDontSee('01811111111')->assertDontSee('Iqbal Store');
     }
 
+    public function test_a_packer_holds_from_ongoing_it_leaves_their_lists_and_comes_back_to_ongoing(): void
+    {
+        \Illuminate\Support\Facades\Artisan::call('notifications:sync');
+        $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $this->actingAs($this->packer)->post(route('packaging.next-batch'));
+        $this->get('/packaging')->assertSee($a->order_no)->assertSee('Put on hold')->assertSee('Item not found while packaging')->assertDontSee('Waiting for advance payment');
+
+        // Hold with a reason, no scan needed: on hold, out of Ongoing and To pack, the moderator and managers told.
+        $reason = DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'item_not_found')->value('id');
+        $this->post(route('packaging.hold', $a->id), ['reason_id' => $reason, 'note' => 'Dates not on the shelf'])->assertSessionHasNoErrors();
+        $this->assertSame('hold', $this->key($a));
+        $this->get('/packaging?show=ongoing')->assertSee('Nothing in hand.');
+        $this->get('/packaging?show=all')->assertDontSee($a->order_no.'</span>', false);
+        $this->assertDatabaseHas('app_notifications', ['title' => $a->order_no.' held by packer Packer']);
+
+        // Sent back to packaging: Ongoing again (its sticker is printed, its batch kept).
+        app(OrderStateMachine::class)->transition($a->fresh(), 'ready_for_packaging', $this->desk);
+        $this->get('/packaging?show=ongoing')->assertSee($a->order_no)->assertSee('Print label'); // its sticker not printed in this test: Print label, then Done
+    }
+
     public function test_a_packers_bottom_bar_is_packaging_and_handover_only(): void
     {
         $bar = fn ($html) => \Illuminate\Support\Str::between($html, 'app-bottom-nav', '</nav>');
@@ -355,7 +375,12 @@ class PackagingTest extends TestCase
     {
         $order = $this->booked('01712345641', [['variant_id' => $this->dates->id, 'qty' => 1]]);
         $reason = DB::table('status_reasons')->where('reason_type', 'hold')->value('id');
+        // Another packer is on it: not theirs to hold (one nobody took, any packer may hold: the packer page needs no scan).
+        $other = User::factory()->create();
+        $other->roles()->attach(DB::table('roles')->where('system_key', 'packaging')->value('id'));
+        DB::table('orders')->where('id', $order->id)->update(['packer_id' => $other->id]);
         $this->actingAs($this->packer)->post("/packaging/orders/{$order->id}/hold", ['reason_id' => $reason])->assertSessionHasErrors('order');
+        DB::table('orders')->where('id', $order->id)->update(['packer_id' => null]);
         $this->assertSame('ready_for_packaging', $this->key($order->fresh()));
 
         $confirmed = app(OrderService::class)->create(['channel' => 'messenger', 'phone' => '01712345642', 'name' => 'Karim', 'address_line' => 'Road 1', 'items' => [['variant_id' => $this->dates->id, 'qty' => 1]]], $this->desk);

@@ -11,7 +11,7 @@
 @endphp
 
 <x-layouts.app :heading="__('Packaging')">
-<div class="mx-auto max-w-2xl" x-data="{ pop: null }" @keydown.escape.window="pop = null">
+<div class="mx-auto max-w-2xl" x-data="{ pop: null, hold: null }" @keydown.escape.window="pop = null; hold = null">
 
     {{-- Print the next batch of stickers (the oldest orders waiting): on To pack only. --}}
     @if ($nextBatch && $nextBatch['ids'] && $filter === 'all')
@@ -101,6 +101,10 @@
                             <button type="button" @click="pop = { no: @js($o->order_no), label: @js($label->barcode), items: @js($popItems), url: @js(route('packaging.mark-done', $o->id)), repack: @js($repack) }"
                                 @class(['lockable flex h-12 w-full items-center justify-center rounded-xl text-base font-semibold text-white', 'bg-red-600 hover:bg-red-700' => $repack, 'bg-primary hover:bg-primary-dark' => ! $repack])>{{ $repack ? __('Repack done') : __('Done') }}</button>
                         @endif
+                        @if ($filter === 'ongoing')
+                            {{-- A problem (item missing, damaged): Hold with a reason. It leaves the packer's lists; the moderator and managers are told and send it back. --}}
+                            <button type="button" @click="hold = { no: @js($o->order_no), url: @js(route('packaging.hold', $o->id)) }" class="mt-2 h-10 w-full rounded-xl border border-amber-400 bg-white text-sm font-semibold text-amber-800">{{ __('Hold') }}</button>
+                        @endif
                     </div>
                 </div>
             @empty
@@ -109,6 +113,29 @@
         </div>
         <div class="mt-4">{{ $queue->links() }}</div>
     @endif
+
+    {{-- Hold: why (one tap), a note if needed. --}}
+    <div x-show="hold" x-cloak class="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
+        <div class="absolute inset-0" @click="hold = null"></div>
+        <form method="POST" :action="hold?.url" class="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl" x-data="{ reason: null }">
+            @csrf
+            <p class="font-mono text-2xl font-bold text-gray-900" x-text="hold?.no"></p>
+            <p class="mt-1 text-sm text-gray-600">{{ __('Why can it not be packed?') }}</p>
+            <div class="mt-3 grid gap-2">
+                @foreach ($holdReasons as $id => $label)
+                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-base" :class="reason == {{ $id }} ? 'border-amber-500 bg-amber-50 font-semibold text-amber-900' : 'border-gray-200 text-gray-800'">
+                        <input type="radio" name="reason_id" value="{{ $id }}" x-model="reason" class="h-5 w-5 text-amber-600" required> {{ __($label) }}
+                    </label>
+                @endforeach
+            </div>
+            <input name="note" maxlength="255" placeholder="{{ __('Note (optional)') }}" class="mt-3 h-11 w-full rounded-xl border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none">
+            <p class="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">{{ __('Set the box aside with its sticker. Do not send it.') }}</p>
+            <div class="mt-4 grid grid-cols-2 gap-2">
+                <button type="button" @click="hold = null" class="h-12 rounded-xl border border-gray-300 text-base text-gray-700">{{ __('Cancel') }}</button>
+                <button :disabled="!reason" class="lockable h-12 rounded-xl bg-amber-600 text-base font-semibold text-white disabled:opacity-50">{{ __('Put on hold') }}</button>
+            </div>
+        </form>
+    </div>
 
     {{-- Done: the items to see and the label to match, one yes. --}}
     <div x-show="pop" x-cloak class="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 sm:items-center sm:p-4">

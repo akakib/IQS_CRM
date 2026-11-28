@@ -175,6 +175,9 @@ class PackagingController extends Controller
                     ->whereIn('i.order_id', $ids)->orderBy('i.id')->get(['i.order_id', 'i.name_snapshot', 'i.qty', 'i.unit', 'v.size_qty', 'v.size_unit', 'pr.image_url'])->groupBy('order_id'),
                 'labels' => $ids->isEmpty() ? collect() : DB::table('shipment_labels')->whereIn('order_id', $ids)->whereNull('voided_at')->orderBy('id')->get(['order_id', 'barcode', 'printed_at', 'order_version'])->keyBy('order_id'),
                 'versions' => $ids->isEmpty() ? collect() : DB::table('orders')->whereIn('id', $ids)->get(['id', 'label_version', 'current_version', 'cod_amount'])->keyBy('id'),
+                // A packer's reasons only (not the moderator's: advance, a date, the customer waits).
+                'holdReasons' => DB::table('status_reasons')->where('reason_type', 'hold')->where('is_active', true)
+                    ->whereIn('system_key', ['item_not_found', 'item_damaged', 'stock_out'])->orderBy('sort_order')->pluck('label_en', 'id')->all() ?: StatusReason::options('hold'),
             ]);
         }
 

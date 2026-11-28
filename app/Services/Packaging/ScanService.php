@@ -159,8 +159,9 @@ class ScanService
         if (! in_array($order->status_id, LabelPrinter::queueStatuses(), true)) {
             throw ValidationException::withMessages(['order' => __('Only an order in packaging can be held here.')]);
         }
-        if ((int) $order->packer_id !== $by->id && ! $by->can('packaging.manage')) {
-            throw ValidationException::withMessages(['order' => __('Scan the label first: only the packer holding the order can put it on hold.')]);
+        // Anyone packing may hold an order nobody has taken (the packer page needs no scan); one another packer holds is theirs.
+        if ($order->packer_id && (int) $order->packer_id !== $by->id && ! $by->can('packaging.manage')) {
+            throw ValidationException::withMessages(['order' => __('Another packer is on this order: only they can put it on hold.')]);
         }
         $this->machine->transition($order, 'hold', $by, 'scan', $reasonId, $note);
         $order->forceFill(['packer_id' => null, 'packaging_started_at' => null])->save();

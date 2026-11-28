@@ -24,6 +24,7 @@
             </div>
             <button type="button" x-show="p.key === 'receipt'" @click="runUsb(p)" :disabled="busy || !usb" class="mt-2 h-12 w-full rounded-xl border-2 border-blue-600 text-sm font-semibold text-blue-700 disabled:opacity-50">{{ __('Print test over USB cable (OTG)') }}</button>
             <p x-show="p.key === 'receipt' && !usb" x-cloak class="mt-1 text-xs text-gray-500">{{ __('USB printing needs Chrome on Android or a computer.') }}</p>
+            <label class="mt-2 flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" x-model="choose"> {{ __('Choose the printer again (a new or another printer)') }}</label>
             <label x-show="p.key === 'sticker'" class="mt-2 flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" x-model="invert"> {{ __('Printed white on black? Tick this and print again.') }}</label>
             <p class="mt-3 whitespace-pre-line rounded-lg px-3 py-2 text-sm" x-show="p.msg" :class="p.ok ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900'" x-text="p.msg"></p>
         </div>
@@ -37,13 +38,20 @@ function printerTest() {
     // Receipt printers (Rongta and the like) mostly use the first two; label printers the short ones.
     const SERVICES = ['49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', 0x18f0, 0xff00, 0xfee7, 0xffe0, 0xae30, 0xfff0, 0xffb0];
     return {
-        supported: !!navigator.bluetooth, usb: !!navigator.usb, busy: false, invert: false, step: '',
+        supported: !!navigator.bluetooth, usb: !!navigator.usb, busy: false, invert: false, step: '', choose: false, current: '',
         printers: [
             { key: 'sticker', name: 'Sticker printer (Ruyi BT-58TSC)', hint: '51 x 76 mm sticker, TSPL', msg: '', ok: false },
             { key: 'receipt', name: 'Receipt printer (Rongta RP328)', hint: '80 mm roll (76 mm print), ESC/POS', msg: '', ok: false },
         ],
         async writer() {
-            const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICES });
+            // The printer chosen once is remembered (when Chrome allows it): no list the next time.
+            let device = null;
+            if (!this.choose && navigator.bluetooth.getDevices) {
+                const name = localStorage.getItem('iqs.btPrinter.' + this.current);
+                device = (await navigator.bluetooth.getDevices()).find(d => d.name && d.name === name) || null;
+            }
+            if (!device) device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICES });
+            try { localStorage.setItem('iqs.btPrinter.' + this.current, device.name || ''); } catch (e) {}
             // Android often drops the first link ("GATT Error Unknown"): try three times, a short wait each, and let the printer settle.
             let server = null, last = null;
             for (let t = 1; t <= 3 && !server; t++) {
@@ -125,7 +133,9 @@ function printerTest() {
         async runUsb(p) {
             this.busy = true; p.msg = 'Choose the printer in the list…'; p.ok = false;
             try {
-                const d = await navigator.usb.requestDevice({ filters: [] });
+                // The printer chosen once is remembered: Chrome gives it back with no list (the cable stays in).
+                const known = await navigator.usb.getDevices();
+                const d = known.length && !this.choose ? known[0] : await navigator.usb.requestDevice({ filters: [] });
                 await d.open();
                 if (d.configuration === null) await d.selectConfiguration(1);
                 let iface = null, ep = null;
@@ -142,6 +152,7 @@ function printerTest() {
             this.busy = false;
         },
         async run(p, kind) {
+            this.current = p.key;
             this.busy = true; p.msg = 'Choose the printer in the list…'; p.ok = false;
             try {
                 this.step = 'choosing';

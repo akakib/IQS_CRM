@@ -1,9 +1,9 @@
 @php
     $tabs = [
         'all' => [__('All'), request()->fullUrlWithQuery(['show' => 'all', 'page' => null]), (int) $counts->all_n],
+        'out' => [__('Out of stock'), request()->fullUrlWithQuery(['show' => 'out', 'page' => null]), (int) $counts->out_n],
         'not_counted' => [__('Not counted yet'), request()->fullUrlWithQuery(['show' => 'not_counted', 'page' => null]), (int) $counts->not_counted],
         'low' => [__('Low (1 to 5)'), request()->fullUrlWithQuery(['show' => 'low', 'page' => null]), (int) $counts->low],
-        'zero' => [__('None left'), request()->fullUrlWithQuery(['show' => 'zero', 'page' => null]), (int) $counts->zero],
     ];
     $canCount = auth()->user()->can('products.availability');
     $color = ['in_stock' => 'green', 'backorder' => 'amber', 'out_of_stock' => 'red'];

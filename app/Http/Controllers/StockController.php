@@ -19,7 +19,7 @@ class StockController extends Controller
 {
     public function index(Request $request): View
     {
-        $list = ListState::from($request, ['name', 'stock_qty', 'stock_counted_at'], ['show' => ['all', 'not_counted', 'low', 'zero']], 'asc');
+        $list = ListState::from($request, ['name', 'stock_qty', 'stock_counted_at'], ['show' => ['all', 'out', 'not_counted', 'low']], 'asc');
         $show = $list->filter('show') ?? 'all';
         $q = mb_strtolower($list->search);
 
@@ -28,14 +28,15 @@ class StockController extends Controller
             ->with('product:id,name,image_url')
             ->when($show === 'not_counted', fn ($w) => $w->whereNull('stock_qty'))
             ->when($show === 'low', fn ($w) => $w->where('stock_qty', '>', 0)->where('stock_qty', '<=', 5))
-            ->when($show === 'zero', fn ($w) => $w->where('stock_qty', '<=', 0))
+            // Out of stock: counted to 0 or set by hand (the Stock status page's list, here for everyone who sees stock).
+            ->when($show === 'out', fn ($w) => $w->where('availability_status', 'out_of_stock'))
             ->when($q !== '', fn ($w) => \App\Support\ProductSearch::apply($w, $q))
             ->tap(fn ($w) => $list->applySort($w))
             ->paginate($list->perPage)
             ->withQueryString();
 
         $counts = ProductVariant::query()->selectRaw('COUNT(*) as all_n, SUM(CASE WHEN stock_qty IS NULL THEN 1 ELSE 0 END) as not_counted,
-            SUM(CASE WHEN stock_qty > 0 AND stock_qty <= 5 THEN 1 ELSE 0 END) as low, SUM(CASE WHEN stock_qty <= 0 THEN 1 ELSE 0 END) as zero')->first();
+            SUM(CASE WHEN stock_qty > 0 AND stock_qty <= 5 THEN 1 ELSE 0 END) as low, SUM(CASE WHEN availability_status = \'out_of_stock\' THEN 1 ELSE 0 END) as out_n')->first();
 
         $last = app(StockService::class)->lastChanges($variants->pluck('id')->all());
 

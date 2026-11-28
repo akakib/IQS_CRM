@@ -127,11 +127,11 @@
 
             @if ($open)
                 {{-- Finish: the question in Bangla, big (owner 2026-11-29, like the packer's Done popup). --}}
-                <div x-data="{ ask: false, bn: n => Number(n).toLocaleString('bn-BD') }">
+                <div x-data="{ ask: false, bn: n => String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]) }">
                     <button type="button" :disabled="!given.length" @click="ask = true" class="mt-4 h-14 w-full rounded-xl bg-green-600 text-lg font-semibold text-white disabled:opacity-40">{{ __('Finish') }}</button>
                     <div x-show="ask" x-cloak class="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 px-4" @click.self="ask = false" @keydown.escape.window="ask = false">
                         <form method="POST" action="{{ route('handover.close', $session->id) }}" class="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-xl">@csrf
-                            <p class="text-xl font-semibold text-gray-900">হ্যান্ডওভার শেষ</p>
+                            <p class="text-xl font-semibold text-gray-900">হ্যান্ডওভার শেষ?</p>
                             <p class="mt-3 text-lg leading-relaxed text-gray-800"><b class="font-semibold text-green-700" x-text="bn(given.length) + 'টা'"></b> পার্সেল রাইডার <b>{{ $session->rider_name ?? '' }}</b>-কে দেওয়া হয়েছে।</p>
                             <p x-show="ready.length" class="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-lg leading-relaxed text-amber-900"><b x-text="bn(ready.length) + 'টা'"></b> পার্সেল পরের পিকআপে যাবে।</p>
                             <div class="mt-6 grid grid-cols-2 gap-3">

@@ -32,7 +32,7 @@
                 <div class="flex flex-wrap items-start justify-between gap-2">
                     <div class="min-w-0">
                         <p class="font-mono text-base font-bold text-gray-900">{{ $o->order_no }}@if ($o->consignment_id)<span class="ml-2 text-sm font-medium text-gray-500">CN {{ $o->consignment_id }}</span>@endif</p>
-                        <p class="text-sm text-gray-700">{{ $o->ship_name }} · {{ collect([$o->ship_thana, $o->ship_district])->filter()->join(', ') ?: '-' }}@if ($o->ship_phone) · <span class="tabular-nums">{{ $o->ship_phone }}</span>@endif</p>
+                        <p class="text-sm text-gray-700">{{ $o->ship_name }} · {{ collect([$o->ship_thana, \App\Support\BdDistricts::name($o->ship_district)])->filter()->unique()->join(', ') ?: '-' }}@if ($o->ship_phone) · <span class="tabular-nums">{{ $o->ship_phone }}</span>@endif</p>
                     </div>
                     @if ($o->handed_at)
                         <span class="shrink-0 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-800">{{ __('Handed over') }}@if ($o->rider) · {{ $o->rider }}@endif · {{ \Illuminate\Support\Carbon::parse($o->handed_at)->format('d M, g:i A') }}</span>

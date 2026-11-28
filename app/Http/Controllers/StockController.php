@@ -36,9 +36,9 @@ class StockController extends Controller
             ->when($show === 'not_counted', fn ($w) => $w->whereNull('stock_qty'))
             ->when($show === 'low', fn ($w) => $w->where('stock_qty', '>', 0)->where('stock_qty', '<=', 5))
             // Out of stock: counted to 0 or set by hand (the Stock status page's list, here for everyone who sees stock).
-            // Packer's page: Out of stock = not on the shelf, so Pre-order is here too (first: it is coming); In stock = on the shelf.
-            ->when($show === 'out', fn ($w) => $simple ? $w->whereIn('availability_status', ['out_of_stock', 'backorder'])->orderByRaw("availability_status = 'backorder' DESC") : $w->where('availability_status', 'out_of_stock'))
-            ->when($show === 'in', fn ($w) => $simple ? $w->where('availability_status', 'in_stock') : $w->where('availability_status', '<>', 'out_of_stock'))
+            // Pre-order still takes orders (owner 2026-11-29), so it is In stock; on the packer's page it comes first there.
+            ->when($show === 'out', fn ($w) => $w->where('availability_status', 'out_of_stock'))
+            ->when($show === 'in', fn ($w) => $w->where('availability_status', '<>', 'out_of_stock')->when($simple, fn ($x) => $x->orderByRaw("availability_status = 'backorder' DESC")))
             ->when($q !== '', fn ($w) => \App\Support\ProductSearch::apply($w, $q))
             ->tap(fn ($w) => $list->applySort($w))
             ->paginate($list->perPage)

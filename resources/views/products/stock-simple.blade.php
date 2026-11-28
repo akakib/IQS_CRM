@@ -3,8 +3,8 @@
      (in stock -> out of stock, out -> in); a product with more sizes lists them and asks: all sizes, or only this one. --}}
 @php
     $tab = fn (string $key) => request()->fullUrlWithQuery(['show' => $key, 'page' => null]);
-    $out = (int) $counts->out_n + (int) $counts->pre_n; // Pre-order is not on the shelf either
-    $in = (int) $counts->all_n - $out;
+    $out = (int) $counts->out_n;
+    $in = (int) $counts->all_n - $out; // Pre-order counts here: orders are still taken
 @endphp
 <x-layouts.app :heading="__('Stock')">
     <div class="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-gray-200/70 p-1">
@@ -39,8 +39,8 @@
                     $all = $canChange ? ($sizes[$v->product_id] ?? collect()) : collect();
                 @endphp
                 <{{ $canChange ? 'button type=button' : 'div' }} @if ($canChange)
-                    @click="pick = { id: {{ $v->id }}, name: @js($v->product->name ?? '-'), size: @js($size($v->name)), out: @js($v->availability_status !== 'in_stock'), pre: @js($v->availability_status === 'backorder'),
-                        sizes: @js($all->map(fn ($x) => ['id' => $x->id, 'name' => $size($x->name) ?: '-', 'out' => $x->availability_status !== 'in_stock', 'pre' => $x->availability_status === 'backorder'])->values()) }; error = ''"
+                    @click="pick = { id: {{ $v->id }}, name: @js($v->product->name ?? '-'), size: @js($size($v->name)), out: @js($v->availability_status === 'out_of_stock'), pre: @js($v->availability_status === 'backorder'),
+                        sizes: @js($all->map(fn ($x) => ['id' => $x->id, 'name' => $size($x->name) ?: '-', 'out' => $x->availability_status === 'out_of_stock', 'pre' => $x->availability_status === 'backorder'])->values()) }; error = ''"
                     @endif class="flex w-full items-center gap-3 px-3 py-2.5 text-left">
                     <x-product-thumb :src="$v->product?->image_url" size="lg" />
                     <div class="min-w-0 flex-1">

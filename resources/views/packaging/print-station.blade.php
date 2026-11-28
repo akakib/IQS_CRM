@@ -4,10 +4,13 @@
      a reopened page connect again by themselves); only Disconnect lets go. The screen is kept on. --}}
 <x-layouts.app :heading="__('Print station')">
 <div class="mx-auto max-w-xl space-y-3" x-data="station()" x-init="init()">
-    <p class="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">{{ __('Connect once: the printers are remembered and come back by themselves. Only Disconnect lets them go. Keep this page open on the printing phone (the screen stays on). For Ongoing and Done use another tab or phone.') }}</p>
+    <p x-show="!pdfMode" class="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">{{ __('Connect once: the printers are remembered and come back by themselves. Only Disconnect lets them go. Keep this page open on the printing phone (the screen stays on). For Ongoing and Done use another tab or phone.') }}</p>
+
+    {{-- A phone that cannot reach the printers (iPhone, iPad): the batch comes as PDF files instead. --}}
+    <p x-show="pdfMode" x-cloak class="rounded-2xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">{{ __('This phone cannot reach the printers, so each batch comes as two PDF files: the labels (51 x 76 mm) and the list (76 mm). Save them, then print or send them.') }}</p>
 
     {{-- The two printers: connected once. --}}
-    <div class="grid grid-cols-2 gap-2">
+    <div x-show="!pdfMode" class="grid grid-cols-2 gap-2">
         <template x-for="p in [{ key: 'sticker', name: @js(__('Label printer')), how: 'Bluetooth' }, { key: 'receipt', name: @js(__('Receipt printer')), how: @js(__('USB cable')) }]" :key="p.key">
             <div class="rounded-2xl border bg-white p-3" :class="st[p.key] ? 'border-green-300' : 'border-gray-200'">
                 <p class="text-sm font-semibold text-gray-900" x-text="p.name"></p>
@@ -22,9 +25,17 @@
 
     {{-- One press: the next batch, its stickers, its list. --}}
     <button type="button" @click="printNext()" :disabled="busy || !next" class="flex w-full items-center justify-between rounded-2xl bg-blue-600 px-5 py-5 text-left text-white disabled:opacity-50">
-        <span class="text-xl font-semibold">{{ __('Print next batch') }}</span>
+        <span class="text-xl font-semibold" x-text="pdfMode ? @js(__('Make next batch')) : @js(__('Print next batch'))">{{ __('Print next batch') }}</span>
         <span class="text-sm" x-text="next ? next + ' ' + @js(__('orders')) : @js(__('Nothing waiting'))"></span>
     </button>
+    {{-- PDF mode: the batch just made (or picked below), its two files. A tap saves (the phone allows a file only from a tap). --}}
+    <div x-show="pdfMode && ready" x-cloak class="rounded-2xl border border-blue-200 bg-white p-4">
+        <p class="text-sm font-semibold text-gray-900" x-text="ready ? ready.batch + ' · ' + ready.labels.length + ' ' + @js(__('orders')) : ''"></p>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" @click="savePdf('labels')" class="h-12 rounded-xl bg-blue-600 text-sm font-semibold text-white">{{ __('Labels PDF') }}</button>
+            <button type="button" @click="savePdf('list')" class="h-12 rounded-xl border border-blue-600 text-sm font-semibold text-blue-700">{{ __('List PDF') }}</button>
+        </div>
+    </div>
     <p x-show="msg" x-cloak class="whitespace-pre-line rounded-2xl px-4 py-3 text-sm font-medium" :class="bad ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'" x-text="msg"></p>
 
     {{-- Today's batches: print again (a torn sticker, a lost list). --}}
@@ -34,8 +45,9 @@
             <div class="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2 last:border-0">
                 <span class="text-sm"><b class="font-mono" x-text="b.batch_no"></b> <span class="text-gray-500" x-text="'· ' + b.orders + ' ' + @js(__('orders'))"></span></span>
                 <span class="flex shrink-0 gap-1.5">
-                    <button type="button" @click="again(b.id, 'stickers')" :disabled="busy" class="h-8 rounded-lg border border-gray-300 px-2.5 text-xs font-medium text-gray-700">{{ __('Labels') }}</button>
-                    <button type="button" @click="again(b.id, 'list')" :disabled="busy" class="h-8 rounded-lg border border-gray-300 px-2.5 text-xs font-medium text-gray-700">{{ __('List') }}</button>
+                    <button type="button" x-show="pdfMode" x-cloak @click="again(b.id, 'pdf')" :disabled="busy" class="h-8 rounded-lg border border-blue-600 px-3 text-xs font-semibold text-blue-700">PDF</button>
+                    <button type="button" x-show="!pdfMode" @click="again(b.id, 'stickers')" :disabled="busy" class="h-8 rounded-lg border border-gray-300 px-2.5 text-xs font-medium text-gray-700">{{ __('Labels') }}</button>
+                    <button type="button" x-show="!pdfMode" @click="again(b.id, 'list')" :disabled="busy" class="h-8 rounded-lg border border-gray-300 px-2.5 text-xs font-medium text-gray-700">{{ __('List') }}</button>
                 </span>
             </div>
         </template>
@@ -48,7 +60,7 @@
 function station() {
     const url = @js(route('packaging.station-batch')), csrf = @js(csrf_token()), store = @js($store);
     return {
-        st: {}, busy: false, msg: '', bad: false, next: @js(count($next['ids'])), recent: @js($recent),
+        st: {}, busy: false, pdfMode: !IqsPrint.canPrint, ready: null, msg: '', bad: false, next: @js(count($next['ids'])), recent: @js($recent),
         init() {
             const up = () => { this.st = IqsPrint.status(); }; up(); window.addEventListener('iqs-printers', up); setInterval(up, 3000);
             // The screen stays on while this page is open (a sleeping phone drops Bluetooth).
@@ -74,6 +86,7 @@ function station() {
                 const b = await this.load(null);
                 if (!b.ok) { this.say(b.message, true); this.next = 0; this.busy = false; return; }
                 this.recent.unshift({ id: b.id, batch_no: b.batch, orders: b.stickers.length }); this.next = b.next;
+                if (this.pdfMode) { this.keep(b); this.busy = false; return; }
                 await IqsPrint.printStickers(b.stickers, store, false, t => this.say(b.batch + ': ' + t));
                 await IqsPrint.marked(b.printed, csrf);
                 this.say(b.batch + ': ' + @js(__('labels done, printing the list…')));
@@ -82,10 +95,18 @@ function station() {
             } catch (e) { this.fail(e); }
             this.st = IqsPrint.status(); this.busy = false;
         },
+        // PDF mode: hold the batch, then each tap saves one file (labels mark the batch's labels printed, as a print does).
+        keep(b) { this.ready = { batch: b.batch, labels: b.stickers, list: b.receipt, printed: b.printed }; this.say(b.batch + ': ' + @js(__('ready. Tap Labels PDF and List PDF to save them.'))); },
+        savePdf(what) {
+            const r = this.ready; if (!r) return;
+            if (what === 'labels') { IqsPrint.labelsPdf(r.labels, store, r.batch + '-labels.pdf'); IqsPrint.marked(r.printed, csrf); }
+            else IqsPrint.listPdf(r.list, r.batch + '-list.pdf');
+        },
         async again(id, what) {
             this.busy = true;
             try {
                 const b = await this.load(id);
+                if (this.pdfMode) { this.keep(b); this.busy = false; return; }
                 if (what === 'stickers') { await IqsPrint.printStickers(b.stickers, store, false, t => this.say(b.batch + ': ' + t)); await IqsPrint.marked(b.printed, csrf); }
                 else await IqsPrint.printReceipt(b.receipt, false, t => {});
                 this.say(b.batch + ': ' + @js(__('printed again.')));

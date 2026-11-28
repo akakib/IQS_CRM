@@ -194,13 +194,51 @@ window.IqsPrint = (() => {
 
     async function marked(url, csrf) { try { await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json' } }); } catch (e) {} }
 
+    // ── PDF (a phone that cannot reach the printers, e.g. an iPhone): the same pictures, one per page, saved as a file ──
+    // A tiny PDF writer: each page is one JPEG at the paper's size. No library, Bangla kept (it is a picture).
+    function pdf(pages) {
+        const parts = [], offs = []; let len = 0;
+        const add = x => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
+        const obj = (n, body) => { offs[n] = len; add(n + ' 0 obj\n'); body(); add('\nendobj\n'); };
+        add('%PDF-1.4\n');
+        const n = pages.length, kids = pages.map((_, i) => (3 + i * 3) + ' 0 R').join(' ');
+        obj(1, () => add('<< /Type /Catalog /Pages 2 0 R >>'));
+        obj(2, () => add('<< /Type /Pages /Kids [' + kids + '] /Count ' + n + ' >>'));
+        pages.forEach((p, i) => {
+            const pg = 3 + i * 3, w = p.wMm * 72 / 25.4, h = p.hMm * 72 / 25.4;
+            const jpg = Uint8Array.from(atob(p.canvas.toDataURL('image/jpeg', 0.92).split(',')[1]), ch => ch.charCodeAt(0));
+            const draw = 'q ' + w.toFixed(2) + ' 0 0 ' + h.toFixed(2) + ' 0 0 cm /Im Do Q';
+            obj(pg, () => add('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + w.toFixed(2) + ' ' + h.toFixed(2) + '] /Resources << /XObject << /Im ' + (pg + 2) + ' 0 R >> >> /Contents ' + (pg + 1) + ' 0 R >>'));
+            obj(pg + 1, () => { add('<< /Length ' + draw.length + ' >>\nstream\n'); add(draw); add('\nendstream'); });
+            obj(pg + 2, () => { add('<< /Type /XObject /Subtype /Image /Width ' + p.canvas.width + ' /Height ' + p.canvas.height + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpg.length + ' >>\nstream\n'); add(jpg); add('\nendstream'); });
+        });
+        const total = 3 + n * 3, xref = len;
+        add('xref\n0 ' + total + '\n0000000000 65535 f \n');
+        for (let k = 1; k < total; k++) add(String(offs[k]).padStart(10, '0') + ' 00000 n \n');
+        add('trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+        return new Blob(parts, { type: 'application/pdf' });
+    }
+    function save(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+    // Labels: one 51 x 76 mm page each, laid out as printed (the bars drawn here, since the printer draws them on paper).
+    function labelsPdf(list, store, name) {
+        save(pdf(list.map(s => {
+            const art = sticker(s, store), [c, g] = canvas(408, 608); g.drawImage(art, 8, 24);
+            const widths = String(s.bars).split('').map(Number); let x = s._bar.x;
+            widths.forEach((w, i) => { if (i % 2 === 0) g.fillRect(x, s._bar.y, w * s._bar.m, s._bar.h); x += w * s._bar.m; });
+            return { canvas: c, wMm: 51, hMm: 76 };
+        })), name);
+    }
+    // The batch list: one 76 mm wide page, as long as the list.
+    function listPdf(r, name) { const c = receipt(r); save(pdf([{ canvas: c, wMm: 76, hMm: c.height * 76 / 576 }]), name); }
+
     if (navigator.usb) {
         navigator.usb.addEventListener('disconnect', () => { usb = null; changed(); });
         navigator.usb.addEventListener('connect', () => { if (flag('receipt')) receipt_(false).catch(() => {}); }); // the cable back in: open again
     }
     restore();
 
-    return { sticker, receipt, printStickers, printReceipt, marked, connectSticker: sticker_, connectReceipt: receipt_, disconnect,
+    return { sticker, receipt, printStickers, printReceipt, marked, connectSticker: sticker_, connectReceipt: receipt_, disconnect, labelsPdf, listPdf,
+        canPrint: !!(navigator.bluetooth || navigator.usb),
         status: () => ({ sticker: !!(ble && ble.d.gatt.connected), stickerName: ble?.d.name || bleDev?.name || '', reconnecting: retrying,
             receipt: !!(usb && usb.d.opened), receiptName: usb?.d.productName || '' }),
         ok: { ble: !!navigator.bluetooth, usb: !!navigator.usb } };

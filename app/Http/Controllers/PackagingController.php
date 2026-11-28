@@ -128,7 +128,13 @@ class PackagingController extends Controller
         $pause = app(\App\Services\Packaging\PackagingPause::class);
         $controls = $pause->canControl($user);
 
-        $filter = in_array($request->query('show'), ['red', 'waiting', 'mine', 'hold', 'today', 'packed'], true) ? $request->query('show') : 'all';
+        // The packer's page: Ongoing = printed or started (in a batch, a label printed, a packer on it, changed after packing);
+        // To pack = the rest, waiting for Print next batch. Opening the page: Ongoing first while it has work.
+        $simple = $this->isSimple($user);
+        $ongoing = "(o.batch_id IS NOT NULL OR o.packer_id IS NOT NULL OR {$red} OR {$orange} OR EXISTS (SELECT 1 FROM shipment_labels sl WHERE sl.order_id = o.id AND sl.voided_at IS NULL AND sl.printed_at IS NOT NULL))";
+        $onGoingCount = $simple ? DB::table('orders as o')->whereRaw($inQueue)->whereRaw($ongoing)->count() : 0;
+        $filter = in_array($request->query('show'), ['red', 'waiting', 'mine', 'hold', 'today', 'packed', 'ongoing'], true) ? $request->query('show')
+            : ($simple && $onGoingCount > 0 && ! $request->has('show') ? 'ongoing' : 'all');
         // Packed already: today's, or any day by date. A packer sees their own; a manager everyone's (by packer).
         $packed = $this->packedList($request, $user, $canManage, $filter);
         $counts['today'] = $packed['today'];
@@ -146,6 +152,8 @@ class PackagingController extends Controller
             ->when($filter === 'red', fn ($q) => $q->whereRaw($red))
             ->when($filter === 'waiting', fn ($q) => $q->where('o.status_id', $rfp)->whereNull('o.packer_id'))
             ->when($filter === 'mine', fn ($q) => $q->where('o.packer_id', $user->id))
+            ->when($filter === 'ongoing', fn ($q) => $q->whereRaw($ongoing))
+            ->when($simple && $filter === 'all', fn ($q) => $q->whereRaw("NOT {$ongoing}"))
             ->orderByRaw("{$red} DESC, {$orange} DESC")->orderBy('o.packaging_sent_at')->orderBy('o.id')
             ->selectRaw("o.id, o.order_no, o.status_id, o.packaging_sent_at, o.packaging_started_at, o.packer_id, o.ship_district, o.ship_thana, o.edited_after_pack,
                 m.name as moderator, p.name as packer, {$red} as is_red, {$orange} as is_orange,
@@ -156,8 +164,10 @@ class PackagingController extends Controller
         $mine = DB::table('orders')->where('packer_id', $user->id)->where('packed_at', '>=', $since)->get(['packaging_started_at', 'packed_at']);
 
         // A packer (no orders, no packaging management): the simple page, two tabs, one button per order.
-        if ($this->isSimple($user) && in_array($filter, ['all', 'packed'], true)) {
+        if ($simple && in_array($filter, ['all', 'ongoing', 'packed'], true)) {
             $ids = $queue->pluck('id');
+            $counts['ongoing'] = $onGoingCount;
+            $counts['to_pack'] = max(0, $counts['all'] - $onGoingCount);
             return view('packaging.simple', [
                 'filter' => $filter, 'queue' => $queue, 'packed' => $packed, 'counts' => $counts,
                 'nextBatch' => $user->can('packaging.create') ? app(BatchService::class)->nextUp($user) : null,

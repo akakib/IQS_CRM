@@ -13,7 +13,7 @@
 <x-layouts.app :heading="__('Packaging')">
 <div class="mx-auto max-w-2xl" x-data="{ pop: null }" @keydown.escape.window="pop = null">
 
-    {{-- Print the next batch of stickers (the oldest orders waiting). --}}
+    {{-- Print the next batch of stickers (the oldest orders waiting): on To pack only. --}}
     @if ($nextBatch && $nextBatch['ids'] && $filter === 'all')
         <form method="POST" action="{{ route('packaging.next-batch') }}" class="mb-3">
             @csrf
@@ -27,10 +27,11 @@
 
     <a href="{{ route('packaging.printer-test') }}" class="mb-3 block text-right text-sm font-medium text-blue-700 underline">{{ __('Printer test') }}</a>
 
-    {{-- Two tabs. --}}
-    <div class="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-gray-200/70 p-1">
-        <a href="{{ route('packaging.index') }}" @class(['rounded-xl py-3 text-center text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'all', 'text-gray-600' => $filter !== 'all'])>{{ __('To pack') }} <b class="tabular-nums">({{ $counts['all'] }})</b></a>
-        <a href="{{ $day(today()->toDateString()) }}" @class(['rounded-xl py-3 text-center text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'packed', 'text-gray-600' => $filter !== 'packed'])>{{ __('Packed') }}</a>
+    {{-- Three tabs: waiting to print, the work in hand (the only place with Done), what is done. --}}
+    <div class="mb-3 grid grid-cols-3 gap-1 rounded-2xl bg-gray-200/70 p-1">
+        <a href="{{ route('packaging.index', ['show' => 'all']) }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'all', 'text-gray-600' => $filter !== 'all'])>{{ __('To pack') }}<br><b class="tabular-nums">{{ $counts['to_pack'] }}</b></a>
+        <a href="{{ route('packaging.index', ['show' => 'ongoing']) }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'ongoing', 'text-gray-600' => $filter !== 'ongoing'])>{{ __('Ongoing') }}<br><b class="tabular-nums">{{ $counts['ongoing'] }}</b></a>
+        <a href="{{ $day(today()->toDateString()) }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'packed', 'text-gray-600' => $filter !== 'packed'])>{{ __('Packed') }}<br><b class="tabular-nums">{{ $counts['today'] }}</b></a>
     </div>
 
     @if ($filter === 'packed')
@@ -41,6 +42,19 @@
             @endforeach
         </div>
         @include('packaging._packed')
+    @elseif ($filter === 'all')
+        {{-- To pack: how many wait, and their numbers to see. Nothing to press here but Print next batch. --}}
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 text-center">
+            <p class="text-4xl font-bold tabular-nums text-gray-900">{{ $counts['to_pack'] }}</p>
+            <p class="text-base text-gray-600">{{ __('to print, then pack') }}</p>
+            @if ($counts['ongoing'])<a href="{{ route('packaging.index', ['show' => 'ongoing']) }}" class="mt-3 inline-block text-sm font-medium text-blue-700 underline">{{ __(':n in Ongoing: finish them first', ['n' => $counts['ongoing']]) }}</a>@endif
+        </div>
+        @if ($queue->isNotEmpty())
+            <div class="mt-3 flex flex-wrap gap-1.5">
+                @foreach ($queue as $o)<span class="rounded-lg border border-gray-200 bg-white px-2 py-1 font-mono text-xs text-gray-600">{{ $o->order_no }}</span>@endforeach
+            </div>
+            <div class="mt-3">{{ $queue->links() }}</div>
+        @endif
     @else
         <div class="space-y-3">
             @forelse ($queue as $o)
@@ -75,7 +89,7 @@
                     </div>
                 </div>
             @empty
-                <div class="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-base text-gray-500">{{ __('Nothing to pack right now.') }}</div>
+                <div class="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-base text-gray-500">{{ __('Nothing in hand.') }}@if ($counts['to_pack'])<br><a href="{{ route('packaging.index', ['show' => 'all']) }}" class="mt-2 inline-block text-blue-700 underline">{{ __('Print the next batch') }}</a>@endif</div>
             @endforelse
         </div>
         <div class="mt-4">{{ $queue->links() }}</div>

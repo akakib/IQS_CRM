@@ -204,10 +204,14 @@ class PackagingTest extends TestCase
         $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
         DB::table('shipment_labels')->where('order_id', $a->id)->update(['printed_at' => null]);
 
-        // Two tabs, the order with its items; its one button: Print label. No manager tools, no phone.
-        $page = $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSee('To pack')->assertSee('Packed')
-            ->assertSee($a->order_no)->assertSee('Dates')->assertSee('Nuts')->assertSee('Print label')->assertDontSee('>Done<', false)
+        // Three tabs. To pack: how many wait and Print next batch; nothing to press on an order. No manager tools, no phone.
+        $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSeeInOrder(['To pack', 'Ongoing', 'Packed'])
+            ->assertSee('Print next batch')->assertSee($a->order_no)->assertDontSee('Dates')
             ->assertDontSee('Tools')->assertDontSee('On hold')->assertDontSee('Select all')->assertDontSee('01811111111');
+
+        // Printed as a batch: it is Ongoing, opened first, with its items; the sticker not printed yet = Print label.
+        $this->post(route('packaging.next-batch'));
+        $this->get('/packaging')->assertSee('Dates')->assertSee('Nuts')->assertSee('Print label')->assertDontSee('Print next batch');
 
         // Printed: the button is Done. One yes = packed and the label on.
         $this->get(route('packaging.labels', ['orders' => $a->id]));
@@ -215,7 +219,7 @@ class PackagingTest extends TestCase
         $this->post(route('packaging.mark-done', $a->id))->assertSessionHasNoErrors();
         $this->assertSame('packed', $this->key($a));
         $this->assertNotNull(DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('applied_at'));
-        $this->get('/packaging')->assertSee('Nothing to pack right now.'); // left To pack
+        $this->get('/packaging?show=ongoing')->assertSee('Nothing in hand.'); // left Ongoing (the page now opens on To pack)
 
         // Packed: their own, today and yesterday at a tap.
         $this->get(route('packaging.index', ['show' => 'packed', 'from' => today()->toDateString(), 'to' => today()->toDateString()]))
@@ -273,7 +277,7 @@ class PackagingTest extends TestCase
         $this->travel(30)->minutes();
         $this->actingAs($this->desk)->post(route('packaging.pause'))->assertSessionHas('success', 'Packaging resumed: 1 orders sent to the packers.');
         $this->assertTrue($during->fresh()->packaging_sent_at->gte(now()->subSecond()));
-        $this->actingAs($this->packer)->get('/packaging')->assertSee($during->order_no);
+        $this->actingAs($this->packer)->get('/packaging?show=all')->assertSee($during->order_no); // To pack
     }
 
     public function test_labels_print_with_an_a4_sheet_the_scan_marks_the_label_on_and_an_edit_tells_the_packer_what_to_do(): void

@@ -235,7 +235,7 @@
     {{-- Seven tabs: one row from a tablet up; on a phone the row slides sideways. --}}
     <div class="mt-4 flex gap-1 overflow-x-auto rounded-xl bg-gray-200/70 p-1 sm:grid sm:grid-cols-7">
         @foreach ($filters as $f => $label)
-            <a href="{{ route('packaging.index', $f === 'all' ? [] : ['show' => $f]) }}"
+            <a href="{{ route('packaging.index', $f === 'all' ? [] : ['show' => $f]) }}" @if ($filter === $f) x-data x-init="$el.scrollIntoView({ inline: 'center', block: 'nearest' })" @endif
                 @class(['flex min-w-[4.5rem] shrink-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-center text-[11px] leading-tight sm:min-w-0 sm:text-xs',
                     'bg-white font-semibold text-gray-900 shadow-sm' => $filter === $f, 'text-gray-600 hover:bg-white/60' => $filter !== $f])>
                 <span class="text-base font-semibold tabular-nums">{{ $counts[$f] }}</span>{{ $label }}

@@ -37,7 +37,9 @@ class StockController extends Controller
         $counts = ProductVariant::query()->selectRaw('COUNT(*) as all_n, SUM(CASE WHEN stock_qty IS NULL THEN 1 ELSE 0 END) as not_counted,
             SUM(CASE WHEN stock_qty > 0 AND stock_qty <= 5 THEN 1 ELSE 0 END) as low, SUM(CASE WHEN stock_qty <= 0 THEN 1 ELSE 0 END) as zero')->first();
 
-        return view('products.stock', compact('variants', 'list', 'show', 'counts'));
+        $last = app(StockService::class)->lastChanges($variants->pluck('id')->all());
+
+        return view('products.stock', compact('variants', 'list', 'show', 'counts', 'last'));
     }
 
     /** The number counted on the shelf. */
@@ -51,16 +53,8 @@ class StockController extends Controller
     }
 
     /** The last changes of one variant. */
-    public function history(int $variant): JsonResponse
+    public function history(int $variant, StockService $stock): JsonResponse
     {
-        $rows = DB::table('stock_movements as m')->leftJoin('users as u', 'u.id', '=', 'm.user_id')->leftJoin('orders as o', 'o.id', '=', 'm.order_id')
-            ->where('m.variant_id', $variant)->orderByDesc('m.id')->limit(50)
-            ->get(['m.qty_change', 'm.qty_after', 'm.reason', 'm.note', 'm.created_at', 'u.name as person', 'o.order_no']);
-
-        return response()->json(['rows' => $rows->map(fn ($r) => [
-            'when' => \Illuminate\Support\Carbon::parse($r->created_at)->format('d M, g:i A'),
-            'change' => (float) $r->qty_change + 0, 'after' => (float) $r->qty_after + 0, 'why' => __(StockService::REASONS[$r->reason] ?? $r->reason),
-            'who' => $r->person, 'order' => $r->order_no, 'note' => $r->note,
-        ])]);
+        return response()->json(['rows' => array_map(fn ($r) => ['when' => $r['at']->format('d M, g:i A')] + \Illuminate\Support\Arr::except($r, 'at'), $stock->history($variant))]);
     }
 }

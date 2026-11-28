@@ -562,9 +562,21 @@ class PackagingTest extends TestCase
         $this->assertSame(1.0, $this->dates->fresh()->stock_qty);
 
         // Every change is listed with why and which order.
-        $this->actingAs($this->desk)->getJson('/products/stock/'.$this->dates->id.'/history')->assertOk()
-            ->assertJsonPath('rows.0.why', 'Box put back')->assertJsonPath('rows.0.order', $b->order_no)
-            ->assertJsonPath('rows.3.why', 'Counted')->assertJsonPath('rows.3.after', 3);
+        // Newest first, numbers and status changes in one list (here all in the same second: the status rows first).
+        $qtyRows = collect($this->actingAs($this->desk)->getJson('/products/stock/'.$this->dates->id.'/history')->assertOk()
+            ->assertJsonPath('rows.0.why', 'Out of stock → In stock')->json('rows'))->where('kind', 'qty')->values();
+        $this->assertSame($b->order_no, $qtyRows[0]['order']);
+        $this->assertSame(['Box put back', 'Packed', 'Packed', 'Counted'], $qtyRows->pluck('why')->all());
+        $this->assertSame(3, $qtyRows[3]['after']);
+        // The status changes are in the same list, with who did them; each row on the page says its last change.
+        $rows = collect($this->getJson('/products/stock/'.$this->dates->id.'/history')->json('rows'));
+        $this->assertTrue($rows->contains(fn ($r) => $r['kind'] === 'status' && $r['why'] === 'In stock → Out of stock'));
+        $this->travel(1)->minutes();
+        $this->actingAs($this->desk)->post('/products/availability', ['ids' => [$this->dates->id], 'status' => 'out_of_stock', 'note' => 'Shelf empty']);
+        $this->getJson('/products/stock/'.$this->dates->id.'/history')->assertJsonPath('rows.0.why', 'In stock → Out of stock')
+            ->assertJsonPath('rows.0.who', $this->desk->name)->assertJsonPath('rows.0.note', 'Shelf empty');
+        $this->get('/products/stock')->assertSee('Last change: Out of stock · '.$this->desk->name, false);
+        $this->get('/products/availability?status=out_of_stock')->assertSee('Out of stock · '.$this->desk->name, false);
     }
 
     /** The courier sent it back: status Returned, as the webhook leaves it. */

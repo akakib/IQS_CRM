@@ -31,6 +31,7 @@
                     <th>{{ __('Status') }}</th>
                     <th><x-list.sort :list="$list" column="expected_restock_date">{{ __('Expected') }}</x-list.sort></th>
                     <th><x-list.sort :list="$list" column="oos_marked_at">{{ __('Marked') }}</x-list.sort></th>
+                    <th>{{ __('Last change') }}</th>
                 </x-slot:head>
                 @foreach ($variants as $v)
                     <tr>
@@ -40,6 +41,8 @@
                         <td><x-badge :color="$color[$v->availability_status]">{{ $v->availabilityLabel() }}</x-badge></td>
                         <td @class(['text-gray-600', 'font-medium text-red-600' => $v->expected_restock_date?->isPast()])>{{ $v->expected_restock_date?->format('d M Y') ?? '-' }}</td>
                         <td class="text-xs text-gray-500">{{ $v->oos_marked_at ? $v->oos_marked_at->format('d M, g:i A').' · '.($v->markedBy?->name ?? '') : '-' }}</td>
+                        @php $lc = $last[$v->id] ?? null; @endphp
+                        <td class="text-xs text-gray-500">@if ($lc){{ $lc['why'] }} · {{ $lc['who'] ?? '-' }}<br>{{ $lc['at']->format('d M, g:i A') }}@else-@endif</td>
                     </tr>
                 @endforeach
             </x-list.table>
@@ -47,7 +50,8 @@
                 @foreach ($variants as $v)
                     <x-record-card :title="$v->product?->name.($v->name !== 'Default' ? ' · '.$v->name : '')" :subtitle="$v->sku">
                         <x-slot:badge><div class="flex items-center gap-2"><x-badge :color="$color[$v->availability_status]">{{ $v->availabilityLabel() }}</x-badge><x-list.check :id="$v->id" /></div></x-slot:badge>
-                        <x-slot:footer>{{ $v->expected_restock_date ? __('Expected :d', ['d' => $v->expected_restock_date->format('d M Y')]) : '' }}</x-slot:footer>
+                        @php $lc = $last[$v->id] ?? null; @endphp
+                        <x-slot:footer>{{ $v->expected_restock_date ? __('Expected :d', ['d' => $v->expected_restock_date->format('d M Y')]).' · ' : '' }}{{ $lc ? __('Last change: :w · :p · :t', ['w' => $lc['why'], 'p' => $lc['who'] ?? '-', 't' => $lc['at']->format('d M, g:i A')]) : '' }}</x-slot:footer>
                     </x-record-card>
                 @endforeach
             </x-list.cards>

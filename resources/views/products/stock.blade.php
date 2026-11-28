@@ -34,10 +34,11 @@
                             <p class="text-gray-800"><span x-text="r.why"></span><span x-show="r.order" class="text-gray-500" x-text="' · ' + r.order"></span></p>
                             <p class="text-xs text-gray-500"><span x-text="r.when"></span><span x-show="r.who" x-text="' · ' + r.who"></span><span x-show="r.note" x-text="' · ' + r.note"></span></p>
                         </div>
-                        <div class="shrink-0 text-right tabular-nums">
+                        <div class="shrink-0 text-right tabular-nums" x-show="r.kind === 'qty'">
                             <p class="font-semibold" :class="r.change < 0 ? 'text-red-600' : 'text-green-700'" x-text="(r.change > 0 ? '+' : '') + r.change"></p>
                             <p class="text-xs text-gray-500" x-text="@js(__('now')) + ' ' + r.after"></p>
                         </div>
+                        <span x-show="r.kind === 'status'" class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{{ __('Status') }}</span>
                     </div>
                 </template>
             </div>
@@ -67,6 +68,7 @@
                         <p class="truncate text-sm font-medium text-gray-900">{{ $label }}</p>
                         <p class="text-xs text-gray-500">{{ $v->sku ?: '-' }}@if ($v->shelf_code) · {{ __('Shelf') }} {{ $v->shelf_code }}@endif
                             · <span :class="{ 'text-green-700': status === 'in_stock', 'text-amber-700': status === 'backorder', 'text-red-600': status === 'out_of_stock' }" x-text="({{ \Illuminate\Support\Js::from(array_map('__', \App\Models\ProductVariant::AVAILABILITY)) }})[status]"></span></p>
+                        @if ($lc = $last[$v->id] ?? null)<p class="text-[11px] text-gray-400">{{ __('Last change: :w · :p · :t', ['w' => $lc['why'], 'p' => $lc['who'] ?? '-', 't' => $lc['at']->format('d M, g:i A')]) }}</p>@endif
                     </div>
                     </div>
                     <div class="flex items-center gap-3">

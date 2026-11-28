@@ -38,7 +38,9 @@ class AvailabilityController extends Controller
         $counts = ProductVariant::query()->tap($active)->selectRaw('availability_status, COUNT(*) as n')->groupBy('availability_status')->pluck('n', 'availability_status');
         $reviewDue = ProductVariant::query()->tap($active)->where('availability_status', '!=', 'in_stock')->where('oos_review_at', '<=', now())->count();
 
-        return view('products.availability', compact('variants', 'list', 'status', 'counts', 'reviewDue'));
+        $last = app(\App\Services\Catalog\StockService::class)->lastChanges($variants->pluck('id')->all());
+
+        return view('products.availability', compact('variants', 'list', 'status', 'counts', 'reviewDue', 'last'));
     }
 
     public function update(Request $request, ProductService $products): RedirectResponse|\Illuminate\Http\JsonResponse

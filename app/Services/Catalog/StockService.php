@@ -25,6 +25,62 @@ class StockService
 
     public function __construct(private ProductService $products) {}
 
+    /**
+     * Everything that changed one variant's stock, newest first: the number (count, packing, returns)
+     * and the status (In stock / Out of stock / Pre-order), each with who and when. Two queries.
+     *
+     * @return list<array{at: \Illuminate\Support\Carbon, kind: string, why: string, change: ?float, after: ?float, who: ?string, order: ?string, note: ?string}>
+     */
+    public function history(int $variantId, int $limit = 50): array
+    {
+        $labels = \App\Models\ProductVariant::AVAILABILITY;
+        $qty = DB::table('stock_movements as m')->leftJoin('users as u', 'u.id', '=', 'm.user_id')->leftJoin('orders as o', 'o.id', '=', 'm.order_id')
+            ->where('m.variant_id', $variantId)->orderByDesc('m.id')->limit($limit)
+            ->get(['m.qty_change', 'm.qty_after', 'm.reason', 'm.note', 'm.created_at', 'u.name as person', 'o.order_no'])
+            ->map(fn ($r) => ['at' => \Illuminate\Support\Carbon::parse($r->created_at), 'kind' => 'qty', 'why' => __(self::REASONS[$r->reason] ?? $r->reason),
+                'change' => (float) $r->qty_change + 0, 'after' => (float) $r->qty_after + 0, 'who' => $r->person, 'order' => $r->order_no, 'note' => $r->note]);
+        $status = DB::table('availability_events as e')->leftJoin('users as u', 'u.id', '=', 'e.user_id')
+            ->where('e.variant_id', $variantId)->orderByDesc('e.id')->limit($limit)
+            ->get(['e.from_status', 'e.to_status', 'e.source', 'e.note', 'e.created_at', 'u.name as person'])
+            ->map(fn ($r) => ['at' => \Illuminate\Support\Carbon::parse($r->created_at), 'kind' => 'status',
+                'why' => __($labels[$r->from_status] ?? (string) $r->from_status).' → '.__($labels[$r->to_status] ?? (string) $r->to_status),
+                'change' => null, 'after' => null, 'who' => $r->person ?? ($r->source === 'manual' ? null : __('System')), 'order' => null, 'note' => $r->note]);
+
+        // Same second: the status first, it follows the number that caused it (the last one packed: Out of stock).
+        return $qty->concat($status)->sort(fn ($a, $b) => [$b['at']->getTimestamp(), $b['kind'] === 'status'] <=> [$a['at']->getTimestamp(), $a['kind'] === 'status'])
+            ->take($limit)->values()->all();
+    }
+
+    /**
+     * The last change of each variant on a page (number or status, whichever is later): what, who, when.
+     * Two queries for the whole page.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, array{why: string, who: ?string, at: \Illuminate\Support\Carbon}>
+     */
+    public function lastChanges(array $ids): array
+    {
+        if (! $ids) {
+            return [];
+        }
+        $labels = \App\Models\ProductVariant::AVAILABILITY;
+        $last = fn (string $table) => DB::table($table)->whereIn('variant_id', $ids)->groupBy('variant_id')->selectRaw('MAX(id) as id');
+        $out = [];
+        foreach (DB::table('stock_movements as m')->joinSub($last('stock_movements'), 'x', 'x.id', '=', 'm.id')->leftJoin('users as u', 'u.id', '=', 'm.user_id')
+            ->get(['m.variant_id', 'm.reason', 'm.qty_after', 'm.created_at', 'u.name']) as $r) {
+            $out[$r->variant_id] = ['why' => __(self::REASONS[$r->reason] ?? $r->reason).' '.((float) $r->qty_after + 0), 'who' => $r->name, 'at' => \Illuminate\Support\Carbon::parse($r->created_at)];
+        }
+        foreach (DB::table('availability_events as e')->joinSub($last('availability_events'), 'x', 'x.id', '=', 'e.id')->leftJoin('users as u', 'u.id', '=', 'e.user_id')
+            ->get(['e.variant_id', 'e.to_status', 'e.created_at', 'u.name']) as $r) {
+            $at = \Illuminate\Support\Carbon::parse($r->created_at);
+            if (! isset($out[$r->variant_id]) || $at->gt($out[$r->variant_id]['at'])) {
+                $out[$r->variant_id] = ['why' => __($labels[$r->to_status] ?? (string) $r->to_status), 'who' => $r->name, 'at' => $at];
+            }
+        }
+
+        return $out;
+    }
+
     /** A count on the shelf: the number is set, the difference is recorded. */
     public function count(int $variantId, float $qty, ?User $by, ?string $note = null): void
     {

@@ -140,8 +140,16 @@ class PackagingController extends Controller
                 'avg' => $mine->count() ? (int) round($mine->avg(fn ($o) => $o->packaging_started_at ? max(0, strtotime($o->packed_at) - strtotime($o->packaging_started_at)) : 0) / 60) : null,
                 'errors' => DB::table('scan_logs')->where('user_id', $user->id)->where('created_at', '>=', $since)->whereIn('result', ['blocked', 'unknown'])->count(),
             ],
+            // Print by batch: what the next one would take (by lines of paper), and today's batches with how far each got.
+            'nextBatch' => $user->can('packaging.create') ? app(BatchService::class)->nextUp($user) : null,
+            'batchesToday' => DB::table('batches as b')->leftJoin('users as u', 'u.id', '=', 'b.released_by')->where('b.created_at', '>=', today())
+                ->orderByDesc('b.id')->limit(40)
+                ->get(['b.id', 'b.batch_no', 'b.released_at', 'u.name as by',
+                    DB::raw('(SELECT COUNT(*) FROM orders o WHERE o.batch_id = b.id) as orders'),
+                    DB::raw('(SELECT COUNT(*) FROM orders o WHERE o.batch_id = b.id AND o.packed_at IS NOT NULL) as packed')]),
+            // A label not printed yet on an order already in a batch: it changed after printing (new orders go by batch).
             'newLabels' => DB::table('shipment_labels as l')->join('orders as o', 'o.id', '=', 'l.order_id')
-                ->whereNull('l.voided_at')->whereNull('l.printed_at')->whereRaw($inQueue)->count(),
+                ->whereNull('l.voided_at')->whereNull('l.printed_at')->whereNotNull('o.batch_id')->whereRaw($inQueue)->count(),
             'holdReasons' => StatusReason::options('hold'),
             // Boxes to open: taken back or cancelled after a packer started them.
             'toUnpack' => DB::table('orders as o')->leftJoin('users as p', 'p.id', '=', 'o.unpack_packer_id')->whereNotNull('o.unpack_needed_at')
@@ -311,6 +319,35 @@ class PackagingController extends Controller
         ])->values();
 
         return view('packaging.sheet', ['rows' => $rows, 'summary' => $summary]);
+    }
+
+    /** Print next batch: the oldest orders that fit the batch list (BatchService::nextUp), then its print page. */
+    public function nextBatch(Request $request, BatchService $batches): RedirectResponse
+    {
+        $id = $batches->makeNext($request->user());
+
+        return $id ? redirect()->route('packaging.batch-list', $id) : back()->with('error', __('No new order to print.'));
+    }
+
+    /**
+     * One batch on the 80 mm receipt printer: what to take from the shelves (by item), then each order with its
+     * items to tick. No customer name or phone: the shop goes by the order no. Prints again the same (lost or torn).
+     */
+    public function batchList(int $batch, BatchService $batches): View
+    {
+        $b = DB::table('batches as b')->leftJoin('users as u', 'u.id', '=', 'b.released_by')->where('b.id', $batch)->first(['b.*', 'u.name as by']);
+        abort_unless($b, 404);
+        $orders = Order::where('batch_id', $batch)->orderBy('packaging_sent_at')->orderBy('id')
+            ->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,shelf_code,size_qty,size_unit')
+            ->get(['id', 'order_no', 'ship_thana', 'ship_district', 'active_shipment_id', 'packed_at']);
+        $cn = DB::table('shipments')->whereIn('id', $orders->pluck('active_shipment_id')->filter())->pluck('consignment_id', 'id');
+        $dayNo = DB::table('batches')->whereDate('created_at', \Illuminate\Support\Carbon::parse($b->created_at)->toDateString())->where('id', '<=', $b->id)->count();
+
+        return view('packaging.batch-list', [
+            'batch' => $b, 'orders' => $orders, 'cn' => $cn, 'dayNo' => $dayNo,
+            'pick' => $batches->pickList($batch),
+            'todayTotal' => DB::table('orders')->whereIn('batch_id', DB::table('batches')->whereDate('created_at', \Illuminate\Support\Carbon::parse($b->created_at)->toDateString())->where('id', '<=', $b->id)->pluck('id'))->count(),
+        ]);
     }
 
     // ── Batches (older flow, kept for bulk pick lists; not in the menu) ──

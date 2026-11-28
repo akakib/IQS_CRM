@@ -126,6 +126,41 @@ class PackagingTest extends TestCase
         $this->assertSame($before, $this->label($a));
     }
 
+    public function test_batches_go_by_lines_of_paper_never_split_an_order_and_print_on_80mm_without_customer_details(): void
+    {
+        app(\App\Services\SettingsService::class)->set(['packaging.batch_lines' => 6, 'packaging.batch_orders' => 15]);
+        // Oldest first: a (1 item = 2 lines), b (2 items = 3 lines), c (1 item = 2 lines). 6 lines: a + b fit (5), c waits.
+        $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2]]);
+        $b = $this->booked('01822222222', [['variant_id' => $this->dates->id, 'qty' => 1], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        $c = $this->booked('01833333333', [['variant_id' => $this->nuts->id, 'qty' => 3]]);
+
+        $this->actingAs($this->packer)->get('/packaging')->assertSee('Next batch: 2 orders · 5 lines')->assertSee('3 waiting in all');
+        $this->post(route('packaging.next-batch'))->assertRedirect();
+        $first = DB::table('batches')->orderBy('id')->first();
+        $this->assertSame([$a->id, $b->id], DB::table('orders')->where('batch_id', $first->id)->orderBy('id')->pluck('id')->all());
+        $this->assertStringStartsWith('B'.now()->format('dmy').'-01', $first->batch_no);
+
+        // The 80 mm list: shelves first, then each order with its items to tick; no customer name or phone.
+        $this->get(route('packaging.batch-list', $first->id))->assertOk()->assertSee('BATCH '.$first->batch_no)
+            ->assertSeeInOrder(['TAKE FROM THE SHELVES', 'PACK EACH ORDER', $a->order_no, $b->order_no])
+            ->assertSee('Print 2 labels')->assertDontSee('01811111111')->assertDontSee($a->ship_name);
+
+        // Next press: c alone (02). Then nothing left.
+        $this->get('/packaging')->assertSee('Next batch: 1 orders · 2 lines')->assertSeeText($first->batch_no.' · 0/2 packed');
+        $this->post(route('packaging.next-batch'));
+        $this->assertSame(2, DB::table('batches')->count());
+        $this->assertNotNull($c->fresh()->batch_id);
+        $this->get('/packaging')->assertSee('No new order to print.');
+
+        // One order bigger than the limit goes alone, never split.
+        $big = $this->booked('01844444444', [['variant_id' => $this->dates->id, 'qty' => 1], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        app(\App\Services\SettingsService::class)->set(['packaging.batch_lines' => 2]);
+        $this->get('/packaging')->assertSee('Next batch: 1 orders · 3 lines');
+
+        // Its labels: the sticker points to the batch list for items that do not fit.
+        $this->get(route('packaging.labels', ['orders' => $a->id]))->assertOk()->assertSee('see batch list '.$first->batch_no)->assertSee('Batch list (80 mm)');
+    }
+
     public function test_a_packers_bottom_bar_is_packaging_and_handover_only(): void
     {
         $bar = fn ($html) => \Illuminate\Support\Str::between($html, 'app-bottom-nav', '</nav>');
@@ -175,7 +210,7 @@ class PackagingTest extends TestCase
         $labelA = $this->label($a);
 
         // One print: the stickers, and the A4 sheet of the same orders with the same label IDs and big item lines.
-        $page = $this->actingAs($this->packer)->get(route('packaging.labels'))->assertOk()->assertSee('Packing sheet (A4)');
+        $page = $this->actingAs($this->packer)->get(route('packaging.labels'))->assertOk()->assertDontSee('Packing sheet (A4)'); // A4 is off until the shop has an A4 printer (the sheet page stays)
         $run = DB::table('shipment_labels')->where('barcode', $labelA)->value('print_run');
         $this->assertNotNull($run);
         $this->get(route('packaging.sheet', ['run' => $run]))->assertOk()->assertSeeInOrder([$labelA, 'Dates', $this->label($b)])->assertSee('Label on')
@@ -783,7 +818,7 @@ class PackagingTest extends TestCase
         $b = $this->booked('01712345662', [['variant_id' => $this->dates->id, 'qty' => 1]]);
         $this->actingAs($this->packer);
         $this->packIt($a);
-        $this->get('/packaging')->assertSee("Today's sheet");
+        $this->get('/packaging')->assertDontSee("Today's sheet"); // A4 off for now: the page below still works for when the shop has an A4 printer
         $this->get(route('packaging.sheet', ['today' => 1]))->assertOk()->assertSee("Today's packing sheet")
             ->assertSeeInOrder([$a->order_no, 'Dates', 'Nuts', $b->order_no, 'Dates'])
             ->assertSeeInOrder(['Total', '2', 'Packed', '1', 'Still to pack', '1']);

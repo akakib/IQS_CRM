@@ -250,6 +250,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/packaging/pulse', [PackagingController::class, 'pulse'])->name('packaging.pulse');
         Route::get('/packaging/orders/{order}', [PackagingController::class, 'preview'])->name('packaging.preview');
         Route::get('/packaging/batches/{batch}', [PackagingController::class, 'batch'])->whereNumber('batch')->name('packaging.batch');
+        Route::get('/packaging/batches/{batch}/list', [PackagingController::class, 'batchList'])->whereNumber('batch')->name('packaging.batch-list');
         Route::post('/packaging/report', [PackagingController::class, 'report'])->name('packaging.report');
         Route::get('/packaging/issues', [PackagingController::class, 'issues'])->name('packaging.issues');
         Route::get('/returns', [\App\Http\Controllers\ReturnController::class, 'index'])->name('returns.index');
@@ -270,6 +271,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/packaging/orders/{order}/hold', [PackagingController::class, 'hold'])->name('packaging.hold');
         Route::post('/packaging/orders/{order}/unpacked', [PackagingController::class, 'unpacked'])->name('packaging.unpacked');
         Route::post('/packaging/release', [PackagingController::class, 'release'])->name('packaging.release');
+        Route::post('/packaging/batches/next', [PackagingController::class, 'nextBatch'])->name('packaging.next-batch');
         Route::post('/packaging/batches/{batch}/picked', [PackagingController::class, 'picked'])->whereNumber('batch')->name('packaging.picked');
         Route::post('/packaging/batches/{batch}/done', [PackagingController::class, 'done'])->whereNumber('batch')->name('packaging.done');
         Route::post('/handover', [HandoverController::class, 'start'])->name('handover.start');

@@ -19,6 +19,61 @@ class BatchService
 {
     public function __construct(private TelegramService $telegram, private OrderStateMachine $machine) {}
 
+    /**
+     * The next batch to print, by paper: the oldest orders waiting (not in a batch yet), one by one, until the
+     * batch list would pass Settings > Packaging lines (an order = 1 line + 1 per item) or orders. An order is
+     * never split; one order bigger than the limit goes alone. Oldest first: a big order never waits behind small ones.
+     *
+     * @return array{ids: list<int>, lines: int, waiting: int}
+     */
+    public function nextUp(?User $for = null): array
+    {
+        $hide = $for && app(PackagingPause::class)->canControl($for) ? '' : app(PackagingPause::class)->visibleSql('o');
+        $rows = DB::table('orders as o')->where('o.status_id', OrderStatus::idFor('ready_for_packaging'))->whereNull('o.batch_id')->whereNotNull('o.active_shipment_id')
+            ->when($hide !== '', fn ($q) => $q->whereRaw($hide))
+            ->orderBy('o.packaging_sent_at')->orderBy('o.id')->limit(300)
+            ->get(['o.id', DB::raw('(SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) as items')]);
+        $maxLines = max(5, (int) settings('packaging.batch_lines'));
+        $maxOrders = max(1, (int) settings('packaging.batch_orders'));
+        $ids = [];
+        $lines = 0;
+        foreach ($rows as $r) {
+            $need = 1 + (int) $r->items;
+            if ($ids && ($lines + $need > $maxLines || count($ids) >= $maxOrders)) {
+                break;
+            }
+            $ids[] = (int) $r->id;
+            $lines += $need;
+        }
+
+        return ['ids' => $ids, 'lines' => $lines, 'waiting' => $rows->count()];
+    }
+
+    /** Makes the next batch (nextUp) and numbers it B + date + count of the day. Null when nothing waits. */
+    public function makeNext(User $by): ?int
+    {
+        // One at a time: two people pressing together never put an order in two batches, nor take the same number.
+        return \Illuminate\Support\Facades\Cache::lock('packaging-next-batch', 15)->block(10, fn () => DB::transaction(function () use ($by) {
+            $ids = $this->nextUp($by)['ids'];
+            if (! $ids) {
+                return null;
+            }
+            $n = DB::table('batches')->whereDate('created_at', today())->count() + 1;
+            $id = DB::table('batches')->insertGetId([
+                'batch_no' => 'B'.now()->format('dmy').'-'.str_pad((string) $n, 2, '0', STR_PAD_LEFT), 'pickup_date' => today(), 'status' => 'released',
+                'released_by' => $by->id, 'released_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $taken = DB::table('orders')->whereIn('id', $ids)->whereNull('batch_id')->update(['batch_id' => $id, 'updated_at' => now()]);
+            if ($taken === 0) {
+                DB::table('batches')->where('id', $id)->delete();
+
+                return null;
+            }
+
+            return $id;
+        }));
+    }
+
     /** @param list<int>|null $orderIds null = every booked order not yet in a batch */
     public function release(?array $orderIds, User $by): ?int
     {

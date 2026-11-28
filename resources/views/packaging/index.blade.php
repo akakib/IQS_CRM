@@ -89,9 +89,30 @@
     <div class="mt-2 space-y-2">
         {{-- Owner and managers: pause or resume, always in sight (not inside Manage). --}}
         <x-packaging-pause />
+        {{-- Print by batch: the oldest orders waiting, as many as fit the batch list (Settings > Packaging). --}}
+        @if ($nextBatch)
+            @if ($nextBatch['ids'])
+                <form method="POST" action="{{ route('packaging.next-batch') }}" class="flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary-soft px-3 py-2.5 text-sm text-primary">
+                    @csrf
+                    <span><b>{{ __('Next batch: :o orders · :l lines', ['o' => count($nextBatch['ids']), 'l' => $nextBatch['lines']]) }}</b>@if ($nextBatch['waiting'] > count($nextBatch['ids']))<span class="block text-xs">{{ __(':n waiting in all', ['n' => $nextBatch['waiting']]) }}</span>@endif</span>
+                    <button class="lockable inline-flex h-8 shrink-0 items-center rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-dark">{{ __('Print next batch') }}</button>
+                </form>
+            @else
+                <p class="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-500">{{ __('No new order to print.') }}</p>
+            @endif
+        @endif
+        @if ($batchesToday->isNotEmpty())
+            <div class="flex gap-1.5 overflow-x-auto pb-1">
+                @foreach ($batchesToday as $b)
+                    <a href="{{ route('packaging.batch-list', $b->id) }}" @class(['shrink-0 rounded-lg border px-2.5 py-1.5 text-xs', 'border-green-300 bg-green-50 text-green-800' => $b->orders && $b->packed >= $b->orders, 'border-gray-200 bg-white text-gray-700' => ! ($b->orders && $b->packed >= $b->orders)])>
+                        <b class="font-mono">{{ $b->batch_no }}</b> · {{ $b->packed }}/{{ $b->orders }} {{ __('packed') }}@if ($b->orders && $b->packed >= $b->orders) ✓@endif
+                    </a>
+                @endforeach
+            </div>
+        @endif
         @if ($newLabels)
             <a href="{{ route('packaging.labels') }}" target="_blank" class="flex items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm font-medium text-orange-900">
-                <span>{{ trans_choice(':n new label to print|:n new labels to print', $newLabels, ['n' => $newLabels]) }}</span>
+                <span>{{ trans_choice(':n changed label to print again|:n changed labels to print again', $newLabels, ['n' => $newLabels]) }}</span>
                 <span class="shrink-0 rounded-lg border border-orange-300 bg-white px-3 py-1 text-xs font-semibold">{{ __('Print') }}</span>
             </a>
         @endif
@@ -112,9 +133,8 @@
                 <button type="button" @click="tools = false" class="h-8 rounded-lg border border-gray-300 px-3 text-sm text-gray-600">{{ __('Close') }}</button>
             </div>
             <div class="grid grid-cols-2 gap-2">
-                <a href="{{ route('packaging.sheet', ['today' => 1]) }}" target="_blank" class="flex h-10 items-center justify-center rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Today\'s sheet') }}</a>
+                {{-- The A4 sheet is off until the shop has an A4 printer (the 80 mm batch list does its job); the page stays. --}}
                 <a href="{{ route('handover.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Handover') }}</a>
-                @if ($newLabels)<a href="{{ route('packaging.labels') }}" target="_blank" class="flex h-10 items-center justify-center rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Print new labels (:n)', ['n' => $newLabels]) }}</a>@endif
                 @if ($openIssues)<a href="{{ route('packaging.issues') }}" class="flex h-10 items-center justify-center rounded-lg border border-red-200 text-sm font-medium text-red-700 hover:bg-red-50">{{ __('Missing items (:n)', ['n' => $openIssues]) }}</a>@endif
             </div>
             @if ($canManage)

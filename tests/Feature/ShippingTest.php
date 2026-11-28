@@ -86,7 +86,7 @@ class ShippingTest extends TestCase
             $this->assertDatabaseHas('shipment_labels', ['order_id' => $o->id, 'barcode' => $o->order_no.'-1', 'voided_at' => null]);
         }
 
-        $this->get('/shipping/labels?orders='.$a->order_no)->assertOk()->assertSee($a->order_no.'-1')->assertSee('<svg', false)->assertSee('Packing sheet (A4)');
+        $this->get('/shipping/labels?orders='.$a->order_no)->assertOk()->assertSee($a->order_no.'-1')->assertSee('<svg', false)->assertDontSee('Packing sheet (A4)'); // A4 off until the shop has an A4 printer
         $label = DB::table('shipment_labels')->where('order_id', $a->id)->first();
         $this->assertNotNull($label->printed_at);
         $this->assertNotNull($label->print_run); // same print path as Packaging: the A4 sheet lists it

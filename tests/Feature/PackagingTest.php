@@ -87,6 +87,17 @@ class PackagingTest extends TestCase
         $this->postJson("/packaging/orders/{$o->id}/pack", ['items' => DB::table('order_items')->where('order_id', $o->id)->pluck('id')->all()])->assertJson(['ok' => true]);
     }
 
+    public function test_a_packers_bottom_bar_is_packaging_and_handover_only(): void
+    {
+        $bar = fn ($html) => \Illuminate\Support\Str::between($html, 'app-bottom-nav', '</nav>');
+        $html = $bar($this->actingAs($this->packer)->get('/packaging')->assertOk()->getContent());
+        $this->assertStringContainsString('Handover', $html);
+        $this->assertStringNotContainsString('Chats', $html);
+        $this->assertStringNotContainsString('Products', $html);
+        $this->assertStringNotContainsString('>Home', str_replace(["
+", ' '], '', $html));
+    }
+
     public function test_a_manager_pauses_packaging_booking_goes_on_and_the_packer_gets_the_orders_on_resume(): void
     {
         $before = $this->booked('01712345601', [['variant_id' => $this->dates->id, 'qty' => 1]]);

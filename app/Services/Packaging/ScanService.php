@@ -219,7 +219,10 @@ class ScanService
         if ($key === 'packed') {
             $this->machine->transition($order, 'ready_for_pickup', $by, 'scan');
         }
-        $this->machine->transition($order, 'handed_over', $by, 'scan', null, $byHand ? __('ticked by hand, label not scanned') : null);
+        // The order's history says which rider took it (owner 2026-11-29: who took which parcel, any day later).
+        $s = DB::table('handover_sessions')->where('id', $sessionId)->first(['rider_name', 'rider_phone']);
+        $to = $s && $s->rider_name ? __('To rider :r', ['r' => trim($s->rider_name.' '.($s->rider_phone ?? ''))]) : null;
+        $this->machine->transition($order, 'handed_over', $by, 'scan', null, implode(' · ', array_filter([$to, $byHand ? __('ticked by hand, label not scanned') : null])) ?: null);
 
         return $this->log('handover', $sessionId, $code, $order->refresh(), $label, [
             'ok' => true, 'level' => $order->edited_after_pack ? 'edited' : 'ok', 'result' => 'ok',

@@ -539,7 +539,7 @@ class PackagingTest extends TestCase
         $this->postJson("/handover/{$session}/scan", ['code' => 'NOPE-1'])->assertJson(['ok' => false, 'result' => 'unknown']);
         $this->assertSame('handed_over', $this->key($a));
 
-        $this->post("/handover/{$session}/close")->assertRedirect("/handover/{$session}/manifest");
+        $this->actingAs($this->desk)->post("/handover/{$session}/close")->assertRedirect("/handover/{$session}/manifest"); // a manager gets the manifest; a packer, the slip
         $this->get("/handover/{$session}/manifest")->assertOk()->assertSee($a->order_no)->assertSee('NOT handed over')->assertSee($b->order_no)->assertSee('Pickup sheet')->assertSee(route('handover.excel', $session), false)->assertSee('Received by rider')->assertDontSee('window.print(), 300');
         $this->get("/handover/{$session}/manifest?print=1")->assertSee('Print / PDF')->assertSee('window.print(), 300', false)
             ->assertDontSee('window.close()', false)->assertDontSee('as=pdf', false); // Back, not Close; one Print / PDF button
@@ -547,7 +547,7 @@ class PackagingTest extends TestCase
 
         // Any time later, from the list: the handed parcels only, same columns as the orders export; contact masked for packers.
         $this->get('/handover')->assertOk()->assertSee(route('handover.print', $session))->assertSee(route('handover.excel', $session));
-        $print = $this->get("/handover/{$session}/print")->assertOk()->assertSee('Rider: Rafiq 01911111111')->assertSee($a->order_no)->assertDontSee($b->order_no)->assertSee('Orders: <b>1</b>', false);
+        $print = $this->actingAs($this->packer)->get("/handover/{$session}/print")->assertOk()->assertSee('Rider: Rafiq 01911111111')->assertSee($a->order_no)->assertDontSee($b->order_no)->assertSee('Orders: <b>1</b>', false);
         $print->assertDontSee('01712345678');
         $excel = $this->get("/handover/{$session}/excel")->assertOk();
         $zip = new \ZipArchive;
@@ -581,6 +581,31 @@ class PackagingTest extends TestCase
         $this->actingAs($this->packer)->get('/packers-report')->assertForbidden();
     }
 
+    public function test_a_packers_handover_is_ready_and_given_rider_first_typed_digits_and_a_slip_at_the_end(): void
+    {
+        $a = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $b = $this->booked('01812345678', [['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        $this->actingAs($this->packer);
+        $this->packIt($a);
+        $this->packIt($b);
+
+        $this->get('/handover')->assertOk()->assertSee('Which rider?')->assertSee($a->order_no)->assertDontSee('Recent handovers');
+        $this->post('/handover', ['rider_name' => 'Rafiq', 'rider_phone' => '01911111111'])->assertRedirectContains('scan=1');
+        $session = DB::table('handover_sessions')->value('id');
+        $this->get('/handover')->assertRedirect("/handover/{$session}"); // open: straight back into it
+        $this->get("/handover/{$session}")->assertOk()->assertSee('Rafiq')->assertSee('Finish')->assertDontSee('Manual');
+
+        // A torn barcode: the order no's last digits.
+        $this->postJson("/handover/{$session}/scan", ['code' => substr($a->order_no, -4), 'via' => 'typed'])->assertJson(['ok' => true]);
+        $this->assertStringContainsString('To rider Rafiq 01911111111', DB::table('order_notes')->where('order_id', $a->id)->where('note_type', 'status')->orderByDesc('id')->value('body'));
+        // Ticking by hand is for a manager.
+        $this->post("/handover/{$session}/manual", ['order_ids' => [$b->id]])->assertForbidden();
+
+        $this->post("/handover/{$session}/close")->assertRedirect("/handover/{$session}");
+        $this->get("/handover/{$session}")->assertOk()->assertSee('Slip PDF')->assertSee('A4 print')->assertSee('stays for the next pickup');
+        $this->get('/handover')->assertOk()->assertSee('Last handover: Rafiq');
+    }
+
     public function test_handover_by_hand_runs_the_same_checks_and_is_marked_manual(): void
     {
         $good = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
@@ -592,7 +617,7 @@ class PackagingTest extends TestCase
         app(OrderEditor::class)->request($edited->fresh(), ['items' => [['variant_id' => $this->nuts->id, 'qty' => 2]]],
             DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'customer_request')->value('id'), $this->desk, $edited->fresh()->lock_version);
 
-        $this->post('/handover', ['rider_name' => 'Rafiq']);
+        $this->actingAs($this->desk)->post('/handover', ['rider_name' => 'Rafiq']); // by hand is for a manager
         $session = DB::table('handover_sessions')->value('id');
         $this->get("/handover/{$session}?tab=manual")->assertOk()->assertSee('Manual')->assertSee($good->order_no);
 

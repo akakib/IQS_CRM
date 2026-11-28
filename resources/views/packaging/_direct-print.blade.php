@@ -179,10 +179,10 @@ window.IqsPrint = (() => {
         if (ep === null) throw new Error('Receipt printer: no way to send.');
         await d.claimInterface(iface); return { d, ep };
     }
-    async function printReceipt(r, choose, progress) {
+    async function printReceipt(r, choose, progress, draw) {
         progress('Receipt');
         const { d, ep } = await receipt_(choose);
-        const b = bits(receipt(r));
+        const b = bits((draw || receipt)(r));
         await d.transferOut(ep, new Uint8Array([0x1b, 0x40]));
         for (let y = 0; y < b.h; y += 200) { // bands, so the printer's memory never overflows
             const h = Math.min(200, b.h - y), part = b.data.slice(y * b.row, (y + h) * b.row);
@@ -229,6 +229,24 @@ window.IqsPrint = (() => {
             return { canvas: c, wMm: 51, hMm: 76 };
         })), name);
     }
+    // The handover slip on 76 mm paper: who took the parcels, each parcel with its COD, the total, and a line for the rider to sign.
+    function slip(h) {
+        const W = 576, [c, g] = canvas(W, 520 + h.parcels.length * 80), L = 8, R = W - 8; let y = 10;
+        g.textAlign = 'center'; g.font = 'bold 40px Arial'; g.fillText('HANDOVER', W / 2, y); y += 50;
+        g.font = 'bold 26px Arial'; g.fillText(h.rider, W / 2, y); y += 34;
+        g.font = '22px Arial'; for (const t of h.head) { g.fillText(t, W / 2, y); y += 28; } g.textAlign = 'left';
+        g.fillRect(L, y + 4, R - L, 3); y += 18;
+        h.parcels.forEach((p, n) => {
+            for (let x = L; x < R; x += 14) g.fillRect(x, y, 8, 2); y += 10;
+            g.font = 'bold 28px Arial'; g.fillText((n + 1) + '. ' + p.no, L, y); g.textAlign = 'right'; g.fillText(p.cod, R, y); g.textAlign = 'left'; y += 34;
+            g.font = '20px Arial'; g.fillText(p.area, L + 34, y); if (p.cn) { g.font = 'bold 20px Arial'; g.textAlign = 'right'; g.fillText('CN ' + p.cn, R, y); g.textAlign = 'left'; } y += 32;
+        });
+        g.fillRect(L, y, R - L, 3); y += 14;
+        g.font = 'bold 28px Arial'; g.fillText(h.count, L, y); g.textAlign = 'right'; g.fillText(h.total, R, y); g.textAlign = 'left'; y += 60;
+        g.font = '22px Arial'; g.fillText('Rider signature: ______________________', L, y); y += 50; g.fillText('Given by: ' + h.by, L, y); y += 40;
+        const [out, og] = canvas(W, y); og.drawImage(c, 0, 0); return out;
+    }
+    function slipPdf(h, name) { const c = slip(h); save(pdf([{ canvas: c, wMm: 76, hMm: c.height * 76 / 576 }]), name); }
     // The batch list: one 76 mm wide page, as long as the list.
     function listPdf(r, name) { const c = receipt(r); save(pdf([{ canvas: c, wMm: 76, hMm: c.height * 76 / 576 }]), name); }
 
@@ -238,7 +256,7 @@ window.IqsPrint = (() => {
     }
     restore();
 
-    return { sticker, receipt, printStickers, printReceipt, marked, connectSticker: sticker_, connectReceipt: receipt_, disconnect, labelsPdf, listPdf,
+    return { sticker, receipt, slip, slipPdf, printStickers, printReceipt, marked, connectSticker: sticker_, connectReceipt: receipt_, disconnect, labelsPdf, listPdf,
         canPrint: !!(navigator.bluetooth || navigator.usb),
         status: () => ({ sticker: !!(ble && ble.d.gatt.connected), stickerName: ble?.d.name || bleDev?.name || '', reconnecting: retrying,
             receipt: !!(usb && usb.d.opened), receiptName: usb?.d.productName || '' }),

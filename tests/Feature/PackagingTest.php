@@ -206,7 +206,7 @@ class PackagingTest extends TestCase
 
         // Three tabs. To pack: how many wait and Print next batch; nothing to press on an order. No manager tools, no phone.
         $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSeeInOrder(['To pack', 'Ongoing', 'Packed'])
-            ->assertSee('Print next batch')->assertSee($a->order_no)->assertDontSee('Dates')
+            ->assertSee('Print next batch')->assertSee($a->order_no)->assertSee('Dates')->assertDontSee('>Done</button>', false)->assertDontSee('>Hold</button>', false)
             ->assertDontSee('Tools')->assertDontSee('On hold')->assertDontSee('Select all')->assertDontSee('01811111111');
 
         // Printed as a batch: it is Ongoing, opened first, with its items; the sticker not printed yet = Print label.

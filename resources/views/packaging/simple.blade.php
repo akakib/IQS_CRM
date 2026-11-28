@@ -58,10 +58,27 @@
         </div>
         @include('packaging._packed')
     @elseif ($filter === 'all')
-        {{-- To pack: the order numbers only (owner 2026-11-28). Nothing to press here but Print next batch. --}}
+        {{-- To pack: the order no and its CN; a tap opens what is in it (photos, amounts). No Done or Hold here: those are in Ongoing. --}}
         @if ($queue->isNotEmpty())
-            <div class="divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white">
-                @foreach ($queue as $o)<p class="px-4 py-3 font-mono text-lg font-semibold text-gray-900">{{ $o->order_no }}</p>@endforeach
+            <div class="divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white" x-data="{ open: null }">
+                @foreach ($queue as $o)
+                    @php $its = $items[$o->id] ?? collect(); @endphp
+                    <div>
+                        <button type="button" @click="open = open === {{ $o->id }} ? null : {{ $o->id }}" class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
+                            <span class="min-w-0">
+                                <span class="block font-mono text-lg font-semibold text-gray-900">{{ $o->order_no }}</span>
+                                @if ($cns[$o->id] ?? null)<span class="block text-sm text-gray-600">CN <b class="font-semibold text-gray-900">{{ $cns[$o->id] }}</b></span>@endif
+                            </span>
+                            <span class="flex shrink-0 items-center gap-2 text-sm text-gray-500">{{ trans_choice(':count item|:count items', $its->count(), ['count' => $its->count()]) }}
+                                <svg class="h-5 w-5 transition" :class="open === {{ $o->id }} ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg></span>
+                        </button>
+                        <div x-show="open === {{ $o->id }}" x-cloak class="space-y-2 px-4 pb-3">
+                            @foreach ($its as $i)
+                                <div class="flex items-center gap-3 rounded-xl border border-gray-200 px-2 py-1.5 text-sm text-gray-800"><x-product-thumb :src="$i->image_url" /><span class="min-w-0 flex-1">{{ $i->name_snapshot }}{{ ($s = $size($i)) ? ' '.$s : '' }}</span><b class="shrink-0">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b></div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
             </div>
             <div class="mt-3">{{ $queue->links() }}</div>
         @else

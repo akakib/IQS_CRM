@@ -286,6 +286,16 @@
             @endforelse
         </div>
     @else
+    {{-- Tick every order on this page at once (then Print selected), or none. --}}
+    @if ($queue->count() > 1)
+        @php $pageIds = $queue->pluck('id')->map(fn ($id) => (string) $id)->values(); @endphp
+        <label class="mt-3 flex w-fit cursor-pointer items-center gap-3 rounded-lg px-4 py-1.5 text-sm text-gray-700">
+            <input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                :checked="picked.length && @js($pageIds).every(id => picked.includes(id))"
+                @change="picked = $event.target.checked ? [...new Set([...picked, ...@js($pageIds)])] : picked.filter(id => !@js($pageIds).includes(id))">
+            {{ __('Select all on this page (:n)', ['n' => $queue->count()]) }}
+        </label>
+    @endif
     <div class="mt-3 space-y-2">
         @forelse ($queue as $o)
             <div @class(['overflow-hidden rounded-xl border bg-white',

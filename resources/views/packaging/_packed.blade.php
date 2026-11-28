@@ -46,9 +46,7 @@
                 <div class="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-100">
                     @foreach ($items as $i)
                         <div class="flex items-center gap-3 px-3 py-2 text-sm">
-                            <span class="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-gray-200 bg-gray-100">
-                                @if ($i->image_url)<img src="{{ $i->image_url }}" alt="" loading="lazy" class="h-full w-full object-cover" onerror="this.remove()">@endif
-                            </span>
+                            <x-product-thumb :src="$i->image_url" />
                             <span class="min-w-0 flex-1 text-gray-800">{{ $i->name_snapshot }}</span>
                             <b class="shrink-0 tabular-nums">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b>
                         </div>

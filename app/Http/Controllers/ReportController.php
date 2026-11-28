@@ -91,7 +91,7 @@ class ReportController extends Controller
             $tiles[] = [__('Out of stock'), $oos, route('products.availability'), $oos ? 'down' : null];
         } elseif ($user->can('products.availability')) {
             $sq = trim((string) $request->query('oos'));
-            $outOfStock = \App\Models\ProductVariant::with('product:id,name')->where('availability_status', 'out_of_stock')
+            $outOfStock = \App\Models\ProductVariant::with('product:id,name,image_url')->where('availability_status', 'out_of_stock')
                 ->whereHas('product', fn ($p) => $p->where('status', 'active'))
                 ->when($sq !== '', fn ($w) => $w->where(fn ($s) => $s->where('sku', 'like', $sq.'%')->orWhere('name', 'like', '%'.$sq.'%')
                     ->orWhereHas('product', fn ($p) => $p->where('name', 'like', '%'.$sq.'%'))))

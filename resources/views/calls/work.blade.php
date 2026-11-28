@@ -139,7 +139,7 @@
                                 <p class="text-gray-700"><span class="text-gray-500">{{ $o->created_at->format('d M Y') }}</span> ·
                                     @if ($canOpenOrders)<a href="{{ route('orders.show', $o->id) }}" @click.prevent="window.dispatchEvent(new CustomEvent('order-new', { detail: { url: @js(route('orders.show', ['order' => $o->id, 'embed' => 1])), title: @js($o->order_no), page: @js(route('orders.show', $o->id)) } }))" class="font-mono font-medium text-primary hover:underline">{{ $o->order_no }}</a>@else<span class="font-mono">{{ $o->order_no }}</span>@endif
                                     · ৳{{ number_format((float) $o->grand_total) }} <x-order-status :order="$o" /><br>
-                                    <span class="text-xs text-gray-500">{{ $o->items->map(fn ($i) => $i->name_snapshot)->join(', ') }}</span></p>
+                                    </p><x-item-chips :items="$o->items" class="mt-1" />
                             @endforeach
                             @foreach ($history['past'] as $p)
                                 <p class="text-gray-700"><span class="text-gray-500">{{ \Illuminate\Support\Carbon::parse($p->at)->format('d M Y') }}</span> · ৳{{ number_format((float) $p->amount) }} · {{ __(\App\Services\Customers\HistoryImport::STATUSES[$p->status] ?? $p->status) }}

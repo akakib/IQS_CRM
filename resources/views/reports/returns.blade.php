@@ -44,12 +44,12 @@
             <section x-show="tab === 'damaged'">
                 @forelse ($damagedItems as $d)
                     <div class="mb-2 flex flex-col gap-1 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:gap-3">
-                        <div class="min-w-0 flex-1">
+                        <div class="flex min-w-0 flex-1 items-start gap-3"><x-product-thumb :src="$d['image']" /><div class="min-w-0 flex-1">
                             <p class="text-sm font-medium text-gray-900">{{ $d['name'] }}</p>
                             <p class="text-xs text-gray-500">
                                 @foreach ($d['orders'] as $o)<a href="{{ route('orders.show', $o['id']) }}" class="font-mono text-primary hover:underline">{{ $o['no'] }}</a>@if (! $loop->last), @endif @endforeach
                             </p>
-                        </div>
+                        </div></div>
                         <p class="text-sm">
                             @if ($d['damaged'])<span class="font-medium text-red-700">{{ __(':n damaged', ['n' => $num($d['damaged'])]) }}</span>@endif
                             @if ($d['damaged'] && $d['missing']) · @endif
@@ -68,7 +68,7 @@
                         @forelse ($rows as $r)
                             @php $r = (array) $r; @endphp
                             <div class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                                <span class="min-w-0 truncate text-gray-800">{{ $r['label'] ?? $r['name'] }}</span>
+                                <span class="flex min-w-0 items-center gap-2 text-gray-800">@if ($key === 'product')<x-product-thumb :src="$r['image'] ?? null" size="sm" />@endif<span class="truncate">{{ $r['label'] ?? $r['name'] }}</span></span>
                                 <span class="shrink-0 text-right tabular-nums">
                                     @if ($key === 'product')
                                         {{ trans_choice(':count parcel|:count parcels', (int) $r['parcels'], ['count' => (int) $r['parcels']]) }} · {{ $num($r['qty']) }}

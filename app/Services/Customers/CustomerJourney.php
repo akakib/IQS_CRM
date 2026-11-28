@@ -27,7 +27,7 @@ class CustomerJourney
         // One row per order; what was really received comes from the courier (as in the profit report).
         $orders = Order::query()->where('orders.customer_id', $customer->id)
             ->leftJoin('shipments as s', 's.id', '=', 'orders.active_shipment_id')
-            ->with(['items:id,order_id,name_snapshot,qty,unit', 'moderator:id,name'])
+            ->with(['items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,product_id', 'items.variant.product:id,image_url', 'moderator:id,name'])
             ->orderByDesc('orders.id')->limit(300)
             ->get(['orders.id', 'orders.order_no', 'orders.status_id', 'orders.channel', 'orders.source_campaign', 'orders.moderator_id', 'orders.grand_total',
                 'orders.cod_amount', 'orders.advance_verified', 'orders.created_at', 'orders.ship_district', 'orders.ship_thana',

@@ -63,7 +63,7 @@ class TelegramController extends Controller
             'name' => $user->name,
             'batch' => $batch->batch_no,
             'lines' => $batches->pickList($batch->id)->map(fn ($l) => [
-                'variant_id' => $l->variant_id, 'name' => $l->name, 'shelf' => $l->shelf_code,
+                'variant_id' => $l->variant_id, 'name' => $l->name, 'shelf' => $l->shelf_code, 'image' => $l->image_url,
                 'qty' => \App\Support\Units::qty($l->qty, $l->unit),
             ]),
         ]);

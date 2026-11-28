@@ -112,6 +112,14 @@ class PackagingTest extends TestCase
         $this->get('/packaging?show=packed&packer='.$other->id)->assertSee($b->order_no)->assertDontSee($a->order_no);
         $this->get('/packaging?show=packed&q=01822222222')->assertSee($b->order_no)->assertDontSee($a->order_no);
 
+        // Every list shows the product photo: the packed list, the packing checklist, the order page and Order management.
+        $photo = 'https://iqbalstorebd.com/wp-content/uploads/t5-test-dates.jpg';
+        DB::table('products')->where('id', $this->dates->product_id)->update(['image_url' => $photo]);
+        $this->actingAs($this->packer)->get('/packaging?show=today')->assertSee($photo, false);
+        $this->getJson(route('packaging.preview', $a))->assertJsonPath('items.0.image', $photo);
+        $this->actingAs($this->desk)->get('/orders/'.$a->id)->assertSee($photo, false);
+        $this->get('/desk?order='.$a->id)->assertSee($photo, false);
+
         // The label prints again (the same one: the box still scans).
         $before = $this->label($a);
         $this->actingAs($this->packer)->get(route('packaging.labels', ['orders' => $a->id]))->assertOk()->assertSee($before);

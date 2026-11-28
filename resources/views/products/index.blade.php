@@ -65,9 +65,7 @@
                 <tr @if ($quick) @click="open(@js($quickData($product)))" class="cursor-pointer hover:bg-gray-50" @endif>
                     <td>
                         <div class="flex items-center gap-3">
-                            @if ($product->image_url)
-                                <img src="{{ $product->image_url }}" alt="" loading="lazy" class="h-9 w-9 shrink-0 rounded-md border border-gray-200 object-cover">
-                            @endif
+                                <x-product-thumb :src="$product->image_url" />
                             <div class="min-w-0">
                                 <p class="font-medium text-gray-800">{{ $product->name }}</p>
                                 @if ($product->status !== 'active')<x-badge :color="$statusColor[$product->status]">{{ ucfirst($product->status) }}</x-badge>@endif
@@ -116,7 +114,7 @@
                     <template x-if="item">
                         <div>
                             <div class="flex items-center gap-3">
-                                <img x-show="item.image" :src="item.image" alt="" class="h-12 w-12 shrink-0 rounded-lg border border-gray-200 object-cover">
+                                <img x-show="item.image" :src="item.image" onerror="this.style.visibility='hidden'" alt="" class="h-12 w-12 shrink-0 rounded-lg border border-gray-200 object-cover">'
                                 <div class="min-w-0 flex-1">
                                     <p class="font-medium leading-snug text-gray-900" x-text="item.name"></p>
                                     <p class="text-sm text-gray-500" x-text="item.category || ''"></p>

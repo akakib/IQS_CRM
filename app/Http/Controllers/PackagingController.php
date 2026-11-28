@@ -330,7 +330,7 @@ class PackagingController extends Controller
         return view('packaging.batch', [
             'batch' => $row,
             'lines' => $batches->pickList($batch),
-            'orders' => Order::where('batch_id', $batch)->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,size_qty,size_unit')
+            'orders' => Order::where('batch_id', $batch)->with('items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,product_id,size_qty,size_unit', 'items.variant.product:id,image_url')
                 ->get(['id', 'order_no', 'status_id', 'stock_issue_flag', 'packed_version', 'current_version', 'edited_after_pack', 'is_duplicate_flag', 'duplicate_of_no', 'duplicate_items', 'duplicate_address']),
             'statuses' => OrderStatus::map(),
         ]);
@@ -370,7 +370,7 @@ class PackagingController extends Controller
                 ->join('products as p', 'p.id', '=', 'v.product_id')->leftJoin('users as u', 'u.id', '=', 'r.reported_by')
                 ->leftJoin('orders as o', 'o.id', '=', 'r.order_id')
                 ->where('r.status', 'open')->orderBy('r.id')
-                ->get(['r.*', 'p.name as product', 'v.name as variant', 'v.sku', 'v.shelf_code', 'u.name as reporter', 'o.order_no']),
+                ->get(['r.*', 'p.name as product', 'p.image_url', 'v.name as variant', 'v.sku', 'v.shelf_code', 'u.name as reporter', 'o.order_no']),
         ]);
     }
 

@@ -35,7 +35,7 @@
                 <p class="mb-3 text-xs text-gray-500" x-text="data.name"></p>
                 <template x-for="l in data.lines" :key="l.variant_id">
                     <div class="mb-2 flex items-center justify-between gap-2 rounded-xl bg-white p-3 shadow-sm">
-                        <div><p class="text-sm font-medium" x-text="l.name"></p><p class="text-xs text-gray-500" x-text="(l.shelf ? l.shelf + ' · ' : '') + l.qty"></p></div>
+                        <div class="flex min-w-0 items-center gap-2"><x-product-thumb x-src="l.image" /><div class="min-w-0"><p class="text-sm font-medium" x-text="l.name"></p><p class="text-xs text-gray-500" x-text="(l.shelf ? l.shelf + ' · ' : '') + l.qty"></p></div></div>
                         <button type="button" @click="missing(l)" :disabled="done[l.variant_id]" class="shrink-0 rounded-lg px-3 py-2 text-xs font-medium"
                             :class="done[l.variant_id] ? 'bg-gray-100 text-gray-400' : 'bg-red-600 text-white'" x-text="done[l.variant_id] ? @js(__('Reported')) : @js(__('Not found'))"></button>
                     </div>

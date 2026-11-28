@@ -43,7 +43,7 @@
                     <x-parcel-track :order="$o" flat class="mt-4 border-t border-gray-100 pt-4" />
                     <p class="mt-3 text-sm"><b>{{ $o->ship_name }}</b> · <a href="tel:{{ $o->ship_phone }}" class="font-mono text-primary">{{ $o->ship_phone }}</a>{{ $o->ship_alt_phone ? ' / '.$o->ship_alt_phone : '' }}</p>
                     <p class="text-sm text-gray-600">{{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}</p>
-                    <p class="mt-2 text-sm text-gray-700">{{ $o->items->map(fn ($i) => $i->name_snapshot.' ×'.rtrim(rtrim($i->qty, '0'), '.'))->join(', ') }}</p>
+                    <x-item-chips :items="$o->items" class="mt-2" />
                     <p class="mt-2 text-sm">{{ __('Assigned to') }}: <b>{{ $o->moderator?->name ?? __('nobody') }}</b></p>
                     @foreach ($detail['issues'] as $i)
                         <p class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ __('Open issue: :t, due :d', ['t' => $types[$i->issue_type] ?? $i->issue_type, 'd' => \Illuminate\Support\Carbon::parse($i->sla_due_at)->diffForHumans()]) }}</p>

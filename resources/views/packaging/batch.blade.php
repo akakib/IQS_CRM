@@ -21,7 +21,7 @@
                     @foreach ($lines as $l)
                         <tr>
                             <td class="py-2 pr-2 font-mono text-xs">{{ $l->shelf_code ?? '-' }}</td>
-                            <td class="py-2 pr-2">{{ $l->name }} <span class="font-mono text-xs text-gray-400">{{ $l->sku }}</span></td>
+                            <td class="py-2 pr-2"><span class="flex items-center gap-2"><x-product-thumb :src="$l->image_url" size="sm" class="print:hidden" /><span>{{ $l->name }} <span class="font-mono text-xs text-gray-400">{{ $l->sku }}</span></span></span></td>
                             <td class="py-2 pr-2 text-right font-semibold tabular-nums">{{ \App\Support\Units::qty($l->qty, $l->unit) }}</td>
                             <td class="py-2 text-right tabular-nums text-gray-500">{{ $l->orders }}</td>
                             <td class="py-2 pl-2 text-right">
@@ -48,7 +48,8 @@
                             <x-order-status :order="$o" :statuses="$statuses" />
                         </span>
                     </div>
-                    <p class="text-xs text-gray-600">{{ $o->items->map(fn ($i) => $i->name_snapshot.' ×'.rtrim(rtrim($i->qty, '0'), '.'))->join(', ') }}</p>
+                    <x-item-chips :items="$o->items" class="print:hidden" />
+                    <p class="hidden text-xs text-gray-600 print:block">{{ $o->items->map(fn ($i) => $i->name_snapshot.' ×'.rtrim(rtrim($i->qty, '0'), '.'))->join(', ') }}</p>
                 </div>
             @endforeach
         </x-card>

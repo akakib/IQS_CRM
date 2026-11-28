@@ -15,8 +15,17 @@
 
 @if ($short)
     <div x-data="{ ask: false }" {{ $attributes->merge(['class' => 'mb-3 rounded-xl border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-900']) }}>
-        <p><b class="font-semibold">{{ in_array('out_of_stock', $short, true) ? __('Out of stock:') : __('Pre-order:') }}</b>
-            {{ collect($short)->map(fn ($s, $n) => $n.($s === 'backorder' ? ' ('.__('pre-order').')' : ''))->join(', ') }}</p>
+        @php
+            // The photos of the short items (one query, only when something is short).
+            $shortImg = \Illuminate\Support\Facades\DB::table('order_items as i')->join('product_variants as v', 'v.id', '=', 'i.variant_id')->leftJoin('products as p', 'p.id', '=', 'v.product_id')
+                ->where('i.order_id', $order->id)->whereIn('i.name_snapshot', array_keys($short))->pluck('p.image_url', 'i.name_snapshot');
+        @endphp
+        <p><b class="font-semibold">{{ in_array('out_of_stock', $short, true) ? __('Out of stock:') : __('Pre-order:') }}</b></p>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+            @foreach ($short as $n => $s)
+                <span class="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-orange-200 bg-white py-0.5 pl-0.5 pr-2 text-xs"><x-product-thumb :src="$shortImg[$n] ?? null" size="sm" /><span class="min-w-0 truncate">{{ $n }}{{ $s === 'backorder' ? ' ('.__('pre-order').')' : '' }}</span></span>
+            @endforeach
+        </div>
         @if ($order->stock_waived_at)
             <p class="mt-1 font-medium">{{ __('An admin allowed it without stock: it may be confirmed.') }}</p>
         @else

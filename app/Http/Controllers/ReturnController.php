@@ -73,9 +73,9 @@ class ReturnController extends Controller
         return response()->json(['ok' => true, 'level' => 'ok', 'message' => __(':no: mark each item.', ['no' => $order->order_no]), 'order' => [
             'id' => $order->id, 'order_no' => $order->order_no, 'customer' => $order->ship_name, 'partial' => $key === 'partial_delivered',
             // The pack each one was sold in ("1 kg"): the amounts are typed in that unit.
-            'items' => DB::table('order_items as i')->leftJoin('product_variants as v', 'v.id', '=', 'i.variant_id')->where('i.order_id', $order->id)
-                ->get(['i.id', 'i.name_snapshot', 'i.qty', 'i.unit', 'v.name as pack'])
-                ->map(fn ($i) => ['id' => $i->id, 'name' => $i->name_snapshot, 'qty' => (float) $i->qty, 'unit' => $i->unit,
+            'items' => DB::table('order_items as i')->leftJoin('product_variants as v', 'v.id', '=', 'i.variant_id')->leftJoin('products as p', 'p.id', '=', 'v.product_id')->where('i.order_id', $order->id)
+                ->get(['i.id', 'i.name_snapshot', 'i.qty', 'i.unit', 'v.name as pack', 'p.image_url'])
+                ->map(fn ($i) => ['id' => $i->id, 'name' => $i->name_snapshot, 'qty' => (float) $i->qty, 'unit' => $i->unit, 'image' => $i->image_url,
                     'pack' => $i->pack && ! in_array(strtolower($i->pack), ['default', ''], true) && ! str_contains($i->name_snapshot, $i->pack) ? $i->pack : null])->values(),
         ]]);
     }

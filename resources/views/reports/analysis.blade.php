@@ -65,7 +65,7 @@
             </x-slot:head>
             @foreach ($rows as $r)
                 <tr class="border-t border-gray-100 [&_td]:px-4 [&_td]:py-3">
-                    <td class="font-medium text-gray-800">{{ $label($r) }}</td>
+                    <td class="font-medium text-gray-800">@if ($group === 'product')<span class="flex items-center gap-2"><x-product-thumb :src="$r->image ?? null" size="sm" /><span>{{ $label($r) }}</span></span>@else{{ $label($r) }}@endif</td>
                     <td class="text-right tabular-nums">{{ $r->orders }}</td>
                     @if ($lineLevel)<td class="text-right tabular-nums">{{ rtrim(rtrim(number_format((float) $r->qty, 3), '0'), '.') }}</td>@endif
                     <td class="text-right tabular-nums">{{ $tk($r->revenue) }}</td>
@@ -80,7 +80,7 @@
             @foreach ($rows as $r)
                 <div class="rounded-xl border border-gray-200 bg-white p-4">
                     <div class="flex items-center justify-between">
-                        <p class="font-medium text-gray-800">{{ $label($r) }}</p>
+                        <p class="flex items-center gap-2 font-medium text-gray-800">@if ($group === 'product')<x-product-thumb :src="$r->image ?? null" size="sm" />@endif<span>{{ $label($r) }}</span></p>
                         @if ($seeProfit)<p @class(['font-semibold tabular-nums', 'text-green-800' => $r->profit >= 0, 'text-red-700' => $r->profit < 0])>{{ $tk($r->profit) }}</p>@endif
                     </div>
                     <p class="mt-1 text-xs text-gray-500">

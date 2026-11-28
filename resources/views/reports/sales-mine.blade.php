@@ -40,7 +40,7 @@
             @endphp
             <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                 <div class="flex flex-wrap items-start justify-between gap-2 border-b border-gray-100 px-4 py-3">
-                    <div class="min-w-0">
+                    <div class="flex min-w-0 items-start gap-3">@if ($r['kind'] === 'product')<x-product-thumb :src="$r['image']" />@endif<div class="min-w-0">
                         <p class="font-semibold text-gray-900">{{ $r['name'] }}</p>
                         <p class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                             <x-badge :color="$r['kind'] === 'category' ? 'purple' : 'gray'">{{ $r['kind'] === 'category' ? __('Category') : __('Product') }}</x-badge>
@@ -48,7 +48,7 @@
                             @if ($s['pre'])<span>· {{ __(':n on pre-order', ['n' => $s['pre']]) }}</span>@endif
                             @if ($s['counted'] !== null)<span>· {{ __(':n counted in stock', ['n' => $num($s['counted'])]) }}</span>@endif
                         </p>
-                    </div>
+                    </div></div>
                     <form method="POST" action="{{ route('sales-report.watch.remove', $r['id']) }}">@csrf @method('DELETE')
                         <button class="text-xs text-gray-500 hover:text-red-600">{{ __('Remove') }}</button>
                     </form>

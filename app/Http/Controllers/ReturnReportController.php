@@ -45,12 +45,12 @@ class ReturnReportController extends Controller
 
         // Damaged or missing, by product, at what it cost us.
         $bad = DB::table('return_items as r')->join('order_items as i', 'i.id', '=', 'r.order_item_id')->join('orders as o', 'o.id', '=', 'r.order_id')
-            ->leftJoin('product_variants as v', 'v.id', '=', 'r.variant_id')
+            ->leftJoin('product_variants as v', 'v.id', '=', 'r.variant_id')->leftJoin('products as p', 'p.id', '=', 'v.product_id')
             ->whereIn('r.condition', ['damaged', 'missing'])->whereBetween('r.created_at', $range)
-            ->get(['r.variant_id', 'r.condition', 'r.qty', 'i.name_snapshot', 'i.cost_price_snapshot', 'v.cost_price', 'o.id as order_id', 'o.order_no']);
+            ->get(['r.variant_id', 'r.condition', 'r.qty', 'i.name_snapshot', 'i.cost_price_snapshot', 'v.cost_price', 'p.image_url', 'o.id as order_id', 'o.order_no']);
         $cost = fn ($r) => (float) $r->qty * (float) ($r->cost_price_snapshot ?? $r->cost_price ?? 0);
         $damagedItems = $bad->groupBy(fn ($r) => $r->variant_id ?: $r->name_snapshot)->map(fn ($g) => [
-            'name' => $g->first()->name_snapshot,
+            'name' => $g->first()->name_snapshot, 'image' => $g->first()->image_url,
             'damaged' => (float) $g->where('condition', 'damaged')->sum('qty'), 'missing' => (float) $g->where('condition', 'missing')->sum('qty'),
             'cost' => $g->sum($cost), 'orders' => $g->map(fn ($r) => ['id' => $r->order_id, 'no' => $r->order_no])->unique('id')->values(),
         ])->sortByDesc('cost')->values();
@@ -59,12 +59,13 @@ class ReturnReportController extends Controller
         $byReason = $events->groupBy('reason_id')->map(fn ($g, $id) => ['label' => __($reasons[$id] ?? 'Not set'), 'n' => $g->count()])->sortByDesc('n')->values();
 
         // Full returns: every item; partial deliveries: only the pieces that came back (counted at the shop).
-        $byProduct = DB::table('order_items')->whereIn('order_id', $ids)->groupBy('name_snapshot')
-            ->selectRaw('name_snapshot as name, COUNT(DISTINCT order_id) as parcels, SUM(qty) as qty')->get()
-            ->concat(DB::table('return_items as r')->join('order_items as i', 'i.id', '=', 'r.order_item_id')->whereIn('r.order_id', $partialIds)
+        $photo = fn ($q, string $item) => $q->leftJoin('product_variants as pv', 'pv.id', '=', "{$item}.variant_id")->leftJoin('products as pp', 'pp.id', '=', 'pv.product_id');
+        $byProduct = DB::table('order_items as oi')->tap(fn ($q) => $photo($q, 'oi'))->whereIn('oi.order_id', $ids)->groupBy('oi.name_snapshot')
+            ->selectRaw('oi.name_snapshot as name, MAX(pp.image_url) as image, COUNT(DISTINCT oi.order_id) as parcels, SUM(oi.qty) as qty')->get()
+            ->concat(DB::table('return_items as r')->join('order_items as i', 'i.id', '=', 'r.order_item_id')->tap(fn ($q) => $photo($q, 'i'))->whereIn('r.order_id', $partialIds)
                 ->where('r.condition', '!=', 'kept')->groupBy('i.name_snapshot')
-                ->selectRaw('i.name_snapshot as name, COUNT(DISTINCT r.order_id) as parcels, SUM(r.qty) as qty')->get())
-            ->groupBy('name')->map(fn ($g, $name) => (object) ['name' => $name, 'parcels' => (int) $g->sum('parcels'), 'qty' => (float) $g->sum('qty')])
+                ->selectRaw('i.name_snapshot as name, MAX(pp.image_url) as image, COUNT(DISTINCT r.order_id) as parcels, SUM(r.qty) as qty')->get())
+            ->groupBy('name')->map(fn ($g, $name) => (object) ['name' => $name, 'image' => $g->pluck('image')->filter()->first(), 'parcels' => (int) $g->sum('parcels'), 'qty' => (float) $g->sum('qty')])
             ->sortByDesc('parcels')->take(50)->values();
 
         $rate = fn (int $ret, int $del) => $ret + $del ? round($ret * 100 / ($ret + $del)) : null;

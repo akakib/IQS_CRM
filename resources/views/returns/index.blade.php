@@ -49,7 +49,7 @@
                     <template x-for="i in order.items" :key="i.id">
                         <div class="rounded-lg border p-3" :class="left(i) === 0 ? 'border-green-300 bg-green-50/40' : 'border-gray-200'">
                             <div class="mb-2 flex items-center justify-between gap-2">
-                                <p class="text-sm text-gray-800"><span x-text="i.name"></span> <b x-text="'×' + i.qty"></b> <span x-show="i.pack" class="text-xs text-gray-500" x-text="'(' + @js(__('each')) + ' ' + i.pack + ')'"></span></p>
+                                <p class="flex min-w-0 items-center gap-2 text-sm text-gray-800"><x-product-thumb x-src="i.image" /><span><span x-text="i.name"></span> <b x-text="'×' + i.qty"></b> <span x-show="i.pack" class="text-xs text-gray-500" x-text="'(' + @js(__('each')) + ' ' + i.pack + ')'"></span></span></p>
                                 <span class="shrink-0 text-xs font-medium" :class="left(i) === 0 ? 'text-green-700' : 'text-amber-700'"
                                     x-text="left(i) === 0 ? @js(__('Done')) : left(i) + ' ' + @js(__('left to count'))"></span>
                             </div>

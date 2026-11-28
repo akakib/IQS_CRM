@@ -70,8 +70,8 @@ class SalesReport
     {
         return $this->items($stage, $from, $to)->join('products as p', 'p.id', '=', 'v.product_id')
             ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
-            ->groupBy('v.id', 'p.id', 'p.name', 'v.name', 'v.sku', 'v.unit', 'v.size_qty', 'v.size_unit', 'v.availability_status', 'c.name')
-            ->selectRaw('v.id, p.id as product_id, p.name as product, v.name as variant, v.sku, v.unit, v.size_qty, v.size_unit, v.availability_status as stock, c.name as category, SUM(i.qty) as qty, '.$this->gramsSql().' as grams, '.$this->mlSql().' as ml, SUM(i.line_total) as money')
+            ->groupBy('v.id', 'p.id', 'p.name', 'p.image_url', 'v.name', 'v.sku', 'v.unit', 'v.size_qty', 'v.size_unit', 'v.availability_status', 'c.name')
+            ->selectRaw('v.id, p.id as product_id, p.name as product, p.image_url, v.name as variant, v.sku, v.unit, v.size_qty, v.size_unit, v.availability_status as stock, c.name as category, SUM(i.qty) as qty, '.$this->gramsSql().' as grams, '.$this->mlSql().' as ml, SUM(i.line_total) as money')
             ->orderByDesc('money')->get();
     }
 
@@ -86,7 +86,7 @@ class SalesReport
             'pcs' => (float) $rows->filter(fn ($r) => (float) $r->grams + (float) $r->ml == 0)->sum('qty')];
 
         return $products->groupBy(fn ($r) => $r->category ?: __('No category'))->map(fn ($rows, $cat) => ['name' => $cat] + $sum($rows) + [
-            'items' => $rows->groupBy('product_id')->map(fn ($v) => ['name' => $v->first()->product, 'product_id' => $v->first()->product_id] + $sum($v) + [
+            'items' => $rows->groupBy('product_id')->map(fn ($v) => ['name' => $v->first()->product, 'product_id' => $v->first()->product_id, 'image' => $v->first()->image_url] + $sum($v) + [
                 'sizes' => $v->sortByDesc('money')->map(fn ($r) => [
                     'label' => $r->variant !== 'Default' ? $r->variant : (in_array($r->size_unit, ['g', 'ml'], true) ? \App\Support\Units::amount($r->size_unit === 'g' ? (float) $r->size_qty : 0, $r->size_unit === 'ml' ? (float) $r->size_qty : 0) : null),
                     'qty' => \App\Support\Units::qty($r->qty, $r->unit),
@@ -111,6 +111,7 @@ class SalesReport
         }
         $productIds = $watch->where('kind', 'product')->pluck('ref_id')->all();
         $categoryIds = $watch->where('kind', 'category')->pluck('ref_id')->all();
+        $photos = DB::table('products')->whereIn('id', $productIds)->pluck('image_url', 'id');
         $names = ['product' => DB::table('products')->whereIn('id', $productIds)->pluck('name', 'id'), 'category' => DB::table('categories')->whereIn('id', $categoryIds)->pluck('name', 'id')];
         $mine = fn ($q) => $q->where(fn ($w) => $w->whereIn('p.id', $productIds ?: [0])->orWhereIn('p.category_id', $categoryIds ?: [0]));
 
@@ -161,6 +162,7 @@ class SalesReport
             $s = $stock->filter(fn ($r) => $w->kind === 'product' ? (int) $r->id === (int) $w->ref_id : (int) $r->category_id === (int) $w->ref_id);
 
             return ['id' => (int) $w->id, 'kind' => $w->kind, 'ref' => (int) $w->ref_id, 'name' => $names[$w->kind][$w->ref_id] ?? __('Removed'),
+                'image' => $w->kind === 'product' ? ($photos[$w->ref_id] ?? null) : null,
                 'channels' => $channels, 'total' => $total,
                 'stock' => ['products' => $s->count(), 'sizes' => (int) $s->sum('sizes'), 'out' => (int) $s->sum('out_sizes'), 'pre' => (int) $s->sum('pre_sizes'),
                     'counted' => $s->whereNotNull('counted')->isEmpty() ? null : (float) $s->sum('counted')]];
@@ -216,9 +218,9 @@ class SalesReport
                 (SELECT SUM(x.qty) FROM order_items x WHERE x.order_id = o.id AND x.variant_id = ?) as item_qty', [$item])
             ->orderBy('s.at')->limit(200)->get();
         $first = DB::table('order_items as x')->join('product_variants as v', 'v.id', '=', 'x.variant_id')->join('products as p', 'p.id', '=', 'v.product_id')
-            ->whereIn('x.order_id', $rows->pluck('id'))->orderBy('x.id')->get(['x.order_id', 'p.name'])->unique('order_id')->pluck('name', 'order_id');
+            ->whereIn('x.order_id', $rows->pluck('id'))->orderBy('x.id')->get(['x.order_id', 'p.name', 'p.image_url'])->unique('order_id')->keyBy('order_id');
 
-        return ['rows' => $rows->each(fn ($r) => $r->first_item = $first[$r->id] ?? null), 'count' => (int) $count->n, 'returned' => (int) $count->returned];
+        return ['rows' => $rows->each(function ($r) use ($first) { $r->first_item = $first[$r->id]->name ?? null; $r->first_image = $first[$r->id]->image_url ?? null; }), 'count' => (int) $count->n, 'returned' => (int) $count->returned];
     }
 
     /** An earlier order of the same customer was delivered (fully or partly). */

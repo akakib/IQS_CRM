@@ -580,7 +580,7 @@ class CallListController extends Controller
     {
         $past = $item->customer_id ? DB::table('customer_past_orders')->where('customer_id', $item->customer_id)->orderByDesc('ordered_at')->limit(5)
             ->get(['ordered_at as at', 'amount', 'status', 'items', 'source']) : collect();
-        $orders = $item->customer_id ? Order::where('customer_id', $item->customer_id)->with('items:id,order_id,name_snapshot,qty,unit')->latest('id')->limit(5)
+        $orders = $item->customer_id ? Order::where('customer_id', $item->customer_id)->with(['items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,product_id', 'items.variant.product:id,image_url'])->latest('id')->limit(5)
             ->get(['id', 'order_no', 'status_id', 'grand_total', 'created_at']) : collect();
         $calls = DB::table('customer_calls as cc')->leftJoin('users as u', 'u.id', '=', 'cc.user_id')->where('cc.phone', $item->phone)
             ->whereNotNull('cc.outcome')->orderByDesc('cc.started_at')->limit(5)->get(['cc.started_at', 'cc.note', 'cc.satisfaction', 'u.name as by']);

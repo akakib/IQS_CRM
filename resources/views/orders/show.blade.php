@@ -98,7 +98,7 @@
                 <div class="divide-y divide-gray-100">
                     @foreach ($order->items as $item)
                         <div class="flex items-center justify-between gap-3 py-2 text-sm">
-                            <div class="min-w-0"><p class="text-gray-800">{{ $item->name_snapshot }}</p><p class="font-mono text-xs text-gray-400">{{ $item->sku_snapshot }}</p></div>
+                            <div class="flex min-w-0 flex-1 items-center gap-3"><x-product-thumb :src="$item->variant?->product?->image_url" /><div class="min-w-0"><p class="text-gray-800">{{ $item->name_snapshot }}</p><p class="font-mono text-xs text-gray-400">{{ $item->sku_snapshot }}</p></div></div>
                             <p class="shrink-0 text-gray-500">{{ \App\Support\Units::qty($item->qty, $item->unit) }} · ৳{{ number_format((float) $item->unit_price, 2) }}</p>
                             <p class="w-24 shrink-0 text-right tabular-nums">৳{{ number_format((float) $item->line_total, 2) }}</p>
                         </div>

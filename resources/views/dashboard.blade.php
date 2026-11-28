@@ -32,6 +32,7 @@
                         @foreach ($outOfStock as $v)
                             <div class="flex items-center gap-3 px-3 py-2.5">
                                 <x-list.check :id="$v->id" />
+                                <x-product-thumb :src="$v->product?->image_url" />
                                 <span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium text-gray-900">{{ $v->product?->name }}{{ $v->name !== 'Default' ? ' · '.$v->name : '' }}</span>
                                     <span class="block text-xs text-gray-500">{{ $v->oos_marked_at ? __('Out since :d', ['d' => $v->oos_marked_at->format('d M')]) : '' }}</span></span>
                                 <form method="POST" action="{{ route('products.availability.update') }}">

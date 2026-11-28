@@ -57,11 +57,11 @@ class BatchService
     public function pickList(int $batchId): Collection
     {
         return DB::table('order_items as i')->join('orders as o', 'o.id', '=', 'i.order_id')
-            ->join('product_variants as v', 'v.id', '=', 'i.variant_id')
+            ->join('product_variants as v', 'v.id', '=', 'i.variant_id')->leftJoin('products as p', 'p.id', '=', 'v.product_id')
             ->where('o.batch_id', $batchId)->where('o.stock_issue_flag', false)
-            ->groupBy('i.variant_id', 'i.name_snapshot', 'i.sku_snapshot', 'i.unit', 'v.shelf_code')
+            ->groupBy('i.variant_id', 'i.name_snapshot', 'i.sku_snapshot', 'i.unit', 'v.shelf_code', 'p.image_url')
             ->orderByRaw('v.shelf_code is null, v.shelf_code')->orderBy('i.name_snapshot')
-            ->get(['i.variant_id', 'i.name_snapshot as name', 'i.sku_snapshot as sku', 'i.unit', 'v.shelf_code',
+            ->get(['i.variant_id', 'i.name_snapshot as name', 'i.sku_snapshot as sku', 'i.unit', 'v.shelf_code', 'p.image_url',
                 DB::raw('SUM(i.qty) as qty'), DB::raw('COUNT(DISTINCT o.id) as orders')]);
     }
 

@@ -615,7 +615,7 @@
                             </div>
                             @foreach ($detail['items'] as $i)
                                 <div class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                                    <span class="min-w-0 text-gray-800">{{ $i->name_snapshot }} <b class="whitespace-nowrap">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b></span>
+                                    <span class="flex min-w-0 items-center gap-3"><x-product-thumb :src="$i->image_url" /><span class="min-w-0 text-gray-800">{{ $i->name_snapshot }} <b class="whitespace-nowrap">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b></span></span>
                                     <span class="flex shrink-0 items-center gap-3">
                                         <span class="tabular-nums text-gray-600">{{ $money($i->line_total) }}</span>
                                         <span @class(['max-sm:hidden' => $i->availability_status === 'in_stock'])><x-badge :color="$stock[$i->availability_status][0] ?? 'gray'">{{ $stock[$i->availability_status][1] ?? $i->availability_status }}</x-badge></span>

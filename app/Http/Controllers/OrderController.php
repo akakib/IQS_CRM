@@ -178,7 +178,7 @@ class OrderController extends Controller
         $user = $request->user();
         abort_unless(Order::visibleTo($user)->whereKey($order->id)->exists(), 403);
 
-        $order->load(['items', 'moderator:id,name', 'zone:id,name', 'customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en']);
+        $order->load(['items.variant:id,product_id', 'items.variant.product:id,image_url', 'moderator:id,name', 'zone:id,name', 'customer:id,name,orders_count,delivered_count,returned_count,risk_level', 'holdReason:id,label_en']);
         $notes = DB::table('order_notes as n')->leftJoin('users as u', 'u.id', '=', 'n.user_id')
             ->where('n.order_id', $order->id)->orderByDesc('n.id')->limit(200)
             ->get(['n.id', 'n.note_type', 'n.body', 'n.created_at', 'n.status_at_time_id', 'n.meta', 'u.name as user']);

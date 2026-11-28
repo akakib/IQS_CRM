@@ -27,7 +27,7 @@ class AvailabilityController extends Controller
         $active = fn ($w) => $w->whereHas('product', fn ($p) => $p->where('status', 'active')); // archived products are not stock to watch
         $variants = ProductVariant::query()->tap($active)
             ->select(['id', 'product_id', 'sku', 'name', 'availability_status', 'expected_restock_date', 'oos_marked_by', 'oos_marked_at', 'oos_review_at'])
-            ->with(['product:id,name', 'markedBy:id,name'])
+            ->with(['product:id,name,image_url', 'markedBy:id,name'])
             ->when($status === 'review', fn ($w) => $w->where('availability_status', '!=', 'in_stock')->where('oos_review_at', '<=', now()))
             ->when($status !== 'review', fn ($w) => $w->where('availability_status', $status))
             ->when($q !== '', fn ($w) => \App\Support\ProductSearch::apply($w, $q))

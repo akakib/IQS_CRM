@@ -275,7 +275,7 @@
                             <template x-for="(p, i) in results" :key="p.value">
                                 <button type="button" @click="add(p)" @mouseenter="active = i" :disabled="!p.sellable"
                                     class="block w-full px-3 py-1.5 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50" :class="i === active ? 'bg-green-50' : ''">
-                                    <span class="flex items-center gap-2"><img x-show="p.image" :src="p.image" alt="" loading="lazy" class="h-9 w-9 shrink-0 rounded-md border border-gray-200 bg-gray-50 object-cover"><span class="min-w-0"><span x-text="p.label"></span><span class="block text-xs text-gray-400" x-text="p.sub"></span></span></span>
+                                    <span class="flex items-center gap-2"><x-product-thumb x-src="p.image" /><span class="min-w-0"><span x-text="p.label"></span><span class="block text-xs text-gray-400" x-text="p.sub"></span></span></span>
                                 </button>
                             </template>
                         </div>
@@ -287,7 +287,7 @@
                             <div class="grid grid-cols-12 items-end gap-2 rounded-lg border border-gray-100 p-2 text-sm">
                                 <input type="hidden" :name="`items[${i}][variant_id]`" :value="it.variant_id">
                                 <div class="col-span-12 flex items-center gap-2 self-center md:col-span-5">
-                                    <img x-show="it.image" :src="it.image" alt="" loading="lazy" class="h-9 w-9 shrink-0 rounded-md border border-gray-200 bg-gray-50 object-cover">
+                                    <x-product-thumb x-src="it.image" />
                                     <div class="min-w-0">
                                     <p class="font-medium text-gray-800" x-text="it.label"></p>
                                     <p class="text-xs" :class="it.preorder ? 'text-amber-700' : 'text-gray-400'" x-text="it.preorder ? @js(__('Pre-order: order will wait on Hold')) : it.sub"></p>

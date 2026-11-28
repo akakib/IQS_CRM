@@ -175,7 +175,7 @@
 
         <x-card :title="__('Picture')">
             @if ($product->image_url)
-                <img src="{{ $product->image_url }}" alt="" class="mb-4 aspect-square w-full max-w-48 rounded-lg border border-gray-200 object-contain lg:max-w-none">
+                <img src="{{ $product->image_url }}" onerror="this.remove()" alt="" class="mb-4 aspect-square w-full max-w-48 rounded-lg border border-gray-200 object-contain lg:max-w-none">
             @endif
             <x-form.input name="image_url" type="url" :label="__('Main image URL')" :value="$product->image_url" maxlength="500" />
         </x-card>

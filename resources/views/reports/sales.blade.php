@@ -13,7 +13,7 @@
     $short = ['web' => 'WEB', 'messenger' => 'FB', 'whatsapp' => 'WA', 'comments' => 'FC', 'instagram' => 'IG', 'tiktok' => 'TT', 'telegram' => 'TG', 'phone' => 'PH', 'b2b' => 'B2B', 'other' => 'OT'];
     $all = ['orders' => (int) $channels->sum('orders'), 'money' => (float) $channels->sum('money'), 'ret' => (int) $channels->sum('ret'), 'retMoney' => (float) $channels->sum('ret_money')];
     $retPct = $all['orders'] ? (int) round($all['ret'] / $all['orders'] * 100) : 0;
-    $items = $products->map(fn ($p) => ['id' => $p->id, 'name' => $p->product.($p->variant !== 'Default' ? ' · '.$p->variant : ''),
+    $items = $products->map(fn ($p) => ['id' => $p->id, 'name' => $p->product.($p->variant !== 'Default' ? ' · '.$p->variant : ''), 'image' => $p->image_url,
         'money' => (float) $p->money, 'qty' => (float) $p->qty, 'amount' => (float) $p->grams + (float) $p->ml,
         'moneyText' => $money($p->money), 'qtyText' => $num($p->qty), 'amountText' => Units::amount((float) $p->grams, (float) $p->ml),
         'out' => $p->stock === 'out_of_stock'])->values();
@@ -178,7 +178,7 @@
             @else
                 <template x-for="it in top" :key="it.id">
                     <button type="button" @click="show({ item: it.id }, it.name)" class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 rounded-xl px-1.5 py-2 text-left hover:bg-gray-50">
-                        <span class="min-w-0 truncate text-sm font-medium text-gray-900"><span x-text="it.name"></span><span x-show="it.out" class="ml-1.5 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700">{{ __('Out of stock') }}</span></span>
+                        <span class="flex min-w-0 items-center gap-2 text-sm font-medium text-gray-900"><x-product-thumb x-src="it.image" size="sm" /><span class="min-w-0 truncate"><span x-text="it.name"></span><span x-show="it.out" class="ml-1.5 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700">{{ __('Out of stock') }}</span></span></span>
                         <span class="text-sm font-semibold tabular-nums text-gray-900"><span x-text="itemMetric === 'money' ? it.moneyText : itemMetric === 'amount' ? it.amountText : it.qtyText"></span> <span class="text-primary">›</span></span>
                         <span class="col-span-2 h-2 overflow-hidden rounded-full bg-gray-100"><span class="block h-full rounded-full bg-primary" :style="`width: ${top[0][itemMetric] ? it[itemMetric] / top[0][itemMetric] * 100 : 0}%`"></span></span>
                     </button>
@@ -213,7 +213,7 @@
                 @foreach ($c['items'] as $it)
                     <li class="py-2.5 text-sm">
                         <div class="flex items-start justify-between gap-3">
-                            <button type="button" @click="show({ product: {{ $it['product_id'] }} }, @js($it['name']))" class="min-w-0 text-left font-medium text-gray-900 hover:text-primary">{{ $it['name'] }} <span class="text-primary">›</span></button>
+                            <button type="button" @click="show({ product: {{ $it['product_id'] }} }, @js($it['name']))" class="flex min-w-0 items-center gap-2 text-left font-medium text-gray-900 hover:text-primary"><x-product-thumb :src="$it['image']" size="sm" /><span>{{ $it['name'] }} <span class="text-primary">›</span></span></button>
                             <span class="shrink-0 text-right tabular-nums"><span class="block font-semibold text-gray-900">{{ $howMuch($it) }}</span><span class="block text-xs text-gray-500">{{ $money($it['money']) }}</span></span>
                         </div>
                         <p class="mt-1 flex flex-wrap gap-1.5 text-xs text-gray-600">
@@ -231,7 +231,8 @@
         <ul class="divide-y divide-gray-100">
             @foreach ($products as $p)
                 <li class="flex items-start justify-between gap-3 py-2.5 text-sm">
-                    <span class="min-w-0">
+                    <x-product-thumb :src="$p->image_url" size="sm" />
+                    <span class="min-w-0 flex-1">
                         <span class="block text-gray-900">{{ $p->product }}{{ $p->variant !== 'Default' ? ' · '.$p->variant : '' }}</span>
                         <span class="block text-xs text-gray-500">{{ __('Qty :n', ['n' => $num($p->qty)]) }} · {{ Units::amount((float) $p->grams, (float) $p->ml) }}</span>
                     </span>

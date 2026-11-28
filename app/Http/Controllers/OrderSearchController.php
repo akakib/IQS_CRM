@@ -36,7 +36,7 @@ class OrderSearchController extends Controller
             $nameMatch = fn ($w) => $w->orWhere('ship_name', 'like', $q.'%')->orWhere('ship_name', 'like', '% '.$q.'%');
             $phoneMatch = fn ($w) => $w->orWhere('ship_phone', $phone ?: $q)->orWhere('ship_alt_phone', $phone ?: $q);
             $results = Order::query()
-                ->with(['items:id,order_id,name_snapshot,qty,unit', 'moderator:id,name'])
+                ->with(['items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,product_id', 'items.variant.product:id,image_url', 'moderator:id,name'])
                 ->where(fn ($w) => match ($by) {
                     'cn' => $cnMatch($w),
                     'phone' => $phoneMatch($w),

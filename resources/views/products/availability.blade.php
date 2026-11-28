@@ -36,7 +36,7 @@
                 @foreach ($variants as $v)
                     <tr>
                         <td><x-list.check :id="$v->id" /></td>
-                        <td class="font-medium text-gray-800">{{ $v->product?->name }}{{ $v->name !== 'Default' ? ' · '.$v->name : '' }}</td>
+                        <td class="font-medium text-gray-800"><span class="flex items-center gap-3"><x-product-thumb :src="$v->product?->image_url" /><span>{{ $v->product?->name }}{{ $v->name !== 'Default' ? ' · '.$v->name : '' }}</span></span></td>
                         <td class="font-mono text-xs text-gray-600">{{ $v->sku }}</td>
                         <td><x-badge :color="$color[$v->availability_status]">{{ $v->availabilityLabel() }}</x-badge></td>
                         <td @class(['text-gray-600', 'font-medium text-red-600' => $v->expected_restock_date?->isPast()])>{{ $v->expected_restock_date?->format('d M Y') ?? '-' }}</td>
@@ -48,7 +48,7 @@
             </x-list.table>
             <x-list.cards>
                 @foreach ($variants as $v)
-                    <x-record-card :title="$v->product?->name.($v->name !== 'Default' ? ' · '.$v->name : '')" :subtitle="$v->sku">
+                    <x-record-card :title="$v->product?->name.($v->name !== 'Default' ? ' · '.$v->name : '')" :subtitle="$v->sku" :image="$v->product?->image_url">
                         <x-slot:badge><div class="flex items-center gap-2"><x-badge :color="$color[$v->availability_status]">{{ $v->availabilityLabel() }}</x-badge><x-list.check :id="$v->id" /></div></x-slot:badge>
                         @php $lc = $last[$v->id] ?? null; @endphp
                         <x-slot:footer>{{ $v->expected_restock_date ? __('Expected :d', ['d' => $v->expected_restock_date->format('d M Y')]).' · ' : '' }}{{ $lc ? __('Last change: :w · :p · :t', ['w' => $lc['why'], 'p' => $lc['who'] ?? '-', 't' => $lc['at']->format('d M, g:i A')]) : '' }}</x-slot:footer>

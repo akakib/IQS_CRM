@@ -112,7 +112,7 @@ class OrderProfit
                 ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
                 ->where('x.delivered', 1)
                 ->groupByRaw($key)
-                ->selectRaw("$key as g, $label as label, COUNT(DISTINCT x.id) as orders, SUM($sold) as qty,
+                ->selectRaw("$key as g, $label as label, MAX(p.image_url) as image, COUNT(DISTINCT x.id) as orders, SUM($sold) as qty,
                     SUM(i.line_total * $sold / i.qty) as revenue, SUM($sold * COALESCE(i.cost_price_snapshot, 0)) as cogs,
                     SUM(i.line_total * $sold / i.qty) - SUM($sold * COALESCE(i.cost_price_snapshot, 0)) as profit")
                 ->orderByDesc('revenue')->paginate($perPage)->withQueryString();

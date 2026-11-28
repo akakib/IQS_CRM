@@ -31,7 +31,7 @@ class HotlineController extends Controller
         $selected = $pick ? Order::find($pick) : null;
         $detail = null;
         if ($selected) {
-            $selected->load(['items:id,order_id,name_snapshot,qty,unit', 'moderator:id,name']);
+            $selected->load(['items:id,order_id,variant_id,name_snapshot,qty,unit', 'items.variant:id,product_id', 'items.variant.product:id,image_url', 'moderator:id,name']);
             $detail = [
                 'order' => $selected,
                 'shipment' => DB::table('shipments')->where('id', $selected->active_shipment_id)->first(['consignment_id', 'courier_status', 'cod_amount']),

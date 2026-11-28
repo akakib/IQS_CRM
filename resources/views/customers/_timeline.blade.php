@@ -31,7 +31,7 @@
                     @if ($r->kind === 'delivered' && abs($r->sold - (float) $r->grand_total) >= 1)<span>{{ __('received :a', ['a' => $tk($r->sold)]) }}</span>@endif
                     @if ((float) $r->refunded > 0)<span class="text-red-700">{{ __('refunded :a', ['a' => $tk($r->refunded)]) }}</span>@endif
                 </p>
-                <p class="mt-1 text-sm text-gray-700">{{ $r->items->map(fn ($it) => $it->name_snapshot.' × '.\App\Support\Units::qty($it->qty, $it->unit))->join(', ') }}</p>
+                <x-item-chips :items="$r->items" class="mt-1" />
                 <p class="mt-0.5 text-xs text-gray-500">{{ __('By :n', ['n' => $r->moderator?->name ?? __('nobody')]) }}@if ($r->source_campaign) · {{ __('ad: :c', ['c' => $r->source_campaign]) }}@endif</p>
             </li>
         @elseif ($e['type'] === 'past')

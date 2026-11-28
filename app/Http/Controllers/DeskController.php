@@ -487,9 +487,9 @@ class DeskController extends Controller
     /** @return array<string, mixed> everything the detail pane shows beyond the order row */
     private function detail(Order $order): array
     {
-        $items = DB::table('order_items as i')->join('product_variants as v', 'v.id', '=', 'i.variant_id')
+        $items = DB::table('order_items as i')->join('product_variants as v', 'v.id', '=', 'i.variant_id')->leftJoin('products as p', 'p.id', '=', 'v.product_id')
             ->where('i.order_id', $order->id)->orderBy('i.id')
-            ->get(['i.name_snapshot', 'i.qty', 'i.unit', 'i.line_total', 'v.availability_status', 'v.expected_restock_date']);
+            ->get(['i.name_snapshot', 'i.qty', 'i.unit', 'i.line_total', 'v.availability_status', 'v.expected_restock_date', 'p.image_url']);
 
         $notes = DB::table('order_notes as n')->leftJoin('users as u', 'u.id', '=', 'n.user_id')
             ->where('n.order_id', $order->id)->orderByDesc('n.id')->limit(30)

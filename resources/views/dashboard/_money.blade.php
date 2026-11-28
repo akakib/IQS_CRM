@@ -154,7 +154,7 @@
                 <button type="button" @click="tab = 'out'" class="{{ $chip }}" :class="tab === 'out' ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white text-gray-700'">{{ __('Out of stock') }} ({{ number_format($money['outCount']) }})</button>
             </div>
         </div>
-        @php($thumb = fn ($url) => $url ? '<img src="'.e($url).'" alt="" loading="lazy" class="size-10 shrink-0 rounded-lg border border-gray-100 object-cover">' : '<span class="size-10 shrink-0 rounded-lg bg-gray-100"></span>')
+        @php($thumb = fn ($url) => $url ? '<img src="'.e($url).'" onerror="this.style.visibility=\'hidden\'" alt="" loading="lazy" class="size-10 shrink-0 rounded-lg border border-gray-100 object-cover">' : '<span class="size-10 shrink-0 rounded-lg bg-gray-100"></span>')
         <div x-show="tab === 'selling'">
             @forelse ($money['selling'] as $p)
                 <div class="flex items-center gap-3 border-b border-gray-100 py-2 last:border-0">

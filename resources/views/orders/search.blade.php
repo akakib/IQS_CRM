@@ -152,7 +152,7 @@
                                     </div>
                                 </div>
 
-                                <p class="mt-3 text-sm text-gray-700">{{ $o->items->map(fn ($i) => $i->name_snapshot.' × '.\App\Support\Units::qty($i->qty, $i->unit))->join(', ') }}</p>
+                                <x-item-chips :items="$o->items" class="mt-3" />
                                 <p class="mt-2 text-xs text-gray-500">
                                     {{ collect([$o->ship_thana, $o->ship_district])->filter()->join(', ') ?: '-' }}
                                     · {{ \App\Models\Order::sourceLabel($o) }}

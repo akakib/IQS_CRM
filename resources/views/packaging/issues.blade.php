@@ -8,7 +8,7 @@
     <div class="space-y-3">
         @foreach ($reports as $r)
             <div class="rounded-xl border border-red-200 bg-white p-4" x-data="{ d: null }">
-                <p class="font-medium text-gray-800">{{ $r->product }}{{ $r->variant !== 'Default' ? ' · '.$r->variant : '' }} <span class="font-mono text-xs text-gray-400">{{ $r->sku }} {{ $r->shelf_code ? '· '.$r->shelf_code : '' }}</span></p>
+                <p class="flex items-center gap-3 font-medium text-gray-800"><x-product-thumb :src="$r->image_url" /><span>{{ $r->product }}{{ $r->variant !== 'Default' ? ' · '.$r->variant : '' }} <span class="font-mono text-xs text-gray-400">{{ $r->sku }} {{ $r->shelf_code ? '· '.$r->shelf_code : '' }}</span></span></p>
                 <p class="text-xs text-gray-500">{{ __('Reported by :n', ['n' => $r->reporter ?? '-']) }} · {{ \Illuminate\Support\Carbon::parse($r->created_at)->diffForHumans() }}{{ $r->order_no ? ' · '.$r->order_no : '' }}{{ $r->note ? ' · '.$r->note : '' }}</p>
                 @can('products.availability')
                     <form method="POST" action="{{ route('packaging.issues.resolve', $r->id) }}" id="stock-issue-{{ $r->id }}" class="mt-3 flex flex-wrap items-center gap-2">

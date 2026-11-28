@@ -20,8 +20,10 @@ class StockController extends Controller
     public function index(Request $request): View
     {
         $list = ListState::from($request, ['name', 'stock_qty', 'stock_counted_at'], ['show' => ['all', 'out', 'in', 'not_counted', 'low']], 'asc');
-        // A packer (sees stock, cannot change it): the simple page, Out of stock first, then In stock.
-        $simple = ! $request->user()->isOwner() && ! $request->user()->can('products.availability');
+        // A packer (packaging, no order work: the same people who get the packer's bottom bar), or anyone who may not
+        // change stock: the simple page, Out of stock first, then In stock, look only.
+        $u = $request->user();
+        $simple = ! $u->isOwner() && (($u->can('packaging.view') && ! $u->can('orders.edit')) || ! $u->can('products.availability'));
         $show = $list->filter('show') ?? ($simple ? 'out' : 'all');
         if ($simple && ! in_array($show, ['out', 'in'], true)) {
             $show = 'out';

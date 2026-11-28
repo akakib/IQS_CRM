@@ -9,7 +9,7 @@
 return [
     'store.name' => ['string', 'IQS', 'Store name', 'Store', ['required', 'string', 'max:100']],
     // Printed on the parcel label as the sender (the only place the shop's own name is shown).
-    'store.label_name' => ['string', 'Iqbal Store', 'Sender name on parcel labels', 'Store', ['required', 'string', 'max:100']],
+    'store.label_name' => ['string', 'IQS', 'Sender name on parcel labels', 'Store', ['required', 'string', 'max:100']],
     'store.hotline' => ['string', '', 'Rider hotline number', 'Store', ['nullable', 'regex:/^01[3-9]\d{8}$/']],
     // Shown on the public Privacy and Terms pages as the address customers write to.
     // One line per group of words that mean the same; any of them finds the others (names and descriptions).

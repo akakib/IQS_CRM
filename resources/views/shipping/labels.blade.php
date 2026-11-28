@@ -28,7 +28,7 @@
         .codes svg { width: 100%; height: 0.46in; }
         .bc-text { font-family: monospace; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
         /* 2 x 3 inch: the same parts, smaller; the CN and COD stay the biggest. */
-        .s .label { width: 2in; height: 3in; padding: 0.08in; }
+        .s .label { width: 2in; height: 3in; padding: 0.16in 0.08in 0.08in; } /* off the top edge too */
         .s .store { font-size: 9px; } .s .small { font-size: 7px; }
         .s .cod { font-size: 20px; } .s .cod span { font-size: 8px; }
         .s .cn { margin-top: 5px; padding: 2px 4px; border-width: 2px; flex-direction: column; align-items: flex-start; gap: 0; } .s .cn span { font-size: 8px; } .s .cn b { font-size: 22px; letter-spacing: 0.5px; }

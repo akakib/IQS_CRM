@@ -30,6 +30,7 @@ class BatchService
     {
         $hide = $for && app(PackagingPause::class)->canControl($for) ? '' : app(PackagingPause::class)->visibleSql('o');
         $rows = DB::table('orders as o')->where('o.status_id', OrderStatus::idFor('ready_for_packaging'))->whereNull('o.batch_id')->whereNotNull('o.active_shipment_id')
+            ->whereNull('o.packer_id') // a packer already started it: it is in hand, not in a batch
             ->when($hide !== '', fn ($q) => $q->whereRaw($hide))
             ->orderBy('o.packaging_sent_at')->orderBy('o.id')->limit(300)
             ->get(['o.id', DB::raw('(SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) as items')]);

@@ -28,7 +28,6 @@
         .row { display: flex; justify-content: space-between; gap: 2mm; padding: .6mm 0; }
         .row .n { flex: 1; min-width: 0; overflow-wrap: anywhere; }
         .row .q { font-weight: 700; white-space: nowrap; }
-        .shelf { display: inline-block; min-width: 9mm; font-weight: 700; }
         .order { border-top: 1px dashed #000; margin-top: 2mm; padding-top: 1.5mm; break-inside: avoid; page-break-inside: avoid; }
         .order .top { display: flex; justify-content: space-between; gap: 2mm; font-weight: 800; font-size: 14px; }
         .order .area { font-size: 11px; }
@@ -49,13 +48,13 @@
         <div class="head">
             <div class="no">BATCH {{ $batch->batch_no }}</div>
             <div>{{ $at->format('d M Y · g:i A') }} · {{ $batch->by ?? '-' }}</div>
-            <div><b>{{ trans_choice(':count order|:count orders', $orders->count(), ['count' => $orders->count()]) }}</b> · {{ trans_choice(':count line|:count lines', $pieces, ['count' => $pieces]) }} · {{ __('Batch :n of the day', ['n' => $dayNo]) }}</div>
+            <div><b>{{ trans_choice(':count order|:count orders', $orders->count(), ['count' => $orders->count()]) }}</b> · {{ trans_choice(':count item|:count items', $pieces, ['count' => $pieces]) }} · {{ __('Batch :n of the day', ['n' => $dayNo]) }}</div>
             <div>{{ __('Today so far: :n orders', ['n' => $todayTotal]) }}</div>
         </div>
 
         <div class="sec">{{ __('TAKE FROM THE SHELVES') }}</div>
         @foreach ($pick as $l)
-            <div class="row"><span class="n"><span class="shelf">{{ $l->shelf_code ?: '-' }}</span> {{ $l->name }}</span><span class="q">{{ $qty($l->qty, $l->unit) }}</span></div>
+            <div class="row"><span class="n">@if ($l->shelf_code)<b>[{{ $l->shelf_code }}]</b> @endif{{ $l->name }}</span><span class="q">{{ $qty($l->qty, $l->unit) }}</span></div>
         @endforeach
 
         <div class="sec">{{ __('PACK EACH ORDER') }}</div>

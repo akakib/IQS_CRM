@@ -44,7 +44,7 @@ window.IqsPrint = (() => {
     }
     // The batch list on 76 mm paper (576 dots): head, then each order with its items to tick.
     function receipt(r) {
-        const W = 576, [c, g] = canvas(W, 400 + r.lines * 34 + r.orders.length * 90), L = 8, R = W - 8; let y = 10;
+        const W = 576, [c, g] = canvas(W, 600 + r.lines * 60 + r.orders.length * 100), L = 8, R = W - 8; let y = 10;
         g.textAlign = 'center'; g.font = 'bold 40px Arial'; g.fillText('BATCH ' + r.batch, W / 2, y); y += 50;
         g.font = '22px Arial'; for (const t of r.head) { g.fillText(t, W / 2, y); y += 28; } g.textAlign = 'left';
         g.fillRect(L, y + 4, R - L, 3); y += 18; g.font = 'bold 22px Arial'; g.fillText('PACK EACH ORDER', L, y); y += 32;
@@ -53,10 +53,19 @@ window.IqsPrint = (() => {
             g.font = 'bold 30px Arial'; g.fillText(o.no, L, y); g.textAlign = 'right'; g.fillText((n + 1) + '/' + r.orders.length, R, y); g.textAlign = 'left'; y += 36;
             g.font = '20px Arial'; g.fillText(o.area, L, y); if (o.cn) { g.font = 'bold 20px Arial'; g.fillText('CN ' + o.cn, L + g.measureText(o.area + '   ').width, y); } y += 30;
             g.font = '22px Arial';
+            // The quantity and the weight are what gets packed wrong: both big and bold; the name stays plain.
             for (const it of o.items) {
-                g.strokeRect(L + 2, y + 3, 18, 18); g.textAlign = 'right'; g.font = 'bold 22px Arial'; g.fillText(it.qty, R, y); g.textAlign = 'left'; g.font = '22px Arial';
-                for (const [k, l] of wrap(g, it.name, R - L - 110).entries()) { g.fillText(l, L + 30, y); y += 28; }
-                y += 4;
+                const name = String(it.name || ''), sizes = [...name.matchAll(/\d+(?:[.,]\d+)?\s*(?:kg|gms?|g|ml|ltr|l|pcs?|piece)\b/gi)], cut = sizes.length ? sizes[sizes.length - 1].index : -1;
+                const base = cut > 0 ? name.slice(0, cut).trim() : name, size = cut > 0 ? name.slice(cut).trim() : '', maxW = R - L - 120;
+                g.strokeRect(L + 2, y + 6, 20, 20); g.textAlign = 'right'; g.font = 'bold 36px Arial'; g.fillText(it.qty, R, y - 2); g.textAlign = 'left';
+                g.font = '22px Arial'; const lines = wrap(g, base, maxW);
+                lines.forEach((l, k) => { g.font = '22px Arial'; g.fillText(l, L + 32, y + 4); if (k < lines.length - 1 || size) y += 30; });
+                if (size) {
+                    g.font = '22px Arial'; const last = lines.length ? lines[lines.length - 1] : '', w = g.measureText(last + ' ').width;
+                    g.font = 'bold 28px Arial';
+                    if (lines.length && w + g.measureText(size).width <= maxW) { y -= 30; g.fillText(size, L + 32 + w, y + 1); } else g.fillText(size, L + 32, y + 1);
+                }
+                y += 42;
             }
             y += 6;
         });

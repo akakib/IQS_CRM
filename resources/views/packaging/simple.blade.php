@@ -17,7 +17,8 @@
     @if ($nextBatch && $nextBatch['ids'] && $filter === 'all')
         <form method="POST" action="{{ route('packaging.next-batch') }}" class="mb-3">
             @csrf
-            <button class="lockable flex w-full items-center justify-between gap-3 rounded-2xl bg-primary px-5 py-4 text-left text-white hover:bg-primary-dark">
+            {{-- Orange (owner 2026-11-28): a call to act, apart from the green Done; not red, which reads as an error. --}}
+            <button class="lockable flex w-full items-center justify-between gap-3 rounded-2xl bg-orange-500 px-5 py-4 text-left text-white hover:bg-orange-600">
                 <span class="text-lg font-semibold">{{ __('Print next batch') }}</span>
                 <span class="text-sm">{{ __(':n orders', ['n' => count($nextBatch['ids'])]) }}</span>
             </button>

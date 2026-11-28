@@ -92,10 +92,10 @@
         {{-- Print by batch: the oldest orders waiting, as many as fit the batch list (Settings > Packaging). --}}
         @if ($nextBatch)
             @if ($nextBatch['ids'])
-                <form method="POST" action="{{ route('packaging.next-batch') }}" class="flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary-soft px-3 py-2.5 text-sm text-primary">
+                <form method="POST" action="{{ route('packaging.next-batch') }}" class="flex items-center justify-between gap-3 rounded-xl border border-orange-300 bg-orange-50 px-3 py-2.5 text-sm text-orange-900">
                     @csrf
                     <span><b>{{ __('Next batch: :o orders · :l lines', ['o' => count($nextBatch['ids']), 'l' => $nextBatch['lines']]) }}</b>@if ($nextBatch['waiting'] > count($nextBatch['ids']))<span class="block text-xs">{{ __(':n waiting in all', ['n' => $nextBatch['waiting']]) }}</span>@endif</span>
-                    <button class="lockable inline-flex h-8 shrink-0 items-center rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-dark">{{ __('Print next batch') }}</button>
+                    <button class="lockable inline-flex h-8 shrink-0 items-center rounded-lg bg-orange-500 px-3 text-sm font-semibold text-white hover:bg-orange-600">{{ __('Print next batch') }}</button>
                 </form>
             @else
                 <p class="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-500">{{ __('No new order to print.') }}</p>

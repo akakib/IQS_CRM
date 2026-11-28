@@ -9,7 +9,8 @@
     $area = fn ($r) => $r->ship_thana ? $r->ship_thana.($r->ship_district ? ', '.$r->ship_district : '') : ($r->ship_district ?: '-');
     $card = fn ($r) => ['no' => $r->order_no, 'cn' => (string) $r->consignment_id, 'name' => (string) $r->ship_name, 'area' => $area($r), 'cod' => '৳'.number_format((float) $r->cod_amount)];
 @endphp
-<x-layouts.app :heading="__('Handover')">
+{{-- An open handover is the Handover home for the packer: no Back (it would only come back here). --}}
+<x-layouts.app :heading="__('Handover')" :back="! $open">
     <div x-data="{
             tab: 'ready', last: null, pick: false, name: '', phone: '', riders: @js($riders),
             ready: @js($missing->map($card)->values()),

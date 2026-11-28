@@ -15,6 +15,10 @@
         }
         $backUrl = route($parent ?? 'dashboard');
     }
+    // A page that is its section's home after all (the packer's open handover): :back="false" keeps the menu button.
+    if (($back ?? true) === false) {
+        $backUrl = null;
+    }
     // Phone and tablet: the bottom bar is on every page, also with an order or an Edit page open; a page's own
     // bottom buttons sit just above it (class above-nav). A page can still ask for none with :nav="false".
     $bottomNav = $nav ?? true;

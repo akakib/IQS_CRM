@@ -145,7 +145,7 @@ class PackagingTest extends TestCase
 
         // The 80 mm list: shelves first, then each order with its items to tick; no customer name or phone.
         $this->get(route('packaging.batch-list', $first->id))->assertOk()->assertSee('BATCH '.$first->batch_no)
-            ->assertSeeInOrder(['TAKE FROM THE SHELVES', 'PACK EACH ORDER', $a->order_no, $b->order_no])
+            ->assertSeeInOrder(['PACK EACH ORDER', $a->order_no, $b->order_no])->assertDontSee('TAKE FROM THE SHELVES')
             ->assertSee('Print 2 labels')->assertDontSee('01811111111')->assertDontSee($a->ship_name);
 
         // Next press: c alone (02). Then nothing left.

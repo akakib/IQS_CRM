@@ -1,5 +1,5 @@
 {{-- One batch on the 80 mm receipt printer (PackagingController::batchList): the head (batch no, time, count),
-     what to take from the shelves by item, then each order with its items to tick. No customer name or phone:
+     then each order with its items to tick (no added-up shelf list: it got orders mixed). No customer name or phone:
      the shop goes by the order no. On screen: Print this list and Print the labels; the paper shows only the list. --}}
 @php
     $at = \Illuminate\Support\Carbon::parse($batch->released_at ?? $batch->created_at);
@@ -40,7 +40,7 @@
     <div class="bar">
         <button type="button" class="main" onclick="window.print()">{{ __('Print this list') }}</button>
         <a class="alt" href="{{ route('packaging.labels', ['orders' => $orders->pluck('id')->join(',')]) }}" target="_blank">{{ __('Print :n labels', ['n' => $orders->count()]) }}</a>
-        <a class="alt" href="{{ route('packaging.index') }}">{{ __('Back to packaging') }}</a>
+        <a class="alt" href="{{ route('packaging.index') }}">← {{ __('Back to packaging') }}</a>
         <p>{{ __('The list goes to the 80 mm receipt printer, the labels to the sticker printer.') }}</p>
     </div>
 
@@ -52,16 +52,12 @@
             <div>{{ __('Today so far: :n orders', ['n' => $todayTotal]) }}</div>
         </div>
 
-        <div class="sec">{{ __('TAKE FROM THE SHELVES') }}</div>
-        @foreach ($pick as $l)
-            <div class="row"><span class="n">@if ($l->shelf_code)<b>[{{ $l->shelf_code }}]</b> @endif{{ $l->name }}</span><span class="q">{{ $qty($l->qty, $l->unit) }}</span></div>
-        @endforeach
-
+        {{-- Order by order only: one list of every item added up got packers mixing orders (owner 2026-11-28). --}}
         <div class="sec">{{ __('PACK EACH ORDER') }}</div>
         @foreach ($orders as $i => $o)
             <div class="order">
                 <div class="top"><span>{{ $o->order_no }}</span><span>{{ $i + 1 }}/{{ $orders->count() }}</span></div>
-                <div class="area">{{ collect([$o->ship_thana, \App\Support\BdDistricts::name($o->ship_district)])->filter()->unique()->join(', ') ?: '-' }}@if ($cn[$o->active_shipment_id] ?? null) · CN {{ $cn[$o->active_shipment_id] }}@endif</div>
+                <div class="area">{{ collect([$o->ship_thana, \App\Support\BdDistricts::name($o->ship_district)])->filter()->unique()->join(', ') ?: '-' }}@if ($cn[$o->active_shipment_id] ?? null) · <b>CN {{ $cn[$o->active_shipment_id] }}</b>@endif</div>
                 @foreach ($o->items as $it)
                     <div class="row"><span class="n"><span class="box"></span>{{ $it->name_snapshot }}{{ ($s = \App\Support\Units::itemSize($it)) && ! str_contains(mb_strtolower(str_replace(' ', '', $it->name_snapshot)), mb_strtolower(str_replace(' ', '', $s))) ? ' '.$s : '' }}</span><span class="q">{{ $qty($it->qty, $it->unit) }}</span></div>
                 @endforeach

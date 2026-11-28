@@ -450,7 +450,6 @@ class PackagingController extends Controller
 
         return view('packaging.batch-list', [
             'batch' => $b, 'orders' => $orders, 'cn' => $cn, 'dayNo' => $dayNo,
-            'pick' => $batches->pickList($batch),
             'todayTotal' => DB::table('orders')->whereIn('batch_id', DB::table('batches')->whereDate('created_at', \Illuminate\Support\Carbon::parse($b->created_at)->toDateString())->where('id', '<=', $b->id)->pluck('id'))->count(),
         ]);
     }

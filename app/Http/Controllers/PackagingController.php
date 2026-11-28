@@ -541,6 +541,36 @@ class PackagingController extends Controller
             'printed' => route('packaging.batch-printed', $id), 'next' => count($batches->nextUp($request->user())['ids'])]);
     }
 
+    /**
+     * Reprint one label (torn while putting it on): by its label no, its order no, or the order no's last digits.
+     * The same label no comes out again, so Done's scan and Handover still match. Only orders printed in a batch.
+     */
+    public function stationLabel(Request $request): JsonResponse
+    {
+        $code = strtoupper(preg_replace('/\s+/', '', (string) $request->input('code')));
+        if ($code === '') {
+            return response()->json(['ok' => false, 'message' => __('Type or scan the order or label no.')]);
+        }
+        $q = DB::table('orders as o')->join('shipment_labels as l', fn ($j) => $j->on('l.order_id', '=', 'o.id')->whereNull('l.voided_at'))
+            ->whereNotNull('o.batch_id')->where('o.updated_at', '>=', now()->subDays(14));
+        $digits = ltrim(preg_replace('/\D/', '', $code), '0');
+        $found = (clone $q)->where(fn ($w) => $w->where('l.barcode', $code)->orWhere('o.order_no', $code))->get(['o.id', 'o.order_no', 'o.batch_id']);
+        if ($found->isEmpty() && $digits !== '') {
+            $found = (clone $q)->where('o.order_no', 'like', '%'.$digits)->orderByDesc('o.id')->limit(6)->get(['o.id', 'o.order_no', 'o.batch_id']);
+        }
+        $found = $found->unique('id')->values();
+        if ($found->isEmpty()) {
+            return response()->json(['ok' => false, 'message' => __('No printed order found for :c.', ['c' => $code])]);
+        }
+        if ($found->count() > 1) {
+            return response()->json(['ok' => false, 'choices' => $found->pluck('order_no'), 'message' => __('More than one: pick the order.')]);
+        }
+        $o = $found->first();
+        $sticker = collect($this->batchPrintData((int) $o->batch_id)['stickers'])->firstWhere('order_no', $o->order_no);
+
+        return response()->json(['ok' => true, 'sticker' => $sticker]);
+    }
+
     /** The stickers of a batch were printed straight from the phone: their labels count as printed (Ongoing shows Done). */
     public function batchPrinted(int $batch, Request $request): JsonResponse
     {

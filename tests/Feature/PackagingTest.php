@@ -283,6 +283,14 @@ class PackagingTest extends TestCase
         // Print again: the same batch; nothing left: a clear no.
         $this->postJson(route('packaging.station-batch'), ['batch' => $r['id']])->assertJsonPath('batch', $r['batch']);
         $this->postJson(route('packaging.station-batch'))->assertJsonPath('ok', false);
+
+        // Reprint one label (torn): by the label no, the order no or its last digits; the same label no again. Unknown: a clear no.
+        $label = $r['stickers'][0]['barcode'];
+        $this->postJson(route('packaging.station-label'), ['code' => strtolower($label)])->assertJsonPath('ok', true)->assertJsonPath('sticker.barcode', $label);
+        $this->postJson(route('packaging.station-label'), ['code' => $a->order_no])->assertJsonPath('sticker.barcode', $label);
+        $this->postJson(route('packaging.station-label'), ['code' => substr($a->order_no, -3)])->assertJsonPath('sticker.order_no', $a->order_no);
+        $this->postJson(route('packaging.station-label'), ['code' => 'IQ99999'])->assertJsonPath('ok', false);
+        $this->get(route('packaging.print-station'))->assertSee('Reprint one label');
     }
 
     public function test_a_packers_bottom_bar_is_packaging_and_handover_only(): void

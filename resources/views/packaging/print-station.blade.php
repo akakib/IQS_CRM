@@ -38,17 +38,37 @@
     </div>
     <p x-show="msg" x-cloak class="whitespace-pre-line rounded-2xl px-4 py-3 text-sm font-medium" :class="bad ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'" x-text="msg"></p>
 
-    {{-- Today's batches: print again (a torn sticker, a lost list). --}}
+    {{-- One label again (torn while putting it on): the same label no, so Done's scan and Handover still match. --}}
+    <div class="rounded-2xl border border-gray-200 bg-white p-4">
+        <p class="text-sm font-semibold text-gray-900">{{ __('Reprint one label') }}</p>
+        <p class="mb-2 text-xs text-gray-500">{{ __('Torn label: type the order no (the last digits are enough) or scan what is left of it.') }}</p>
+        <x-scan-input quiet :placeholder="__('Order or label no')" @scan="findOne($event.detail)" />
+        <div x-show="choices.length" x-cloak class="mt-2 flex flex-wrap gap-2">
+            <template x-for="c in choices" :key="c"><button type="button" @click="findOne(c)" class="h-10 rounded-xl border border-blue-600 px-3 font-mono text-sm font-semibold text-blue-700" x-text="c"></button></template>
+        </div>
+        <button type="button" x-show="pdfMode && oneReady" x-cloak @click="IqsPrint.labelsPdf([oneReady], store, oneReady.barcode + '-label.pdf')" class="mt-2 h-11 w-full rounded-xl bg-blue-600 text-sm font-semibold text-white" x-text="@js(__('Label PDF')) + ' ' + (oneReady ? oneReady.barcode : '')"></button>
+    </div>
+
+    {{-- Today's batches: print again (a lost list, a whole batch); a tap on the batch no lists its orders, each label on its own. --}}
     <div class="rounded-2xl border border-gray-200 bg-white">
         <p class="border-b border-gray-100 px-4 py-2 text-sm font-semibold text-gray-900">{{ __('Today\'s batches') }}</p>
         <template x-for="b in recent" :key="b.id">
             <div class="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2 last:border-0">
-                <span class="text-sm"><b class="font-mono" x-text="b.batch_no"></b> <span class="text-gray-500" x-text="'· ' + b.orders + ' ' + @js(__('orders'))"></span></span>
+                <button type="button" @click="toggle(b.id)" class="text-left text-sm"><b class="font-mono text-blue-700 underline" x-text="b.batch_no"></b> <span class="text-gray-500" x-text="'· ' + b.orders + ' ' + @js(__('orders'))"></span></button>
                 <span class="flex shrink-0 gap-1.5">
                     <button type="button" x-show="pdfMode" x-cloak @click="again(b.id, 'pdf')" :disabled="busy" class="h-8 rounded-lg border border-blue-600 px-3 text-xs font-semibold text-blue-700">PDF</button>
                     <button type="button" x-show="!pdfMode" @click="again(b.id, 'stickers')" :disabled="busy" class="h-8 rounded-lg border border-gray-300 px-2.5 text-xs font-medium text-gray-700">{{ __('Labels') }}</button>
                     <button type="button" x-show="!pdfMode" @click="again(b.id, 'list')" :disabled="busy" class="h-8 rounded-lg border border-gray-300 px-2.5 text-xs font-medium text-gray-700">{{ __('List') }}</button>
                 </span>
+            </div>
+            <div x-show="open === b.id" x-cloak class="border-b border-gray-100 bg-gray-50 px-4 py-2">
+                <template x-for="s in (orders[b.id] || [])" :key="s.order_no">
+                    <div class="flex items-center justify-between py-1">
+                        <span class="text-sm"><b class="font-mono" x-text="s.barcode"></b> <span class="text-gray-500" x-show="s.cn" x-text="'CN ' + s.cn"></span></span>
+                        <button type="button" @click="printOne(s)" :disabled="busy" class="h-8 rounded-lg border border-blue-600 px-3 text-xs font-semibold text-blue-700">{{ __('Label') }}</button>
+                    </div>
+                </template>
+                <p x-show="!(orders[b.id] || []).length" class="text-sm text-gray-500">{{ __('Loading…') }}</p>
             </div>
         </template>
         <p x-show="!recent.length" class="px-4 py-3 text-sm text-gray-500">{{ __('No batch yet today.') }}</p>
@@ -60,7 +80,7 @@
 function station() {
     const url = @js(route('packaging.station-batch')), csrf = @js(csrf_token()), store = @js($store);
     return {
-        st: {}, busy: false, pdfMode: !IqsPrint.canPrint, ready: null, msg: '', bad: false, next: @js(count($next['ids'])), recent: @js($recent),
+        st: {}, busy: false, pdfMode: !IqsPrint.canPrint, ready: null, choices: [], oneReady: null, open: null, orders: {}, msg: '', bad: false, next: @js(count($next['ids'])), recent: @js($recent),
         init() {
             const up = () => { this.st = IqsPrint.status(); }; up(); window.addEventListener('iqs-printers', up); setInterval(up, 3000);
             // The screen stays on while this page is open (a sleeping phone drops Bluetooth).
@@ -101,6 +121,28 @@ function station() {
             const r = this.ready; if (!r) return;
             if (what === 'labels') IqsPrint.labelsPdf(r.labels, store, r.batch + '-labels.pdf'); // a saved PDF is not a printed label: no mark
             else IqsPrint.listPdf(r.list, r.batch + '-list.pdf');
+        },
+        async toggle(id) {
+            this.open = this.open === id ? null : id;
+            if (this.open && !this.orders[id]) { try { this.orders = { ...this.orders, [id]: (await this.load(id)).stickers }; } catch (e) { this.fail(e); } }
+        },
+        async findOne(code) {
+            this.choices = []; this.oneReady = null;
+            try {
+                const r = await fetch(@js(route('packaging.station-label')), { method: 'POST', headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+                if (!r.ok) throw new Error(@js(__('The CRM did not answer. Check the internet and try again.')));
+                const j = await r.json();
+                window.dispatchEvent(new CustomEvent('scan-result', { detail: { ok: j.ok, message: j.ok ? j.sticker.barcode : j.message } }));
+                if (!j.ok) { this.choices = j.choices || []; this.say(j.message, !j.choices); return; }
+                await this.printOne(j.sticker);
+            } catch (e) { this.fail(e); }
+        },
+        // One label: the printer (or, on an iPhone, a PDF button). Not marked printed again: it was printed before.
+        async printOne(s) {
+            if (this.pdfMode) { this.oneReady = s; this.say(s.barcode + ': ' + @js(__('ready. Tap Label PDF to save it.'))); return; }
+            this.busy = true;
+            try { await IqsPrint.printStickers([s], store, false, t => {}); this.say(s.barcode + ': ' + @js(__('label printed again.'))); } catch (e) { this.fail(e); }
+            this.st = IqsPrint.status(); this.busy = false;
         },
         async again(id, what) {
             this.busy = true;

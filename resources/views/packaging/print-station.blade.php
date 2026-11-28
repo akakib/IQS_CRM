@@ -8,7 +8,7 @@
 
     {{-- The two printers: connected once. --}}
     <div class="grid grid-cols-2 gap-2">
-        <template x-for="p in [{ key: 'sticker', name: @js(__('Sticker printer')), how: 'Bluetooth' }, { key: 'receipt', name: @js(__('Receipt printer')), how: @js(__('USB cable')) }]" :key="p.key">
+        <template x-for="p in [{ key: 'sticker', name: @js(__('Label printer')), how: 'Bluetooth' }, { key: 'receipt', name: @js(__('Receipt printer')), how: @js(__('USB cable')) }]" :key="p.key">
             <div class="rounded-2xl border bg-white p-3" :class="st[p.key] ? 'border-green-300' : 'border-gray-200'">
                 <p class="text-sm font-semibold text-gray-900" x-text="p.name"></p>
                 <p class="text-xs text-gray-500" x-text="p.how"></p>
@@ -34,7 +34,7 @@
             <div class="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2 last:border-0">
                 <span class="text-sm"><b class="font-mono" x-text="b.batch_no"></b> <span class="text-gray-500" x-text="'· ' + b.orders + ' ' + @js(__('orders'))"></span></span>
                 <span class="flex shrink-0 gap-1.5">
-                    <button type="button" @click="again(b.id, 'stickers')" :disabled="busy" class="h-8 rounded-lg border border-gray-300 px-2.5 text-xs font-medium text-gray-700">{{ __('Stickers') }}</button>
+                    <button type="button" @click="again(b.id, 'stickers')" :disabled="busy" class="h-8 rounded-lg border border-gray-300 px-2.5 text-xs font-medium text-gray-700">{{ __('Labels') }}</button>
                     <button type="button" @click="again(b.id, 'list')" :disabled="busy" class="h-8 rounded-lg border border-gray-300 px-2.5 text-xs font-medium text-gray-700">{{ __('List') }}</button>
                 </span>
             </div>
@@ -76,9 +76,9 @@ function station() {
                 this.recent.unshift({ id: b.id, batch_no: b.batch, orders: b.stickers.length }); this.next = b.next;
                 await IqsPrint.printStickers(b.stickers, store, false, t => this.say(b.batch + ': ' + t));
                 await IqsPrint.marked(b.printed, csrf);
-                this.say(b.batch + ': ' + @js(__('stickers done, printing the list…')));
+                this.say(b.batch + ': ' + @js(__('labels done, printing the list…')));
                 await IqsPrint.printReceipt(b.receipt, false, t => {});
-                this.say(b.batch + ': ' + b.stickers.length + ' ' + @js(__('stickers and the list printed. Pack them in Ongoing.')));
+                this.say(b.batch + ': ' + b.stickers.length + ' ' + @js(__('labels and the list printed. Pack them in Ongoing.')));
             } catch (e) { this.fail(e); }
             this.st = IqsPrint.status(); this.busy = false;
         },

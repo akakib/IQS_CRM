@@ -125,7 +125,7 @@
                 <div class="text-center">
                     <p class="text-base font-semibold text-gray-900" x-text="@js(__('Is this label on the box of')) + ' ' + pop.no + '?'"></p>
                     <p class="mt-3 font-mono text-3xl font-bold tracking-wider text-gray-900" x-text="pop.label"></p>
-                    <p class="mt-1 text-xs text-gray-500">{{ __('Match it with the sticker on the box.') }}</p>
+                    <p class="mt-1 text-xs text-gray-500">{{ __('Match it with the label on the box.') }}</p>
                 </div>
             </template>
             <template x-if="pop && pop.kind === 'undo'">

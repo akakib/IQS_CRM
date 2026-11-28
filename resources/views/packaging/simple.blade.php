@@ -145,7 +145,7 @@
                 @endforeach
             </div>
             <input name="note" maxlength="255" placeholder="{{ __('Note (optional)') }}" class="mt-3 h-11 w-full rounded-xl border border-gray-300 px-3 text-sm focus:border-primary focus:outline-none">
-            <p class="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">{{ __('Set the box aside with its sticker. Do not send it.') }}</p>
+            <p class="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">{{ __('Set the box aside with its label. Do not send it.') }}</p>
             <div class="mt-4 grid grid-cols-2 gap-2">
                 <button type="button" @click="hold = null" class="h-12 rounded-xl border border-gray-300 text-base text-gray-700">{{ __('Cancel') }}</button>
                 <button :disabled="!reason" class="lockable h-12 rounded-xl bg-amber-600 text-base font-semibold text-white disabled:opacity-50">{{ __('Put on hold') }}</button>

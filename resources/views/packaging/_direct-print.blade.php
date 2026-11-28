@@ -7,6 +7,8 @@ window.IqsPrint = (() => {
     const BLE = ['49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', 0x18f0, 0xff00, 0xfee7, 0xffe0, 0xae30, 0xfff0, 0xffb0];
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const enc = new TextEncoder();
+    // iPhone and iPad (every browser there) cannot talk to a printer from a web page.
+    const NO_DIRECT = 'This phone cannot print here (iPhone and iPad cannot). Use the shop\'s Android phone in Chrome.';
 
     // ── Drawing ──
     function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.fillStyle = '#000'; g.textBaseline = 'top'; return [c, g]; }
@@ -75,6 +77,7 @@ window.IqsPrint = (() => {
 
     // ── Bluetooth sticker printer ──
     async function bleDevice(choose) { // the list (or the printer Chrome remembers)
+        if (!navigator.bluetooth) throw new Error(NO_DIRECT);
         let d = null;
         if (!choose && navigator.bluetooth.getDevices) {
             const name = localStorage.getItem('iqs.btPrinter.sticker');
@@ -84,10 +87,10 @@ window.IqsPrint = (() => {
         try { localStorage.setItem('iqs.btPrinter.sticker', d.name || ''); } catch (e) {}
         let server = null, last = null;
         for (let t = 1; t <= 3 && !server; t++) { try { server = await d.gatt.connect(); await wait(500); } catch (e) { last = e; await wait(1000 * t); } }
-        if (!server) throw new Error('Sticker printer: could not connect (' + (last?.message || '') + '). Turn it off and on.');
+        if (!server) throw new Error('Label printer: could not connect (' + (last?.message || '') + '). Turn it off and on.');
         for (const u of BLE) { try { const s = await server.getPrimaryService(u); for (const ch of await s.getCharacteristics()) if (ch.properties.write || ch.properties.writeWithoutResponse) return { d, ch }; } catch (e) {} }
         for (const s of await server.getPrimaryServices()) for (const ch of await s.getCharacteristics()) if (ch.properties.write || ch.properties.writeWithoutResponse) return { d, ch };
-        throw new Error('Sticker printer: connected, but no way to send.');
+        throw new Error('Label printer: connected, but no way to send.');
     }
     // Small pieces, each one confirmed by the printer when it can (a flood without answers loses bytes: the sticker comes out jumbled).
     async function bleSend(ch, bytes) {
@@ -103,7 +106,7 @@ window.IqsPrint = (() => {
         const server = d.gatt.connected ? d.gatt : await d.gatt.connect(); await wait(400);
         for (const u of BLE) { try { const s = await server.getPrimaryService(u); for (const ch of await s.getCharacteristics()) if (ch.properties.write || ch.properties.writeWithoutResponse) return { d, ch }; } catch (e) {} }
         for (const s of await server.getPrimaryServices()) for (const ch of await s.getCharacteristics()) if (ch.properties.write || ch.properties.writeWithoutResponse) return { d, ch };
-        throw new Error('Sticker printer: connected, but no way to send.');
+        throw new Error('Label printer: connected, but no way to send.');
     }
     async function reconnectBle() {
         if (retrying || !bleDev || !flag('sticker')) return;
@@ -147,7 +150,7 @@ window.IqsPrint = (() => {
     async function printStickers(list, store, choose, progress) {
         const { d, ch } = await sticker_(choose);
         for (const [n, s] of list.entries()) {
-            progress('Sticker ' + (n + 1) + ' of ' + list.length);
+            progress('Label ' + (n + 1) + ' of ' + list.length);
             const b = bits(sticker(s, store)); // TSPL: a 0 bit prints black, so flipped below
             const inv = b.data.map(v => ~v & 0xff);
             // The printer holds only a few KB at a time: the picture goes in strips of 32 rows (about 1.5 KB) with a pause,
@@ -166,6 +169,7 @@ window.IqsPrint = (() => {
 
     // ── USB receipt printer ──
     async function usbPrinter(choose) {
+        if (!navigator.usb) throw new Error(NO_DIRECT);
         const known = await navigator.usb.getDevices();
         const d = known.length && !choose ? known[0] : await navigator.usb.requestDevice({ filters: [] });
         if (!d.opened) await d.open();

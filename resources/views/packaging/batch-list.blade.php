@@ -39,14 +39,14 @@
 <body>
     {{-- Straight to the shop printers from the Android phone: stickers over Bluetooth, the list over the USB (OTG) cable. --}}
     <div class="bar">
-        <button type="button" class="main" id="pr-stickers" onclick="iqsRun('stickers')">{{ __('Print :n stickers', ['n' => $orders->count()]) }}</button>
+        <button type="button" class="main" id="pr-stickers" onclick="iqsRun('stickers')">{{ __('Print :n labels', ['n' => $orders->count()]) }}</button>
         <button type="button" class="main" id="pr-list" onclick="iqsRun('list')">{{ __('Print the list') }}</button>
         <a class="alt" href="{{ route('packaging.index') }}">← {{ __('Back to packaging') }}</a>
         <label style="width:100%;text-align:center;font-size:12px;color:#4b5563"><input type="checkbox" id="pr-choose"> {{ __('Choose the printer again (a new or another printer)') }}</label>
         <p id="pr-msg" style="font-weight:600"></p>
-        <p>{{ __('Stickers go to the sticker printer over Bluetooth, the list to the receipt printer on its cable. Other ways:') }}
+        <p>{{ __('Labels go to the label printer over Bluetooth, the list to the receipt printer on its cable. Other ways:') }}
             <a href="#" onclick="window.print(); return false">{{ __('phone print') }}</a> ·
-            <a href="{{ route('packaging.labels', ['orders' => $orders->pluck('id')->join(',')]) }}" target="_blank">{{ __('sticker page') }}</a></p>
+            <a href="{{ route('packaging.labels', ['orders' => $orders->pluck('id')->join(',')]) }}" target="_blank">{{ __('label page') }}</a></p>
     </div>
     {{-- $receipt comes from PackagingController::batchPrintData (the print station uses the same). --}}
     @include('packaging._direct-print')
@@ -60,7 +60,7 @@
                     if (!IqsPrint.ok.ble) throw new Error(@js(__('Open this page in Chrome on the Android phone.')));
                     await IqsPrint.printStickers(@js($stickers), @js($store), choose, say);
                     await IqsPrint.marked(@js(route('packaging.batch-printed', $batch->id)), @js(csrf_token()));
-                    say(@js(__('Stickers printed. Now print the list, then pack in Ongoing.')));
+                    say(@js(__('Labels printed. Now print the list, then pack in Ongoing.')));
                 } else {
                     if (!IqsPrint.ok.usb) throw new Error(@js(__('Open this page in Chrome on the Android phone.')));
                     await IqsPrint.printReceipt(@js($receipt), choose, say);

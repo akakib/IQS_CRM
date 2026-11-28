@@ -44,7 +44,13 @@ function printerTest() {
         ],
         async writer() {
             const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICES });
-            const server = await device.gatt.connect();
+            // Android often drops the first link ("GATT Error Unknown"): try three times, a short wait each, and let the printer settle.
+            let server = null, last = null;
+            for (let t = 1; t <= 3 && !server; t++) {
+                try { server = await device.gatt.connect(); await new Promise(r => setTimeout(r, 600)); }
+                catch (e) { last = e; server = null; try { device.gatt.disconnect(); } catch (x) {} await new Promise(r => setTimeout(r, 1200 * t)); }
+            }
+            if (!server) throw new Error((last && last.message ? last.message : 'Could not connect') + '\nTurn the printer off and on, remove it from the phone Bluetooth settings if it is paired there, close its app, then try again.');
             for (const s of await server.getPrimaryServices()) {
                 for (const c of await s.getCharacteristics()) {
                     if (c.properties.write || c.properties.writeWithoutResponse) return { device, c };

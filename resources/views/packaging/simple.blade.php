@@ -163,7 +163,7 @@
             <template x-if="pop">
                 <div>
                     <p class="font-mono text-2xl font-bold text-gray-900" x-text="pop.no"></p>
-                    <p class="mt-1 text-base font-medium text-gray-700">সব জিনিস কি বক্সে দেওয়া হয়েছে?</p>{{-- Bangla on purpose: the owner asked for the packer's two questions in Bangla (2026-11-28). --}}
+                    <p class="mt-1 text-base font-medium text-gray-700">সব প্রোডাক্ট এই প্যাকেজে দেওয়া হয়েছে?</p>{{-- Bangla on purpose: the owner asked for the packer's two questions in Bangla (2026-11-28). --}}
                     <div class="mt-3 divide-y divide-gray-100 rounded-xl border border-gray-200">
                         <template x-for="(i, n) in pop.items" :key="n">
                             <div class="flex items-center gap-3 px-3 py-2 text-base">

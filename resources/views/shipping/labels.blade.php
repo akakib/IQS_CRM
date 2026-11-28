@@ -33,8 +33,9 @@
         .s .cod { font-size: 20px; } .s .cod span { font-size: 8px; }
         .s .cn { margin-top: 5px; padding: 2px 4px; border-width: 2px; flex-direction: column; align-items: flex-start; gap: 0; } .s .cn span { font-size: 8px; } .s .cn b { font-size: 22px; letter-spacing: 0.5px; }
         .s .to { margin-top: 6px; font-size: 11px; line-height: 1.25; max-height: 0.95in; overflow: hidden; } .s .to b { font-size: 13px; }
-        .s .codes svg { height: 0.5in; } .s .bc-text { font-size: 11px; letter-spacing: 0; }
-        .batch { font-size: 9px; font-weight: 700; }
+        /* Off the bottom edge (printers cut and peel there), the label no and batch no big enough to read across a table. */
+        .s .codes { margin-bottom: 0.14in; } .s .codes svg { height: 0.5in; } .s .bc-text { font-size: 15px; letter-spacing: 0.5px; line-height: 1.2; }
+        .batch { font-size: 9px; font-weight: 700; } .s .batch { font-size: 13px; line-height: 1.2; }
         @media print { body { background: #fff; } .toolbar { display: none; } .label { margin: 0; } }
     </style>
 </head>

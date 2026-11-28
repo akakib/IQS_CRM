@@ -786,6 +786,8 @@ class DeskTest extends TestCase
         $this->assertSame('hold', $this->key($a));
         $this->assertSame(0, $this->desk()->inHand($this->mahim->id));
         $this->get('/desk?tab=hold')->assertSee($a->order_no)->assertSee('Waiting for payment check');
+        // The person calling sees what was paid and the TrxID on the order itself, still waiting for the check.
+        $this->get("/desk?tab=hold&order={$a->id}")->assertSee('BIG1')->assertSee('waiting for check');
         $this->get('/dashboard')->assertSee('My orders waiting for a check or admin');
 
         // The check releases it and it is booked with the lower COD; its person is told.
@@ -1170,7 +1172,8 @@ class DeskTest extends TestCase
         // the advance-hold reason id (1: advance holds are counted in the Call tab), the advance holds waiting (1)
         // and the orders in hand (2: active + uncalled advance holds), the first-open mark (1), the Chat button (1: has a channel?)
         // + the stock hold reasons (1: Hold needs no date for stock) and the open order's stock check (1: orange box)
-        $this->assertLessThanOrEqual(25, count(DB::getQueryLog()));
+        // + what the customer already paid, with the TrxID (1)
+        $this->assertLessThanOrEqual(26, count(DB::getQueryLog()));
         DB::disableQueryLog();
 
         $this->get('/desk/control')->assertForbidden();

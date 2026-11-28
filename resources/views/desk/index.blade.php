@@ -429,6 +429,10 @@
                              then who and where (Courier with the CN once booked, Website, Assigned, Packing). Wider screens keep the row below. --}}
                         @php
                             $parcelWord = $detail['parcel']->courier_status ?? null;
+                            // Already paid (advance or website gateway): shown with its TrxID on both layouts. One query, the open order only.
+                            $paid = \Illuminate\Support\Facades\DB::table('order_payments as p')->join('payment_methods as m', 'm.id', '=', 'p.method_id')
+                                ->where('p.order_id', $order->id)->where('p.payment_type', 'advance')->where('p.status', '!=', 'rejected')
+                                ->orderBy('p.id')->get(['p.amount', 'p.transaction_id', 'p.status', 'm.name as method']);
                         @endphp
                         <div class="rounded-xl border border-gray-200 bg-white p-4 sm:hidden">
                             <div class="flex justify-between gap-3">
@@ -459,6 +463,7 @@
                                 <p class="mt-1 text-xs text-gray-600">{{ __('of :no: :m', ['no' => $order->duplicate_of_no, 'm' => \App\Services\Orders\DuplicateCheck::label($order->duplicate_items, $order->duplicate_address)]) }}</p>
                             @endif
                             <p class="mt-2 text-sm text-gray-700">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
+                            <x-order-paid :payments="$paid" />
                             @php $web = $order->channel === 'web' && $order->external_ref; @endphp
                             @if ($detail['consignment'] || $parcelWord || $web || $order->packer)
                                 <dl class="mt-3 grid grid-cols-[4.5rem_minmax(0,1fr)] items-baseline gap-y-2 border-t border-gray-100 pt-3 text-[13px] text-gray-800">
@@ -513,6 +518,7 @@
                                     @endif
                                 </div>
                                 <x-website-status :order="$order" />
+                                <x-order-paid :payments="$paid" />
                                 <h2 class="mt-1 text-xl font-semibold sm:text-2xl text-gray-900">{{ $order->ship_name }}</h2>
                                 <p class="text-sm text-gray-600">{{ collect([$order->ship_address, $order->ship_thana, $order->ship_district])->filter()->join(', ') }}</p>
                             </div>

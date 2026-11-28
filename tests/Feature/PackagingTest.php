@@ -206,12 +206,12 @@ class PackagingTest extends TestCase
 
         // Four tabs (On hold before Packed). To pack: how many wait and Print next batch; nothing to press on an order. No manager tools, no phone.
         $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSeeInOrder(['To pack', 'Ongoing', 'On hold', 'Packed', 'Stock'])
-            ->assertSee('Print next batch')->assertSee($a->order_no)->assertSee('Dates')->assertDontSee('>Done</button>', false)->assertDontSee('>Hold</button>', false)
+            ->assertSee('Print next batch')->assertSee($a->order_no)->assertSee('Dates')->assertDontSee('>Packing Done</button>', false)->assertDontSee('>Hold</button>', false)
             ->assertDontSee('Tools')->assertDontSee('Select all')->assertDontSee('01811111111');
 
         // Printed as a batch: it is Ongoing, opened first, with its items; a label not marked printed (a PDF) still gets Done.
         $this->post(route('packaging.next-batch'));
-        $this->get('/packaging')->assertSee('Dates')->assertSee('Nuts')->assertSee('>Done</button>', false)->assertDontSee('Print label')->assertDontSee('Print next batch');
+        $this->get('/packaging')->assertSee('Dates')->assertSee('Nuts')->assertSee('>Packing Done</button>', false)->assertDontSee('Print label')->assertDontSee('Print next batch');
 
         // Printed: the button is Done. One yes = packed and the label on.
         $this->get(route('packaging.labels', ['orders' => $a->id]));
@@ -260,7 +260,7 @@ class PackagingTest extends TestCase
 
         // Sent back to packaging: Ongoing again (its sticker is printed, its batch kept).
         app(OrderStateMachine::class)->transition($a->fresh(), 'ready_for_packaging', $this->desk);
-        $this->get('/packaging?show=ongoing')->assertSee($a->order_no)->assertSee('>Done</button>', false); // its label not marked printed: Done all the same (the yes marks it printed)
+        $this->get('/packaging?show=ongoing')->assertSee($a->order_no)->assertSee('>Packing Done</button>', false); // its label not marked printed: Done all the same (the yes marks it printed)
         $this->post(route('packaging.mark-done', $a->id), ['code' => DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('barcode')])->assertSessionHasNoErrors();
         $this->assertNotNull(DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('printed_at')); // on the box = printed
     }

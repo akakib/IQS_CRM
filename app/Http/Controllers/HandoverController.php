@@ -33,6 +33,17 @@ class HandoverController extends Controller
 
     public function index(Request $request): View|RedirectResponse
     {
+        if ($this->simple($request->user()) && $request->query('show') === 'earlier') {
+            // Earlier handovers (owner 2026-11-29: packers see them too): newest first, a day to jump to, each opens its slip.
+            $day = $request->validate(['day' => ['nullable', 'date']])['day'] ?? null;
+
+            return view('handover.earlier', ['day' => $day, 'sessions' => DB::table('handover_sessions as s')->leftJoin('users as u', 'u.id', '=', 's.closed_by')
+                ->whereNotNull('s.closed_at')->whereDate('s.closed_at', '<', today())
+                ->when($day, fn ($q, $d) => $q->whereDate('s.closed_at', $d))
+                ->orderByDesc('s.id')
+                ->selectRaw("s.id, s.rider_name, s.rider_phone, s.closed_at, u.name as by_name, (SELECT COUNT(*) FROM scan_logs l WHERE l.handover_session_id = s.id AND l.result = 'ok') as parcels")
+                ->paginate(20)->withQueryString()]);
+        }
         if ($this->simple($request->user())) {
             // Today's open handover: straight back into it. One from an earlier day: it is finished first (owner 2026-11-29),
             // then a new one starts. None: the Ready list and the Scan button (which asks the rider first).

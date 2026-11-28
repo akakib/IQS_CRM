@@ -604,6 +604,10 @@ class PackagingTest extends TestCase
         $this->post("/handover/{$session}/close")->assertRedirect("/handover/{$session}");
         $this->get("/handover/{$session}")->assertOk()->assertSee('Slip PDF')->assertSee('A4 print')->assertSee('stays for the next pickup');
         $this->get('/handover')->assertOk()->assertSee("Today's handovers")->assertSee('Rafiq')->assertSee('1 parcel');
+        // Earlier days: the packer sees them too, newest first.
+        DB::table('handover_sessions')->where('id', $session)->update(['closed_at' => now()->subDays(2)]);
+        $this->get('/handover?show=earlier')->assertOk()->assertSee('Earlier handovers')->assertSee('Rafiq')->assertSee(route('handover.show', $session), false);
+        $this->get('/handover?show=earlier&day='.today()->subDay()->toDateString())->assertOk()->assertSee('No handover on this day.');
     }
 
     public function test_an_open_handover_from_an_earlier_day_is_finished_before_a_new_one_and_the_rider_changes_until_a_parcel_is_given(): void

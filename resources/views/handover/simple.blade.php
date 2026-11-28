@@ -104,6 +104,8 @@
                 <div>
                     <button type="button" @click="pick = true" :disabled="!ready.length || @js((bool) $stale)" class="mb-3 flex h-14 w-full items-center justify-center rounded-xl bg-primary text-lg font-semibold text-white disabled:opacity-40">
                         <svg class="mr-2 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>{{ __('Scan') }}</button>
+                    {{-- Earlier days too (owner 2026-11-29). --}}
+                    <a href="{{ route('handover.index', ['show' => 'earlier']) }}" class="mb-3 flex h-11 w-full items-center justify-center rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700">{{ __('Earlier handovers') }} ›</a>
                     @if ($last->isNotEmpty())
                         {{-- Today's handovers: tap one to see it and print its slip again. --}}
                         <div class="mb-3 rounded-2xl border border-gray-200 bg-white">

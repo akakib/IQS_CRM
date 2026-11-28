@@ -123,7 +123,9 @@
                             <a href="{{ route('packaging.labels', ['orders' => $o->id]) }}" target="_blank" class="flex h-12 w-full items-center justify-center rounded-xl border-2 border-primary bg-white text-base font-semibold text-primary">{{ __('Print label') }}</a>
                         @else
                             <button type="button" @click="pop = { no: @js($o->order_no), label: @js(strtoupper($label->barcode)), items: @js($popItems), url: @js(route('packaging.mark-done', $o->id)), repack: @js($repack), scanned: false, code: '' }; $nextTick(() => document.querySelector('#done-scan button[aria-label]')?.click())"
-                                @class(['lockable flex h-12 w-full items-center justify-center rounded-xl text-base font-semibold text-white', 'bg-red-600 hover:bg-red-700' => $repack, 'bg-primary hover:bg-primary-dark' => ! $repack])>{{ $repack ? __('Repack done') : __('Done') }}</button>
+                                @class(['lockable flex h-12 w-full items-center justify-center rounded-xl text-base font-semibold text-white', 'bg-red-600 hover:bg-red-700' => $repack, 'bg-primary hover:bg-primary-dark' => ! $repack])>
+                                {{-- Scan icon (owner 2026-11-29): Done opens the camera, the picture says so. --}}
+                                <svg class="mr-2 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>{{ $repack ? __('Repack done') : __('Done') }}</button>
                         @endif
                         @if ($filter === 'ongoing')
                             {{-- A problem (item missing, damaged): Hold with a reason. It leaves the packer's lists; the moderator and managers are told and send it back. --}}

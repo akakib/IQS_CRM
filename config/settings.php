@@ -25,6 +25,7 @@ return [
     'courier.book_website_called' => ['bool', false, 'Book the courier for orders already called and verified on the website. Off while the website books them itself', 'Orders', ['boolean']],
     'orders.pickup_cutoffs' => ['json', ['15:00'], 'Courier pickup cut-off times', 'Orders', ['array', 'min:1', 'max:6']],
     'packaging.batch_lines' => ['int', 45, 'Batch size by paper: lines on the batch list (each order = 1 line + 1 per item). Orders are never split', 'Packaging', ['required', 'integer', 'min:5', 'max:500']],
+    'packaging.label_size' => ['string', '2x3', 'Sticker size: 2x3 (51 x 76 mm, the 58 mm label printer) or 4x3 (a 4 inch label printer)', 'Packaging', ['required', 'in:2x3,4x3']],
     'packaging.batch_orders' => ['int', 15, 'Most orders in one batch', 'Packaging', ['required', 'integer', 'min:1', 'max:100']],
     'orders.packaging_cost' => ['decimal', 0, 'Packaging cost per order (৳)', 'Orders', ['required', 'numeric', 'min:0', 'max:100000']],
     'returns.alert_days' => ['int', 7, 'A returned parcel not back at the shop after this many days shows red (days)', 'Returns', ['required', 'integer', 'min:1', 'max:60']],

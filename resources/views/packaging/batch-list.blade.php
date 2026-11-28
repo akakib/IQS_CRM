@@ -13,7 +13,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $batch->batch_no }}</title>
     <style>
-        @page { size: 80mm auto; margin: 0; }
+        @page { size: 76mm auto; margin: 0; } /* the 80 mm printer's paper is 76 mm wide */
         * { box-sizing: border-box; }
         body { margin: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; color: #000; }
         .bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 12px; }
@@ -21,7 +21,7 @@
         .bar .main { background: #14532d; color: #fff; }
         .bar .alt { background: #fff; color: #14532d; }
         .bar p { width: 100%; margin: 0; text-align: center; font-size: 12px; color: #4b5563; }
-        .paper { width: 80mm; margin: 0 auto 24px; background: #fff; padding: 3mm 4mm; font-size: 12px; line-height: 1.35; }
+        .paper { width: 76mm; margin: 0 auto 24px; background: #fff; padding: 2.5mm 3mm; font-size: 12px; line-height: 1.35; }
         .head { text-align: center; border-bottom: 2px solid #000; padding-bottom: 2mm; }
         .head .no { font-size: 20px; font-weight: 800; letter-spacing: .5px; }
         .sec { margin-top: 2.5mm; font-size: 11px; font-weight: 800; letter-spacing: .5px; border-bottom: 1px solid #000; padding-bottom: .5mm; }

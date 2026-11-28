@@ -4,9 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('Labels') }}</title>
-    {{-- Self-contained print page: 4 x 3 inch labels, one per page. --}}
+    {{-- Self-contained print page, one label per page: 2 x 3 inch (51 x 76 mm, the 58 mm printer) or 4 x 3 inch (Settings > Packaging). --}}
+    @php($small = settings('packaging.label_size') !== '4x3')
     <style>
-        @page { size: 4in 3in; margin: 0; }
+        @page { size: {{ $small ? '2in 3in' : '4in 3in' }}; margin: 0; }
         * { box-sizing: border-box; }
         body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #000; background: #f3f4f6; }
         .toolbar { padding: 12px; text-align: center; }
@@ -27,10 +28,19 @@
         .codes { margin-top: auto; text-align: center; }
         .codes svg { width: 100%; height: 0.46in; }
         .bc-text { font-family: monospace; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+        /* 2 x 3 inch: the same parts, smaller; the CN and COD stay the biggest. */
+        .s .label { width: 2in; height: 3in; padding: 0.08in; }
+        .s .store { font-size: 9px; } .s .small { font-size: 7px; }
+        .s .cod { font-size: 15px; } .s .cod span { font-size: 7px; }
+        .s .cn { padding: 1px 3px; border-width: 1.5px; } .s .cn span { font-size: 7px; } .s .cn b { font-size: 15px; letter-spacing: 0; }
+        .s .to { font-size: 9px; line-height: 1.2; max-height: 0.62in; overflow: hidden; } .s .to b { font-size: 10px; }
+        .s .items { font-size: 8px; max-height: 0.4in; }
+        .s .codes svg { height: 0.42in; } .s .bc-text { font-size: 9px; letter-spacing: 0; }
+        .batch { font-size: 8px; font-weight: 700; }
         @media print { body { background: #fff; } .toolbar { display: none; } .label { margin: 0; } }
     </style>
 </head>
-<body>
+<body @class(['s' => $small])>
     <div class="toolbar"><button onclick="window.print()">{{ __('Print :n labels', ['n' => $orders->count()]) }}</button>
         {{-- The A4 packing sheet is off until the shop has an A4 printer: labels of one batch link to its 80 mm list instead. --}}
         @php($oneBatch = $orders->pluck('batch_id')->filter()->unique())
@@ -59,6 +69,7 @@
                 <div class="codes">
                     {!! \App\Support\Barcode\Code128::svg($l->barcode, 2, 60) !!}
                     <div class="bc-text">{{ $l->barcode }}</div>
+                    @if ($bn = $batchNos[$o->batch_id] ?? null)<div class="batch">{{ $bn }}</div>@endif
                 </div>
             @endif
         </div>

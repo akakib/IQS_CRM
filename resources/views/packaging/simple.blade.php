@@ -25,6 +25,8 @@
         </form>
     @endif
 
+    <a href="{{ route('packaging.printer-test') }}" class="mb-3 block text-right text-sm font-medium text-blue-700 underline">{{ __('Printer test') }}</a>
+
     {{-- Two tabs. --}}
     <div class="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-gray-200/70 p-1">
         <a href="{{ route('packaging.index') }}" @class(['rounded-xl py-3 text-center text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'all', 'text-gray-600' => $filter !== 'all'])>{{ __('To pack') }} <b class="tabular-nums">({{ $counts['all'] }})</b></a>

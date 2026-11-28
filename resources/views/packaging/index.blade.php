@@ -134,6 +134,7 @@
             </div>
             <div class="grid grid-cols-2 gap-2">
                 {{-- The A4 sheet is off until the shop has an A4 printer (the 80 mm batch list does its job); the page stays. --}}
+                <a href="{{ route('packaging.printer-test') }}" class="flex h-10 items-center justify-center rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Printer test') }}</a>
                 <a href="{{ route('handover.index') }}" class="flex h-10 items-center justify-center rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">{{ __('Handover') }}</a>
                 @if ($openIssues)<a href="{{ route('packaging.issues') }}" class="flex h-10 items-center justify-center rounded-lg border border-red-200 text-sm font-medium text-red-700 hover:bg-red-50">{{ __('Missing items (:n)', ['n' => $openIssues]) }}</a>@endif
             </div>

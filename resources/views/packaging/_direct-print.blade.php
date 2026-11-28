@@ -37,7 +37,8 @@ window.IqsPrint = (() => {
         // Barcode: whole dots per module, centred, off the bottom edge.
         const widths = String(s.bars).split('').map(Number), modules = widths.reduce((a, b) => a + b, 0), m = Math.max(1, Math.floor((R - L) / modules));
         let x = Math.round((W - modules * m) / 2); const top = 380, bh = 72;
-        widths.forEach((w, i) => { if (i % 2 === 0) g.fillRect(x, top, w * m, bh); x += w * m; });
+        // The bars themselves are drawn by the printer (TSPL BARCODE in printStickers): sharp, and never lost with the picture.
+        s._bar = { x: x + 8, y: top + 24, h: bh, m };
         g.textAlign = 'center'; g.font = 'bold 30px monospace'; g.fillText(s.barcode, W / 2, top + bh + 6); g.font = 'bold 24px Arial'; g.fillText(s.batch || '', W / 2, top + bh + 40); g.textAlign = 'left';
         return c;
     }
@@ -140,7 +141,8 @@ window.IqsPrint = (() => {
             progress('Sticker ' + (n + 1) + ' of ' + list.length);
             const b = bits(sticker(s, store)); // TSPL: a 0 bit prints black, so flipped below
             const inv = b.data.map(v => ~v & 0xff);
-            await bleSend(ch, new Uint8Array([...enc.encode('SIZE 51 mm,76 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 0\r\nCLS\r\nBITMAP 8,24,' + b.row + ',' + b.h + ',0,'), ...inv, ...enc.encode('\r\nPRINT 1\r\n')]));
+            await bleSend(ch, new Uint8Array([...enc.encode('SIZE 51 mm,76 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 0\r\nCLS\r\nBITMAP 8,24,' + b.row + ',' + b.h + ',0,'), ...inv,
+                ...enc.encode('\r\nBARCODE ' + s._bar.x + ',' + s._bar.y + ',"128",' + s._bar.h + ',0,0,' + s._bar.m + ',' + s._bar.m + ',"' + String(s.barcode).replace(/"/g, '') + '"\r\nPRINT 1\r\n')]));
             await wait(2500); // the printer finishes this sticker before the next one arrives
         }
     }

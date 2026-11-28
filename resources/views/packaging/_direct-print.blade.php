@@ -157,10 +157,10 @@ window.IqsPrint = (() => {
                 const h = Math.min(32, b.h - y), part = inv.slice(y * b.row, (y + h) * b.row);
                 if (part.every(v => v === 0xff)) continue;
                 await bleSend(ch, new Uint8Array([...enc.encode('BITMAP 8,' + (24 + y) + ',' + b.row + ',' + h + ',0,'), ...part, ...enc.encode('\r\n')]));
-                await wait(120);
+                await wait(250);
             }
             await bleSend(ch, enc.encode('BARCODE ' + s._bar.x + ',' + s._bar.y + ',"128",' + s._bar.h + ',0,0,' + s._bar.m + ',' + s._bar.m + ',"' + String(s.barcode).replace(/"/g, '') + '"\r\nPRINT 1\r\n'));
-            await wait(2500); // the printer finishes this sticker before the next one arrives
+            await wait(4000); // the printer finishes this sticker (and is ready) before the next one arrives
         }
     }
 

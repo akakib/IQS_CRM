@@ -7,7 +7,7 @@
         <span class="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-gray-200 bg-white py-0.5 pl-0.5 pr-2 text-xs text-gray-700">
             <x-product-thumb :src="$i->variant?->product?->image_url" size="sm" />
             <span class="min-w-0 truncate">{{ $i->name_snapshot }}</span>
-            <b class="shrink-0 tabular-nums">× {{ \App\Support\Units::qty($i->qty, $i->unit) }}</b>
+            <b class="shrink-0 tabular-nums">{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b>
         </span>
     @endforeach
 </div>

@@ -26,7 +26,8 @@ window.IqsPrint = (() => {
     }
     // One 51 x 76 mm sticker at 203 dpi (408 x 608 dots): IQS, COD, CN, name, address, barcode, label no, batch no.
     function sticker(s, store) {
-        const W = 408, H = 608, [c, g] = canvas(W, H), L = 16, R = W - 16;
+        // 48 mm wide (384 dots): the print head of a 58 mm label printer; a wider picture loses its right edge.
+        const W = 384, H = 608, [c, g] = canvas(W, H), L = 12, R = W - 12;
         g.font = 'bold 26px Arial'; g.fillText(store || 'IQS', L, 34);
         g.textAlign = 'right'; g.font = 'bold 16px Arial'; g.fillText('COD', R, 28); g.font = 'bold 40px Arial'; g.fillText('৳' + s.cod, R, 46); g.textAlign = 'left';
         g.lineWidth = 4; g.strokeRect(L, 98, R - L, 86); g.font = 'bold 16px Arial'; g.fillText('Steadfast CN', L + 10, 106); g.font = 'bold 46px Arial'; g.fillText(s.cn || '-', L + 10, 128);
@@ -77,8 +78,10 @@ window.IqsPrint = (() => {
         for (const s of await server.getPrimaryServices()) for (const ch of await s.getCharacteristics()) if (ch.properties.write || ch.properties.writeWithoutResponse) return { d, ch };
         throw new Error('Sticker printer: connected, but no way to send.');
     }
+    // Small pieces, each one confirmed by the printer when it can (a flood without answers loses bytes: the sticker comes out jumbled).
     async function bleSend(ch, bytes) {
-        for (let i = 0; i < bytes.length; i += 180) { const p = bytes.slice(i, i + 180); ch.properties.writeWithoutResponse ? await ch.writeValueWithoutResponse(p) : await ch.writeValue(p); await wait(20); }
+        const sure = ch.properties.write;
+        for (let i = 0; i < bytes.length; i += 128) { const p = bytes.slice(i, i + 128); sure ? await ch.writeValueWithResponse(p) : (await ch.writeValueWithoutResponse(p), await wait(30)); }
     }
     // Connected once, remembered: a Bluetooth drop reconnects by itself, a reopened page connects to the same printers.
     // Only Disconnect lets go (and forgets the printer).
@@ -137,7 +140,7 @@ window.IqsPrint = (() => {
             const b = bits(sticker(s, store)); // TSPL: a 0 bit prints black, so flipped below
             const inv = b.data.map(v => ~v & 0xff);
             await bleSend(ch, new Uint8Array([...enc.encode('SIZE 51 mm,76 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 0\r\nCLS\r\nBITMAP 0,0,' + b.row + ',' + b.h + ',0,'), ...inv, ...enc.encode('\r\nPRINT 1\r\n')]));
-            await wait(400);
+            await wait(2500); // the printer finishes this sticker before the next one arrives
         }
     }
 

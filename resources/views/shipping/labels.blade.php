@@ -61,7 +61,13 @@
             <div class="to">
                 {{-- No customer phone on the sticker (owner 2026-11-26): the courier has it from the booking. --}}
                 <b>{{ $o->ship_name }}</b><br>
-                {{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}
+                {{-- The full address: the district by name (not the website's BD-10 code), a part the address already says only once, any phone number taken out. --}}
+                <?php
+                    $addr = trim(preg_replace(['/(?:\+?88)?[0০][1১][\d০-৯](?:[\s-]?[\d০-৯]){8}/u', '/\s{2,}/u', '/\s*,\s*(,\s*)+/u'], ['', ' ', ', '], (string) $o->ship_address), " ,");
+                    $parts = collect([$o->ship_thana, \App\Support\BdDistricts::name($o->ship_district)])->filter()
+                        ->reject(fn ($p) => $addr !== '' && mb_stripos($addr, $p) !== false)->unique();
+                ?>
+                {{ collect([$addr])->filter()->merge($parts)->join(', ') }}
             </div>
             {{-- No item list on the sticker (owner 2026-11-28): the courier does not need it; the packer has the batch list and the phone. --}}
             @if ($l)

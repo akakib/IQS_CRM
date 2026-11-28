@@ -225,6 +225,15 @@ class PackagingTest extends TestCase
         $this->actingAs($this->desk)->get('/packaging')->assertSee('Repack')->assertSee('On hold')->assertSee('Mine');
     }
 
+    public function test_a_sticker_has_the_full_address_the_district_by_name_and_no_phone(): void
+    {
+        $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        DB::table('orders')->where('id', $a->id)->update(['ship_address' => 'House 5, Road 2, call 01712-345678 before', 'ship_thana' => 'Panchlaish', 'ship_district' => 'BD-10']);
+        $this->actingAs($this->packer)->get(route('packaging.labels', ['orders' => $a->id]))->assertOk()
+            ->assertSee('House 5, Road 2, call before, Panchlaish, Chattogram')
+            ->assertDontSee('BD-10')->assertDontSee('01712-345678')->assertDontSee('01811111111')->assertDontSee('Iqbal Store');
+    }
+
     public function test_a_packers_bottom_bar_is_packaging_and_handover_only(): void
     {
         $bar = fn ($html) => \Illuminate\Support\Str::between($html, 'app-bottom-nav', '</nav>');

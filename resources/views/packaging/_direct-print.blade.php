@@ -141,8 +141,16 @@ window.IqsPrint = (() => {
             progress('Sticker ' + (n + 1) + ' of ' + list.length);
             const b = bits(sticker(s, store)); // TSPL: a 0 bit prints black, so flipped below
             const inv = b.data.map(v => ~v & 0xff);
-            await bleSend(ch, new Uint8Array([...enc.encode('SIZE 51 mm,76 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 0\r\nCLS\r\nBITMAP 8,24,' + b.row + ',' + b.h + ',0,'), ...inv,
-                ...enc.encode('\r\nBARCODE ' + s._bar.x + ',' + s._bar.y + ',"128",' + s._bar.h + ',0,0,' + s._bar.m + ',' + s._bar.m + ',"' + String(s.barcode).replace(/"/g, '') + '"\r\nPRINT 1\r\n')]));
+            // The printer holds only a few KB at a time: the picture goes in strips of 32 rows (about 1.5 KB) with a pause,
+            // and a strip with nothing on it is not sent at all.
+            await bleSend(ch, enc.encode('SIZE 51 mm,76 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 0\r\nCLS\r\n')); await wait(150);
+            for (let y = 0; y < b.h; y += 32) {
+                const h = Math.min(32, b.h - y), part = inv.slice(y * b.row, (y + h) * b.row);
+                if (part.every(v => v === 0xff)) continue;
+                await bleSend(ch, new Uint8Array([...enc.encode('BITMAP 8,' + (24 + y) + ',' + b.row + ',' + h + ',0,'), ...part, ...enc.encode('\r\n')]));
+                await wait(120);
+            }
+            await bleSend(ch, enc.encode('BARCODE ' + s._bar.x + ',' + s._bar.y + ',"128",' + s._bar.h + ',0,0,' + s._bar.m + ',' + s._bar.m + ',"' + String(s.barcode).replace(/"/g, '') + '"\r\nPRINT 1\r\n'));
             await wait(2500); // the printer finishes this sticker before the next one arrives
         }
     }

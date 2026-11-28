@@ -90,6 +90,13 @@ class DeskService
         return $app->make('desk.stock-reason-ids');
     }
 
+    /** On hold for the advance (delivery charge), not allowed without it: the order still needs its call. */
+    public function isAdvanceHold(object $order): bool
+    {
+        return OrderStatus::map()[$order->status_id]['key'] === 'hold' && ! $order->advance_waived_at
+            && $order->hold_reason_id && (int) $order->hold_reason_id === (int) $this->advanceReasonId();
+    }
+
     public function advanceReasonId(): ?int
     {
         // Asked many times per request (tabs, pulse, follow-ups); never changes. Kept for the request.
@@ -643,8 +650,15 @@ class DeskService
      */
     public function noResponse(Order $order, User $user, ?string $note = null): string
     {
+        $key = OrderStatus::map()[$order->status_id]['key'];
+        // An advance hold is a call too (asking for the delivery charge): a missed call is counted the same way,
+        // but the order stays in the hold, back in Call at the return time (Call again until then).
+        $advance = $this->isAdvanceHold($order);
+        if (! $advance && ! in_array($key, ['record_verified', 'no_answer'], true)) {
+            throw ValidationException::withMessages(['order' => __('No response is for an order waiting for its call.')]);
+        }
         // One try per wait: pressing again before the return time must not burn the remaining tries and cancel the order.
-        if ($order->next_call_at && $order->next_call_at->isFuture() && OrderStatus::map()[$order->status_id]['key'] === 'no_answer') {
+        if ($order->next_call_at && $order->next_call_at->isFuture() && ($key === 'no_answer' || $advance)) {
             throw ValidationException::withMessages(['order' => __('Already marked No response. Call again at :t.', ['t' => $order->next_call_at->format('g:i A')])]);
         }
         $delays = array_values(array_filter(array_map('intval', explode(',', (string) settings('desk.no_response_returns')))));
@@ -664,6 +678,9 @@ class DeskService
 
         // Return time first: the status change below restarts timers and must see it.
         DB::table('orders')->where('id', $order->id)->update(['no_response_count' => $try, 'next_call_at' => $returnAt]);
+        if ($advance) {
+            return 'no_answer'; // stays waiting for the advance; the call note above takes it out of the hand
+        }
         $this->machine->transition($order, 'no_answer', $user);
 
         if ($try === 1 && settings('desk.sms_after_no_response')) {

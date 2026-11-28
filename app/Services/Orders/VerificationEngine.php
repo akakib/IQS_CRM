@@ -108,7 +108,7 @@ class VerificationEngine
             'hold_for_advance' => (function () use ($order, $ruleName, $decision) {
                 // The rule's advance (delivery charge, a fixed amount or a percent of the total); an admin can let it go without (Ask admin).
                 $amount = self::advanceFor($decision['rule'], $order);
-                $order->forceFill(['advance_required' => $amount, 'advance_hold_since' => now(), 'advance_reminded_at' => null])->save();
+                $order->forceFill(['advance_required' => $amount, 'advance_hold_since' => now(), 'advance_reminded_at' => null, 'next_call_at' => null])->save();
                 $this->machine->transition($order, 'hold', null, 'rule',
                     DB::table('status_reasons')->where('reason_type', 'hold')->where('system_key', 'advance_wait')->value('id'),
                     __(':r: ৳:a in advance', ['r' => $ruleName, 'a' => number_format($amount)]));

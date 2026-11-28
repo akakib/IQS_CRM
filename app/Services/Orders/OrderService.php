@@ -480,7 +480,7 @@ class OrderService
             || (float) $order->advance_verified + 0.001 >= (float) $order->advance_required) {
             return;
         }
-        $order->forceFill(['advance_hold_since' => now(), 'advance_reminded_at' => null])->save();
+        $order->forceFill(['advance_hold_since' => now(), 'advance_reminded_at' => null, 'next_call_at' => null])->save(); // a fresh call, not an old No response wait
         $machine->transition($order, 'hold', null, 'system', app(DeskService::class)->advanceReasonId(), __('Advance rejected: ৳:a needed again', ['a' => number_format((float) $order->advance_required - (float) $order->advance_verified)]));
     }
 

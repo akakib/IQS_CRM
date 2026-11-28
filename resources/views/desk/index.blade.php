@@ -709,6 +709,13 @@
                             if ($key === 'hold' && ! auth()->user()->can('orders.approve') && ! app(\App\Services\Orders\OrderStateMachine::class)->advanceSettled($order)) {
                                 $actions = array_values(array_filter($actions, fn ($a) => $a[0] === 'cancel'));
                             }
+                            // Waiting for the advance is a call too: the customer did not pick up = No response, as in Call
+                            // (not again before the return time; not once the money is in or an admin is asked).
+                            $advanceCall = $key === 'hold' && app(\App\Services\Orders\DeskService::class)->isAdvanceHold($order) && ! $order->advance_waiver_requested_at
+                                && ! app(\App\Services\Orders\OrderStateMachine::class)->advanceSettled($order);
+                            if ($advanceCall && ! ($order->next_call_at && $order->next_call_at->isFuture())) {
+                                array_splice($actions, count($actions) - 1, 0, [['no_response', __('No response'), 'n', 'secondary']]);
+                            }
                             // The clock is running on another order: this one waits its turn.
                             if ($blocked) {
                                 $actions = [];
@@ -740,7 +747,7 @@
                                 <input type="hidden" name="tab" value="{{ in_array($tab, \App\Http\Controllers\DeskController::TABS, true) ? $tab : '' }}">{{-- a stage the action can come back to; none from a search or an ended stage --}}
                             @if ($embed)<input type="hidden" name="embed" value="1">@endif
                                 @if ($embed)<input type="hidden" name="embed" value="1">@endif
-                                @if (in_array($key, ['record_verified', 'no_answer'], true))
+                                @if (in_array($key, ['record_verified', 'no_answer'], true) || collect($actions)->contains(fn ($a) => $a[0] === 'no_response'))
                                     <input name="note" maxlength="500" placeholder="{{ __('Call note (optional)') }}" class="{{ $input }}">
                                 @endif
                                 @if ($detail['openDuplicates']->isNotEmpty())<input type="hidden" name="action" value="confirm">@endif {{-- used when "Confirm anyway" submits the form --}}

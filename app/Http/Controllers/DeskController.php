@@ -52,9 +52,10 @@ class DeskController extends Controller
             'verify' => ['status_id = ?', [$s('new')]],
             // Asking for the advance is a call too: an advance hold (not yet allowed without) sits in Call, not On hold.
             // (Asked an admin to go without the advance: nothing to call now, it waits in On hold until the answer.)
-            'call' => ['(status_id = ? OR (status_id = ? AND (next_call_at IS NULL OR next_call_at <= ?)) OR (status_id = ? AND hold_reason_id = ? AND advance_waived_at IS NULL AND advance_waiver_requested_at IS NULL AND NOT EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0)))',
-                [$s('record_verified'), $s('no_answer'), $now, $s('hold'), $advanceReason]],
-            'again' => ['(status_id = ? AND next_call_at > ?)', [$s('no_answer'), $now]],
+            'call' => ['(status_id = ? OR (status_id = ? AND (next_call_at IS NULL OR next_call_at <= ?)) OR (status_id = ? AND hold_reason_id = ? AND advance_waived_at IS NULL AND advance_waiver_requested_at IS NULL AND (next_call_at IS NULL OR next_call_at <= ?) AND NOT EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0)))',
+                [$s('record_verified'), $s('no_answer'), $now, $s('hold'), $advanceReason, $now]],
+            // Also an advance hold whose customer did not pick up: back in Call at its return time.
+            'again' => ['((status_id = ? AND next_call_at > ?) OR (status_id = ? AND hold_reason_id = ? AND advance_waived_at IS NULL AND advance_waiver_requested_at IS NULL AND next_call_at > ? AND NOT EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0)))', [$s('no_answer'), $now, $s('hold'), $advanceReason, $now]],
             'hold' => ['(status_id = ? AND (NOT (COALESCE(hold_reason_id, 0) = ? AND advance_waived_at IS NULL) OR advance_waiver_requested_at IS NOT NULL OR EXISTS (SELECT 1 FROM order_payments pc WHERE pc.order_id = orders.id AND pc.payment_type = \'advance\' AND pc.status = \'pending_verification\' AND pc.counts_now = 0)))', [$s('hold'), $advanceReason]],
             'send' => ["(status_id = ? AND booking_state IN ('none', 'failed'))", [$s('confirmed')]], // Booking failed (shown only when there is one)
             'packaging' => ["((status_id = ? AND booking_state = 'queued') OR status_id IN (?, ?, ?))", [$s('confirmed'), ...$packaging]],

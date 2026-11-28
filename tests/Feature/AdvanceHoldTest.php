@@ -361,6 +361,36 @@ class AdvanceHoldTest extends TestCase
             ->assertSessionHasErrors('advance.transaction_id');
     }
 
+    public function test_no_response_on_an_advance_hold_counts_the_try_keeps_the_hold_and_brings_it_back_to_call(): void
+    {
+        $held = $this->web(9);
+        app(DeskService::class)->assign($held->id, $this->mod->id, 'claimed');
+        $this->actingAs($this->mod);
+        $this->assertSame('hold', $this->key($held));
+        $this->get("/desk?tab=call&order={$held->id}")->assertSee('No response');
+
+        $this->post("/desk/{$held->id}/act", ['action' => 'no_response', 'note' => 'Phone off', 'lock_version' => $held->fresh()->lock_version])->assertRedirect()->assertSessionHasNoErrors();
+        $held->refresh();
+        $this->assertSame('hold', $this->key($held)); // still waiting for the advance
+        $this->assertSame(1, (int) $held->no_response_count);
+        $this->assertTrue($held->next_call_at->isFuture());
+        $this->assertDatabaseHas('order_notes', ['order_id' => $held->id, 'note_type' => 'call']);
+        $this->assertSame(0, app(DeskService::class)->inHand($this->mod->id)); // called: the next order can come
+
+        // Until the return time: in Call again, no second No response.
+        $this->get('/desk?tab=again')->assertSee($held->order_no);
+        $this->get('/desk?tab=call')->assertDontSee($held->order_no);
+        $this->get("/desk?tab=again&order={$held->id}")->assertSee('Call again at')->assertDontSee('>No response<', false);
+        $this->post("/desk/{$held->id}/act", ['action' => 'no_response', 'lock_version' => $held->lock_version])->assertSessionHasErrors('order');
+
+        // At the return time: back in Call, the button again.
+        $this->travelTo($held->next_call_at->copy()->addMinute());
+        $this->get('/desk?tab=call')->assertSee($held->order_no);
+        $this->post("/desk/{$held->id}/act", ['action' => 'no_response', 'lock_version' => $held->fresh()->lock_version])->assertSessionHasNoErrors();
+        $this->assertSame(2, (int) $held->fresh()->no_response_count);
+        $this->assertSame('hold', $this->key($held));
+    }
+
     public function test_no_advance_in_time_reminds_at_half_and_cancels_at_the_end(): void
     {
         app(\App\Services\SettingsService::class)->set(['advance.wait_days' => 2]);

@@ -22,6 +22,9 @@
         <p class="font-semibold">{{ __('Advance needed: ৳:a (delivery charge)', ['a' => number_format((float) $order->advance_required)]) }}
             @if ($remaining > 0 && $remaining < (float) $order->advance_required) · {{ __('৳:r more', ['r' => number_format($remaining)]) }}@endif</p>
         <p class="mt-0.5">{{ __('Weak or new Steadfast history. Call once: check the address, offer more, and ask for the delivery charge by bKash / Nagad.') }}</p>
+        @if ($order->no_response_count && $order->next_call_at && $order->next_call_at->isFuture())
+            <p class="mt-1 text-xs font-medium">{{ __('No response ×:n. Call again at :t.', ['n' => $order->no_response_count, 't' => $order->next_call_at->isToday() ? $order->next_call_at->format('g:i A') : $order->next_call_at->format('d M, g:i A')]) }}</p>
+        @endif
         @if ($order->hold_expected_date)
             <p class="mt-1 text-xs">{{ __('Customer said: by :d', ['d' => $order->hold_expected_date->format('d M')]) }}</p>
         @endif

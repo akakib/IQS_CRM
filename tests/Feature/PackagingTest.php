@@ -135,7 +135,9 @@ class PackagingTest extends TestCase
         $b = $this->booked('01822222222', [['variant_id' => $this->dates->id, 'qty' => 1], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
         $c = $this->booked('01833333333', [['variant_id' => $this->nuts->id, 'qty' => 3]]);
 
-        $this->actingAs($this->packer)->get('/packaging')->assertSee('Next batch: 2 orders · 5 lines')->assertSee('3 waiting in all');
+        $this->actingAs($this->packer)->get('/packaging')->assertSee('Print next batch')->assertSee('2 orders');
+        $this->actingAs($this->desk)->get('/packaging')->assertSee('Next batch: 2 orders · 5 lines')->assertSee('3 waiting in all');
+        $this->actingAs($this->packer);
         $this->post(route('packaging.next-batch'))->assertRedirect();
         $first = DB::table('batches')->orderBy('id')->first();
         $this->assertSame([$a->id, $b->id], DB::table('orders')->where('batch_id', $first->id)->orderBy('id')->pluck('id')->all());
@@ -147,16 +149,16 @@ class PackagingTest extends TestCase
             ->assertSee('Print 2 labels')->assertDontSee('01811111111')->assertDontSee($a->ship_name);
 
         // Next press: c alone (02). Then nothing left.
-        $this->get('/packaging')->assertSee('Next batch: 1 orders · 2 lines')->assertSeeText($first->batch_no.' · 0/2 packed');
+        $this->actingAs($this->desk)->get('/packaging')->assertSee('Next batch: 1 orders · 2 lines')->assertSeeText($first->batch_no.' · 0/2 packed'); $this->actingAs($this->packer);
         $this->post(route('packaging.next-batch'));
         $this->assertSame(2, DB::table('batches')->count());
         $this->assertNotNull($c->fresh()->batch_id);
-        $this->get('/packaging')->assertSee('No new order to print.');
+        $this->actingAs($this->desk)->get('/packaging')->assertSee('No new order to print.'); $this->actingAs($this->packer);
 
         // One order bigger than the limit goes alone, never split.
         $big = $this->booked('01844444444', [['variant_id' => $this->dates->id, 'qty' => 1], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
         app(\App\Services\SettingsService::class)->set(['packaging.batch_lines' => 2]);
-        $this->get('/packaging')->assertSee('Next batch: 1 orders · 3 lines');
+        $this->actingAs($this->desk)->get('/packaging')->assertSee('Next batch: 1 orders · 3 lines'); $this->actingAs($this->packer);
 
         // Its labels: the sticker points to the batch list for items that do not fit.
         $this->get(route('packaging.labels', ['orders' => $a->id]))->assertOk()->assertSee('see batch list '.$first->batch_no)->assertSee('Batch list (80 mm)');
@@ -195,6 +197,32 @@ class PackagingTest extends TestCase
         $this->post(route('packaging.undo-now', $a->id), ['mark' => 'packed', 'reason' => 'Box was empty'])->assertSessionHasNoErrors();
         $this->assertSame('ready_for_packaging', $this->key($a));
         $this->assertNull($a->fresh()->packed_at);
+    }
+
+    public function test_a_packers_simple_page_is_two_tabs_and_one_button_print_label_then_done(): void
+    {
+        $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
+        DB::table('shipment_labels')->where('order_id', $a->id)->update(['printed_at' => null]);
+
+        // Two tabs, the order with its items; its one button: Print label. No manager tools, no phone.
+        $page = $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSee('To pack')->assertSee('Packed')
+            ->assertSee($a->order_no)->assertSee('Dates')->assertSee('Nuts')->assertSee('Print label')->assertDontSee('>Done<', false)
+            ->assertDontSee('Tools')->assertDontSee('On hold')->assertDontSee('Select all')->assertDontSee('01811111111');
+
+        // Printed: the button is Done. One yes = packed and the label on.
+        $this->get(route('packaging.labels', ['orders' => $a->id]));
+        $this->get('/packaging')->assertSee('Yes, done')->assertDontSee('Print label</a>', false);
+        $this->post(route('packaging.mark-done', $a->id))->assertSessionHasNoErrors();
+        $this->assertSame('packed', $this->key($a));
+        $this->assertNotNull(DB::table('shipment_labels')->where('order_id', $a->id)->whereNull('voided_at')->value('applied_at'));
+        $this->get('/packaging')->assertSee('Nothing to pack right now.'); // left To pack
+
+        // Packed: their own, today and yesterday at a tap.
+        $this->get(route('packaging.index', ['show' => 'packed', 'from' => today()->toDateString(), 'to' => today()->toDateString()]))
+            ->assertSee($a->order_no)->assertSee('Yesterday')->assertSee('Waiting for rider');
+
+        // The owner keeps the full page.
+        $this->actingAs($this->desk)->get('/packaging')->assertSee('Repack')->assertSee('On hold')->assertSee('Mine');
     }
 
     public function test_a_packers_bottom_bar_is_packaging_and_handover_only(): void
@@ -273,7 +301,7 @@ class PackagingTest extends TestCase
         $a = $this->booked('01712345631', [['variant_id' => $this->dates->id, 'qty' => 1]]);
         $b = $this->booked('01712345632', [['variant_id' => $this->dates->id, 'qty' => 1]]);
         $c = $this->booked('01712345633', [['variant_id' => $this->dates->id, 'qty' => 1]]);
-        $this->actingAs($this->packer)->get(route('packaging.index'))->assertOk()->assertSee('Print selected');
+        $this->actingAs($this->desk)->get(route('packaging.index'))->assertOk()->assertSee('Print selected'); $this->actingAs($this->packer);
 
         // One order: only its label, and it can be printed again.
         $this->get(route('packaging.labels', ['orders' => $b->id]))->assertOk()->assertSee($this->label($b))->assertDontSee($this->label($a));
@@ -345,7 +373,7 @@ class PackagingTest extends TestCase
             DB::table('status_reasons')->where('reason_type', 'amendment')->where('system_key', 'customer_request')->value('id'), $this->desk, $order->fresh()->lock_version);
         $this->assertSame('repack', $order->fresh()->packMark());
         // The red banner stays on top of the packaging page until the box is repacked.
-        $this->get('/packaging')->assertSee('1 order was edited after packing. Repack it before it goes.');
+        $this->get('/packaging')->assertSee('Changed after packing: open the box and pack it again')->assertSee('Print label'); // the packer's simple page: the new label first, then Repack done
 
         $old = $order->order_no.'-1';
         // The edit itself issued the new label (unprinted), so the packer can print it without asking anyone.
@@ -868,7 +896,7 @@ class PackagingTest extends TestCase
         $order->forceFill(['hold_note' => 'Back on Sunday'])->save();
 
         $this->assertDatabaseHas('app_notifications', ['user_id' => $this->packer->id, 'title' => $order->order_no.' on hold: set the parcel aside, do not send']);
-        $this->actingAs($this->packer)->get('/packaging')->assertSee('On hold');
+        $this->actingAs($this->desk)->get('/packaging')->assertSee('On hold'); $this->actingAs($this->packer);
         $this->get('/packaging?show=hold')->assertOk()->assertSee($order->order_no)->assertSee($this->label($order))->assertSee('Customer asked to wait')
             ->assertSee('Back on Sunday')->assertSee('Do not send it');
         $this->get('/packaging')->assertDontSee('Set the parcel aside');

@@ -155,6 +155,19 @@ class PackagingController extends Controller
         $since = now()->startOfDay();
         $mine = DB::table('orders')->where('packer_id', $user->id)->where('packed_at', '>=', $since)->get(['packaging_started_at', 'packed_at']);
 
+        // A packer (no orders, no packaging management): the simple page, two tabs, one button per order.
+        if ($this->isSimple($user) && in_array($filter, ['all', 'packed'], true)) {
+            $ids = $queue->pluck('id');
+            return view('packaging.simple', [
+                'filter' => $filter, 'queue' => $queue, 'packed' => $packed, 'counts' => $counts,
+                'nextBatch' => $user->can('packaging.create') ? app(BatchService::class)->nextUp($user) : null,
+                'items' => $ids->isEmpty() ? collect() : DB::table('order_items as i')->leftJoin('product_variants as v', 'v.id', '=', 'i.variant_id')->leftJoin('products as pr', 'pr.id', '=', 'v.product_id')
+                    ->whereIn('i.order_id', $ids)->orderBy('i.id')->get(['i.order_id', 'i.name_snapshot', 'i.qty', 'i.unit', 'v.size_qty', 'v.size_unit', 'pr.image_url'])->groupBy('order_id'),
+                'labels' => $ids->isEmpty() ? collect() : DB::table('shipment_labels')->whereIn('order_id', $ids)->whereNull('voided_at')->orderBy('id')->get(['order_id', 'barcode', 'printed_at', 'order_version'])->keyBy('order_id'),
+                'versions' => $ids->isEmpty() ? collect() : DB::table('orders')->whereIn('id', $ids)->get(['id', 'label_version', 'current_version', 'cod_amount'])->keyBy('id'),
+            ]);
+        }
+
         return view('packaging.index', [
             'working' => $working,
             'onDuty' => $onDuty,
@@ -389,6 +402,23 @@ class PackagingController extends Controller
         DB::transaction(fn () => $marks->undo($order, $data['mark'], $request->user(), $data['reason']));
 
         return redirect()->to(route('packaging.index', ['show' => 'today']).'#o'.$order->id)->with('success', __('Taken back on :no.', ['no' => $order->order_no]));
+    }
+
+    /** The packer's simple page: packaging work only (Owners and managers keep the full page). */
+    private function isSimple(User $user): bool
+    {
+        return ! $user->isOwner() && ! $user->can('packaging.manage') && ! $user->can('orders.edit') && $user->can('packaging.view');
+    }
+
+    /** Done (the simple page): everything in the box and the label on it, one yes. */
+    public function markDone(Request $request, Order $order, \App\Services\Packaging\PackMarks $marks): RedirectResponse
+    {
+        DB::transaction(function () use ($order, $request, $marks) {
+            $marks->packed($order, $request->user());
+            $marks->labelOn($order->refresh(), $request->user());
+        });
+
+        return redirect()->route('packaging.index')->with('success', __(':no done: packed, label on.', ['no' => $order->order_no]));
     }
 
     private function canUndo(User $user): bool

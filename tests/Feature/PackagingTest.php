@@ -278,7 +278,7 @@ class PackagingTest extends TestCase
         $this->assertStringNotContainsString('01811111111', json_encode($r)); // never the phone
         $this->assertCount(2, $r['receipt']['orders'][0]['items']);
         $this->postJson($r['printed'])->assertJsonPath('marked', 1);
-        $this->get('/packaging?show=ongoing')->assertSee('Done');
+        $this->get('/packaging?show=ongoing')->assertSee('Packing Done');
 
         // Print again: the same batch; nothing left: a clear no.
         $this->postJson(route('packaging.station-batch'), ['batch' => $r['id']])->assertJsonPath('batch', $r['batch']);

@@ -62,7 +62,7 @@ window.IqsPrint = (() => {
     }
 
     // ── Bluetooth sticker printer ──
-    async function bleDevice(choose) {
+    async function bleDevice(choose) { // the list (or the printer Chrome remembers)
         let d = null;
         if (!choose && navigator.bluetooth.getDevices) {
             const name = localStorage.getItem('iqs.btPrinter.sticker');
@@ -80,20 +80,55 @@ window.IqsPrint = (() => {
     async function bleSend(ch, bytes) {
         for (let i = 0; i < bytes.length; i += 180) { const p = bytes.slice(i, i + 180); ch.properties.writeWithoutResponse ? await ch.writeValueWithoutResponse(p) : await ch.writeValue(p); await wait(20); }
     }
-    // Connected once, kept open while the page stays open (no list, no new connect for the next batch).
-    let ble = null, usb = null;
+    // Connected once, remembered: a Bluetooth drop reconnects by itself, a reopened page connects to the same printers.
+    // Only Disconnect lets go (and forgets the printer).
+    let ble = null, usb = null, bleDev = null, retrying = false;
+    const flag = (k, v) => { try { if (v === undefined) return localStorage.getItem('iqs.printer.' + k) === '1'; localStorage.setItem('iqs.printer.' + k, v ? '1' : '0'); } catch (e) {} };
+    const changed = () => window.dispatchEvent(new Event('iqs-printers'));
+    async function bleWriter(d) {
+        const server = d.gatt.connected ? d.gatt : await d.gatt.connect(); await wait(400);
+        for (const u of BLE) { try { const s = await server.getPrimaryService(u); for (const ch of await s.getCharacteristics()) if (ch.properties.write || ch.properties.writeWithoutResponse) return { d, ch }; } catch (e) {} }
+        for (const s of await server.getPrimaryServices()) for (const ch of await s.getCharacteristics()) if (ch.properties.write || ch.properties.writeWithoutResponse) return { d, ch };
+        throw new Error('Sticker printer: connected, but no way to send.');
+    }
+    async function reconnectBle() {
+        if (retrying || !bleDev || !flag('sticker')) return;
+        retrying = true; changed();
+        for (let t = 0; t < 40 && flag('sticker') && !(ble && ble.d.gatt.connected); t++) { // about two minutes, then a tap on Connect
+            try { ble = await bleWriter(bleDev); } catch (e) { await wait(3000); }
+        }
+        retrying = false; changed();
+    }
     async function sticker_(choose) {
         if (!choose && ble && ble.d.gatt.connected) return ble;
+        if (!choose && bleDev) { try { ble = await bleWriter(bleDev); changed(); return ble; } catch (e) {} }
         ble = await bleDevice(choose);
-        ble.d.addEventListener('gattserverdisconnected', () => { ble = null; window.dispatchEvent(new Event('iqs-printers')); });
-        window.dispatchEvent(new Event('iqs-printers'));
+        if (bleDev !== ble.d) { bleDev = ble.d; bleDev.addEventListener('gattserverdisconnected', () => { ble = null; changed(); reconnectBle(); }); }
+        flag('sticker', true); changed();
         return ble;
     }
     async function receipt_(choose) {
         if (!choose && usb && usb.d.opened) return usb;
         usb = await usbPrinter(choose);
-        window.dispatchEvent(new Event('iqs-printers'));
+        flag('receipt', true); changed();
         return usb;
+    }
+    async function disconnect(key) {
+        flag(key, false);
+        if (key === 'sticker') { try { bleDev?.gatt.disconnect(); } catch (e) {} try { await bleDev?.forget?.(); } catch (e) {} ble = null; bleDev = null; try { localStorage.removeItem('iqs.btPrinter.sticker'); } catch (e) {} }
+        else { try { await usb?.d.close(); } catch (e) {} try { await usb?.d.forget?.(); } catch (e) {} usb = null; }
+        changed();
+    }
+    // A reopened page: the printers used last time, with no tap (when Chrome allows it).
+    async function restore() {
+        if (navigator.usb && flag('receipt')) { try { if ((await navigator.usb.getDevices()).length) await receipt_(false); } catch (e) {} }
+        if (navigator.bluetooth?.getDevices && flag('sticker')) {
+            try {
+                const name = localStorage.getItem('iqs.btPrinter.sticker');
+                const d = (await navigator.bluetooth.getDevices()).find(x => x.name && x.name === name);
+                if (d) { bleDev = d; d.addEventListener('gattserverdisconnected', () => { ble = null; changed(); reconnectBle(); }); reconnectBle(); }
+            } catch (e) {}
+        }
     }
     async function printStickers(list, store, choose, progress) {
         const { d, ch } = await sticker_(choose);
@@ -132,11 +167,15 @@ window.IqsPrint = (() => {
 
     async function marked(url, csrf) { try { await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json' } }); } catch (e) {} }
 
-    // The cable printer, if Chrome remembers it: opened on page load, no tap needed.
-    if (navigator.usb) { navigator.usb.getDevices().then(l => { if (l.length) receipt_(false).catch(() => {}); }); navigator.usb.addEventListener('disconnect', () => { usb = null; window.dispatchEvent(new Event('iqs-printers')); }); }
+    if (navigator.usb) {
+        navigator.usb.addEventListener('disconnect', () => { usb = null; changed(); });
+        navigator.usb.addEventListener('connect', () => { if (flag('receipt')) receipt_(false).catch(() => {}); }); // the cable back in: open again
+    }
+    restore();
 
-    return { sticker, receipt, printStickers, printReceipt, marked, connectSticker: sticker_, connectReceipt: receipt_,
-        status: () => ({ sticker: !!(ble && ble.d.gatt.connected), stickerName: ble?.d.name || '', receipt: !!(usb && usb.d.opened), receiptName: usb?.d.productName || '' }),
+    return { sticker, receipt, printStickers, printReceipt, marked, connectSticker: sticker_, connectReceipt: receipt_, disconnect,
+        status: () => ({ sticker: !!(ble && ble.d.gatt.connected), stickerName: ble?.d.name || bleDev?.name || '', reconnecting: retrying,
+            receipt: !!(usb && usb.d.opened), receiptName: usb?.d.productName || '' }),
         ok: { ble: !!navigator.bluetooth, usb: !!navigator.usb } };
 })();
 </script>

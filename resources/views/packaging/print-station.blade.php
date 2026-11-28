@@ -1,10 +1,10 @@
 {{-- The print station (PackagingController::printStation): one page open all day on the shop's Android phone.
      Connect the sticker printer (Bluetooth) and the receipt printer (USB cable) once; Print next batch then makes the
-     batch and prints its stickers and its list right here. Leaving the page drops the printers: keep it open
-     (use another tab or phone for Ongoing and Done). --}}
+     batch and prints its stickers and its list right here. The printers are remembered (a dropped Bluetooth link and
+     a reopened page connect again by themselves); only Disconnect lets go. The screen is kept on. --}}
 <x-layouts.app :heading="__('Print station')">
 <div class="mx-auto max-w-xl space-y-3" x-data="station()" x-init="init()">
-    <p class="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">{{ __('Keep this page open on the printing phone. Leaving it drops the printers. For Ongoing and Done use another tab or phone.') }}</p>
+    <p class="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">{{ __('Connect once: the printers are remembered and come back by themselves. Only Disconnect lets them go. Keep this page open on the printing phone (the screen stays on). For Ongoing and Done use another tab or phone.') }}</p>
 
     {{-- The two printers: connected once. --}}
     <div class="grid grid-cols-2 gap-2">
@@ -12,9 +12,10 @@
             <div class="rounded-2xl border bg-white p-3" :class="st[p.key] ? 'border-green-300' : 'border-gray-200'">
                 <p class="text-sm font-semibold text-gray-900" x-text="p.name"></p>
                 <p class="text-xs text-gray-500" x-text="p.how"></p>
-                <p class="mt-2 text-sm font-semibold" :class="st[p.key] ? 'text-green-700' : 'text-gray-500'" x-text="st[p.key] ? '✓ ' + (st[p.key + 'Name'] || @js(__('Connected'))) : @js(__('Not connected'))"></p>
-                <button type="button" @click="connect(p.key, !!st[p.key])" :disabled="busy" class="mt-2 h-10 w-full rounded-xl border text-sm font-semibold disabled:opacity-50"
-                    :class="st[p.key] ? 'border-gray-300 text-gray-600' : 'border-blue-600 bg-blue-600 text-white'" x-text="st[p.key] ? @js(__('Change')) : @js(__('Connect'))"></button>
+                <p class="mt-2 text-sm font-semibold" :class="st[p.key] ? 'text-green-700' : (p.key === 'sticker' && st.reconnecting ? 'text-amber-700' : 'text-gray-500')"
+                    x-text="st[p.key] ? '✓ ' + (st[p.key + 'Name'] || @js(__('Connected'))) : (p.key === 'sticker' && st.reconnecting ? @js(__('Reconnecting…')) : @js(__('Not connected')))"></p>
+                <button type="button" x-show="!st[p.key]" @click="connect(p.key, false)" :disabled="busy" class="mt-2 h-10 w-full rounded-xl border border-blue-600 bg-blue-600 text-sm font-semibold text-white disabled:opacity-50">{{ __('Connect') }}</button>
+                <button type="button" x-show="st[p.key]" x-cloak @click="disconnect(p.key)" :disabled="busy" class="mt-2 h-10 w-full rounded-xl border border-red-300 text-sm font-semibold text-red-700 disabled:opacity-50">{{ __('Disconnect') }}</button>
             </div>
         </template>
     </div>
@@ -48,7 +49,13 @@ function station() {
     const url = @js(route('packaging.station-batch')), csrf = @js(csrf_token()), store = @js($store);
     return {
         st: {}, busy: false, msg: '', bad: false, next: @js(count($next['ids'])), recent: @js($recent),
-        init() { const up = () => { this.st = IqsPrint.status(); }; up(); window.addEventListener('iqs-printers', up); setInterval(up, 3000); },
+        init() {
+            const up = () => { this.st = IqsPrint.status(); }; up(); window.addEventListener('iqs-printers', up); setInterval(up, 3000);
+            // The screen stays on while this page is open (a sleeping phone drops Bluetooth).
+            const awake = () => { if (document.visibilityState === 'visible') navigator.wakeLock?.request('screen').catch(() => {}); };
+            awake(); document.addEventListener('visibilitychange', awake);
+        },
+        async disconnect(key) { this.busy = true; await IqsPrint.disconnect(key); this.say(@js(__('Disconnected. Tap Connect to use a printer again.'))); this.st = IqsPrint.status(); this.busy = false; },
         say(t, bad = false) { this.msg = t; this.bad = bad; },
         fail(e) { this.say(e.name === 'NotFoundError' ? @js(__('No printer chosen. Is it on (and its cable in)?')) : (e.message || String(e)), true); },
         async connect(key, change) {

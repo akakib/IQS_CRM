@@ -13,6 +13,9 @@
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family={{ $family }}&display=swap">
 @endif
 {{-- Installable on phones (Android: Install app, iPhone: Add to Home Screen). sw.js keeps no data, only the No internet page. --}}
+{{-- Bangla text only (owner 2026-11-29): Hind Siliguri sits after the main font, so English keeps its font and only Bangla letters
+     take this one; the browser fetches just the Bengali part, and only on a page that shows Bangla. --}}
+<link rel="stylesheet" href="https://fonts.bunny.net/css?family=hind-siliguri:400,500,600,700&display=swap">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="{{ $brand }}">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">

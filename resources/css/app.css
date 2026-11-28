@@ -12,7 +12,7 @@
 | new colour needs no rebuild.
 */
 @theme {
-    --font-sans: var(--app-font, 'Figtree'), ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+    --font-sans: var(--app-font, 'Figtree'), 'Hind Siliguri', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
         'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
     /* One typeface everywhere: order numbers, phones and codes use the normal font too (tabular digits keep columns aligned). */
     --font-mono: var(--font-sans);

@@ -24,19 +24,17 @@
         .cn b { font-family: Arial, Helvetica, sans-serif; font-size: 27px; font-weight: 800; letter-spacing: 1px; line-height: 1.1; white-space: nowrap; }
         .to { margin-top: 4px; font-size: 12px; line-height: 1.25; }
         .to b { font-size: 13px; }
-        .items { font-size: 9px; margin-top: 3px; color: #222; max-height: 0.42in; overflow: hidden; }
         .codes { margin-top: auto; text-align: center; }
         .codes svg { width: 100%; height: 0.46in; }
         .bc-text { font-family: monospace; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
         /* 2 x 3 inch: the same parts, smaller; the CN and COD stay the biggest. */
         .s .label { width: 2in; height: 3in; padding: 0.08in; }
         .s .store { font-size: 9px; } .s .small { font-size: 7px; }
-        .s .cod { font-size: 15px; } .s .cod span { font-size: 7px; }
-        .s .cn { padding: 1px 3px; border-width: 1.5px; } .s .cn span { font-size: 7px; } .s .cn b { font-size: 15px; letter-spacing: 0; }
-        .s .to { font-size: 9px; line-height: 1.2; max-height: 0.62in; overflow: hidden; } .s .to b { font-size: 10px; }
-        .s .items { font-size: 8px; max-height: 0.82in; }
-        .s .codes svg { height: 0.42in; } .s .bc-text { font-size: 9px; letter-spacing: 0; }
-        .batch { font-size: 8px; font-weight: 700; }
+        .s .cod { font-size: 20px; } .s .cod span { font-size: 8px; }
+        .s .cn { margin-top: 5px; padding: 2px 4px; border-width: 2px; flex-direction: column; align-items: flex-start; gap: 0; } .s .cn span { font-size: 8px; } .s .cn b { font-size: 22px; letter-spacing: 0.5px; }
+        .s .to { margin-top: 6px; font-size: 11px; line-height: 1.25; max-height: 0.95in; overflow: hidden; } .s .to b { font-size: 13px; }
+        .s .codes svg { height: 0.5in; } .s .bc-text { font-size: 11px; letter-spacing: 0; }
+        .batch { font-size: 9px; font-weight: 700; }
         @media print { body { background: #fff; } .toolbar { display: none; } .label { margin: 0; } }
     </style>
 </head>
@@ -64,7 +62,7 @@
                 <b>{{ $o->ship_name }}</b><br>
                 {{ collect([$o->ship_address, $o->ship_thana, $o->ship_district])->filter()->join(', ') }}
             </div>
-            <div class="items" data-more="{{ ($bn = $batchNos[$o->batch_id] ?? null) ? __('see batch list :b', ['b' => $bn]) : __('see packing sheet') }}">@foreach ($o->items as $i)<span>{{ $i->name_snapshot }}{{ ($s = \App\Support\Units::itemSize($i)) && ! str_contains(mb_strtolower(str_replace(' ', '', $i->name_snapshot)), mb_strtolower(str_replace(' ', '', $s))) ? ' '.$s : '' }} <b>{{ \App\Support\Units::qty($i->qty, $i->unit) }}</b>{{ $loop->last ? '' : ' · ' }}</span>@endforeach</div>
+            {{-- No item list on the sticker (owner 2026-11-28): the courier does not need it; the packer has the batch list and the phone. --}}
             @if ($l)
                 <div class="codes">
                     {!! \App\Support\Barcode\Code128::svg($l->barcode, 2, 60) !!}
@@ -74,19 +72,5 @@
             @endif
         </div>
     @endforeach
-<script>
-    // A long item list that does not fit on the sticker: drop the last items until it fits and say how many more (the batch list, or the A4 sheet, has them all).
-    document.querySelectorAll('.items').forEach(function (box) {
-        var spans = Array.from(box.children), cut = 0;
-        if (box.scrollHeight <= box.clientHeight) return;
-        var more = document.createElement('b');
-        box.appendChild(more);
-        while (spans.length > 1 && box.scrollHeight > box.clientHeight) {
-            spans.pop().remove();
-            cut++;
-            more.textContent = ' +' + cut + ' more, ' + box.dataset.more;
-        }
-    });
-</script>
 </body>
 </html>

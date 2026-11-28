@@ -161,7 +161,7 @@ class PackagingTest extends TestCase
         $this->actingAs($this->desk)->get('/packaging')->assertSee('Next batch: 1 orders · 3 lines'); $this->actingAs($this->packer);
 
         // Its labels: the sticker points to the batch list for items that do not fit.
-        $this->get(route('packaging.labels', ['orders' => $a->id]))->assertOk()->assertSee('see batch list '.$first->batch_no)->assertSee('Batch list (80 mm)');
+        $this->get(route('packaging.labels', ['orders' => $a->id]))->assertOk()->assertSee($first->batch_no)->assertDontSee('Dates')->assertSee('Batch list (80 mm)'); // no item list on the sticker, the batch no under the barcode
     }
 
     public function test_today_sheet_ticks_packed_then_label_on_locks_them_and_only_a_manager_takes_one_back(): void

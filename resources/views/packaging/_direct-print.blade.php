@@ -192,7 +192,8 @@ window.IqsPrint = (() => {
         await d.transferOut(ep, new Uint8Array([0x1b, 0x64, 4, 0x1d, 0x56, 0x42, 0]));
     }
 
-    async function marked(url, csrf) { try { await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json' } }); } catch (e) {} }
+    // keepalive: the mark still arrives when the page goes away right after (an iPhone opens a saved PDF in this tab).
+    async function marked(url, csrf) { try { await fetch(url, { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json' } }); } catch (e) {} }
 
     // ── PDF (a phone that cannot reach the printers, e.g. an iPhone): the same pictures, one per page, saved as a file ──
     // A tiny PDF writer: each page is one JPEG at the paper's size. No library, Bangla kept (it is a picture).

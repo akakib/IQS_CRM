@@ -99,7 +99,7 @@ function station() {
         keep(b) { this.ready = { batch: b.batch, labels: b.stickers, list: b.receipt, printed: b.printed }; this.say(b.batch + ': ' + @js(__('ready. Tap Labels PDF and List PDF to save them.'))); },
         savePdf(what) {
             const r = this.ready; if (!r) return;
-            if (what === 'labels') { IqsPrint.labelsPdf(r.labels, store, r.batch + '-labels.pdf'); IqsPrint.marked(r.printed, csrf); }
+            if (what === 'labels') { IqsPrint.marked(r.printed, csrf); IqsPrint.labelsPdf(r.labels, store, r.batch + '-labels.pdf'); } // the mark goes first
             else IqsPrint.listPdf(r.list, r.batch + '-list.pdf');
         },
         async again(id, what) {

@@ -204,8 +204,8 @@ class PackagingTest extends TestCase
         $a = $this->booked('01811111111', [['variant_id' => $this->dates->id, 'qty' => 2], ['variant_id' => $this->nuts->id, 'qty' => 1]]);
         DB::table('shipment_labels')->where('order_id', $a->id)->update(['printed_at' => null]);
 
-        // Four tabs (On hold last). To pack: how many wait and Print next batch; nothing to press on an order. No manager tools, no phone.
-        $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSeeInOrder(['To pack', 'Ongoing', 'Packed', 'On hold', 'Stock'])
+        // Four tabs (On hold before Packed). To pack: how many wait and Print next batch; nothing to press on an order. No manager tools, no phone.
+        $this->actingAs($this->packer)->get('/packaging')->assertOk()->assertSeeInOrder(['To pack', 'Ongoing', 'On hold', 'Packed', 'Stock'])
             ->assertSee('Print next batch')->assertSee($a->order_no)->assertSee('Dates')->assertDontSee('>Done</button>', false)->assertDontSee('>Hold</button>', false)
             ->assertDontSee('Tools')->assertDontSee('Select all')->assertDontSee('01811111111');
 

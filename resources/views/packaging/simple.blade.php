@@ -35,8 +35,8 @@
     <div class="mb-3 grid grid-cols-4 gap-1 rounded-2xl bg-gray-200/70 p-1">
         <a href="{{ route('packaging.index', ['show' => 'all']) }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'all', 'text-gray-600' => $filter !== 'all'])>{{ __('To pack') }}<br><b class="tabular-nums">{{ $counts['to_pack'] }}</b></a>
         <a href="{{ route('packaging.index', ['show' => 'ongoing']) }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'ongoing', 'text-gray-600' => $filter !== 'ongoing'])>{{ __('Ongoing') }}<br><b class="tabular-nums">{{ $counts['ongoing'] }}</b></a>
-        <a href="{{ $day(today()->toDateString()) }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'packed', 'text-gray-600' => $filter !== 'packed'])>{{ __('Packed') }}<br><b class="tabular-nums">{{ $counts['today'] }}</b></a>
         <a href="{{ route('packaging.index', ['show' => 'hold']) }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'hold', 'text-gray-600' => $filter !== 'hold'])>{{ __('On hold') }}<br><b class="tabular-nums">{{ $counts['hold'] }}</b></a>
+        <a href="{{ $day(today()->toDateString()) }}" @class(['rounded-xl py-3 text-center text-sm sm:text-base', 'bg-white font-semibold text-gray-900 shadow-sm' => $filter === 'packed', 'text-gray-600' => $filter !== 'packed'])>{{ __('Packed') }}<br><b class="tabular-nums">{{ $counts['today'] }}</b></a>
     </div>
 
     @if ($filter === 'hold')

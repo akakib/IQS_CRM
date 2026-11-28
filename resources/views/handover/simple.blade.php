@@ -11,7 +11,7 @@
 @endphp
 <x-layouts.app :heading="__('Handover')">
     <div x-data="{
-            tab: 'ready', last: null,
+            tab: 'ready', last: null, pick: false, name: '', phone: '', riders: @js($riders),
             ready: @js($missing->map($card)->values()),
             given: @js($handed->map($card)->values()),
             async handle(code) {
@@ -69,7 +69,11 @@
             @if ($open)
                 <div class="mb-3 rounded-2xl border border-gray-200 bg-white p-3">
                     <p class="text-sm text-gray-500">{{ __('Rider') }}</p>
-                    <p class="text-lg font-semibold text-gray-900">{{ $session->rider_name ?? '-' }} <span class="font-normal text-gray-500">{{ $session->rider_phone }}</span></p>
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="min-w-0 text-lg font-semibold text-gray-900">{{ $session->rider_name ?? '-' }} <span class="font-normal text-gray-500">{{ $session->rider_phone }}</span></p>
+                        {{-- The wrong rider: another one, while nothing has been given yet. --}}
+                        <button type="button" x-show="!given.length" @click="pick = true" class="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700">{{ __('Change') }}</button>
+                    </div>
                 </div>
             @endif
 
@@ -87,32 +91,22 @@
                     <p class="font-mono text-sm" x-text="last?.order?.order_no"></p>
                 </div>
             @else
+                {{-- One from an earlier day still open: finish it first (owner 2026-11-29), then a new one starts. --}}
+                @if ($stale)
+                    <div class="mb-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-3">
+                        <p class="text-base font-semibold text-amber-900">{{ __('Not finished: :d · :r · :n given', ['d' => \Illuminate\Support\Carbon::parse($stale->started_at)->format('d M'), 'r' => $stale->rider_name ?? __('Rider'), 'n' => $stale->given]) }}</p>
+                        <form method="POST" action="{{ route('handover.close', $stale->id) }}" class="mt-2">@csrf
+                            <button class="h-12 w-full rounded-xl bg-amber-500 text-base font-semibold text-white">{{ $stale->given ? __('Finish it') : __('Close, nothing given') }}</button>
+                        </form>
+                    </div>
+                @endif
                 {{-- Scan: first the rider. --}}
-                <div x-data="{ pick: false, name: '', phone: '', riders: @js($riders) }">
-                    <button type="button" @click="pick = true" :disabled="!ready.length" class="mb-3 flex h-14 w-full items-center justify-center rounded-xl bg-primary text-lg font-semibold text-white disabled:opacity-40">
+                <div>
+                    <button type="button" @click="pick = true" :disabled="!ready.length || @js((bool) $stale)" class="mb-3 flex h-14 w-full items-center justify-center rounded-xl bg-primary text-lg font-semibold text-white disabled:opacity-40">
                         <svg class="mr-2 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>{{ __('Scan') }}</button>
                     @if ($last)
                         <a href="{{ route('handover.show', $last->id) }}" class="-mt-1 mb-3 block text-center text-sm text-blue-700 underline">{{ __('Last handover: :r, :t (print again)', ['r' => $last->rider_name ?? __('Rider'), 't' => \Illuminate\Support\Carbon::parse($last->closed_at)->format('g:i A')]) }}</a>
                     @endif
-                    <div x-show="pick" x-cloak class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" @click.self="pick = false" @keydown.escape.window="pick = false">
-                        <form method="POST" action="{{ route('handover.start') }}" x-ref="start" class="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-2xl">
-                            @csrf
-                            <input type="hidden" name="rider_name" :value="name"><input type="hidden" name="rider_phone" :value="phone">
-                            <p class="mb-3 text-lg font-semibold text-gray-900">{{ __('Which rider?') }}</p>
-                            <div class="space-y-2">
-                                <template x-for="r in riders" :key="r.name">
-                                    <button type="button" @click="name = r.name; phone = r.phone; $nextTick(() => $refs.start.submit())" class="flex h-14 w-full items-center justify-between rounded-xl border-2 border-gray-200 px-4 text-left hover:border-primary">
-                                        <span class="truncate text-base font-semibold text-gray-900" x-text="r.name"></span><span class="shrink-0 text-sm tabular-nums text-gray-500" x-text="r.phone"></span>
-                                    </button>
-                                </template>
-                            </div>
-                            <p class="mb-2 mt-4 text-sm font-medium text-gray-700">{{ __('New rider') }}</p>
-                            <input x-model="name" maxlength="100" placeholder="{{ __('Rider name') }}" class="mb-2 h-12 w-full rounded-xl border border-gray-300 px-3 text-base">
-                            <input x-model="phone" inputmode="tel" maxlength="20" placeholder="{{ __('Rider phone') }}" class="mb-3 h-12 w-full rounded-xl border border-gray-300 px-3 text-base">
-                            <button type="submit" :disabled="!name.trim()" class="h-12 w-full rounded-xl bg-primary text-base font-semibold text-white disabled:opacity-40">{{ __('Start scanning') }}</button>
-                            <button type="button" @click="pick = false" class="mt-2 h-11 w-full rounded-xl border border-gray-300 text-base text-gray-700">{{ __('Cancel') }}</button>
-                        </form>
-                    </div>
                 </div>
             @endif
 
@@ -138,6 +132,29 @@
                 </form>
                 <x-confirm-modal id="hand-finish-confirm" :verb="__('Finish')" :danger="false" />
             @endif
+        @endif
+
+        {{-- Which rider: to start, or (nothing given yet) to change. --}}
+        @if (! $closed)
+                    <div x-show="pick" x-cloak class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" @click.self="pick = false" @keydown.escape.window="pick = false">
+                        <form method="POST" action="{{ $open ? route('handover.rider', $session->id) : route('handover.start') }}" x-ref="start" class="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-2xl">
+                            @csrf
+                            <input type="hidden" name="rider_name" :value="name"><input type="hidden" name="rider_phone" :value="phone">
+                            <p class="mb-3 text-lg font-semibold text-gray-900">{{ __('Which rider?') }}</p>
+                            <div class="space-y-2">
+                                <template x-for="r in riders" :key="r.name">
+                                    <button type="button" @click="name = r.name; phone = r.phone; $nextTick(() => $refs.start.submit())" class="flex h-14 w-full items-center justify-between rounded-xl border-2 border-gray-200 px-4 text-left hover:border-primary">
+                                        <span class="truncate text-base font-semibold text-gray-900" x-text="r.name"></span><span class="shrink-0 text-sm tabular-nums text-gray-500" x-text="r.phone"></span>
+                                    </button>
+                                </template>
+                            </div>
+                            <p class="mb-2 mt-4 text-sm font-medium text-gray-700">{{ __('New rider') }}</p>
+                            <input x-model="name" maxlength="100" placeholder="{{ __('Rider name') }}" class="mb-2 h-12 w-full rounded-xl border border-gray-300 px-3 text-base">
+                            <input x-model="phone" inputmode="tel" maxlength="20" placeholder="{{ __('Rider phone') }}" class="mb-3 h-12 w-full rounded-xl border border-gray-300 px-3 text-base">
+                            <button type="submit" :disabled="!name.trim()" class="h-12 w-full rounded-xl bg-primary text-base font-semibold text-white disabled:opacity-40">{{ $open ? __('Save') : __('Start scanning') }}</button>
+                            <button type="button" @click="pick = false" class="mt-2 h-11 w-full rounded-xl border border-gray-300 text-base text-gray-700">{{ __('Cancel') }}</button>
+                        </form>
+                    </div>
         @endif
     </div>
     @include('packaging._direct-print')

@@ -287,6 +287,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/handover', [HandoverController::class, 'start'])->name('handover.start');
         Route::post('/handover/{session}/scan', [HandoverController::class, 'scan'])->whereNumber('session')->name('handover.scan');
         Route::post('/handover/{session}/manual', [HandoverController::class, 'manual'])->whereNumber('session')->name('handover.manual');
+        Route::post('/handover/{session}/rider', [HandoverController::class, 'rider'])->whereNumber('session')->name('handover.rider');
         Route::post('/handover/{session}/close', [HandoverController::class, 'close'])->whereNumber('session')->name('handover.close');
     });
 

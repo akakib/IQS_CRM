@@ -34,16 +34,21 @@ class HandoverController extends Controller
     public function index(Request $request): View|RedirectResponse
     {
         if ($this->simple($request->user())) {
-            // A handover still open: straight back into it. None: the Ready list and the Scan button (which asks the rider first).
-            $open = DB::table('handover_sessions')->whereNull('closed_at')->orderByDesc('id')->value('id');
-            if ($open) {
-                return redirect()->route('handover.show', $open);
+            // Today's open handover: straight back into it. One from an earlier day: it is finished first (owner 2026-11-29),
+            // then a new one starts. None: the Ready list and the Scan button (which asks the rider first).
+            $open = DB::table('handover_sessions')->whereNull('closed_at')->orderByDesc('id')->first(['id', 'rider_name', 'started_at']);
+            if ($open && \Illuminate\Support\Carbon::parse($open->started_at)->isToday()) {
+                return redirect()->route('handover.show', $open->id);
+            }
+            $stale = $open;
+            if ($stale) {
+                $stale->given = DB::table('scan_logs')->where('handover_session_id', $stale->id)->where('result', 'ok')->count();
             }
 
             // The last one finished today: its slip can be printed again (torn, lost).
             $last = DB::table('handover_sessions')->whereNotNull('closed_at')->whereDate('closed_at', today())->orderByDesc('id')->first(['id', 'rider_name', 'closed_at']);
 
-            return view('handover.simple', ['session' => null, 'riders' => $this->riders(), 'last' => $last] + $this->manifestData(0));
+            return view('handover.simple', ['session' => null, 'riders' => $this->riders(), 'last' => $last, 'stale' => $stale] + $this->manifestData(0));
         }
         $filters = $request->validate(['from' => ['nullable', 'date'], 'to' => ['nullable', 'date']]) + ['from' => null, 'to' => null];
 
@@ -64,15 +69,13 @@ class HandoverController extends Controller
     public function start(Request $request): RedirectResponse
     {
         $data = $request->validate(['rider_name' => ['required', 'string', 'max:100'], 'rider_phone' => ['nullable', 'string', 'max:20']]);
-        // Remember the rider (new name = new rider; a changed phone replaces the old one).
-        $name = trim((string) ($data['rider_name'] ?? ''));
-        $phone = Phone::normalize($data['rider_phone'] ?? null);
-        if ($name !== '') {
-            $rider = DB::table('riders')->where('name', $name)->first();
-            $rider
-                ? DB::table('riders')->where('id', $rider->id)->update(['phone' => $phone ?: $rider->phone, 'last_used_at' => now(), 'updated_at' => now()])
-                : DB::table('riders')->insert(['name' => $name, 'phone' => $phone, 'last_used_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        // One open handover at a time (owner 2026-11-29): the open one is finished first.
+        $open = DB::table('handover_sessions')->whereNull('closed_at')->orderByDesc('id')->value('id');
+        if ($open) {
+            return redirect()->route($this->simple($request->user()) ? 'handover.index' : 'handover.show', $this->simple($request->user()) ? [] : $open)
+                ->with('error', __('Finish the open handover first.'));
         }
+        $this->remember($data['rider_name'], $data['rider_phone'] ?? null);
         $id = DB::table('handover_sessions')->insertGetId([
             'courier' => 'steadfast', 'pickup_date' => today(), 'rider_name' => $data['rider_name'] ?? null,
             'rider_phone' => Phone::normalize($data['rider_phone'] ?? null), 'started_by' => $request->user()->id, 'started_at' => now(),
@@ -82,12 +85,39 @@ class HandoverController extends Controller
         return redirect()->route('handover.show', $this->simple($request->user()) ? ['session' => $id, 'scan' => 1] : $id);
     }
 
+    /** Remember the rider (new name = new rider; a changed phone replaces the old one). */
+    private function remember(string $name, ?string $phone): void
+    {
+        $name = trim($name);
+        $phone = Phone::normalize($phone);
+        if ($name === '') {
+            return;
+        }
+        $rider = DB::table('riders')->where('name', $name)->first();
+        $rider
+            ? DB::table('riders')->where('id', $rider->id)->update(['phone' => $phone ?: $rider->phone, 'last_used_at' => now(), 'updated_at' => now()])
+            : DB::table('riders')->insert(['name' => $name, 'phone' => $phone, 'last_used_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    /** The wrong rider picked: another one, while nothing has been given yet (after that the record stands). */
+    public function rider(int $session, Request $request): RedirectResponse
+    {
+        $data = $request->validate(['rider_name' => ['required', 'string', 'max:100'], 'rider_phone' => ['nullable', 'string', 'max:20']]);
+        $s = DB::table('handover_sessions')->find($session);
+        abort_unless($s && ! $s->closed_at, 422, __('This handover is closed.'));
+        abort_if(DB::table('scan_logs')->where('handover_session_id', $session)->where('result', 'ok')->exists(), 422, __('Parcels were already given to this rider.'));
+        $this->remember($data['rider_name'], $data['rider_phone'] ?? null);
+        DB::table('handover_sessions')->where('id', $session)->update(['rider_name' => trim($data['rider_name']), 'rider_phone' => Phone::normalize($data['rider_phone'] ?? null)]);
+
+        return redirect()->route('handover.show', $session);
+    }
+
     public function show(int $session, Request $request): View
     {
         $s = DB::table('handover_sessions')->find($session);
         abort_unless($s, 404);
         if ($this->simple($request->user())) {
-            return view('handover.simple', ['session' => $s, 'riders' => collect(), 'packers' => $this->packers($session)] + $this->manifestData($session));
+            return view('handover.simple', ['session' => $s, 'riders' => $s->closed_at ? collect() : $this->riders(), 'packers' => $this->packers($session)] + $this->manifestData($session));
         }
 
         return view('handover.show', ['session' => $s] + $this->manifestData($session));
@@ -136,8 +166,14 @@ class HandoverController extends Controller
                 ->update(['pickup_date' => today()->addDay()]);
         }
 
-        // A packer stays on the same page: the summary and the slips to print for the rider to sign.
-        return $this->simple($request->user()) ? redirect()->route('handover.show', $session) : redirect()->route('handover.manifest', $session);
+        // A packer stays on the same page: the summary and the slips to print for the rider to sign. Nothing given: no slip, a new one starts.
+        if ($this->simple($request->user())) {
+            $given = DB::table('scan_logs')->where('handover_session_id', $session)->where('result', 'ok')->exists();
+
+            return $given ? redirect()->route('handover.show', $session) : redirect()->route('handover.index');
+        }
+
+        return redirect()->route('handover.manifest', $session);
     }
 
     /**

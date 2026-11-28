@@ -606,6 +606,30 @@ class PackagingTest extends TestCase
         $this->get('/handover')->assertOk()->assertSee('Last handover: Rafiq');
     }
 
+    public function test_an_open_handover_from_an_earlier_day_is_finished_before_a_new_one_and_the_rider_changes_until_a_parcel_is_given(): void
+    {
+        $a = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);
+        $this->actingAs($this->packer);
+        $this->packIt($a);
+        $old = DB::table('handover_sessions')->insertGetId(['courier' => 'steadfast', 'pickup_date' => today()->subDays(3), 'rider_name' => 'Ashraf',
+            'started_by' => $this->packer->id, 'started_at' => now()->subDays(3)]);
+
+        // Not walked into: shown, and finished first.
+        $this->get('/handover')->assertOk()->assertSee('Not finished:')->assertSee('Ashraf')->assertSee('Close, nothing given');
+        $this->post('/handover', ['rider_name' => 'Rafiq'])->assertRedirect('/handover')->assertSessionHas('error');
+        $this->assertSame(1, DB::table('handover_sessions')->count());
+        $this->post("/handover/{$old}/close")->assertRedirect('/handover'); // nothing given: no slip, straight to a new one
+        $this->get('/handover')->assertOk()->assertDontSee('Not finished:');
+
+        // The wrong rider: changed while nothing is given, not after.
+        $this->post('/handover', ['rider_name' => 'Rafiq']);
+        $session = DB::table('handover_sessions')->whereNull('closed_at')->value('id');
+        $this->post("/handover/{$session}/rider", ['rider_name' => 'Karim', 'rider_phone' => '01911111111'])->assertRedirect("/handover/{$session}");
+        $this->assertSame('Karim', DB::table('handover_sessions')->where('id', $session)->value('rider_name'));
+        $this->postJson("/handover/{$session}/scan", ['code' => $this->label($a->fresh())])->assertJson(['ok' => true]);
+        $this->post("/handover/{$session}/rider", ['rider_name' => 'Rafiq'])->assertStatus(422);
+    }
+
     public function test_handover_by_hand_runs_the_same_checks_and_is_marked_manual(): void
     {
         $good = $this->booked('01712345678', [['variant_id' => $this->dates->id, 'qty' => 1]]);

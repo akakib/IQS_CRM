@@ -84,6 +84,8 @@
             </div>
 
             @if ($open)
+                {{-- The earlier ones are reachable from here too (a handover in hand is the Handover home). --}}
+                <a href="{{ route('handover.index', ['show' => 'earlier']) }}" class="-mt-1 mb-3 block text-right text-sm font-medium text-blue-700">{{ __('Earlier handovers') }} ›</a>
                 <div id="hand-scan" class="mb-3"><x-scan-input quiet :placeholder="__('Scan, or type the order no')" @scan="handle($event.detail)" /></div>
                 {{-- The last scan, big: green given, red keep it aside (the reason in words). --}}
                 <div x-show="last" x-cloak class="mb-3 rounded-xl border-2 p-3"

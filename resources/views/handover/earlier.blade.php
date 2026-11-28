@@ -3,7 +3,7 @@
 <x-layouts.app :heading="__('Earlier handovers')">
     <form method="GET" x-ref="f" x-data class="mb-3 flex items-center gap-2">
         <input type="hidden" name="show" value="earlier">
-        <x-date-input name="day" :value="$day" :max="today()->subDay()->toDateString()" :placeholder="__('Pick a day')" size="md" @date-change="$nextTick(() => $refs.f.requestSubmit())" />
+        <x-date-input name="day" :value="$day" :max="today()->toDateString()" :placeholder="__('Pick a day')" size="md" @date-change="$nextTick(() => $refs.f.requestSubmit())" />
         @if ($day)<a href="{{ route('handover.index', ['show' => 'earlier']) }}" class="flex h-10 items-center rounded-xl border border-gray-300 px-3 text-sm text-gray-700">{{ __('Clear') }}</a>@endif
     </form>
 

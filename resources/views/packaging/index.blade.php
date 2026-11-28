@@ -293,7 +293,7 @@
             <input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
                 :checked="picked.length && @js($pageIds).every(id => picked.includes(id))"
                 @change="picked = $event.target.checked ? [...new Set([...picked, ...@js($pageIds)])] : picked.filter(id => !@js($pageIds).includes(id))">
-            {{ __('Select all on this page (:n)', ['n' => $queue->count()]) }}
+            <span x-text="picked.length && @js($pageIds).every(id => picked.includes(id)) ? @js(__('Unselect all')) : @js(__('Select all on this page (:n)', ['n' => $queue->count()]))">{{ __('Select all on this page (:n)', ['n' => $queue->count()]) }}</span>
         </label>
     @endif
     <div class="mt-3 space-y-2">

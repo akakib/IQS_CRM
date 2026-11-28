@@ -230,6 +230,14 @@ window.IqsPrint = (() => {
         })), name);
     }
     // The handover slip on 76 mm paper: who took the parcels, each parcel with its COD, the total, and a line for the rider to sign.
+    // Right-aligned money: an iPhone ignores right alignment for text with the ৳ sign (it drew it off the paper), so the
+    // place is worked out here: the digits measured on their own, the sign put just before them.
+    function money(g, t, R, y) {
+        g.textAlign = 'left'; const m = /^(.*?)৳(.*)$/.exec(t);
+        if (!m) { g.fillText(t, R - g.measureText(t).width, y); return; }
+        const num = m[2], wn = g.measureText(num).width, wt = g.measureText('৳').width || 16, wp = m[1] ? g.measureText(m[1]).width : 0;
+        g.fillText(num, R - wn, y); g.fillText('৳', R - wn - wt, y); if (m[1]) g.fillText(m[1], R - wn - wt - wp, y);
+    }
     function slip(h) {
         const W = 576, [c, g] = canvas(W, 520 + h.parcels.length * 80), L = 8, R = W - 8; let y = 10;
         g.textAlign = 'center'; g.font = 'bold 40px Arial'; g.fillText('HANDOVER', W / 2, y); y += 50;
@@ -238,11 +246,11 @@ window.IqsPrint = (() => {
         g.fillRect(L, y + 4, R - L, 3); y += 18;
         h.parcels.forEach((p, n) => {
             for (let x = L; x < R; x += 14) g.fillRect(x, y, 8, 2); y += 10;
-            g.font = 'bold 28px Arial'; g.fillText((n + 1) + '. ' + p.no, L, y); g.textAlign = 'right'; g.fillText(p.cod, R, y); g.textAlign = 'left'; y += 34;
+            g.font = 'bold 28px Arial'; g.fillText((n + 1) + '. ' + p.no, L, y); money(g, p.cod, R, y); y += 34;
             g.font = '20px Arial'; g.fillText(p.area, L + 34, y); if (p.cn) { g.font = 'bold 20px Arial'; g.textAlign = 'right'; g.fillText('CN ' + p.cn, R, y); g.textAlign = 'left'; } y += 32;
         });
         g.fillRect(L, y, R - L, 3); y += 14;
-        g.font = 'bold 28px Arial'; g.fillText(h.count, L, y); g.textAlign = 'right'; g.fillText(h.total, R, y); g.textAlign = 'left'; y += 60;
+        g.font = 'bold 28px Arial'; g.fillText(h.count, L, y); money(g, h.total, R, y); y += 60;
         g.font = '22px Arial'; g.fillText('Rider signature: ______________________', L, y); y += 50; g.fillText('Given by: ' + h.by, L, y); y += 40;
         const [out, og] = canvas(W, y); og.drawImage(c, 0, 0); return out;
     }

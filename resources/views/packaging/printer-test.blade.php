@@ -34,10 +34,10 @@
 <script>
 function printerTest() {
     // Write services that Bluetooth LE label and receipt printers commonly use.
-    const SERVICES = [0x18f0, 0xff00, 0xfee7, 0xffe0, 0xae30, 0xfff0, 0xffb0, 0x1101,
-        '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '0000ff00-0000-1000-8000-00805f9b34fb'];
+    // Receipt printers (Rongta and the like) mostly use the first two; label printers the short ones.
+    const SERVICES = ['49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', 0x18f0, 0xff00, 0xfee7, 0xffe0, 0xae30, 0xfff0, 0xffb0];
     return {
-        supported: !!navigator.bluetooth, usb: !!navigator.usb, busy: false, invert: false,
+        supported: !!navigator.bluetooth, usb: !!navigator.usb, busy: false, invert: false, step: '',
         printers: [
             { key: 'sticker', name: 'Sticker printer (Ruyi BT-58TSC)', hint: '51 x 76 mm sticker, TSPL', msg: '', ok: false },
             { key: 'receipt', name: 'Receipt printer (Rongta RP328)', hint: '80 mm roll (76 mm print), ESC/POS', msg: '', ok: false },
@@ -51,19 +51,41 @@ function printerTest() {
                 catch (e) { last = e; server = null; try { device.gatt.disconnect(); } catch (x) {} await new Promise(r => setTimeout(r, 1200 * t)); }
             }
             if (!server) throw new Error((last && last.message ? last.message : 'Could not connect') + '\nTurn the printer off and on, remove it from the phone Bluetooth settings if it is paired there, close its app, then try again.');
-            for (const s of await server.getPrimaryServices()) {
-                for (const c of await s.getCharacteristics()) {
-                    if (c.properties.write || c.properties.writeWithoutResponse) return { device, c };
+            this.step = 'connected';
+            // The known printer services first, one by one (asking for all at once fails on some Android phones), then any other.
+            const found = [];
+            for (const uuid of SERVICES) {
+                try { found.push(await server.getPrimaryService(uuid)); } catch (e) {}
+            }
+            if (!found.length) {
+                this.step = 'looking for services';
+                try { found.push(...await server.getPrimaryServices()); } catch (e) { throw new Error('Connected, but could not read the printer (' + (e.message || e) + '). Turn the printer off and on and try again.'); }
+            }
+            const writers = [];
+            for (const s of found) {
+                try { for (const c of await s.getCharacteristics()) if (c.properties.write || c.properties.writeWithoutResponse) writers.push(c); } catch (e) {}
+            }
+            if (!writers.length) throw new Error('Connected to ' + (device.name || 'the printer') + ', but it has no way to send print data.');
+            this.step = 'found ' + writers.length + ' way(s) to send';
+            return { device, writers };
+        },
+        // Small pieces: 180 bytes, or 20 when the printer will not take bigger ones; each way to send in turn until one works.
+        async send(writers, bytes) {
+            let last = null;
+            for (const [n, c] of writers.entries()) {
+                for (const size of [180, 20]) {
+                    try {
+                        for (let i = 0; i < bytes.length; i += size) {
+                            const part = bytes.slice(i, i + size);
+                            c.properties.writeWithoutResponse ? await c.writeValueWithoutResponse(part) : await c.writeValue(part);
+                            await new Promise(r => setTimeout(r, size === 20 ? 8 : 25));
+                        }
+                        this.step = 'sent (way ' + (n + 1) + ', ' + size + ' bytes a piece)';
+                        return;
+                    } catch (e) { last = e; this.step = 'sending failed (way ' + (n + 1) + ', ' + size + ' bytes)'; }
                 }
             }
-            throw new Error('Connected to ' + (device.name || 'the printer') + ', but it has no way to send print data.');
-        },
-        async send(c, bytes) {
-            for (let i = 0; i < bytes.length; i += 180) {
-                const part = bytes.slice(i, i + 180);
-                c.properties.writeWithoutResponse ? await c.writeValueWithoutResponse(part) : await c.writeValue(part);
-                await new Promise(r => setTimeout(r, 25));
-            }
+            throw last || new Error('Could not send.');
         },
         // A small test picture: IQS, a big CN, a Bangla name and address, the date.
         picture(wDots, hDots) {
@@ -122,13 +144,14 @@ function printerTest() {
         async run(p, kind) {
             this.busy = true; p.msg = 'Choose the printer in the list…'; p.ok = false;
             try {
-                const { device, c } = await this.writer();
+                this.step = 'choosing';
+                const { device, writers } = await this.writer();
                 p.msg = 'Sending to ' + (device.name || 'the printer') + '…';
-                await this.send(c, p.key === 'sticker' ? this.tspl(kind) : this.escpos(kind));
-                p.ok = true; p.msg = 'Sent to ' + (device.name || 'the printer') + '. Did it print? Send a photo of the paper.';
+                await this.send(writers, p.key === 'sticker' ? this.tspl(kind) : this.escpos(kind));
+                p.ok = true; p.msg = 'Sent to ' + (device.name || 'the printer') + ' (' + this.step + '). Did it print? Send a photo of the paper.';
                 device.gatt.disconnect();
             } catch (e) {
-                p.msg = e.name === 'NotFoundError' ? 'No printer chosen, or it was not in the list. Not in the list = it does not speak Bluetooth LE.' : (e.message || String(e));
+                p.msg = e.name === 'NotFoundError' ? 'No printer chosen, or it was not in the list. Not in the list = it does not speak Bluetooth LE.' : (e.message || String(e)) + '\nStep: ' + this.step;
             }
             this.busy = false;
         },

@@ -603,7 +603,7 @@ class PackagingTest extends TestCase
 
         $this->post("/handover/{$session}/close")->assertRedirect("/handover/{$session}");
         $this->get("/handover/{$session}")->assertOk()->assertSee('Slip PDF')->assertSee('A4 print')->assertSee('stays for the next pickup');
-        $this->get('/handover')->assertOk()->assertSee('Last handover: Rafiq');
+        $this->get('/handover')->assertOk()->assertSee("Today's handovers")->assertSee('Rafiq')->assertSee('1 parcel');
     }
 
     public function test_an_open_handover_from_an_earlier_day_is_finished_before_a_new_one_and_the_rider_changes_until_a_parcel_is_given(): void

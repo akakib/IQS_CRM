@@ -104,8 +104,17 @@
                 <div>
                     <button type="button" @click="pick = true" :disabled="!ready.length || @js((bool) $stale)" class="mb-3 flex h-14 w-full items-center justify-center rounded-xl bg-primary text-lg font-semibold text-white disabled:opacity-40">
                         <svg class="mr-2 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>{{ __('Scan') }}</button>
-                    @if ($last)
-                        <a href="{{ route('handover.show', $last->id) }}" class="-mt-1 mb-3 block text-center text-sm text-blue-700 underline">{{ __('Last handover: :r, :t (print again)', ['r' => $last->rider_name ?? __('Rider'), 't' => \Illuminate\Support\Carbon::parse($last->closed_at)->format('g:i A')]) }}</a>
+                    @if ($last->isNotEmpty())
+                        {{-- Today's handovers: tap one to see it and print its slip again. --}}
+                        <div class="mb-3 rounded-2xl border border-gray-200 bg-white">
+                            <p class="border-b border-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">{{ __("Today's handovers") }}</p>
+                            @foreach ($last as $h)
+                                <a href="{{ route('handover.show', $h->id) }}" class="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2.5 last:border-0">
+                                    <span class="min-w-0 truncate text-base font-medium text-gray-900">{{ $h->rider_name ?? __('Rider') }} <span class="text-sm font-normal text-gray-500">{{ \Illuminate\Support\Carbon::parse($h->closed_at)->format('g:i A') }}</span></span>
+                                    <span class="shrink-0 text-sm text-gray-600">{{ trans_choice(':count parcel|:count parcels', $h->parcels) }} <span class="text-blue-700">{{ __('Print') }} ›</span></span>
+                                </a>
+                            @endforeach
+                        </div>
                     @endif
                 </div>
             @endif

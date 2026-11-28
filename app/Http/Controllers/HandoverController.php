@@ -45,8 +45,9 @@ class HandoverController extends Controller
                 $stale->given = DB::table('scan_logs')->where('handover_session_id', $stale->id)->where('result', 'ok')->count();
             }
 
-            // The last one finished today: its slip can be printed again (torn, lost).
-            $last = DB::table('handover_sessions')->whereNotNull('closed_at')->whereDate('closed_at', today())->orderByDesc('id')->first(['id', 'rider_name', 'closed_at']);
+            // Today's finished handovers: any slip can be printed again (torn, lost). Earlier days are for a manager.
+            $last = DB::table('handover_sessions as s')->whereNotNull('s.closed_at')->whereDate('s.closed_at', today())->orderByDesc('s.id')
+                ->selectRaw("s.id, s.rider_name, s.closed_at, (SELECT COUNT(*) FROM scan_logs l WHERE l.handover_session_id = s.id AND l.result = 'ok') as parcels")->get();
 
             return view('handover.simple', ['session' => null, 'riders' => $this->riders(), 'last' => $last, 'stale' => $stale] + $this->manifestData(0));
         }

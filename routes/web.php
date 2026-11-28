@@ -251,6 +251,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/packaging/orders/{order}', [PackagingController::class, 'preview'])->name('packaging.preview');
         Route::get('/packaging/batches/{batch}', [PackagingController::class, 'batch'])->whereNumber('batch')->name('packaging.batch');
         Route::get('/packaging/batches/{batch}/list', [PackagingController::class, 'batchList'])->whereNumber('batch')->name('packaging.batch-list');
+        Route::view('/packaging/printer-test', 'packaging.printer-test')->name('packaging.printer-test');
         Route::post('/packaging/report', [PackagingController::class, 'report'])->name('packaging.report');
         Route::get('/packaging/issues', [PackagingController::class, 'issues'])->name('packaging.issues');
         Route::get('/returns', [\App\Http\Controllers\ReturnController::class, 'index'])->name('returns.index');

@@ -29,7 +29,7 @@
         $places = collect([
             ['Packaging', route('packaging.index'), request()->routeIs('packaging.*'), null, 'box'],
             ['Handover', route('handover.index'), request()->routeIs('handover.*'), null, 'swap'],
-            ['Stock', route('products.stock'), request()->routeIs('products.stock*'), 'products.view', 'stock'],
+            ['Stock', route('products.stock', ['show' => 'out']), request()->routeIs('products.stock*'), 'products.view', 'stock'], // Out of stock first
         ])->filter(fn ($p) => $can($p[3]))->values();
     }
     // Orders in their hand to work now (new and record verified): one indexed count, only for who takes orders.
